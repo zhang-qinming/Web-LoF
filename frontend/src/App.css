@@ -1,0 +1,377 @@
+/* App.css — 精简与结构化
+   结构:
+   1) 主题变量
+   2) 基础重置
+   3) 布局容器
+   4) Header 与导航
+   5) 内容/卡片/排版
+   6) 表格/表单/按钮
+   7) 工具类
+   8) 动画与滚动条
+   9) 响应式
+   10) 移动端汉堡导航（按钮不遮挡菜单）
+
+   清理说明:
+   - 保留 :focus-visible 高可见度焦点，未使用 outline: none
+   - 去重/合并重复规则与动画；抽屉左右由修饰类控制（不在基础类强制 left/right）
+   - 移除无效/冗余属性（如重复的 border-radius 等）
+*/
+
+/* 1) 主题变量 */
+:root {
+    --bg: #f5f7fb;                 /* 页面背景 */
+    --card: #fff;                  /* 卡片/主容器 */
+    --muted: #6b7280;              /* 次要文字 */
+    --text: #0f1724;               /* 主文本 */
+    --accent: #2563eb;             /* 强调色 */
+    --radius: 10px;                /* 统一圆角 */
+    --max-width: 1600px;           /* 页面最大宽度 */
+    --transition: all 0.2s ease;   /* 通用过渡 */
+    --focus: rgba(37, 99, 235, 0.14); /* 焦点高亮 */
+}
+
+/* 2) 基础重置 */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+
+body {
+    margin: 0;
+    font-family: Inter, UI-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: linear-gradient(180deg, var(--bg) 0%, #eef4fb 100%) fixed;
+}
+
+/* 3) 布局容器 */
+.app-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.main {
+    width: 100%;
+    max-width: var(--max-width);
+    padding: 12px 24px 16px;
+    margin: 12px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    flex: 1;
+}
+
+/* 4) Header 与导航（用 padding 控高，不用固定 height） */
+.header {
+    width: 100%;
+    background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.7));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(15, 23, 36, 0.06);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    padding: 6px 16px;  /* 调整此值实现“紧凑头部” */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+}
+
+.nav {
+    width: 100%;
+    max-width: var(--max-width);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    text-decoration: none;
+    color: var(--muted);
+    font-weight: 600;
+    border-radius: 8px;
+    transition: var(--transition);
+    white-space: nowrap;
+    font-size: 14px;
+    background: transparent;
+}
+
+.nav-link svg {
+    width: 15px;
+    height: 15px;
+    opacity: 0.95;
+    transition: var(--transition);
+}
+
+.nav-link:hover {
+    color: var(--text);
+    transform: translateY(-1px);
+    background: rgba(37, 99, 235, 0.06);
+}
+.nav-link:hover svg { opacity: 1; transform: scale(1.1); }
+
+.nav-link:focus-visible,
+.button:focus-visible,
+.input:focus-visible,
+.select:focus-visible {
+    box-shadow: 0 0 0 3px var(--focus);
+    border-color: var(--accent);
+}
+
+.nav-link.active {
+    color: #fff;
+    background-color: var(--accent);
+}
+
+/* 5) 内容/卡片/排版 */
+.card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 20px;
+    border: 1px solid rgba(15, 23, 36, 0.06);
+    box-shadow: 0 6px 18px rgba(15, 23, 36, 0.04);
+    transition: var(--transition);
+}
+.card:hover {
+    box-shadow: 0 8px 25px rgba(15, 23, 36, 0.07);
+    transform: translateY(-2px);
+}
+
+.footer {
+    margin-top: 40px;
+    padding: 14px 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    width: 100%;
+    border-top: 1px solid rgba(15, 23, 36, 0.06);
+}
+
+/* 排版 */
+h1, h2, h3 {
+    margin: 0 0 8px;
+    font-weight: 700;
+    color: var(--text);
+}
+h1 { font-size: 28px; margin-bottom: 16px; }
+h2 { font-size: 22px; margin-bottom: 12px; }
+
+p {
+    margin: 0 0 12px;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+/* 404 页面 */
+.not-found { text-align: center; padding: 40px 20px; }
+.not-found h1 { font-size: 36px; color: var(--muted); margin-bottom: 16px; }
+.not-found p { font-size: 18px; margin-bottom: 30px; }
+
+/* 6) 表格/表单/按钮 */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    overflow: hidden;
+    border-radius: 8px;
+    margin: 16px 0;
+}
+.table thead tr { background: rgba(15, 23, 36, 0.02); }
+.table th, .table td {
+    padding: 12px 14px;
+    text-align: left;
+    border-bottom: 1px solid rgba(15, 23, 36, 0.04);
+    color: var(--text);
+    font-size: 14px;
+}
+.table th { font-weight: 600; }
+.table tbody tr:hover { background: rgba(37, 99, 235, 0.02); }
+
+.input, .select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 36, 0.06);
+    background: var(--card);
+    color: var(--text);
+    transition: var(--transition);
+    font-family: inherit;
+}
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 6px 14px rgba(37, 99, 235, 0.12);
+    transition: var(--transition);
+    font-family: inherit;
+    font-size: 14px;
+}
+.button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+}
+.button.ghost {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid rgba(37, 99, 235, 0.12);
+    box-shadow: none;
+}
+.button.ghost:hover {
+    background: rgba(37, 99, 235, 0.06);
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.1);
+}
+
+/* 7) 工具类 */
+.helper { font-size: 13px; color: var(--muted); }
+.row { display: flex; gap: 12px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.center { display: flex; align-items: center; justify-content: center; flex-direction: column; }
+
+pre, code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+    background: rgba(15, 23, 36, 0.02);
+    padding: 8px 10px;
+    border-radius: 6px;
+    overflow: auto;
+    font-size: 14px;
+}
+
+/* 8) 动画与滚动条 */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.main > * { animation: fadeInUp 0.3s ease forwards; }
+
+/* 滚动条（WebKit） */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(15, 23, 36, 0.02); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(15, 23, 36, 0.1); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 36, 0.2); }
+
+/* 9) 响应式 */
+@media (max-width: 880px) {
+    .nav {
+        overflow-x: auto;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+    }
+    .nav-link { padding: 8px 12px; font-size: 13px; }
+    .main { padding: 16px 16px 100px; }
+    .card { padding: 16px; }
+    .hidden-mobile { display: none !important; } /* 移动端隐藏 */
+}
+@media (max-width: 520px) {
+    .nav { gap: 4px; }
+    .nav-link { font-size: 12px; padding: 6px 8px; }
+    h1 { font-size: 20px; }
+    h2 { font-size: 18px; }
+    .table { font-size: 12px; }
+    .table th, .table td { padding: 8px 10px; }
+}
+@media (min-width: 881px) {
+    .visible-mobile { display: none !important; } /* 桌面端隐藏仅移动端显示元素 */
+}
+
+/* 10) 移动端汉堡导航（按钮>菜单>遮罩，菜单与按钮相反侧停靠） */
+
+/* 默认按钮：小巧可拖拽；具体位置由 JS translate3d 控制 */
+.hamburger-btn {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    z-index: 200; /* 高于菜单和遮罩 */
+    transition: transform .18s ease-out, box-shadow .2s ease, background-color .2s ease;
+    background: rgba(37, 99, 235, 0.06);
+    color: var(--text);
+    border: 1px solid rgba(15, 23, 36, 0.06);
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+.hamburger-btn:hover { background-color: var(--card); }
+.hamburger-btn.dragging { cursor: grabbing; transition: none; }
+
+.hamburger-btn-inner { display: inline-block; will-change: transform; }
+@keyframes btnPulse { 0%{transform:scale(1)}40%{transform:scale(.92)}100%{transform:scale(1)} }
+.hamburger-btn-inner.pulse { animation: btnPulse .18s ease-out; }
+
+/* 遮罩 */
+.hamburger-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 120;
+    animation: fadeOverlayIn .18s ease-out;
+}
+@keyframes fadeOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOverlayOut { from { opacity: 1; } to { opacity: 0; } }
+.hamburger-overlay.closing { animation: fadeOverlayOut .16s ease-in forwards; }
+
+/* 抽屉基础：不预设 left/right，由修饰类决定展开侧 */
+.hamburger-nav {
+    position: fixed;
+    top: 0;
+    width: 76%;
+    max-width: 420px;
+    height: 100%;
+    background: var(--card);
+    padding: 16px 12px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px 10px;
+    align-content: start;
+    z-index: 140; /* 低于按钮，高于遮罩 */
+    box-shadow: 0 10px 30px rgba(0,0,0,.15);
+}
+
+/* 展开侧：与按钮贴靠侧相反（避免按钮被遮挡） */
+@keyframes slideInLeft  { from { transform: translateX(-100%);} to { transform: translateX(0);} }
+@keyframes slideOutLeft { from { transform: translateX(0);}     to { transform: translateX(-100%);} }
+@keyframes slideInRight { from { transform: translateX(100%);}  to { transform: translateX(0);} }
+@keyframes slideOutRight{ from { transform: translateX(0);}     to { transform: translateX(100%);} }
+
+.hamburger-nav.side-left  { left: 0;  animation: slideInLeft  .18s ease-out; }
+.hamburger-nav.side-right { right: 0; animation: slideInRight .18s ease-out; box-shadow: -4px 0 16px rgba(0,0,0,.12); }
+
+.hamburger-nav.closing.side-left  { animation: slideOutLeft  .16s ease-in forwards; }
+.hamburger-nav.closing.side-right { animation: slideOutRight .16s ease-in forwards; }
+
+/* 可选：移动端“顶栏占位”按钮容器（如果使用） */
+@media (max-width: 880px) {
+    .mobile-header {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        background: transparent;
+        border: 0;
+        padding: 0;
+        z-index: 98;
+    }
+}
