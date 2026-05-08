@@ -1,7 +1,6 @@
-name: gwas-browser
+name: Web-LoF
 channels:
   - conda-forge
   - nodefaults
 dependencies:
   - nodejs=22
-  - npm
