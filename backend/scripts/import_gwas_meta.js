@@ -221,10 +221,23 @@ async function insertBatch(pool, rows) {
         await pool.query(sql, values);
     } catch (err) {
         console.error('Batch insert failed:', err.message);
-        // 逐行重试以跳过坏行
+        // 逐行重试：每次只插一行，用单行 SQL
+        const singleSql = `INSERT INTO gwas_meta (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})
+                           ON DUPLICATE KEY UPDATE
+                               trait = VALUES(trait), mesh_term = VALUES(mesh_term),
+                               mesh_id = VALUES(mesh_id), sample_size = VALUES(sample_size),
+                               n_case = VALUES(n_case), n_control = VALUES(n_control),
+                               population = VALUES(population), first_author = VALUES(first_author),
+                               pmid = VALUES(pmid), year = VALUES(year),
+                               n_variants = VALUES(n_variants), n_sig = VALUES(n_sig),
+                               qc_score = VALUES(qc_score), if_ukb = VALUES(if_ukb),
+                               collect_date = VALUES(collect_date), url = VALUES(url),
+                               file_path = VALUES(file_path), mesh_source = VALUES(mesh_source),
+                               source_batch = VALUES(source_batch)`;
         for (const row of rows) {
             try {
-                await pool.query(sql, row);
+                const vals = cols.map(c => row[c] || null);
+                await pool.query(singleSql, vals);
             } catch (e) {
                 console.error(`  Skipping row ${row.gwas_id}: ${e.message}`);
             }
@@ -233,16 +246,27 @@ async function insertBatch(pool, rows) {
 }
 
 // ============================================================
-// 将 gwas_meta 中的 trait 同步到 file_metadata
+// 将 gwas_meta.gwas_id 匹配到 file_metadata.gwas_id，同步 trait_name 和 file_id
 async function syncTraitNames(pool, source) {
-    const [result] = await pool.query(
+    // 先补齐 gwas_meta.file_id（通过 gwas_id 关联到 file_metadata）
+    const [a] = await pool.query(
+        `UPDATE gwas_meta gm
+         JOIN file_metadata fm ON fm.gwas_id = gm.gwas_id
+         SET gm.file_id = fm.file_id
+         WHERE gm.file_id IS NULL AND gm.source_batch = ?`,
+        [source]
+    );
+    console.log(`  Linked ${a.affectedRows} gwas_meta rows to file_metadata.`);
+
+    // 再把 trait 名同步到 file_metadata
+    const [b] = await pool.query(
         `UPDATE file_metadata fm
-         JOIN gwas_meta gm ON fm.file_id = gm.gwas_id
+         JOIN gwas_meta gm ON gm.gwas_id = fm.gwas_id
          SET fm.trait_name = gm.trait
          WHERE gm.trait IS NOT NULL AND gm.source_batch = ?`,
         [source]
     );
-    console.log(`  Synced ${result.affectedRows} trait names to file_metadata.`);
+    console.log(`  Synced ${b.affectedRows} trait names to file_metadata.`);
 }
 
 // ============================================================
