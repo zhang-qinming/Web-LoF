@@ -1,0 +1,7 @@
+name: gwas-browser
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - nodejs=22
+  - npm
