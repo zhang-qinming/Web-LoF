@@ -9,6 +9,7 @@ import Trait from './routes/Trait.jsx';
 import Genes from './routes/Genes.jsx';
 import Variants from './routes/Variants.jsx';
 import Browse from './routes/Browse.jsx';
+import Programs from './routes/Programs.jsx';
 
 function NotFound() {
     return <h1>404 - Page Not Found</h1>;
@@ -42,6 +43,7 @@ function App() {
                         <Route path="/genes" element={<Genes />} />
                         <Route path="/variants" element={<Variants />} />
                         <Route path="/browse" element={<Browse />} />
+                        <Route path="/programs" element={<Programs />} />
                         <Route path="*" element={<NotFound />} />
                     </Routes>
                     <footer className="footer">

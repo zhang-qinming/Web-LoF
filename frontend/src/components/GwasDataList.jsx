@@ -156,10 +156,10 @@ function TraitRow({row, index, columns}) {
         }}
     >
         {columns.map((col) => (<TableCell key={col.id} align={col.numeric ? "right" : "left"}>
-            {col.id === "Trait" ? (// Trait列显示为链接，点击可跳转到详情页
+            {col.id === "trait_name" ? (// Trait列显示为链接，点击可跳转到详情页
                 <Link
                     component={RouterLink}
-                    to={`/trait/${encodeURIComponent(row[col.id])}`}
+                    to={`/trait/${encodeURIComponent(row.file_id)}`}
                     underline="none"
                     sx={{
                         display: 'inline-flex',

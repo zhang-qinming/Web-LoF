@@ -1,16 +1,18 @@
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
 const express = require("express");
 const cors = require("cors");
 const browse = require('./routes/Rbrowse');
 const trait = require('./routes/Rtrait');
+const program = require('./routes/Rprogram');
 const app = express();
-
 
 app.use(cors());
 app.use(express.json());
 
-// 路由
 app.use(browse);
 app.use(trait);
+app.use(program);
 
 // 启动服务
 const PORT = 4000;

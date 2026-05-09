@@ -1,22 +1,18 @@
-// Browse.jsx
-import React from "react";
-import GwasDataList from "../components/GwasDataList";
+import React from 'react';
+import GwasDataList from '../components/GwasDataList';
 
 export default function Browse() {
     const columns = [
-        { id: "Trait", label: "Trait" },
-        { id: "mesh_term", label: "Mesh Term" },
-        { id: "mesh_id", label: "Mesh ID" },
-        { id: "sample_size", label: "Sample Size" },
-        { id: "n_blocks", label: "n_blocks" },
-        { id: "n_variants", label: "n_variants" },
+        { id: 'file_id', label: 'File ID' },
+        { id: 'gwas_id', label: 'GWAS ID' },
+        { id: 'trait_name', label: 'Trait' },
     ];
 
     return (
         <GwasDataList
             title="Browse All Traits"
             columns={columns}
-            defaultSortBy="Trait"
+            defaultSortBy="trait_name"
             defaultOrder="ASC"
         />
     );

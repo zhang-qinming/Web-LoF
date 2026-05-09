@@ -44,6 +44,9 @@ CLAUDE.md
 *.sln
 *.sw?
 
+# Data files (local only)
+backend/data/
+
 # Windows
 Thumbs.db
 Desktop.ini
