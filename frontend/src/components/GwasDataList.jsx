@@ -28,14 +28,9 @@ import {fetcher} from "../api/gwas";
 import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, FormControl, Select, MenuItem,
     Box, Typography, Pagination, CircularProgress, TableSortLabel, Link, TextField,
-    Button, Chip, Card, CardHeader, CardContent, Alert,
-} from "@mui/material";
-import {
-    FilterList as FilterIcon,
-    Refresh as RefreshIcon,
-    Send as SendIcon,
-    TrendingUp as TrendingUpIcon
-} from "@mui/icons-material";
+    Chip, Card, CardContent, Alert, Button,
+} from '@mui/material';
+import { Send as SendIcon } from '@mui/icons-material';
 
 // 分页控制组件 - 用于显示分页导航
 function PaginationControl({totalPages, page, onChange}) {
@@ -156,26 +151,12 @@ function TraitRow({row, index, columns}) {
         }}
     >
         {columns.map((col) => (<TableCell key={col.id} align={col.numeric ? "right" : "left"}>
-            {col.id === "trait_name" ? (// Trait列显示为链接，点击可跳转到详情页
-                <Link
-                    component={RouterLink}
-                    to={`/trait/${encodeURIComponent(row.file_id)}`}
-                    underline="none"
-                    sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                        color: 'primary.main',
-                        fontWeight: 600,
-                        transition: 'color 0.2s',
-                        '&:hover': {
-                            color: 'primary.dark',
-                        },
-                    }}
-                >
-                    <TrendingUpIcon sx={{fontSize: 16}}/>
-                    {row[col.id]}
-                </Link>) : col.id === "Sample Size" ? (// Sample Size列显示为Chip组件，格式化数字
+            {col.id === 'trait_name' ? (
+                <Link component={RouterLink} to={`/trait/${encodeURIComponent(row.file_id)}`}
+                    underline="hover"
+                    sx={{ color: '#2563eb', fontWeight: 500, fontSize: '0.85rem' }}>
+                    {String(row[col.id] || '').replace(/^["']+|["']+$/g, '')}
+                </Link>) : col.id === 'Sample Size' ? (// Sample Size列显示为Chip组件，格式化数字
                 <Chip
                     label={row[col.id]?.toLocaleString() || "-"}
                     size="small"
@@ -224,18 +205,14 @@ export default function GwasDataList({
     const apiUrl = traitName ? `/api/trait/${encodeURIComponent(traitName)}?page=${page}&limit=${limit}&sortBy=${sortBy}&order=${order}` : `/api/browse?page=${page}&limit=${limit}&sortBy=${sortBy}&order=${order}`;
 
     // 使用SWR获取数据，启用缓存和自动重新验证
-    const {data, error, isLoading, mutate} = useSWR(apiUrl, fetcher, {
+    const {data, error, isLoading} = useSWR(apiUrl, fetcher, {
         keepPreviousData: true, // 保持上一次数据以提供平滑过渡
         revalidateOnFocus: false, // 禁用焦点重新验证以减少请求
         revalidateOnReconnect: false, revalidateIfStale: false, refreshInterval: 0, shouldRetryOnError: false,
     });
 
 // 刷新数据
-    const handleRefresh = () => {
-        mutate();
-    };
-
-// 处理排序 - 重置到第一页
+    // 处理排序 - 重置到第一页
     const handleSort = useCallback((column) => {
         const isAsc = sortBy === column && order === "ASC";
         setOrder(isAsc ? "DESC" : "ASC");
@@ -273,88 +250,52 @@ export default function GwasDataList({
 
     return (<Box sx={{position: 'relative'}}>
         <Card elevation={0} sx={{
-            border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: 1, overflow: 'hidden',
+            border: '1px solid rgba(0,0,0,.06)', borderRadius: 2, overflow: 'hidden',
         }}>
-            <CardHeader
-                title={<Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-                    <Typography variant="h5" fontWeight="600" color="primary.main">
-                        {title}
+            {/* 分页控制栏 */}
+            <Box sx={{
+                px: 2, py: 1.5,
+                display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+                bgcolor: '#fafbfc', borderBottom: '1px solid #eef0f2',
+            }}>
+                {/* 左: Per page */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                        Per page
                     </Typography>
-                    {totalCount > 0 && (<Chip
-                        label={`Total ${totalCount.toLocaleString()} records`}
-                        color="primary"
-                        variant="filled"
-                        size="small"
-                    />)}
-                </Box>}
-                action={<Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-                    <Button
-                        startIcon={<RefreshIcon/>}
-                        onClick={handleRefresh}
-                        disabled={isLoading}
-                        variant="outlined"
-                        size="small"
-                        sx={{
-                            textTransform: "none",
-                            minWidth: 0,
-                            width: {xs: "100%", sm: "auto"},
-                            height: 40,
-                            px: 2,
-                            fontSize: 13,
-                        }}
-                    >
-                        Refresh
-                    </Button>
-                </Box>}
-                sx={{
-                    pb: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)', background: 'rgba(255, 255, 255, 0.9)',
-                }}
-            />
+                    <FormControl size="small" sx={{ minWidth: 70 }}>
+                        <Select value={limit} onChange={handleChangeLimit}
+                            sx={{ fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.6 } }}>
+                            {[5, 10, 20, 50, 100].map(v => (
+                                <MenuItem key={v} value={v} dense>{v}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
 
-            <CardContent sx={{p: 0}}>
-                {/* 控制栏 */}
-                <Box sx={{
-                    p: 2,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 2,
-                    background: 'rgba(245, 245, 245, 0.5)',
-                    borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-                }}>
-                    <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-                        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-                            <FilterIcon color="action" fontSize="small"/>
-                            <Typography variant="body2" color="text.secondary">
-                                Per page:
-                            </Typography>
-                            <FormControl size="small" sx={{minWidth: 80}}>
-                                <Select
-                                    value={limit}
-                                    onChange={handleChangeLimit}
-                                    sx={{borderRadius: 1}}
-                                >
-                                    {[5, 10, 20, 50, 100].map((val) => (<MenuItem key={val} value={val}>
-                                        {val}
-                                    </MenuItem>))}
-                                </Select>
-                            </FormControl>
-                        </Box>
+                {/* 中: Total */}
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                    {totalCount.toLocaleString()} records
+                </Typography>
 
-                        <JumpToPageControl
-                            totalPages={totalPages}
-                            page={page}
-                            onChange={(e, value) => setPage(value)}
-                        />
-                    </Box>
-
+                {/* 中右: 页码 */}
+                <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
                     <PaginationControl
                         totalPages={totalPages}
                         page={page}
                         onChange={(e, value) => setPage(value)}
                     />
                 </Box>
+
+                {/* 右: 跳转 */}
+                <JumpToPageControl
+                    totalPages={totalPages}
+                    page={page}
+                    onChange={(e, value) => setPage(value)}
+                />
+            </Box>
+
+            <CardContent sx={{p: 0}}>
 
                 {/* 表格容器 - 固定高度以防止loading时高度跳动 */}
                 <Box sx={{
@@ -364,7 +305,7 @@ export default function GwasDataList({
                         component={Paper}
                         elevation={0}
                         sx={{
-                            border: 'none', borderRadius: 0, maxHeight: 600, // 固定最大高度
+                            border: '1px solid rgba(0,0,0,.06)', borderRadius: 2, maxHeight: 600,
                             overflow: 'auto',
                         }}
                     >
@@ -373,28 +314,27 @@ export default function GwasDataList({
                                 <TableRow>
                                     {columns.map(({id, label, numeric}) => (<TableCell
                                         key={id}
-                                        align={numeric ? "right" : "left"}
+                                        align={numeric ? 'right' : 'left'}
                                         sx={{
-                                            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-                                            color: 'white',
-                                            fontSize: '0.875rem',
-                                            fontWeight: 600,
-                                            border: 'none',
-                                            py: 1.5, // 减小表头行高
+                                            background: '#f8f9fb',
+                                            color: '#444',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            letterSpacing: '0.03em',
+                                            textTransform: 'uppercase',
+                                            borderBottom: '2px solid #e8eaed',
+                                            py: 1.2,
                                         }}
                                     >
                                         <TableSortLabel
                                             active={sortBy === id}
-                                            direction={sortBy === id ? order.toLowerCase() : "asc"}
+                                            direction={sortBy === id ? order.toLowerCase() : 'asc'}
                                             onClick={() => handleSort(id)}
                                             sx={{
-                                                color: 'inherit', '&:hover': {
-                                                    color: 'rgba(255, 255, 255, 0.8)',
-                                                }, '&.Mui-active': {
-                                                    color: 'inherit',
-                                                }, '& .MuiTableSortLabel-icon': {
-                                                    color: 'inherit !important',
-                                                },
+                                                color: 'inherit',
+                                                '&:hover': { color: '#2563eb' },
+                                                '&.Mui-active': { color: '#2563eb', fontWeight: 700 },
+                                                '& .MuiTableSortLabel-icon': { color: '#2563eb !important' },
                                             }}
                                         >
                                             {label}

@@ -26,7 +26,7 @@
     --accent: #2563eb;             /* 强调色 */
     --radius: 10px;                /* 统一圆角 */
     --max-width: 1600px;           /* 页面最大宽度 */
-    --transition: all 0.2s ease;   /* 通用过渡 */
+    --transition: background 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s, opacity 0.2s;
     --focus: rgba(37, 99, 235, 0.14); /* 焦点高亮 */
 }
 
@@ -102,6 +102,7 @@ body {
     white-space: nowrap;
     font-size: 14px;
     background: transparent;
+    touch-action: manipulation;
 }
 
 .nav-link svg {
@@ -252,6 +253,14 @@ pre, code {
 }
 
 /* 8) 动画与滚动条 */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }

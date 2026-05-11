@@ -17,18 +17,17 @@ import React, {useCallback, useEffect, useRef, useState} from "react";
 import {NavLink} from "react-router-dom";
 import {
     FaHome, FaDna, FaListAlt, FaEnvelope,
-    FaFolderOpen, FaInfoCircle
-} from "react-icons/fa";
+    FaInfoCircle, FaProjectDiagram, FaFolderOpen,
+} from 'react-icons/fa';
 
-// 导航链接配置：路由地址 + 图标 + 文案
 const navLinks = [
-    {to: "/", icon: <FaHome/>, label: "Home"},
-    {to: "/trait", icon: <FaListAlt/>, label: "Trait"},
-    {to: "/genes", icon: <FaDna/>, label: "Genes"},
-    {to: "/variants", icon: <FaDna/>, label: "Variants"},
-    {to: "/browse", icon: <FaFolderOpen/>, label: "Browse"},
-    {to: "/contact", icon: <FaEnvelope/>, label: "Contact"},
-    {to: "/about", icon: <FaInfoCircle/>, label: "About"},
+    {to: '/', icon: <FaHome />, label: 'Home'},
+    {to: '/trait', icon: <FaListAlt />, label: 'Trait'},
+    {to: '/programs', icon: <FaProjectDiagram />, label: 'Programs'},
+    {to: '/genes', icon: <FaDna />, label: 'Genes'},
+    {to: '/data', icon: <FaFolderOpen />, label: 'Data'},
+    {to: '/contact', icon: <FaEnvelope />, label: 'Contact'},
+    {to: '/about', icon: <FaInfoCircle />, label: 'About'},
 ];
 
 export default function HamburgerMenu() {
@@ -206,14 +205,16 @@ export default function HamburgerMenu() {
         <>
             <button
                 ref={btnRef}
-                className={`hamburger-btn ${dragging ? "dragging" : ""}`}
+                className={`hamburger-btn ${dragging ? 'dragging' : ''}`}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
                 onClick={onButtonClick}
-                aria-label="Open menu"
-                style={{position: "fixed", top: 0, left: 0, zIndex: 200}} // 位置由 transform 驱动
+                aria-label={isOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={isOpen}
+                aria-controls="hamburger-nav"
+                style={{position: 'fixed', top: 0, left: 0, zIndex: 200}}
             >
                 <span className={`hamburger-btn-inner ${pulse ? "pulse" : ""}`}>☰</span>
             </button>
@@ -224,8 +225,9 @@ export default function HamburgerMenu() {
                     onClick={requestCloseMenu} // 点击遮罩关闭
                 >
                     <nav
-                        className={`hamburger-nav ${navSideClass}${isClosing ? " closing" : ""}`}
-                        onClick={(e) => e.stopPropagation()} // 阻止冒泡，避免点击菜单自身触发关闭
+                        id="hamburger-nav"
+                        className={`hamburger-nav ${navSideClass}${isClosing ? ' closing' : ''}`}
+                        onClick={(e) => e.stopPropagation()}
                     >
                         {navLinks.map((link) => (
                             <NavLink
