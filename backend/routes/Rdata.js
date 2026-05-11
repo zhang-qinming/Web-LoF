@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { ZipArchive } = require('archiver');
 const router = express.Router();
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
@@ -73,7 +74,21 @@ router.get('/api/data/download', (req, res) => {
     try {
         const fp = safePath(req.query.path || '');
         if (!fp) return res.status(403).json({ error: 'Forbidden' });
-        if (!fs.existsSync(fp) || fs.statSync(fp).isDirectory()) return res.status(404).send('Not found');
+        if (!fs.existsSync(fp)) return res.status(404).send('Not found');
+
+        // 文件夹 → zip
+        if (fs.statSync(fp).isDirectory()) {
+            const dirName = path.basename(fp);
+            res.setHeader('Content-Type', 'application/zip');
+            res.setHeader('Content-Disposition', `attachment; filename="${dirName}.zip"`);
+            const archive = new ZipArchive({ zlib: { level: 6 } });
+            archive.on('error', () => { res.status(500).end(); });
+            archive.pipe(res);
+            archive.directory(fp, dirName);
+            archive.finalize();
+            return;
+        }
+
         res.download(fp);
     } catch (err) {
         res.status(500).json({ error: err.message });
