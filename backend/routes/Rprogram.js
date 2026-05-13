@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const programModel = require('../models/Mprogram');
 const router = express.Router();
 
 const DATA_DIR = process.env.PROGRAM_DATA_DIR || path.join(__dirname, '..', 'data', 'program_regulator');
@@ -28,6 +29,16 @@ async function parseTSV(filePath) {
     }
     return rows;
 }
+
+// Program 注释信息（必须在 /:fileId 之前，否则 Express 把 /info 当成 :fileId）
+router.get('/api/programs/info', async (req, res) => {
+    try {
+        const map = await programModel.getProgramInfo();
+        res.json(map);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // 列出可用的 Program TSV
 router.get('/api/programs/list', (req, res) => {

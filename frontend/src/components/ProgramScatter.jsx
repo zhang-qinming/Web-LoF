@@ -107,6 +107,8 @@ export default function ProgramScatter({ fileId }) {
         fileId ? `/api/programs/${fileId}` : null,
         fetcher,
     );
+    const { data: infoData } = useSWR('/api/programs/info', fetcher);
+    const programInfo = infoData || {};
 
     const [mode, setMode] = useState(MODES.SCATTER);
     const [topN, setTopN] = useState(DEFAULT_TOP_N);
@@ -368,20 +370,25 @@ export default function ProgramScatter({ fileId }) {
             legendgroup: key,
             showlegend: true,
             hovertemplate: isRank
-                ? '<b>%{customdata[0]}</b><br>Prog Score: %{customdata[6]:.3f}  |  Reg Score: %{customdata[7]:.3f}<br>Prog P: %{customdata[1]:.2e}  |  Reg P: %{customdata[2]:.2e}<br>Prog γ=%{customdata[3]:.4f}  |  Reg β=%{customdata[4]:.4f}<br>Rank: Prog #%{customdata[8]}  Reg #%{customdata[9]}<br><b>%{customdata[5]}</b><extra></extra>'
-                : '<b>%{customdata[0]}</b><br>Prog Score: %{x:.3f}  (P: %{customdata[1]:.2e})<br>Reg Score: %{y:.3f}  (P: %{customdata[2]:.2e})<br>γ=%{customdata[3]:.4f}  β=%{customdata[4]:.4f}<br>Rank: Prog #%{customdata[8]}  Reg #%{customdata[9]}<br><b>%{customdata[5]}</b><extra></extra>',
-            customdata: pts.map((item) => ([
-                item.program,
-                item.progP,
-                item.regP,
-                item.progGamma,
-                item.regBeta,
-                LEGEND_LABELS[key],
-                item.progScore,
-                item.regScore,
-                item.rankProg,
-                item.rankReg,
-            ])),
+                ? '<b>%{customdata[0]}</b><br>%{customdata[10]}<br><br>Prog Score: %{customdata[6]:.3f}  |  Reg Score: %{customdata[7]:.3f}<br>Prog P: %{customdata[1]:.2e}  |  Reg P: %{customdata[2]:.2e}<br>Prog γ=%{customdata[3]:.4f}  |  Reg β=%{customdata[4]:.4f}<br>Rank: Prog #%{customdata[8]}  Reg #%{customdata[9]}<br><b>%{customdata[5]}</b><extra></extra>'
+                : '<b>%{customdata[0]}</b><br>%{customdata[10]}<br><br>Prog Score: %{x:.3f}  (P: %{customdata[1]:.2e})<br>Reg Score: %{y:.3f}  (P: %{customdata[2]:.2e})<br>γ=%{customdata[3]:.4f}  β=%{customdata[4]:.4f}<br>Rank: Prog #%{customdata[8]}  Reg #%{customdata[9]}<br><b>%{customdata[5]}</b><extra></extra>',
+            customdata: pts.map((item) => {
+                const info = programInfo[`P${item.program}`] || programInfo[item.program] || {};
+                const desc = info.Curated_annotation || '';
+                return [
+                    item.program,
+                    item.progP,
+                    item.regP,
+                    item.progGamma,
+                    item.regBeta,
+                    LEGEND_LABELS[key],
+                    item.progScore,
+                    item.regScore,
+                    item.rankProg,
+                    item.rankReg,
+                    desc,
+                ];
+            }),
         };
     }), [getBubbleSize, markerSize, mode, showLabels, visibleRowsByColor]);
 

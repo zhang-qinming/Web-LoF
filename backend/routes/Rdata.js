@@ -28,8 +28,10 @@ router.get('/api/data/list', (req, res) => {
         if (!fs.existsSync(full)) return res.status(404).json({ error: 'Not found' });
 
         const entries = fs.readdirSync(full, { withFileTypes: true });
+        const searchQ = (req.query.search || '').toLowerCase();
         const items = [];
         for (const e of entries) {
+            if (searchQ && !e.name.toLowerCase().includes(searchQ)) continue;
             const stat = fs.statSync(path.join(full, e.name));
             items.push({
                 name: e.name,
@@ -82,7 +84,9 @@ router.get('/api/data/download', (req, res) => {
             res.setHeader('Content-Type', 'application/zip');
             res.setHeader('Content-Disposition', `attachment; filename="${dirName}.zip"`);
             const archive = new ZipArchive({ zlib: { level: 6 } });
-            archive.on('error', () => { res.status(500).end(); });
+            archive.on('error', () => { 
+                if (!res.headersSent) res.status(500).end(); 
+            });
             archive.pipe(res);
             archive.directory(fp, dirName);
             archive.finalize();
@@ -90,6 +94,55 @@ router.get('/api/data/download', (req, res) => {
         }
 
         res.download(fp);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/api/data/search', async (req, res) => {
+    try {
+        const q = (req.query.q || '').toLowerCase();
+        if (!q || q.length < 2) return res.json({ results: [] });
+
+        const results = [];
+        
+        async function scan(dir, base) {
+            try {
+                const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+                for (const e of entries) {
+                    const rel = base ? `${base}/${e.name}` : e.name;
+                    if (e.name.toLowerCase().includes(q)) {
+                        let size = 0;
+                        if (e.isFile()) {
+                            try {
+                                const stat = await fs.promises.stat(path.join(dir, e.name));
+                                size = stat.size;
+                            } catch (err) {}
+                        }
+                        results.push({
+                            name: e.name,
+                            path: rel,
+                            type: e.isDirectory() ? 'dir' : 'file',
+                            size,
+                        });
+                    }
+                    if (e.isDirectory() && results.length < 100) {
+                        await scan(path.join(dir, e.name), rel);
+                    }
+                }
+            } catch (err) {
+                // Ignore permission or access errors during recursive scan
+            }
+        }
+        
+        try {
+            await fs.promises.access(DATA_DIR);
+            await scan(DATA_DIR, '');
+        } catch (err) {
+            // DATA_DIR doesn't exist
+        }
+        
+        res.json({ results: results.slice(0, 50) });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

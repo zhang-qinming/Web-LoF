@@ -15,6 +15,8 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
     const { data, error, isLoading } = useSWR(
         programId ? `/api/regulation/${programId}` : null, fetcher,
     );
+    const { data: infoData } = useSWR('/api/programs/info', fetcher);
+    const pinfo = (infoData && programId) ? (infoData[`P${programId}`] || infoData[programId]) : null;
 
     const plotElRef = useRef(null);
 
@@ -57,92 +59,164 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
     }, [top100Cutoff]);
 
     const CLASS_STYLE = {
-        nodata:      { color: '#ddd',   size: 5,  name: 'No data' },
-        ns:          { color: '#b0b0b0', size: 6,  name: 'Not significant' },
-        sig_up:      { color: '#FF7043', size: 8,  name: 'Up (p<0.05, |ES|>0.1)' },
-        sig_down:    { color: '#42A5F5', size: 8,  name: 'Down (p<0.05, |ES|>0.1)' },
-        top100_up:   { color: '#D84315', size: 10, name: `Top 100 up` },
-        top100_down: { color: '#1565C0', size: 10, name: `Top 100 down` },
+        nodata:      { color: '#ddd',     hoverBg: 'rgba(220,220,220,0.35)', size: 4,  name: 'No data' },
+        ns:          { color: '#b0b0b0',  hoverBg: 'rgba(176,176,176,0.25)', size: 6,  name: 'Not significant' },
+        sig_up:      { color: '#FF7043',  hoverBg: 'rgba(255,112,67,0.2)',   size: 8,  name: 'Up (p<0.05, |ES|>0.1)' },
+        sig_down:    { color: '#42A5F5',  hoverBg: 'rgba(66,165,245,0.2)',   size: 8,  name: 'Down (p<0.05, |ES|>0.1)' },
+        top100_up:   { color: '#D84315',  hoverBg: 'rgba(216,67,21,0.3)',    size: 10, name: 'Top 100 up' },
+        top100_down: { color: '#1565C0',  hoverBg: 'rgba(21,101,192,0.3)',   size: 10, name: 'Top 100 down' },
     };
 
-    // ---- Plotly 数据 ----
-    const plotData = useMemo(() => {
-        if (rows.length === 0) return [];
-        const grouped = {};
-        rows.forEach((r) => {
-            const cat = classify(r.es, r.p);
-            if (!grouped[cat]) grouped[cat] = { x: [], y: [], text: [], customdata: [] };
-            grouped[cat].x.push(r.es);
-            grouped[cat].y.push(r.negLogP);
-            grouped[cat].text.push(`${r.gene}<br>ES: ${r.es?.toFixed(4)}<br>P: ${r.p?.toExponential(2)}`);
-            grouped[cat].customdata.push([r.gene]);
-        });
+    // ---- 自动检测断轴 ----
+    const breakInfo = useMemo(() => {
+        if (rows.length === 0) return null;
+        const ys = rows.map(r => r.negLogP).filter(y => y != null && y > 0).sort((a, b) => b - a);
+        if (ys.length < 10) return null;
 
-        // 按指定顺序渲染，ns 在最底层
-        const order = ['ns', 'sig_down', 'sig_up', 'top100_down', 'top100_up', 'nodata'];
-        return order.map((cat) => {
-            const g = grouped[cat];
-            if (!g || g.x.length === 0) return { type: 'scatter', x: [], y: [], visible: false };
-            const s = CLASS_STYLE[cat];
+        // 寻找最大的相邻间隔（排序后）
+        let maxGap = 0, gapIdx = 0;
+        for (let i = 0; i < ys.length - 1; i++) {
+            const gap = ys[i] - ys[i + 1];
+            if (gap > maxGap) { maxGap = gap; gapIdx = i; }
+        }
+
+        const aboveGap = gapIdx + 1;           // gap 上方的点数
+        const p95 = ys[Math.floor(ys.length * 0.05)];
+
+        // 条件：上方点 ≤ 5 个 且 间隔 > 总范围的 25% 且 高于 p95 的 1.5 倍
+        if (aboveGap <= 5 && maxGap > (ys[0] - ys[ys.length - 1]) * 0.25 && ys[0] > p95 * 1.5) {
             return {
-                x: g.x, y: g.y,
-                mode: 'markers',
-                type: 'scatter',
-                marker: { size: s.size, color: s.color, opacity: 0.75, line: { width: 0 } },
-                text: g.text,
-                customdata: g.customdata,
-                hovertemplate: '%{text}<extra></extra>',
-                name: s.name,
-                showlegend: true,
+                threshold: (ys[gapIdx] + ys[gapIdx + 1]) / 2,
+                above: aboveGap,
             };
-        });
-    }, [rows, classify]);
+        }
+        return null;
+    }, [rows]);
 
-    const layout = useMemo(() => {
-        const maxY = Math.max(...rows.map(r => r.negLogP || 0), 5);
+    const titleText = `Program ${programId || ''}${pinfo?.curated_annotation ? ` — ${pinfo.curated_annotation}` : ''}`;
+
+    // ---- Plotly 数据 ----
+    const { plotData, layout } = useMemo(() => {
+        if (rows.length === 0) return { plotData: [], layout: {} };
         const absX = Math.max(...rows.map(r => Math.abs(r.es || 0)), 1);
+
+        const legendShown = new Set();
+        function buildTraces(dataRows, yaxisKey, isPrimary) {
+            const grouped = {};
+            dataRows.forEach((r) => {
+                const cat = classify(r.es, r.p);
+                if (!grouped[cat]) grouped[cat] = { x: [], y: [], text: [], customdata: [] };
+                grouped[cat].x.push(r.es);
+                grouped[cat].y.push(r.negLogP);
+                grouped[cat].text.push(`<b>${r.gene}</b><br>Effect size: ${r.es?.toFixed(4)}<br>P value: ${r.p?.toExponential(2)}`);
+                grouped[cat].customdata.push([r.gene]);
+            });
+            const order = ['ns', 'sig_down', 'sig_up', 'top100_down', 'top100_up', 'nodata'];
+            return order.map((cat) => {
+                const g = grouped[cat];
+                if (!g || g.x.length === 0) return { type: 'scatter', x: [], y: [], visible: false, yaxis: yaxisKey };
+                const s = CLASS_STYLE[cat];
+                const show = isPrimary && !legendShown.has(cat);
+                if (show) legendShown.add(cat);
+                return {
+                    x: g.x, y: g.y, mode: 'markers', type: 'scatter',
+                    marker: { size: s.size, color: s.color, opacity: 0.82, line: { width: 0 } },
+                    text: g.text, customdata: g.customdata,
+                    hovertemplate: '%{text}<extra></extra>',
+                    hoverlabel: { bgcolor: s.hoverBg, font: { color: '#333', size: 12 } },
+                    name: s.name, showlegend: show,
+                    legendgroup: cat,
+                    yaxis: yaxisKey,
+                };
+            });
+        }
+
+        if (breakInfo) {
+            const { threshold, above } = breakInfo;
+            const lowRows  = rows.filter(r => (r.negLogP || 0) <= threshold);
+            const highRows = rows.filter(r => (r.negLogP || 0) > threshold);
+            const maxLow  = Math.max(...lowRows.map(r => r.negLogP || 0), 5);
+            const maxHigh = Math.max(...highRows.map(r => r.negLogP || 0), threshold + 1);
+
+            // 上子图高度按孤立点数动态：5个点最多占30%，1个点只占12%
+            const hiRatio = Math.min(0.3, 0.06 + above * 0.05);
+            const botDom = 1 - hiRatio;
+
+            const plotData = [
+                ...buildTraces(lowRows, 'y', true),
+                ...buildTraces(highRows, 'y2', false),
+            ];
+
+            const layout = {
+                title: { text: titleText, font: { size: 16, color: '#333' }, x: 0.01 },
+                xaxis: { domain: [0, 1],
+                    range: [-absX * 1.1, absX * 1.1],
+                    zeroline: true, zerolinewidth: 1, zerolinecolor: '#999',
+                    showgrid: true, gridwidth: 0.5, gridcolor: '#eee', tickfont: { size: 11, color: '#666' } },
+                xaxis2: { domain: [0, 1], anchor: 'y2', matches: 'x', showticklabels: false,
+                    showgrid: true, gridwidth: 0.5, gridcolor: '#eee' },
+                yaxis: { domain: [0, botDom], anchor: 'x',
+                    title: { text: '−log₁₀(P-value)', font: { size: 13 } },
+                    range: [-0.5, maxLow * 1.05],
+                    showgrid: true, gridwidth: 0.5, gridcolor: '#eee', tickfont: { size: 11, color: '#666' } },
+                yaxis2: { domain: [botDom, 1], anchor: 'x2',
+                    range: [threshold - 1, maxHigh * 1.08],
+                    showgrid: true, gridwidth: 0.5, gridcolor: '#eee', tickfont: { size: 11, color: '#666' } },
+                hovermode: 'closest',
+                hoverlabel: { bgcolor: 'white', bordercolor: '#ccc', font: { size: 12 } },
+                margin: { l: 70, r: 30, t: 50, b: 50 },
+                plot_bgcolor: '#fafafa', paper_bgcolor: 'white',
+                showlegend: true,
+                legend: { x: 0.02, y: 0.95, xanchor: 'left', yanchor: 'top',
+                    bgcolor: 'rgba(255,255,255,0.85)', font: { size: 11 } },
+                shapes: [
+                    { type: 'line', xref: 'x', x0: 0.1, x1: 0.1, yref: 'paper', y0: 0, y1: 1,
+                      line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
+                    { type: 'line', xref: 'x', x0: -0.1, x1: -0.1, yref: 'paper', y0: 0, y1: 1,
+                      line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
+                    { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: -Math.log10(0.05), y1: -Math.log10(0.05),
+                      line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
+                ],
+            };
+            return { plotData, layout };
+        }
+
+        // 普通模式
+        const maxY = Math.max(...rows.map(r => r.negLogP || 0), 5);
         return {
-            title: {
-                text: `Gene Perturbation Effects — Program ${programId || ''}`,
-                font: { size: 16, color: '#333' },
-                x: 0.01,
+            plotData: buildTraces(rows, 'y', true),
+            layout: {
+                title: { text: titleText, font: { size: 16, color: '#333' }, x: 0.01 },
+                xaxis: { title: { text: 'Effect size (lm_es)', font: { size: 13 } },
+                    range: [-absX * 1.1, absX * 1.1],
+                    zeroline: true, zerolinewidth: 1, zerolinecolor: '#999',
+                    showgrid: true, gridwidth: 0.5, gridcolor: '#eee', tickfont: { size: 11, color: '#666' } },
+                yaxis: { title: { text: '−log₁₀(P-value)', font: { size: 13 } },
+                    range: [-0.5, maxY * 1.08],
+                    showgrid: true, gridwidth: 0.5, gridcolor: '#eee', tickfont: { size: 11, color: '#666' } },
+                hovermode: 'closest',
+                hoverlabel: { bgcolor: 'white', bordercolor: '#ccc', font: { size: 12 } },
+                margin: { l: 70, r: 30, t: 50, b: 50 },
+                plot_bgcolor: '#fafafa', paper_bgcolor: 'white',
+                showlegend: true,
+                legend: { x: 0.02, y: 0.98, xanchor: 'left', yanchor: 'top',
+                    bgcolor: 'rgba(255,255,255,0.85)', font: { size: 11 } },
+                shapes: [
+                    { type: 'line', xref: 'x', x0: 0.1, x1: 0.1, yref: 'paper', y0: 0, y1: 1,
+                      line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
+                    { type: 'line', xref: 'x', x0: -0.1, x1: -0.1, yref: 'paper', y0: 0, y1: 1,
+                      line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
+                    { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: -Math.log10(0.05), y1: -Math.log10(0.05),
+                      line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
+                ],
             },
-            xaxis: {
-                title: { text: 'Effect size (lm_es)', font: { size: 13 } },
-                range: [-absX * 1.1, absX * 1.1],
-                zeroline: true, zerolinewidth: 1, zerolinecolor: '#999',
-                showgrid: true, gridwidth: 0.5, gridcolor: '#eee',
-                tickfont: { size: 11, color: '#666' },
-            },
-            yaxis: {
-                title: { text: '−log₁₀(P-value)', font: { size: 13 } },
-                range: [-0.5, maxY * 1.08],
-                zeroline: false,
-                showgrid: true, gridwidth: 0.5, gridcolor: '#eee',
-                tickfont: { size: 11, color: '#666' },
-            },
-            hovermode: 'closest',
-            hoverlabel: { bgcolor: 'white', bordercolor: '#ccc', font: { size: 12 } },
-            margin: { l: 70, r: 30, t: 50, b: 50 },
-            plot_bgcolor: '#fafafa',
-            paper_bgcolor: 'white',
-            showlegend: true,
-            legend: { x: 0.02, y: 0.98, xanchor: 'left', yanchor: 'top',
-                      bgcolor: 'rgba(255,255,255,0.85)', font: { size: 11 } },
-            shapes: [
-                { type: 'line', xref: 'x', x0: 0.1, x1: 0.1, yref: 'paper', y0: 0, y1: 1,
-                  line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
-                { type: 'line', xref: 'x', x0: -0.1, x1: -0.1, yref: 'paper', y0: 0, y1: 1,
-                  line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
-                { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: -Math.log10(0.05), y1: -Math.log10(0.05),
-                  line: { color: '#aaa', width: 1, dash: '4px,2px' }, layer: 'below' },
-            ],
         };
-    }, [programId, rows]);
+    }, [rows, classify, breakInfo, titleText]);
 
     const plotConfig = useMemo(() => ({
         responsive: true, displaylogo: false,
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+        edits: { legendPosition: true },
     }), []);
 
     // ---- 表格 ----
@@ -232,15 +306,24 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
         <Box sx={{ position: 'relative' }}>
             {/* ---- 头部：选择器 + 统计 ---- */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                <FormControl size="small" sx={{ minWidth: 220 }}>
-                    <Select value={programId || ''} onChange={e => onProgramChange?.(e.target.value)}
+                <FormControl size="small" sx={{ minWidth: 300 }}>
+                    <Select value={programs.length > 0 ? (programId || '') : ''}
+                        onChange={e => onProgramChange?.(e.target.value)}
                         displayEmpty sx={{ fontSize: '0.85rem' }}>
-                        <MenuItem value="" disabled>Select program</MenuItem>
-                        {programs.map(p => (
-                            <MenuItem key={p.id} value={p.id}>Program {p.id}</MenuItem>
-                        ))}
+                        <MenuItem value="" disabled>
+                            {programs.length > 0 ? 'Select program' : 'Loading...'}
+                        </MenuItem>
+                        {programs.map(p => {
+                            const pi = infoData?.[`P${p.id}`];
+                            return (
+                                <MenuItem key={p.id} value={p.id}>
+                                    P{p.id}{pi?.curated_annotation ? ` — ${pi.curated_annotation}` : ''}
+                                </MenuItem>
+                            );
+                        })}
                     </Select>
                 </FormControl>
+
                 {rows.length > 0 && (
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Chip label={`${stats.total} genes`} size="small" sx={{ bgcolor: '#f5f5f5' }} />
