@@ -192,6 +192,7 @@ export default function ManhattanPlot({
 
     const config = useMemo(() => ({
         responsive: true, displaylogo: false,
+        edits: { legendPosition: true },
         modeBarButtonsToAdd: [{
             name: 'toSVG', title: 'Download plot as SVG',
             icon: Plotly.Icons.disk,
@@ -201,7 +202,7 @@ export default function ManhattanPlot({
             }
         }],
         modeBarButtonsToRemove: ['select2d', 'lasso2d'],
-        displayModeBar: true
+        displayModeBar: true,
     }), []);
 
     const handleClick = (evt) => {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef, createContext, useContext } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Box, Typography, TextField, IconButton, Checkbox,
     Chip, Pagination, Table, TableBody, TableCell, TableContainer,
@@ -46,7 +47,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
-        API.get('/list', { params: { dir, page, limit: PER } })
+        API.get('/list', { params: { dir, page, limit: PER, search: filter || undefined } })
             .then(r => {
                 if (cancelled) return;
                 const d = r.data.data || [];
@@ -58,7 +59,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             .catch(() => {})
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [dir, onFiles, page]);
+    }, [dir, onFiles, page, filter]);
 
     useEffect(() => { setPage(1); }, [filter]);
     useEffect(() => {
@@ -68,14 +69,14 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     }, [animState]);
 
     const filtered = useMemo(() => {
-        let list = filter ? items.filter(f => f.name.toLowerCase().includes(filter.toLowerCase())) : [...items];
+        const list = [...items];
         list.sort((a, b) => {
             const d = sortDir === 'asc' ? 1 : -1;
             if (sortBy === 'size') return ((a.size || 0) - (b.size || 0)) * d;
             return a.name.toLowerCase().localeCompare(b.name.toLowerCase()) * d;
         });
         return list;
-    }, [items, filter, sortBy, sortDir]);
+    }, [items, sortBy, sortDir]);
 
     const files = filtered.filter(f => f.type === 'file');
     const cked = files.filter(f => checked.has(f.path));
@@ -252,10 +253,23 @@ let _colId = 0;
 const mkCol = (dir) => ({ dir, id: _colId++ });
 
 export default function DataBrowser() {
-    // columns = active columns shown; exitingCols = columns animating out
-    const [columns, setColumns] = useState(() => [mkCol('')]);
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // 从 URL 参数初始化
+    const initDir = searchParams.get('dir') || '';
+    const initFilter = searchParams.get('q') || '';
+    const initCols = useMemo(() => {
+        if (!initDir) return [mkCol('')];
+        const parts = initDir.split('/').filter(Boolean);
+        const cols = [mkCol('')];
+        let acc = '';
+        for (const p of parts) { acc = acc ? `${acc}/${p}` : p; cols.push(mkCol(acc)); }
+        return cols;
+    }, []);
+
+    const [columns, setColumns] = useState(() => initCols);
     const [exitingCols, setExiting] = useState([]);
-    const [filter, setFilter] = useState('');
+    const [filter, setFilter] = useState(initFilter);
     const [checked, setChecked] = useState(new Set());
     const [dirFileMap, setDirFileMap] = useState({});
     const scrollRef = useRef(null);
@@ -282,21 +296,34 @@ export default function DataBrowser() {
     }, []);
 
     // ── navigation (side effects OUTSIDE state updaters) ──
+    const syncUrl = useCallback((cols) => {
+        const dirs = cols.slice(1).map(c => c.dir);
+        const params = new URLSearchParams();
+        if (dirs.length) params.set('dir', dirs.join('/'));
+        if (filter) params.set('q', filter);
+        setSearchParams(params, { replace: true });
+    }, [filter, setSearchParams]);
+
     const enterDir = useCallback((colIndex, subPath) => {
         const prev = columnsRef.current;
         clearExitColumns();
-        setColumns([...prev.slice(0, colIndex + 1), mkCol(subPath)]);
-    }, [clearExitColumns]);
+        const next = [...prev.slice(0, colIndex + 1), mkCol(subPath)];
+        setColumns(next);
+        syncUrl(next);
+    }, [clearExitColumns, syncUrl]);
 
     const backTo = useCallback((colIndex) => {
         const prev = columnsRef.current;
         if (colIndex >= prev.length - 1) return;
         const removed = prev.slice(colIndex + 1);
         scheduleExit(removed);
-        setColumns(prev.slice(0, colIndex + 1));
-    }, [scheduleExit]);
+        const next = prev.slice(0, colIndex + 1);
+        setColumns(next);
+        syncUrl(next);
+    }, [scheduleExit, syncUrl]);
 
     useEffect(() => () => clearTimeout(exitTimer.current), []);
+    useEffect(() => { syncUrl(columnsRef.current); }, [filter]);
 
     // auto-scroll right when columns change
     useEffect(() => {

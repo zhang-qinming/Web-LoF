@@ -30,7 +30,6 @@ import {
     Box, Typography, Pagination, CircularProgress, TableSortLabel, Link, TextField,
     Chip, Card, CardContent, Alert, Button,
 } from '@mui/material';
-import { Send as SendIcon } from '@mui/icons-material';
 
 // 分页控制组件 - 用于显示分页导航
 function PaginationControl({totalPages, page, onChange}) {
@@ -96,40 +95,25 @@ function JumpToPageControl({totalPages, page, onChange}) {
 
     if (totalPages <= 1) return null;
 
-    return (<Box component="form" onSubmit={handleSubmit} sx={{display: "flex", alignItems: "center", gap: 2}}>
-        <Typography variant="body2" color="text.secondary" sx={{whiteSpace: "nowrap"}}>
-            Jump to
-        </Typography>
-        <TextField
-            size="small"
-            value={inputPage}
-            onChange={(e) => setInputPage(e.target.value)}
-            onBlur={handleBlur}
-            type="number"
-            slotProps={{
-                input: {
-                    min: 1, max: totalPages, style: {textAlign: 'center', width: 100}
-                },
-            }}
-        />
-        <Button
-            type="submit"
-            variant="outlined"
-            size="small"
-            startIcon={<SendIcon/>}
-            disabled={!isValid}
-            sx={{
-                textTransform: "none",
-                minWidth: 0,
-                width: {xs: "100%", sm: "auto"},
-                height: 40,
-                px: 1.5,
-                fontSize: 13,
-            }}
-        >
-            Confirm
-        </Button>
-    </Box>);
+    return (
+        <Box component="form" onSubmit={handleSubmit}
+            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+            <TextField size="small" value={inputPage}
+                onChange={(e) => setInputPage(e.target.value)}
+                onBlur={handleBlur}
+                type="number"
+                slotProps={{ input: { min: 1, max: totalPages, sx: { textAlign: 'center', width: 52, py: 0.5, fontSize: '0.8rem' } } }}
+                sx={{ '& fieldset': { borderRadius: 1.5 } }} />
+            <Typography variant="caption" color="text.secondary" sx={{ mx: 0.3 }}>
+                / {totalPages}
+            </Typography>
+            <Button type="submit" size="small" variant="text"
+                disabled={!isValid}
+                sx={{ minWidth: 0, px: 1, fontSize: '0.75rem', textTransform: 'none' }}>
+                Go
+            </Button>
+        </Box>
+    );
 }
 
 
@@ -197,7 +181,7 @@ export default function GwasDataList({
                                          defaultOrder = "ASC",
                                      }) {
     const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(10); // 默认显示10条
+    const [limit, setLimit] = useState(20);
     const [sortBy, setSortBy] = useState(defaultSortBy);
     const [order, setOrder] = useState(defaultOrder);
 
@@ -266,7 +250,7 @@ export default function GwasDataList({
                     <FormControl size="small" sx={{ minWidth: 70 }}>
                         <Select value={limit} onChange={handleChangeLimit}
                             sx={{ fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.6 } }}>
-                            {[5, 10, 20, 50, 100].map(v => (
+                            {[20, 50, 100, 200].map(v => (
                                 <MenuItem key={v} value={v} dense>{v}</MenuItem>
                             ))}
                         </Select>

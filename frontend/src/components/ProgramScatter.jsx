@@ -116,8 +116,10 @@ export default function ProgramScatter({ fileId }) {
     const [bubbleScale, setBubbleScale] = useState(1.5);
     const [showLabels, setShowLabels] = useState(true);
     const [exportOpen, setExportOpen] = useState(false);
-    const [svgW, setSvgW] = useState(DEFAULT_EXPORT_WIDTH);
-    const [svgH, setSvgH] = useState(DEFAULT_EXPORT_HEIGHT);
+    const [expW, setExpW] = useState(1200);
+    const [expH, setExpH] = useState(800);
+    const [expFmt, setExpFmt] = useState('svg');
+    const exportGdRef = useRef(null);
     const [tableOpen, setTableOpen] = useState(false);
     const [sortBy, setSortBy] = useState('progScore');
     const [sortDir, setSortDir] = useState('desc');
@@ -490,9 +492,24 @@ export default function ProgramScatter({ fileId }) {
         };
     }, [axisRanges.x, axisRanges.y, fileId, mode]);
 
+    const doExport = useCallback(() => {
+        const gd = exportGdRef.current;
+        if (!gd) return;
+        Plotly.toImage(gd, { format: expFmt, width: expW, height: expH }).then(dataUrl => {
+            const a = document.createElement('a');
+            a.href = dataUrl; a.download = `program_${fileId || 'plot'}.${expFmt}`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        });
+    }, [expFmt, expW, expH, fileId]);
+
     const plotConfig = useMemo(() => ({
-        responsive: true,
-        displaylogo: false,
+        responsive: true, displaylogo: false,
+        edits: { legendPosition: true },
+        modeBarButtonsToAdd: [{
+            name: 'download', title: 'Download plot',
+            icon: Plotly.Icons.disk,
+            click: function (gd) { exportGdRef.current = gd; setExportOpen(true); },
+        }],
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     }), []);
 
@@ -506,27 +523,6 @@ export default function ProgramScatter({ fileId }) {
         rows.length,
     ].join('|')), [bubbleScale, effectiveTopN, fileId, markerSize, mode, rows.length, showLabels]);
 
-    const exportSVG = useCallback((width, height) => {
-        const gd = plotElRef.current;
-        if (!gd) return;
-
-        const safeWidth = normalizeExportSize(width, DEFAULT_EXPORT_WIDTH);
-        const safeHeight = normalizeExportSize(height, DEFAULT_EXPORT_HEIGHT);
-        const safeFileId = sanitizeFileNamePart(fileId);
-
-        Plotly.toImage(gd, {
-            format: 'svg',
-            width: safeWidth,
-            height: safeHeight,
-        }).then((dataUrl) => {
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `program_${mode}_${safeFileId}.svg`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
-    }, [fileId, mode]);
 
     if (!fileId) {
         return (
@@ -696,22 +692,6 @@ export default function ProgramScatter({ fileId }) {
                         ))}
                     </Box>
 
-                    <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<Download />}
-                        onClick={() => setExportOpen(true)}
-                        sx={{
-                            ml: 0.5,
-                            textTransform: 'none',
-                            fontSize: '0.78rem',
-                            color: '#888',
-                            borderColor: '#ddd',
-                            '&:hover': { borderColor: '#aaa', color: '#555' },
-                        }}
-                    >
-                        SVG
-                    </Button>
                 </Box>
             )}
 
@@ -736,7 +716,7 @@ export default function ProgramScatter({ fileId }) {
                 </Alert>
             )}
 
-            {hasVisiblePoints && (
+            {hasVisiblePoints && (<>
                 <Plot
                     onInitialized={onInitialized}
                     onUpdate={onUpdate}
@@ -755,7 +735,28 @@ export default function ProgramScatter({ fileId }) {
                     useResizeHandler
                     style={{ width: '100%', height: 620 }}
                 />
-            )}
+
+                <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
+                    <DialogTitle>Export Plot</DialogTitle>
+                    <DialogContent>
+                        <ToggleButtonGroup value={expFmt} exclusive size="small"
+                            onChange={(e, v) => v && setExpFmt(v)} sx={{ mb: 2 }}>
+                            <ToggleButton value="svg">SVG</ToggleButton>
+                            <ToggleButton value="png">PNG</ToggleButton>
+                        </ToggleButtonGroup>
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                            <TextField label="Width" type="number" value={expW}
+                                onChange={e => setExpW(Number(e.target.value))} size="small" />
+                            <TextField label="Height" type="number" value={expH}
+                                onChange={e => setExpH(Number(e.target.value))} size="small" />
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setExportOpen(false)}>Cancel</Button>
+                        <Button variant="contained" onClick={() => { doExport(); setExportOpen(false); }}>Export</Button>
+                    </DialogActions>
+                </Dialog>
+            </>)}
 
             {/* ==================== 数据表格 ==================== */}
             {rows.length > 0 && (
@@ -883,42 +884,6 @@ export default function ProgramScatter({ fileId }) {
                 </Paper>
             )}
 
-            <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
-                <DialogTitle sx={{ fontSize: '1rem', fontWeight: 600 }}>Export SVG</DialogTitle>
-                <DialogContent>
-                    <TextField
-                        label="Width"
-                        type="number"
-                        value={svgW}
-                        onChange={(event) => setSvgW(event.target.value)}
-                        sx={{ mt: 1, mr: 2 }}
-                        slotProps={{ htmlInput: { min: 200, max: 4000, step: 50 } }}
-                    />
-                    <TextField
-                        label="Height"
-                        type="number"
-                        value={svgH}
-                        onChange={(event) => setSvgH(event.target.value)}
-                        sx={{ mt: 1 }}
-                        slotProps={{ htmlInput: { min: 200, max: 4000, step: 50 } }}
-                    />
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setExportOpen(false)} sx={{ textTransform: 'none' }}>
-                        Cancel
-                    </Button>
-                    <Button
-                        variant="contained"
-                        onClick={() => {
-                            exportSVG(svgW, svgH);
-                            setExportOpen(false);
-                        }}
-                        sx={{ textTransform: 'none' }}
-                    >
-                        Export
-                    </Button>
-                </DialogActions>
-            </Dialog>
         </Box>
     );
 }

@@ -1,12 +1,14 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import Plot from 'react-plotly.js';
+import Plotly from 'plotly.js-basic-dist';
 import {
-    Box, Typography, Alert, CircularProgress, Button, Select, MenuItem,
+    Box, Typography, Alert, CircularProgress, Button, IconButton, Select, MenuItem,
     FormControl, Chip, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, TableSortLabel, Paper, Collapse, Pagination,
-    TextField,
+    TextField, Dialog, DialogTitle, DialogContent, DialogActions,
+    ToggleButtonGroup, ToggleButton,
 } from '@mui/material';
-import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
+import { Download, ExpandLess, ExpandMore, Fullscreen, FullscreenExit } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 
@@ -213,10 +215,41 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
         };
     }, [rows, classify, breakInfo, titleText]);
 
+    const [exportOpen, setExportOpen] = useState(false);
+    const [expW, setExpW] = useState(1200);
+    const [expH, setExpH] = useState(800);
+    const [expFmt, setExpFmt] = useState('svg');
+    const plotGdRef = useRef(null);
+
+    const doExport = useCallback(() => {
+        const gd = plotGdRef.current;
+        if (!gd) return;
+        Plotly.toImage(gd, { format: expFmt, width: expW, height: expH }).then(dataUrl => {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `program_${programId || 'plot'}.${expFmt}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    }, [expFmt, expW, expH, programId]);
+
     const plotConfig = useMemo(() => ({
         responsive: true, displaylogo: false,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
         edits: { legendPosition: true },
+        modeBarButtonsToAdd: [{
+            name: 'fullscreen', title: 'Fullscreen',
+            icon: {
+                width: 857.1, height: 1000, path: 'M32 32h288v96H128v192H32V32z m672 0v288h-96V128h-192V32h288z M32 736v-288h96v192h192v96H32z m672 0v-96H512v-192h192v288H704z',
+                ascent: 850, descent: -150,
+            },
+            click: function () { setFullscreen(f => !f); },
+        }, {
+            name: 'download', title: 'Download plot',
+            icon: Plotly.Icons.disk,
+            click: function (gd) { plotGdRef.current = gd; setExportOpen(true); },
+        }],
+        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     }), []);
 
     // ---- 表格 ----
@@ -224,6 +257,14 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
     const [sortBy, setSortBy] = useState('p');
     const [sortDir, setSortDir] = useState('asc');
     const [highlightGene, setHighlightGene] = useState({ gene: null, key: 0 });
+    const [fullscreen, setFullscreen] = useState(false);
+
+    useEffect(() => {
+        if (!fullscreen) return;
+        const onEsc = (e) => { if (e.key === 'Escape') setFullscreen(false); };
+        window.addEventListener('keydown', onEsc);
+        return () => window.removeEventListener('keydown', onEsc);
+    }, [fullscreen]);
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const [jumpInput, setJumpInput] = useState('');
@@ -361,6 +402,28 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
                 </Paper>
             )}
 
+            {/* 导出对话框 */}
+            <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
+                <DialogTitle>Export Plot</DialogTitle>
+                <DialogContent>
+                    <ToggleButtonGroup value={expFmt} exclusive size="small"
+                        onChange={(e, v) => v && setExpFmt(v)} sx={{ mb: 2 }}>
+                        <ToggleButton value="svg">SVG</ToggleButton>
+                        <ToggleButton value="png">PNG</ToggleButton>
+                    </ToggleButtonGroup>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <TextField label="Width" type="number" value={expW}
+                            onChange={e => setExpW(Number(e.target.value))} size="small" />
+                        <TextField label="Height" type="number" value={expH}
+                            onChange={e => setExpH(Number(e.target.value))} size="small" />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setExportOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={() => { doExport(); setExportOpen(false); }}>Export</Button>
+                </DialogActions>
+            </Dialog>
+
             {/* ---- 数据表格 ---- */}
             {rows.length > 0 && (
                 <Paper ref={tablePaperRef} variant="outlined" sx={{ border: '1px solid #e8e8ec', borderRadius: 2, overflow: 'hidden' }}>
@@ -456,6 +519,29 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
                         </Box>
                     </Collapse>
                 </Paper>
+            )}
+
+            {/* 全屏覆盖 */}
+            {fullscreen && (
+                <Box sx={{
+                    position: 'fixed', inset: 0, zIndex: 9999, bgcolor: '#fff',
+                }}>
+                    <Plot
+                        data={plotData}
+                        layout={{ ...layout, title: titleText, margin: { l: 80, r: 30, t: 50, b: 50 } }}
+                        config={plotConfig}
+                        onClick={(evt) => {
+                            if (!evt?.points?.length) return;
+                            const gene = evt.points[0].customdata?.[0];
+                            if (gene) {
+                                setHighlightGene(prev => ({ gene, key: prev.key + 1 }));
+                                setTableOpen(true);
+                            }
+                        }}
+                        useResizeHandler
+                        style={{ width: '100%', height: '100%' }}
+                    />
+                </Box>
             )}
         </Box>
     );
