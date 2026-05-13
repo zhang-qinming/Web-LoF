@@ -58,10 +58,14 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             .catch(() => {})
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [dir, page]);
+    }, [dir, onFiles, page]);
 
     useEffect(() => { setPage(1); }, [filter]);
-    useEffect(() => { if (animState !== 'exit') { const t = setTimeout(() => setHasEntered(true), ANIM + 20); return () => clearTimeout(t); } }, []);
+    useEffect(() => {
+        if (animState === 'exit') return undefined;
+        const t = setTimeout(() => setHasEntered(true), ANIM + 20);
+        return () => clearTimeout(t);
+    }, [animState]);
 
     const filtered = useMemo(() => {
         let list = filter ? items.filter(f => f.name.toLowerCase().includes(filter.toLowerCase())) : [...items];
@@ -156,7 +160,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                 {filter ? 'No match' : '—'}
                             </TableCell></TableRow>
                         ) : (
-                            filtered.map((f, ri) => {
+                            filtered.map((f) => {
                                 const isFile = f.type === 'file', isCk = checked.has(f.path);
                                 return (
                                     <TableRow key={f.path}
@@ -165,10 +169,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                             '& td': { py: 0.3, px: 1.5 },
                                             bgcolor: isCk ? '#f0f4ff' : 'transparent',
                                             '&:hover': { bgcolor: isCk ? '#e8edf8' : '#f8faff' },
-                                            '&:active': { transform: 'scale(0.997)' },
-                                            transition: 'background .15s, transform .1s',
-                                            animation: `rowIn .22s ${ri * 15}ms cubic-bezier(.22,1,.36,1) both`,
-                                            '@keyframes rowIn': { from: { opacity: 0, transform: 'translateX(6px)' }, to: { opacity: 1, transform: 'none' } },
+                                            transition: 'background-color .15s ease',
                                         }}>
                                         <TableCell sx={{ borderBottom: '1px solid #f3f4f6', textAlign: 'center', px: 0.3 }}>
                                             {isFile && <Checkbox size="small" sx={{ p: 0.3 }} checked={isCk}
@@ -259,42 +260,56 @@ export default function DataBrowser() {
     const [dirFileMap, setDirFileMap] = useState({});
     const scrollRef = useRef(null);
     const exitTimer = useRef(null);
+    const columnsRef = useRef(columns);
+    const prevColumnCountRef = useRef(columns.length);
+    columnsRef.current = columns;
 
-    // ── navigation ──
-    const enterDir = useCallback((colIndex, subPath) => {
-        setColumns(prev => {
-            const removed = prev.slice(colIndex + 1);
-            if (removed.length > 0) {
-                setExiting(old => [...old, ...removed]);
-                clearTimeout(exitTimer.current);
-                exitTimer.current = setTimeout(() => setExiting([]), ANIM + 30);
-            }
-            return [...prev.slice(0, colIndex + 1), mkCol(subPath)];
+    // Schedule exit animation (dedup by id to handle Strict Mode)
+    const scheduleExit = useCallback((removed) => {
+        if (!removed.length) return;
+        setExiting(old => {
+            const ids = new Set(old.map(c => c.id));
+            const fresh = removed.filter(c => !ids.has(c.id));
+            return fresh.length ? [...old, ...fresh] : old;
         });
+        clearTimeout(exitTimer.current);
+        exitTimer.current = setTimeout(() => setExiting([]), ANIM + 30);
     }, []);
+
+    const clearExitColumns = useCallback(() => {
+        clearTimeout(exitTimer.current);
+        setExiting([]);
+    }, []);
+
+    // ── navigation (side effects OUTSIDE state updaters) ──
+    const enterDir = useCallback((colIndex, subPath) => {
+        const prev = columnsRef.current;
+        clearExitColumns();
+        setColumns([...prev.slice(0, colIndex + 1), mkCol(subPath)]);
+    }, [clearExitColumns]);
 
     const backTo = useCallback((colIndex) => {
-        setColumns(prev => {
-            if (colIndex >= prev.length - 1) return prev;
-            const removed = prev.slice(colIndex + 1);
-            if (removed.length > 0) {
-                setExiting(old => [...old, ...removed]);
-                clearTimeout(exitTimer.current);
-                exitTimer.current = setTimeout(() => setExiting([]), ANIM + 30);
-            }
-            return prev.slice(0, colIndex + 1);
-        });
-    }, []);
+        const prev = columnsRef.current;
+        if (colIndex >= prev.length - 1) return;
+        const removed = prev.slice(colIndex + 1);
+        scheduleExit(removed);
+        setColumns(prev.slice(0, colIndex + 1));
+    }, [scheduleExit]);
 
     useEffect(() => () => clearTimeout(exitTimer.current), []);
 
     // auto-scroll right when columns change
     useEffect(() => {
         const el = scrollRef.current;
-        if (!el) return;
+        const prevCount = prevColumnCountRef.current;
+        prevColumnCountRef.current = columns.length;
+
+        if (!el || columns.length <= prevCount) return;
+
+        const behavior = prevCount <= 1 ? 'auto' : 'smooth';
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+                el.scrollTo({ left: el.scrollWidth, behavior });
             });
         });
     }, [columns.length]);
@@ -425,7 +440,6 @@ export default function DataBrowser() {
                     <Box ref={scrollRef} sx={{
                         display: 'flex', flex: 1, minHeight: 0,
                         overflowX: 'auto', overflowY: 'hidden',
-                        scrollBehavior: 'smooth',
                         '&::-webkit-scrollbar': { height: 6 },
                         '&::-webkit-scrollbar-thumb': { background: '#ddd', borderRadius: 3 },
                     }}>
@@ -435,9 +449,9 @@ export default function DataBrowser() {
                                 animState="enter"
                                 onEnter={(subPath) => enterDir(i, subPath)} />
                         ))}
-                        {/* exiting columns animate out on the right */}
+                        {/* pure back navigation keeps trailing columns exiting on the right */}
                         {exitingCols.map(c => (
-                            <DirColumn key={c.id} dir={c.dir} filter={filter} onFiles={onFiles}
+                            <DirColumn key={`x-${c.id}`} dir={c.dir} filter={filter} onFiles={onFiles}
                                 animState="exit" onEnter={() => {}} />
                         ))}
                     </Box>

@@ -21,32 +21,31 @@ function safePath(subPath) {
     return resolved;
 }
 
-router.get('/api/data/list', (req, res) => {
+router.get('/api/data/list', async (req, res) => {
     try {
         const full = safePath(req.query.dir || '');
         if (!full) return res.status(403).json({ error: 'Forbidden' });
         if (!fs.existsSync(full)) return res.status(404).json({ error: 'Not found' });
 
-        const entries = fs.readdirSync(full, { withFileTypes: true });
+        const entries = await fs.promises.readdir(full, { withFileTypes: true });
         const searchQ = (req.query.search || '').toLowerCase();
-        const items = [];
-        for (const e of entries) {
-            if (searchQ && !e.name.toLowerCase().includes(searchQ)) continue;
-            const stat = fs.statSync(path.join(full, e.name));
-            items.push({
+        const filteredEntries = entries.filter((e) => !searchQ || e.name.toLowerCase().includes(searchQ));
+        filteredEntries.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+
+        const p = Math.max(1, parseInt(req.query.page) || 1);
+        const l = Math.min(200, Math.max(5, parseInt(req.query.limit) || 50));
+        const total = filteredEntries.length;
+        const pageEntries = filteredEntries.slice((p - 1) * l, p * l);
+        const data = await Promise.all(pageEntries.map(async (e) => {
+            const stat = await fs.promises.stat(path.join(full, e.name));
+            return {
                 name: e.name,
                 type: e.isDirectory() ? 'dir' : 'file',
                 path: req.query.dir ? `${req.query.dir}/${e.name}` : e.name,
                 size: e.isFile() ? stat.size : 0,
                 mtime: stat.mtime.toISOString(),
-            });
-        }
-        items.sort((a, b) => (b.type === 'dir') - (a.type === 'dir') || a.name.localeCompare(b.name));
-
-        const p = Math.max(1, parseInt(req.query.page) || 1);
-        const l = Math.min(200, Math.max(5, parseInt(req.query.limit) || 50));
-        const total = items.length;
-        const data = items.slice((p - 1) * l, p * l);
+            };
+        }));
 
         res.json({ data, totalCount: total, page: p, totalPages: Math.ceil(total / l) });
     } catch (err) {
