@@ -12,7 +12,7 @@ import {
 import axios from 'axios';
 
 const API = axios.create({ baseURL: '/api/data' });
-const PER = 40, COL_W = 440, ANIM = 210;
+const PER = 40, COL_W = 440, ANIM = 170;
 
 function fmtSize(b) {
     if (!b) return '';
@@ -31,9 +31,14 @@ const SelectionCtx = createContext({
     checked: new Set(), toggleFile: () => {}, toggleDirAll: () => {}, clearAll: () => {},
 });
 
+const LIST_CACHE = new Map();
+
+function getListCacheKey(dir, page, filter) {
+    return `${dir}::${page}::${filter || ''}`;
+}
+
 /* ═══════════════ Column ═══════════════ */
 const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles, animState }) {
-    const [hasEntered, setHasEntered] = useState(false);
     const [items, setItems] = useState([]);
     const [page, setPage] = useState(1);
     const [totalPages, setTotal] = useState(1);
@@ -42,19 +47,42 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     const [hovered, setHov] = useState(null);
     const [sortBy, setSortBy] = useState('name');
     const [sortDir, setSortDir] = useState('asc');
+    const enterSettledRef = useRef(animState === 'exit');
     const { checked, toggleFile, toggleDirAll } = useContext(SelectionCtx);
 
     useEffect(() => {
         let cancelled = false;
-        setLoading(true);
+        const cacheKey = getListCacheKey(dir, page, filter);
+        const cached = LIST_CACHE.get(cacheKey);
+
+        if (cached) {
+            setItems(cached.items);
+            setTotal(cached.totalPages);
+            setCnt(cached.totalCount);
+            onFiles(dir, cached.filePaths);
+            setLoading(false);
+        } else {
+            setItems([]);
+            setTotal(1);
+            setCnt(0);
+            setLoading(true);
+        }
+
         API.get('/list', { params: { dir, page, limit: PER, search: filter || undefined } })
             .then(r => {
                 if (cancelled) return;
                 const d = r.data.data || [];
+                const nextCache = {
+                    items: d,
+                    totalPages: r.data.totalPages || 1,
+                    totalCount: r.data.totalCount || 0,
+                    filePaths: d.filter(f => f.type === 'file').map(f => f.path),
+                };
+                LIST_CACHE.set(cacheKey, nextCache);
                 setItems(d);
-                setTotal(r.data.totalPages || 1);
-                setCnt(r.data.totalCount || 0);
-                onFiles(dir, d.filter(f => f.type === 'file').map(f => f.path));
+                setTotal(nextCache.totalPages);
+                setCnt(nextCache.totalCount);
+                onFiles(dir, nextCache.filePaths);
             })
             .catch(() => {})
             .finally(() => { if (!cancelled) setLoading(false); });
@@ -64,7 +92,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     useEffect(() => { setPage(1); }, [filter]);
     useEffect(() => {
         if (animState === 'exit') return undefined;
-        const t = setTimeout(() => setHasEntered(true), ANIM + 20);
+        const t = setTimeout(() => { enterSettledRef.current = true; }, ANIM + 20);
         return () => clearTimeout(t);
     }, [animState]);
 
@@ -91,7 +119,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
 
     const anim = animState === 'exit'
         ? `colExit ${ANIM}ms ease forwards`
-        : hasEntered ? 'none' : `colEnter ${ANIM}ms cubic-bezier(0.22,1,0.36,1) both`;
+        : enterSettledRef.current ? 'none' : `colEnter ${ANIM}ms cubic-bezier(0.22,1,0.36,1) both`;
 
     return (
         <Box sx={{
@@ -102,12 +130,12 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             pointerEvents: animState === 'exit' ? 'none' : 'auto',
             willChange: 'opacity, transform',
             '@keyframes colEnter': {
-                from: { opacity: 0, transform: 'translateX(18px)' },
+                from: { opacity: 0, transform: 'translateX(12px)' },
                 to: { opacity: 1, transform: 'translateX(0)' },
             },
             '@keyframes colExit': {
                 from: { opacity: 1, transform: 'translateX(0)' },
-                to: { opacity: 0, transform: 'translateX(-14px)' },
+                to: { opacity: 0, transform: 'translateX(-10px)' },
             },
         }}>
             {/* header */}
@@ -248,6 +276,52 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     );
 });
 
+const ExitingColumnGhost = React.memo(function ExitingColumnGhost({ dir }) {
+    return (
+        <Box sx={{
+            width: COL_W, minWidth: COL_W, maxWidth: COL_W, flexShrink: 0,
+            borderRight: '1px solid #eef0f2',
+            display: 'flex', flexDirection: 'column',
+            bgcolor: '#fff',
+            pointerEvents: 'none',
+            animation: `colExit ${ANIM}ms ease forwards`,
+            willChange: 'opacity, transform',
+            '@keyframes colExit': {
+                from: { opacity: 1, transform: 'translateX(0)' },
+                to: { opacity: 0, transform: 'translateX(-10px)' },
+            },
+        }}>
+            <Box sx={{
+                px: 1.5, py: 0.9,
+                bgcolor: '#fafbfc',
+                borderBottom: '2px solid #e8eaed',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+            }}>
+                <FolderOpen sx={{ fontSize: 17, color: '#6b9fd4', flexShrink: 0 }} />
+                <Typography noWrap variant="caption" sx={{ fontWeight: 700, color: '#444', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', flex: 1 }}>
+                    {dir.split('/').pop() || 'data'}
+                </Typography>
+            </Box>
+            <Box sx={{ flex: 1, px: 2, py: 1.2 }}>
+                {Array.from({ length: 8 }, (_, index) => (
+                    <Box
+                        key={`${dir}-ghost-${index}`}
+                        sx={{
+                            height: 12,
+                            borderRadius: 999,
+                            bgcolor: index % 2 === 0 ? 'rgba(226,232,240,0.9)' : 'rgba(241,245,249,0.95)',
+                            mb: 1.2,
+                            width: `${72 + ((index * 7) % 20)}%`,
+                        }}
+                    />
+                ))}
+            </Box>
+        </Box>
+    );
+});
+
 /* ═══════════════ DataBrowser ═══════════════ */
 let _colId = 0;
 const mkCol = (dir) => ({ dir, id: _colId++ });
@@ -255,21 +329,21 @@ const mkCol = (dir) => ({ dir, id: _colId++ });
 export default function DataBrowser() {
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // 从 URL 参数初始化
-    const initDir = searchParams.get('dir') || '';
-    const initFilter = searchParams.get('q') || '';
-    const initCols = useMemo(() => {
+    const [columns, setColumns] = useState(() => {
+        const initDir = searchParams.get('dir') || '';
         if (!initDir) return [mkCol('')];
+
         const parts = initDir.split('/').filter(Boolean);
         const cols = [mkCol('')];
         let acc = '';
-        for (const p of parts) { acc = acc ? `${acc}/${p}` : p; cols.push(mkCol(acc)); }
+        for (const p of parts) {
+            acc = acc ? `${acc}/${p}` : p;
+            cols.push(mkCol(acc));
+        }
         return cols;
-    }, []);
-
-    const [columns, setColumns] = useState(() => initCols);
+    });
     const [exitingCols, setExiting] = useState([]);
-    const [filter, setFilter] = useState(initFilter);
+    const [filter, setFilter] = useState(() => searchParams.get('q') || '');
     const [checked, setChecked] = useState(new Set());
     const [dirFileMap, setDirFileMap] = useState({});
     const scrollRef = useRef(null);
@@ -323,7 +397,7 @@ export default function DataBrowser() {
     }, [scheduleExit, syncUrl]);
 
     useEffect(() => () => clearTimeout(exitTimer.current), []);
-    useEffect(() => { syncUrl(columnsRef.current); }, [filter]);
+    useEffect(() => { syncUrl(columnsRef.current); }, [filter, syncUrl]);
 
     // auto-scroll right when columns change
     useEffect(() => {
@@ -478,8 +552,7 @@ export default function DataBrowser() {
                         ))}
                         {/* pure back navigation keeps trailing columns exiting on the right */}
                         {exitingCols.map(c => (
-                            <DirColumn key={`x-${c.id}`} dir={c.dir} filter={filter} onFiles={onFiles}
-                                animState="exit" onEnter={() => {}} />
+                            <ExitingColumnGhost key={`x-${c.id}`} dir={c.dir} />
                         ))}
                     </Box>
                 </Paper>

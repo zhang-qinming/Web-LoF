@@ -213,7 +213,7 @@ export default function Trait() {
             </Tabs>
 
             <Box sx={{ minHeight: 400 }}>
-                {tab === 0 && hasProgram && <ProgramScatter fileId={fileId} />}
+                {tab === 0 && hasProgram && <ProgramScatter key={fileId} fileId={fileId} />}
                 {tab === 0 && !hasProgram && (
                     <Card variant="outlined" sx={{ py: 8, textAlign: 'center', borderRadius: 3, bgcolor: '#fafbfc' }}>
                         <Timeline sx={{ fontSize: 48, color: '#ccc', mb: 2 }} />

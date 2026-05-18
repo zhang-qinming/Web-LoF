@@ -14,10 +14,10 @@ import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 
 const COLORS = {
-    other: '#b0b0b0',
-    program_enriched: '#FEA601',
-    regulator_enriched: '#4783B5',
-    both_enriched: '#34A853',
+    other: '#b8c0cc',
+    program_enriched: '#E69F00',
+    regulator_enriched: '#0072B2',
+    both_enriched: '#009E73',
 };
 
 const LEGEND_LABELS = {
@@ -28,6 +28,30 @@ const LEGEND_LABELS = {
 };
 
 const TRACE_ORDER = ['other', 'program_enriched', 'regulator_enriched', 'both_enriched'];
+const CATEGORY_SIZE_SCALE = {
+    other: 1,
+    program_enriched: 1.32,
+    regulator_enriched: 1.32,
+    both_enriched: 1.55,
+};
+const TABLE_TONES = {
+    program: {
+        headerBg: 'rgba(230,159,0,0.12)',
+        headerBorder: 'rgba(230,159,0,0.34)',
+        headerColor: '#9A5A00',
+        cellStrong: 'rgba(230,159,0,0.065)',
+        cellSoft: 'rgba(230,159,0,0.038)',
+        rankCell: 'rgba(230,159,0,0.095)',
+    },
+    regulator: {
+        headerBg: 'rgba(0,114,178,0.12)',
+        headerBorder: 'rgba(0,114,178,0.3)',
+        headerColor: '#0B5C89',
+        cellStrong: 'rgba(0,114,178,0.06)',
+        cellSoft: 'rgba(0,114,178,0.035)',
+        rankCell: 'rgba(0,114,178,0.09)',
+    },
+};
 
 const MODES = {
     SCATTER: 'scatter',
@@ -83,6 +107,55 @@ function computeAxisRange(values, paddingRatio = 0.08) {
     return [min - padding, max + padding];
 }
 
+function formatFixed(value, digits) {
+    return Number.isFinite(value) ? value.toFixed(digits) : 'NA';
+}
+
+function formatPValue(value) {
+    return Number.isFinite(value) ? value.toExponential(2) : 'NA';
+}
+
+function formatRank(value) {
+    return Number.isFinite(value) ? `#${value}` : 'NA';
+}
+
+function readInfoText(...values) {
+    for (const value of values) {
+        const text = String(value || '').trim();
+        if (text && text.toLowerCase() !== 'none') return text;
+    }
+    return '';
+}
+
+function buildHoverText(item, key, info) {
+    const annotation = readInfoText(info?.curated_annotation, info?.Curated_annotation) || 'No curated annotation';
+    const representativeGo = readInfoText(info?.representative_go);
+    const representativeTf = readInfoText(info?.representative_tf);
+    const representativeTfClass = readInfoText(info?.representative_tf_class);
+    const markerCoexpression = readInfoText(info?.marker_coexpression);
+
+    const lines = [
+        `<b>P${item.program}</b>`,
+        `<span style="color:${COLORS[key]};font-weight:600">${LEGEND_LABELS[key]}</span>`,
+        annotation,
+        '',
+        `<b>Program</b>  score ${formatFixed(item.progScore, 3)}  ·  rank ${formatRank(item.rankProg)}  ·  P ${formatPValue(item.progP)}  ·  γ ${formatFixed(item.progGamma, 4)}`,
+        `<b>Regulator</b>  score ${formatFixed(item.regScore, 3)}  ·  rank ${formatRank(item.rankReg)}  ·  P ${formatPValue(item.regP)}  ·  β ${formatFixed(item.regBeta, 4)}`,
+    ];
+
+    if (representativeGo) {
+        lines.push(`GO: ${representativeGo}${info?.go_enrichment_p ? ` (P ${info.go_enrichment_p})` : ''}`);
+    }
+    if (representativeTf) {
+        lines.push(`TF: ${representativeTf}${representativeTfClass ? ` · ${representativeTfClass}` : ''}${info?.representative_tf_p ? ` (P ${info.representative_tf_p})` : ''}`);
+    }
+    if (markerCoexpression) {
+        lines.push(`Marker: ${markerCoexpression}`);
+    }
+
+    return lines.join('<br>');
+}
+
 const thSx = (align) => ({
     fontWeight: 600, fontSize: '0.7rem', py: 0.7, px: 1.3,
     bgcolor: '#f7f7f7', borderBottom: '2px solid #d0d0d0', color: '#555',
@@ -108,7 +181,7 @@ export default function ProgramScatter({ fileId }) {
         fetcher,
     );
     const { data: infoData } = useSWR('/api/programs/info', fetcher);
-    const programInfo = infoData || {};
+    const programInfo = useMemo(() => infoData || {}, [infoData]);
 
     const [mode, setMode] = useState(MODES.SCATTER);
     const [topN, setTopN] = useState(DEFAULT_TOP_N);
@@ -263,8 +336,8 @@ export default function ProgramScatter({ fileId }) {
     }, [rows, sortBy, sortDir, collator]);
 
     const downloadCSV = useCallback(() => {
-        const cols = ['Program', 'Category', 'Prog Score', 'Prog P', 'Gamma', 'Rank (Prog)', 'Reg Score', 'Reg P', 'Beta', 'Rank (Reg)'];
-        const keys = ['program', 'color', 'progScore', 'progP', 'progGamma', 'rankProg', 'regScore', 'regP', 'regBeta', 'rankReg'];
+        const cols = ['Program', 'Category', 'Prog Score', 'Rank (Prog)', 'Prog P', 'Gamma', 'Reg Score', 'Rank (Reg)', 'Reg P', 'Beta'];
+        const keys = ['program', 'color', 'progScore', 'rankProg', 'progP', 'progGamma', 'regScore', 'rankReg', 'regP', 'regBeta'];
         const header = cols.join(',');
         const body = rows.map((row) => keys.map((k) => {
             const v = row[k];
@@ -275,7 +348,7 @@ export default function ProgramScatter({ fileId }) {
         const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = `program_data_${fileId || 'export'}.csv`;
+        a.href = url; a.download = `program_data_${sanitizeFileNamePart(fileId || 'export')}.csv`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, [rows, fileId]);
@@ -311,13 +384,14 @@ export default function ProgramScatter({ fileId }) {
     }, [effectiveTopN, mode, visibleRows]);
 
     const getBubbleSize = useCallback((row) => {
-        if (mode === MODES.SCATTER || !bubbleSizeConfig) return markerSize;
+        const categoryScale = CATEGORY_SIZE_SCALE[row.color] || 1;
+        if (mode === MODES.SCATTER || !bubbleSizeConfig) return markerSize * categoryScale;
 
         const sourceValue = mode === MODES.RANK_PROG ? row.regScore : row.progScore;
         const absValue = Math.abs(sourceValue || 0);
         const normalized = (absValue - bubbleSizeConfig.min) / ((bubbleSizeConfig.max - bubbleSizeConfig.min) || 1);
 
-        return (5 + normalized * 25) * bubbleScale * bubbleSizeConfig.autoScale;
+        return (5 + normalized * 25) * bubbleScale * bubbleSizeConfig.autoScale * categoryScale;
     }, [bubbleScale, bubbleSizeConfig, markerSize, mode]);
 
     const plotData = useMemo(() => TRACE_ORDER.map((key) => {
@@ -347,8 +421,6 @@ export default function ProgramScatter({ fileId }) {
             return item.rankReg;
         });
 
-        const isRank = mode !== MODES.SCATTER;
-
         return {
             x,
             y,
@@ -360,39 +432,28 @@ export default function ProgramScatter({ fileId }) {
                     return Number.isFinite(sz) && sz > 0 ? sz : markerSize;
                 }),
                 color: COLORS[key],
-                opacity: 0.88,
-                line: { width: 0.5, color: 'rgba(0,0,0,0.15)' },
+                opacity: key === 'other' ? 0.56 : 0.94,
+                line: {
+                    width: key === 'other' ? 0.5 : 1,
+                    color: key === 'other' ? 'rgba(90,98,112,0.14)' : 'rgba(17,24,39,0.22)',
+                },
             },
             ...(showLabels && {
                 text: pts.map((item) => item.label || ''),
                 textposition: 'top center',
-                textfont: { size: 11, color: '#555' },
+                textfont: { size: 11, color: key === 'other' ? '#667085' : COLORS[key] },
             }),
             name: LEGEND_LABELS[key],
             legendgroup: key,
             showlegend: true,
-            hovertemplate: isRank
-                ? '<b>%{customdata[0]}</b><br>%{customdata[10]}<br><br>Prog Score: %{customdata[6]:.3f}  |  Reg Score: %{customdata[7]:.3f}<br>Prog P: %{customdata[1]:.2e}  |  Reg P: %{customdata[2]:.2e}<br>Prog γ=%{customdata[3]:.4f}  |  Reg β=%{customdata[4]:.4f}<br>Rank: Prog #%{customdata[8]}  Reg #%{customdata[9]}<br><b>%{customdata[5]}</b><extra></extra>'
-                : '<b>%{customdata[0]}</b><br>%{customdata[10]}<br><br>Prog Score: %{x:.3f}  (P: %{customdata[1]:.2e})<br>Reg Score: %{y:.3f}  (P: %{customdata[2]:.2e})<br>γ=%{customdata[3]:.4f}  β=%{customdata[4]:.4f}<br>Rank: Prog #%{customdata[8]}  Reg #%{customdata[9]}<br><b>%{customdata[5]}</b><extra></extra>',
-            customdata: pts.map((item) => {
+            hovertemplate: '%{hovertext}<extra></extra>',
+            hovertext: pts.map((item) => {
                 const info = programInfo[`P${item.program}`] || programInfo[item.program] || {};
-                const desc = info.Curated_annotation || '';
-                return [
-                    item.program,
-                    item.progP,
-                    item.regP,
-                    item.progGamma,
-                    item.regBeta,
-                    LEGEND_LABELS[key],
-                    item.progScore,
-                    item.regScore,
-                    item.rankProg,
-                    item.rankReg,
-                    desc,
-                ];
+                return buildHoverText(item, key, info);
             }),
+            customdata: pts.map((item) => [item.program]),
         };
-    }), [getBubbleSize, markerSize, mode, showLabels, visibleRowsByColor]);
+    }), [getBubbleSize, markerSize, mode, programInfo, showLabels, visibleRowsByColor]);
 
     const axisRanges = useMemo(() => {
         if (mode === MODES.SCATTER) {
@@ -449,9 +510,14 @@ export default function ProgramScatter({ fileId }) {
                 fixedrange: false,
             },
             hovermode: 'closest',
-            hoverlabel: { bgcolor: 'white', bordercolor: '#ccc', font: { size: 13, color: '#333' } },
+            hoverlabel: {
+                bgcolor: 'rgba(255,255,255,0.98)',
+                bordercolor: '#cbd5e1',
+                font: { size: 12, color: '#1f2937' },
+                align: 'left',
+            },
             margin: { l: 80, r: 40, t: 60, b: 60 },
-            plot_bgcolor: '#fafafa',
+            plot_bgcolor: '#fcfcfd',
             paper_bgcolor: 'white',
             showlegend: true,
             uirevision: 'program-scatter',
@@ -495,9 +561,11 @@ export default function ProgramScatter({ fileId }) {
     const doExport = useCallback(() => {
         const gd = exportGdRef.current;
         if (!gd) return;
-        Plotly.toImage(gd, { format: expFmt, width: expW, height: expH }).then(dataUrl => {
+        const width = normalizeExportSize(expW, DEFAULT_EXPORT_WIDTH);
+        const height = normalizeExportSize(expH, DEFAULT_EXPORT_HEIGHT);
+        Plotly.toImage(gd, { format: expFmt, width, height }).then(dataUrl => {
             const a = document.createElement('a');
-            a.href = dataUrl; a.download = `program_${fileId || 'plot'}.${expFmt}`;
+            a.href = dataUrl; a.download = `program_${sanitizeFileNamePart(fileId || 'plot')}.${expFmt}`;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
         });
     }, [expFmt, expW, expH, fileId]);
@@ -790,14 +858,14 @@ export default function ProgramScatter({ fileId }) {
                                             Info
                                         </TableCell>
                                         <TableCell colSpan={4}
-                                            sx={{ fontWeight: 600, fontSize: '0.68rem', py: 0.6, bgcolor: '#FFF3E0',
-                                                  borderBottom: '2px solid #FFCC80', textAlign: 'center', color: '#E65100',
+                                            sx={{ fontWeight: 600, fontSize: '0.68rem', py: 0.6, bgcolor: TABLE_TONES.program.headerBg,
+                                                  borderBottom: `2px solid ${TABLE_TONES.program.headerBorder}`, textAlign: 'center', color: TABLE_TONES.program.headerColor,
                                                   textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                             Program
                                         </TableCell>
                                         <TableCell colSpan={4}
-                                            sx={{ fontWeight: 600, fontSize: '0.68rem', py: 0.6, bgcolor: '#E3F2FD',
-                                                  borderBottom: '2px solid #90CAF9', textAlign: 'center', color: '#0D47A1',
+                                            sx={{ fontWeight: 600, fontSize: '0.68rem', py: 0.6, bgcolor: TABLE_TONES.regulator.headerBg,
+                                                  borderBottom: `2px solid ${TABLE_TONES.regulator.headerBorder}`, textAlign: 'center', color: TABLE_TONES.regulator.headerColor,
                                                   textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                             Regulator
                                         </TableCell>
@@ -814,22 +882,22 @@ export default function ProgramScatter({ fileId }) {
                                         ))}
                                         {[
                                             ['progScore',  'Signed −log₁₀(P)',  'right'],
+                                            ['rankProg',   'Rank',              'center'],
                                             ['progP',      'P-value',           'right'],
                                             ['progGamma',  'γ (Gamma)',         'right'],
-                                            ['rankProg',   'Rank',              'center'],
                                         ].map(([key, label, align]) => (
-                                            <TableCell key={key} sx={{ ...thSx(align), bgcolor: '#FFF8E1', borderBottom: '2px solid #FFCC80', color: '#BF360C' }}>
+                                            <TableCell key={key} sx={{ ...thSx(align), bgcolor: TABLE_TONES.program.headerBg, borderBottom: `2px solid ${TABLE_TONES.program.headerBorder}`, color: TABLE_TONES.program.headerColor }}>
                                                 <TableSortLabel active={sortBy === key} direction={sortBy === key ? sortDir : 'asc'}
                                                     onClick={() => handleSort(key)} sx={sortLabelSx}>{label}</TableSortLabel>
                                             </TableCell>
                                         ))}
                                         {[
                                             ['regScore',  'Signed −log₁₀(P)',  'right'],
+                                            ['rankReg',   'Rank',              'center'],
                                             ['regP',      'P-value',           'right'],
                                             ['regBeta',   'β (Beta)',          'right'],
-                                            ['rankReg',   'Rank',              'center'],
                                         ].map(([key, label, align]) => (
-                                            <TableCell key={key} sx={{ ...thSx(align), bgcolor: '#E3F2FD', borderBottom: '2px solid #90CAF9', color: '#0D47A1' }}>
+                                            <TableCell key={key} sx={{ ...thSx(align), bgcolor: TABLE_TONES.regulator.headerBg, borderBottom: `2px solid ${TABLE_TONES.regulator.headerBorder}`, color: TABLE_TONES.regulator.headerColor }}>
                                                 <TableSortLabel active={sortBy === key} direction={sortBy === key ? sortDir : 'asc'}
                                                     onClick={() => handleSort(key)} sx={sortLabelSx}>{label}</TableSortLabel>
                                             </TableCell>
@@ -840,6 +908,8 @@ export default function ProgramScatter({ fileId }) {
                                     {sortedRows.map((row, idx) => {
                                         const isHL = highlight.program === row.program;
                                         const even = idx % 2 === 0;
+                                        const isTopProg = Number.isFinite(row.rankProg) && row.rankProg <= 3;
+                                        const isTopReg = Number.isFinite(row.rankReg) && row.rankReg <= 3;
                                         return (
                                             <TableRow
                                                 key={row.program}
@@ -861,19 +931,19 @@ export default function ProgramScatter({ fileId }) {
                                                 <TableCell sx={tdSx('left')}>
                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
                                                         <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: COLORS[row.color], flexShrink: 0 }} />
-                                                        {LEGEND_LABELS[row.color]}
+                                                        <Box component="span" sx={{ color: row.color === 'other' ? '#667085' : COLORS[row.color], fontWeight: row.color === 'other' ? 400 : 600 }}>
+                                                            {LEGEND_LABELS[row.color]}
+                                                        </Box>
                                                     </Box>
                                                 </TableCell>
-                                                {/* Program 组 — 淡暖色透明底，斑马纹透出 */}
-                                                <TableCell sx={tdSx('right', 'monospace', 400, 'rgba(255,152,0,0.05)')}>{row.progScore?.toFixed(3) ?? '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, 'rgba(255,152,0,0.03)')}>{row.progP != null ? row.progP.toExponential(2) : '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, 'rgba(255,152,0,0.05)')}>{row.progGamma?.toFixed(4) ?? '—'}</TableCell>
-                                                <TableCell sx={{ ...tdSx('center', undefined, row.rankProg <= 3 ? 700 : 400, 'rgba(255,152,0,0.08)'), color: row.rankProg <= 3 ? '#E65100' : '#888' }}>{row.rankProg ?? '—'}</TableCell>
-                                                {/* Regulator 组 — 淡蓝色透明底，斑马纹透出 */}
-                                                <TableCell sx={tdSx('right', 'monospace', 400, 'rgba(33,150,243,0.05)')}>{row.regScore?.toFixed(3) ?? '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, 'rgba(33,150,243,0.03)')}>{row.regP != null ? row.regP.toExponential(2) : '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, 'rgba(33,150,243,0.05)')}>{row.regBeta?.toFixed(4) ?? '—'}</TableCell>
-                                                <TableCell sx={{ ...tdSx('center', undefined, row.rankReg <= 3 ? 700 : 400, 'rgba(33,150,243,0.08)'), color: row.rankReg <= 3 ? '#0D47A1' : '#888' }}>{row.rankReg ?? '—'}</TableCell>
+                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progScore?.toFixed(3) ?? '—'}</TableCell>
+                                                <TableCell sx={{ ...tdSx('center', undefined, isTopProg ? 700 : 400, TABLE_TONES.program.rankCell), color: isTopProg ? TABLE_TONES.program.headerColor : '#888' }}>{row.rankProg ?? '—'}</TableCell>
+                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellSoft)}>{row.progP != null ? row.progP.toExponential(2) : '—'}</TableCell>
+                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progGamma?.toFixed(4) ?? '—'}</TableCell>
+                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regScore?.toFixed(3) ?? '—'}</TableCell>
+                                                <TableCell sx={{ ...tdSx('center', undefined, isTopReg ? 700 : 400, TABLE_TONES.regulator.rankCell), color: isTopReg ? TABLE_TONES.regulator.headerColor : '#888' }}>{row.rankReg ?? '—'}</TableCell>
+                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellSoft)}>{row.regP != null ? row.regP.toExponential(2) : '—'}</TableCell>
+                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regBeta?.toFixed(4) ?? '—'}</TableCell>
                                             </TableRow>
                                         );
                                     })}
