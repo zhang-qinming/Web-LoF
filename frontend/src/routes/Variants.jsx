@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef, createContext, useContext } from 'react';
+import React, { startTransition, useEffect, useState, useMemo, useCallback, useRef, createContext, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     Box, Typography, TextField, IconButton, Checkbox,
     Chip, Pagination, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, Paper, InputAdornment, Tooltip, Button,
+    Alert,
 } from '@mui/material';
 import {
     Download, Folder, InsertDriveFile, Search, FolderOpen, ChevronRight, Close,
@@ -13,6 +14,8 @@ import axios from 'axios';
 
 const API = axios.create({ baseURL: '/api/data' });
 const PER = 40, COL_W = 440, ANIM = 170;
+const GLOBAL_SEARCH_LIMIT = 200;
+const GLOBAL_PAGE_SIZE = 50;
 
 function fmtSize(b) {
     if (!b) return '';
@@ -32,9 +35,66 @@ const SelectionCtx = createContext({
 });
 
 const LIST_CACHE = new Map();
+const FILE_PATHS_CACHE = new Map();
 
 function getListCacheKey(dir, page, filter) {
     return `${dir}::${page}::${filter || ''}`;
+}
+
+function getFilePathsCacheKey(dir, filter) {
+    return `${dir}::${filter || ''}`;
+}
+
+function triggerDownload(path) {
+    const a = document.createElement('a');
+    a.href = `/api/data/download?path=${encodeURIComponent(path)}`;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+function getZipFilenameFromHeader(disposition, fallback) {
+    const match = disposition?.match(/filename="?([^"]+)"?/i);
+    return match?.[1] || fallback;
+}
+
+async function triggerBatchDownload(paths, filename) {
+    const response = await API.post('/download-batch', { paths, filename }, { responseType: 'blob' });
+    const blobUrl = window.URL.createObjectURL(response.data);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = getZipFilenameFromHeader(response.headers['content-disposition'], filename);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+}
+
+async function downloadPaths(paths, options = {}) {
+    const { step = 120, zipThreshold = 10, filename = 'data-selection.zip' } = options;
+    const uniquePaths = [...new Set(paths.filter(Boolean))];
+    if (uniquePaths.length === 0) return;
+
+    if (uniquePaths.length > zipThreshold) {
+        await triggerBatchDownload(uniquePaths, filename);
+        return;
+    }
+
+    uniquePaths.forEach((path, index) => {
+        window.setTimeout(() => triggerDownload(path), index * step);
+    });
+}
+
+async function fetchAllFilePaths(dir, filter) {
+    const cacheKey = getFilePathsCacheKey(dir, filter);
+    const cached = FILE_PATHS_CACHE.get(cacheKey);
+    if (cached) return cached;
+
+    const response = await API.get('/file-paths', { params: { dir, search: filter || undefined } });
+    const paths = response.data?.paths || [];
+    FILE_PATHS_CACHE.set(cacheKey, paths);
+    return paths;
 }
 
 /* ═══════════════ Column ═══════════════ */
@@ -52,6 +112,20 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
 
     useEffect(() => {
         let cancelled = false;
+        const syncVisibleFilePaths = async (fallbackPaths) => {
+            if (!filter) {
+                onFiles(dir, fallbackPaths);
+                return;
+            }
+
+            try {
+                const allPaths = await fetchAllFilePaths(dir, filter);
+                if (!cancelled) onFiles(dir, allPaths);
+            } catch {
+                if (!cancelled) onFiles(dir, fallbackPaths);
+            }
+        };
+
         const cacheKey = getListCacheKey(dir, page, filter);
         const cached = LIST_CACHE.get(cacheKey);
 
@@ -59,7 +133,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             setItems(cached.items);
             setTotal(cached.totalPages);
             setCnt(cached.totalCount);
-            onFiles(dir, cached.filePaths);
+            void syncVisibleFilePaths(cached.filePaths);
             setLoading(false);
         } else {
             setItems([]);
@@ -82,7 +156,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                 setItems(d);
                 setTotal(nextCache.totalPages);
                 setCnt(nextCache.totalCount);
-                onFiles(dir, nextCache.filePaths);
+                void syncVisibleFilePaths(nextCache.filePaths);
             })
             .catch(() => {})
             .finally(() => { if (!cancelled) setLoading(false); });
@@ -111,10 +185,22 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     const allCk = files.length > 0 && cked.length === files.length;
     const someCk = cked.length > 0 && !allCk;
 
-    const dlFolder = () => {
-        const a = document.createElement('a');
-        a.href = `/api/data/download?path=${encodeURIComponent(dir || '')}`;
-        a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    const visibleFilePaths = files.map(f => f.path);
+    const searchDownload = Boolean(filter && visibleFilePaths.length > 0);
+    const headerDownloadTitle = searchDownload ? 'Download visible files' : 'Download folder as ZIP';
+    const hoveredItem = useMemo(
+        () => filtered.find((item) => item.path === hovered) || null,
+        [filtered, hovered],
+    );
+    const handleHeaderDownload = async () => {
+        if (searchDownload) {
+            const allMatchingFilePaths = await fetchAllFilePaths(dir, filter);
+            await downloadPaths(allMatchingFilePaths, {
+                filename: `${dir.split('/').pop() || 'data'}-filtered.zip`,
+            });
+            return;
+        }
+        triggerDownload(dir || '');
     };
 
     const anim = animState === 'exit'
@@ -145,15 +231,15 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                     {dir.split('/').pop() || 'data'}
                 </Typography>
                 <Chip label={totalCount} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: '#eef0f2', color: '#888', fontWeight: 600 }} />
-                <Tooltip title="Download folder as ZIP">
-                    <IconButton size="small" onClick={dlFolder} sx={{ color: '#888', '&:hover': { color: '#e67e22', bgcolor: '#fef7ed' } }}>
+                <Tooltip title={headerDownloadTitle}>
+                    <IconButton size="small" onClick={() => { void handleHeaderDownload(); }} sx={{ color: searchDownload ? '#2563eb' : '#888', '&:hover': { color: searchDownload ? '#1d4ed8' : '#e67e22', bgcolor: searchDownload ? '#eef2ff' : '#fef7ed' } }}>
                         <FileDownload sx={{ fontSize: 16 }} />
                     </IconButton>
                 </Tooltip>
             </Box>
 
             {/* table */}
-            <TableContainer sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+            <TableContainer sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }} onMouseLeave={() => setHov(null)}>
                 <Table stickyHeader size="small" sx={{ tableLayout: 'fixed' }}>
                     <TableHead>
                         <TableRow>
@@ -179,8 +265,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                     <Box sx={{
                                         height: 16, bgcolor: '#f3f4f6', borderRadius: 1,
                                         width: `${55 + i * 8}%`,
-                                        animation: 'shimmer 1.2s ease-in-out infinite alternate',
-                                        '@keyframes shimmer': { from: { opacity: 0.5 }, to: { opacity: 1 } },
+                                        opacity: 0.85,
                                     }} />
                                 </TableCell></TableRow>
                             ))
@@ -193,7 +278,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                 const isFile = f.type === 'file', isCk = checked.has(f.path);
                                 return (
                                     <TableRow key={f.path}
-                                        onMouseEnter={() => setHov(f.path)} onMouseLeave={() => setHov(null)}
+                                        onMouseEnter={() => setHov(f.path)}
                                         sx={{
                                             '& td': { py: 0.3, px: 1.5 },
                                             bgcolor: isCk ? '#f0f4ff' : 'transparent',
@@ -243,21 +328,19 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                             {isFile ? (
                                                 <Tooltip title="Download">
                                                     <IconButton size="small" href={`/api/data/download?path=${encodeURIComponent(f.path)}`}
-                                                        sx={{ opacity: (hovered === f.path || isCk) ? 0.9 : 0.15, transition: 'opacity .12s', '&:hover': { opacity: 1, bgcolor: '#eef2ff' } }}>
+                                                        sx={{ opacity: (hovered === f.path || isCk) ? 0.95 : 0.24, transition: 'opacity .08s linear', '&:hover': { opacity: 1, bgcolor: '#eef2ff' } }}>
                                                         <Download sx={{ fontSize: 16, color: '#2563eb' }} />
                                                     </IconButton>
                                                 </Tooltip>
-                                            ) : (
+                                            ) : !filter ? (
                                                 <Tooltip title="Download as ZIP">
                                                     <IconButton size="small" component="span" onClick={() => {
-                                                        const a = document.createElement('a');
-                                                        a.href = `/api/data/download?path=${encodeURIComponent(f.path)}`;
-                                                        a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                                                    }} sx={{ opacity: hovered === f.path ? 0.8 : 0.3, transition: 'opacity .12s', '&:hover': { opacity: 1, bgcolor: '#fef7ed' } }}>
+                                                        triggerDownload(f.path);
+                                                    }} sx={{ opacity: hovered === f.path ? 0.92 : 0.34, transition: 'opacity .08s linear', '&:hover': { opacity: 1, bgcolor: '#fef7ed' } }}>
                                                         <FileDownload sx={{ fontSize: 16, color: '#e67e22' }} />
                                                     </IconButton>
                                                 </Tooltip>
-                                            )}
+                                            ) : null}
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -266,6 +349,52 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            <Box sx={{
+                px: 1.5,
+                py: 1,
+                borderTop: '1px solid #eef0f2',
+                bgcolor: hoveredItem ? '#fbfdff' : '#fafbfc',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                minHeight: 54,
+                transition: 'background-color .08s linear',
+            }}>
+                {hoveredItem ? (
+                    <>
+                        {hoveredItem.type === 'dir'
+                            ? <Folder sx={{ fontSize: 16, color: '#6b9fd4', flexShrink: 0 }} />
+                            : <InsertDriveFile sx={{ fontSize: 15, color: '#9ca3af', flexShrink: 0 }} />}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography noWrap variant="caption" sx={{ display: 'block', color: '#111827', fontWeight: 700 }}>
+                                {hoveredItem.name}
+                            </Typography>
+                            <Typography noWrap variant="caption" sx={{ display: 'block', color: '#6b7280', fontFamily: 'monospace' }}>
+                                {hoveredItem.path}
+                            </Typography>
+                        </Box>
+                        <Chip
+                            size="small"
+                            label={hoveredItem.type === 'dir' ? 'Folder' : fmtSize(hoveredItem.size)}
+                            sx={{ height: 22, bgcolor: hoveredItem.type === 'dir' ? '#eff6ff' : '#f3f4f6', color: hoveredItem.type === 'dir' ? '#2563eb' : '#4b5563', fontWeight: 600 }}
+                        />
+                    </>
+                ) : (
+                    <>
+                        <FolderOpen sx={{ fontSize: 16, color: '#9ca3af', flexShrink: 0 }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="caption" sx={{ display: 'block', color: '#4b5563', fontWeight: 700 }}>
+                                Hover files or folders for details
+                            </Typography>
+                            <Typography noWrap variant="caption" sx={{ display: 'block', color: '#9ca3af' }}>
+                                {filter ? 'Filtered items update here instantly as you move across the list.' : 'Full path and size metadata appear here while browsing.'}
+                            </Typography>
+                        </Box>
+                        <Chip size="small" label={`${totalCount} items`} sx={{ height: 22, bgcolor: '#f3f4f6', color: '#6b7280', fontWeight: 600 }} />
+                    </>
+                )}
+            </Box>
 
             {totalPages > 1 && (
                 <Box sx={{ py: 0.8, bgcolor: '#fafbfc', borderTop: '1px solid #eef0f2', display: 'flex', justifyContent: 'center' }}>
@@ -326,24 +455,394 @@ const ExitingColumnGhost = React.memo(function ExitingColumnGhost({ dir }) {
 let _colId = 0;
 const mkCol = (dir) => ({ dir, id: _colId++ });
 
+function buildColumnsFromDir(dir) {
+    if (!dir) return [mkCol('')];
+
+    const parts = dir.split('/').filter(Boolean);
+    const cols = [mkCol('')];
+    let acc = '';
+    for (const part of parts) {
+        acc = acc ? `${acc}/${part}` : part;
+        cols.push(mkCol(acc));
+    }
+    return cols;
+}
+
+function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll, onOpenDirectory }) {
+    const trimmedQuery = query.trim();
+    const canSearch = trimmedQuery.length >= 2;
+    const [results, setResults] = useState([]);
+    const [page, setPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const [truncated, setTruncated] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [hovered, setHovered] = useState(null);
+
+    useEffect(() => {
+        setPage(1);
+    }, [trimmedQuery]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!canSearch) {
+            setResults([]);
+            setTotalCount(0);
+            setTruncated(false);
+            setLoading(false);
+            return () => { cancelled = true; };
+        }
+
+        setLoading(true);
+        API.get('/search', { params: { q: trimmedQuery, limit: GLOBAL_SEARCH_LIMIT } })
+            .then(({ data }) => {
+                if (cancelled) return;
+                const nextResults = data.results || [];
+                setResults(nextResults);
+                setTotalCount(data.totalCount ?? nextResults.length);
+                setTruncated(Boolean(data.truncated));
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setResults([]);
+                setTotalCount(0);
+                setTruncated(false);
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        return () => { cancelled = true; };
+    }, [canSearch, trimmedQuery]);
+
+    const totalPages = Math.max(1, Math.ceil(results.length / GLOBAL_PAGE_SIZE));
+
+    useEffect(() => {
+        if (page > totalPages) setPage(totalPages);
+    }, [page, totalPages]);
+
+    const visibleResults = useMemo(() => {
+        const start = (page - 1) * GLOBAL_PAGE_SIZE;
+        return results.slice(start, start + GLOBAL_PAGE_SIZE);
+    }, [page, results]);
+    const fileResults = useMemo(
+        () => results.filter((item) => item.type === 'file'),
+        [results],
+    );
+    const allFilePaths = useMemo(
+        () => fileResults.map((item) => item.path),
+        [fileResults],
+    );
+    const hoveredItem = useMemo(
+        () => results.find((item) => item.path === hovered) || null,
+        [hovered, results],
+    );
+
+    const visibleFilePaths = useMemo(
+        () => visibleResults.filter((item) => item.type === 'file').map((item) => item.path),
+        [visibleResults],
+    );
+    const checkedCount = useMemo(
+        () => fileResults.filter((item) => checked.has(item.path)).length,
+        [checked, fileResults],
+    );
+    const visibleCheckedCount = visibleFilePaths.filter((path) => checked.has(path)).length;
+    const allVisibleChecked = visibleFilePaths.length > 0 && visibleCheckedCount === visibleFilePaths.length;
+    const someVisibleChecked = visibleCheckedCount > 0 && !allVisibleChecked;
+    const allFilesChecked = allFilePaths.length > 0 && allFilePaths.every((path) => checked.has(path));
+    const someFilesChecked = checkedCount > 0 && !allFilesChecked;
+
+    const handleToggleAllVisible = () => {
+        if (!visibleFilePaths.length) return;
+        togglePaths(visibleFilePaths);
+    };
+    const handleToggleAllFiles = () => {
+        if (!allFilePaths.length) return;
+        togglePaths(allFilePaths);
+    };
+
+    const handleDownloadChecked = async () => {
+        const selectedPaths = fileResults.filter((item) => checked.has(item.path)).map((item) => item.path);
+
+        await downloadPaths(selectedPaths, {
+            filename: `${trimmedQuery || 'data-global-search'}-matches.zip`,
+            step: 160,
+        });
+    };
+    const handleDownloadAllFiles = async () => {
+        await downloadPaths(allFilePaths, {
+            filename: `${trimmedQuery || 'data-global-search'}-files.zip`,
+            step: 160,
+        });
+    };
+
+    return (
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
+                <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#111827', mb: 0.3 }}>
+                        Global Search Results
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Search across all indexed files and folders without the column browser layout.
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.7, flexWrap: 'wrap', mt: 1 }}>
+                        <Chip size="small" label={`${results.length} loaded`} sx={{ bgcolor: '#f3f4f6', color: '#4b5563', fontWeight: 600 }} />
+                        <Chip size="small" label={`${fileResults.length} files`} sx={{ bgcolor: '#eef6ff', color: '#2563eb', fontWeight: 600 }} />
+                        <Chip size="small" label={`${results.length - fileResults.length} folders`} sx={{ bgcolor: '#f8fafc', color: '#64748b', fontWeight: 600 }} />
+                    </Box>
+                </Box>
+
+                {fileResults.length > 0 && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.4, px: 0.7, py: 0.35, borderRadius: 999, bgcolor: allFilesChecked ? '#eff6ff' : '#f8fafc', border: '1px solid #e5e7eb' }}>
+                            <Checkbox size="small" sx={{ p: 0.25 }} checked={allFilesChecked} indeterminate={someFilesChecked} onChange={handleToggleAllFiles} />
+                            <Typography variant="caption" sx={{ color: '#4b5563', fontWeight: 700 }}>
+                                All loaded files
+                            </Typography>
+                        </Box>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            sx={{ minWidth: 0, px: 1.4, py: 0.4, fontSize: '0.74rem', textTransform: 'none', borderColor: '#cbd5e1', color: '#334155' }}
+                            onClick={() => { void handleDownloadAllFiles(); }}
+                        >
+                            <FileDownload sx={{ fontSize: 14, mr: 0.4 }} /> {truncated ? 'Download loaded' : 'Download all'}
+                        </Button>
+                        {checkedCount > 0 && (
+                            <Chip label={`${checkedCount} selected`} size="small" color="primary" onDelete={clearAll} />
+                        )}
+                        {checkedCount > 0 && (
+                            <Button
+                                size="small"
+                                variant="contained"
+                                sx={{ minWidth: 0, px: 1.5, py: 0.4, fontSize: '0.74rem', textTransform: 'none', boxShadow: 'none' }}
+                                onClick={() => { void handleDownloadChecked(); }}
+                            >
+                                <FileDownload sx={{ fontSize: 14, mr: 0.4 }} /> Download selected
+                            </Button>
+                        )}
+                    </Box>
+                )}
+            </Box>
+
+            {truncated && !loading && (
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                    Showing the top {results.length} ranked matches out of {totalCount}. "Download loaded" applies to the currently loaded matches.
+                </Alert>
+            )}
+
+            <Paper elevation={0} sx={{ border: '1px solid rgba(0,0,0,.06)', borderRadius: 3, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                {!canSearch ? (
+                    <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            Enter at least 2 characters to search all files and folders.
+                        </Typography>
+                    </Box>
+                ) : (
+                    <>
+                        <TableContainer sx={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }} onMouseLeave={() => setHovered(null)}>
+                            <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', minWidth: { xs: 720, sm: 780 } }}>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={{ ...thSx, width: 38, textAlign: 'center', px: 0.3 }}>
+                                            <Checkbox
+                                                size="small"
+                                                sx={{ p: 0.3 }}
+                                                checked={allVisibleChecked}
+                                                indeterminate={someVisibleChecked}
+                                                onChange={handleToggleAllVisible}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ ...thSx, width: 240 }}>Name</TableCell>
+                                        <TableCell sx={{ ...thSx, width: { xs: 320, sm: 'auto' } }}>Path</TableCell>
+                                        <TableCell sx={{ ...thSx, width: 96, textAlign: 'right' }}>Size</TableCell>
+                                        <TableCell sx={{ ...thSx, width: 92, textAlign: 'center' }}>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {loading ? (
+                                        Array.from({ length: 8 }, (_, index) => (
+                                            <TableRow key={`global-loading-${index}`}>
+                                                <TableCell colSpan={5} sx={{ py: 1.2, px: 2 }}>
+                                                    <Box sx={{ height: 16, bgcolor: '#f3f4f6', borderRadius: 1, width: `${52 + index * 5}%`, opacity: 0.85 }} />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : visibleResults.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} align="center" sx={{ py: 6, color: '#9ca3af', fontSize: '0.82rem' }}>
+                                                No global matches for "{trimmedQuery}"
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        visibleResults.map((item) => {
+                                            const isFile = item.type === 'file';
+                                            const isChecked = isFile && checked.has(item.path);
+                                            const openDir = isFile ? item.path.split('/').slice(0, -1).join('/') : item.path;
+
+                                            return (
+                                                <TableRow
+                                                    key={`${item.type}-${item.path}`}
+                                                    onMouseEnter={() => setHovered(item.path)}
+                                                    sx={{
+                                                        '& td': { py: 0.4, px: 1.5 },
+                                                        bgcolor: isChecked ? '#f0f4ff' : 'transparent',
+                                                        '&:hover': { bgcolor: isChecked ? '#e8edf8' : '#f8faff' },
+                                                        transition: 'background-color .08s linear',
+                                                    }}
+                                                >
+                                                    <TableCell sx={{ borderBottom: '1px solid #f3f4f6', textAlign: 'center', px: 0.3 }}>
+                                                        {isFile && (
+                                                            <Checkbox
+                                                                size="small"
+                                                                sx={{ p: 0.3 }}
+                                                                checked={isChecked}
+                                                                icon={<CheckBoxOutlineBlank sx={{ fontSize: 17 }} />}
+                                                                checkedIcon={<CheckBox sx={{ fontSize: 17 }} />}
+                                                                onChange={() => toggleFile(item.path)}
+                                                            />
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell sx={{ borderBottom: '1px solid #f3f4f6', width: 240 }}>
+                                                        {item.type === 'dir' ? (
+                                                            <Box
+                                                                component="button"
+                                                                onClick={() => onOpenDirectory(item.path)}
+                                                                sx={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 0.7,
+                                                                    width: '100%',
+                                                                    border: 'none',
+                                                                    bgcolor: 'transparent',
+                                                                    cursor: 'pointer',
+                                                                    fontFamily: 'monospace',
+                                                                    fontSize: '0.79rem',
+                                                                    fontWeight: 500,
+                                                                    color: '#2563eb',
+                                                                    textAlign: 'left',
+                                                                    px: 0,
+                                                                    py: 0.1,
+                                                                    transition: 'color .08s linear, transform .08s linear',
+                                                                    '&:hover': { color: '#1d4ed8', transform: 'translateX(2px)' },
+                                                                    '&:active': { transform: 'translateX(4px) scale(0.98)' },
+                                                                }}
+                                                            >
+                                                                <Folder sx={{ fontSize: 17, color: '#6b9fd4', flexShrink: 0 }} />
+                                                                <Box component="span" title={item.name} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                    {item.name}
+                                                                </Box>
+                                                            </Box>
+                                                        ) : (
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.7 }}>
+                                                                <InsertDriveFile sx={{ fontSize: 15, color: '#ccc', flexShrink: 0 }} />
+                                                                <Box component="span" title={item.name} sx={{ fontFamily: 'monospace', fontSize: '0.79rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                    {item.name}
+                                                                </Box>
+                                                            </Box>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell sx={{ borderBottom: '1px solid #f3f4f6', width: { xs: 320, sm: 'auto' } }}>
+                                                        <Box title={item.path} sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {item.path}
+                                                        </Box>
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ borderBottom: '1px solid #f3f4f6', fontSize: '0.72rem', color: '#999' }}>
+                                                        {isFile ? fmtSize(item.size) : ''}
+                                                    </TableCell>
+                                                    <TableCell align="center" sx={{ borderBottom: '1px solid #f3f4f6' }}>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.3 }}>
+                                                            {isFile && (
+                                                                <Tooltip title="Download">
+                                                                    <IconButton size="small" href={`/api/data/download?path=${encodeURIComponent(item.path)}`} sx={{ '&:hover': { bgcolor: '#eef2ff' } }}>
+                                                                        <Download sx={{ fontSize: 16, color: '#2563eb' }} />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            )}
+                                                            <Tooltip title={item.type === 'dir' ? 'Open folder' : 'Open containing folder'}>
+                                                                <IconButton size="small" onClick={() => onOpenDirectory(openDir)} sx={{ '&:hover': { bgcolor: '#eff6ff' } }}>
+                                                                    <FolderOpen sx={{ fontSize: 16, color: '#2563eb' }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </Box>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+
+                        <Box sx={{
+                            px: 1.5,
+                            py: 1,
+                            borderTop: '1px solid #eef0f2',
+                            bgcolor: hoveredItem ? '#fbfdff' : '#fafbfc',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            minHeight: 54,
+                            transition: 'background-color .08s linear',
+                        }}>
+                            {hoveredItem ? (
+                                <>
+                                    {hoveredItem.type === 'dir'
+                                        ? <Folder sx={{ fontSize: 16, color: '#6b9fd4', flexShrink: 0 }} />
+                                        : <InsertDriveFile sx={{ fontSize: 15, color: '#9ca3af', flexShrink: 0 }} />}
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography noWrap variant="caption" sx={{ display: 'block', color: '#111827', fontWeight: 700 }}>
+                                            {hoveredItem.name}
+                                        </Typography>
+                                        <Typography noWrap variant="caption" sx={{ display: 'block', color: '#6b7280', fontFamily: 'monospace' }}>
+                                            {hoveredItem.path}
+                                        </Typography>
+                                    </Box>
+                                    <Chip
+                                        size="small"
+                                        label={hoveredItem.type === 'dir' ? 'Folder' : fmtSize(hoveredItem.size)}
+                                        sx={{ height: 22, bgcolor: hoveredItem.type === 'dir' ? '#eff6ff' : '#f3f4f6', color: hoveredItem.type === 'dir' ? '#2563eb' : '#4b5563', fontWeight: 600 }}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <Search sx={{ fontSize: 16, color: '#9ca3af', flexShrink: 0 }} />
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography variant="caption" sx={{ display: 'block', color: '#4b5563', fontWeight: 700 }}>
+                                            Hover matches for details
+                                        </Typography>
+                                        <Typography noWrap variant="caption" sx={{ display: 'block', color: '#9ca3af' }}>
+                                            Full path, file size, and quick folder context appear here while reviewing matches.
+                                        </Typography>
+                                    </Box>
+                                    <Chip size="small" label={`${totalCount} matches`} sx={{ height: 22, bgcolor: '#f3f4f6', color: '#6b7280', fontWeight: 600 }} />
+                                </>
+                            )}
+                        </Box>
+
+                        {totalPages > 1 && (
+                            <Box sx={{ py: 0.8, bgcolor: '#fafbfc', borderTop: '1px solid #eef0f2', display: 'flex', justifyContent: 'center' }}>
+                                <Pagination count={totalPages} page={page} onChange={(_, value) => setPage(value)} size="small" siblingCount={0} boundaryCount={1} />
+                            </Box>
+                        )}
+                    </>
+                )}
+            </Paper>
+        </Box>
+    );
+}
+
 export default function DataBrowser() {
     const [searchParams, setSearchParams] = useSearchParams();
+    const initDir = searchParams.get('dir') || '';
+    const initFilter = searchParams.get('q') || '';
+    const initMode = searchParams.get('mode') === 'global' || (initFilter && !initDir) ? 'global' : 'browse';
 
-    const [columns, setColumns] = useState(() => {
-        const initDir = searchParams.get('dir') || '';
-        if (!initDir) return [mkCol('')];
-
-        const parts = initDir.split('/').filter(Boolean);
-        const cols = [mkCol('')];
-        let acc = '';
-        for (const p of parts) {
-            acc = acc ? `${acc}/${p}` : p;
-            cols.push(mkCol(acc));
-        }
-        return cols;
-    });
+    const [columns, setColumns] = useState(() => buildColumnsFromDir(initDir));
     const [exitingCols, setExiting] = useState([]);
-    const [filter, setFilter] = useState(() => searchParams.get('q') || '');
+    const [filter, setFilter] = useState(() => initFilter);
+    const [searchMode, setSearchMode] = useState(() => initMode);
     const [checked, setChecked] = useState(new Set());
     const [dirFileMap, setDirFileMap] = useState({});
     const scrollRef = useRef(null);
@@ -351,6 +850,7 @@ export default function DataBrowser() {
     const columnsRef = useRef(columns);
     const prevColumnCountRef = useRef(columns.length);
     columnsRef.current = columns;
+    const isGlobalSearch = searchMode === 'global';
 
     // Schedule exit animation (dedup by id to handle Strict Mode)
     const scheduleExit = useCallback((removed) => {
@@ -373,10 +873,13 @@ export default function DataBrowser() {
     const syncUrl = useCallback((cols) => {
         const dirs = cols.slice(1).map(c => c.dir);
         const params = new URLSearchParams();
-        if (dirs.length) params.set('dir', dirs.join('/'));
+        if (!isGlobalSearch && dirs.length) params.set('dir', dirs.join('/'));
         if (filter) params.set('q', filter);
-        setSearchParams(params, { replace: true });
-    }, [filter, setSearchParams]);
+        if (isGlobalSearch) params.set('mode', 'global');
+        startTransition(() => {
+            setSearchParams(params, { replace: true });
+        });
+    }, [filter, isGlobalSearch, setSearchParams]);
 
     const enterDir = useCallback((colIndex, subPath) => {
         const prev = columnsRef.current;
@@ -407,10 +910,9 @@ export default function DataBrowser() {
 
         if (!el || columns.length <= prevCount) return;
 
-        const behavior = prevCount <= 1 ? 'auto' : 'smooth';
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                el.scrollTo({ left: el.scrollWidth, behavior });
+                el.scrollTo({ left: el.scrollWidth, behavior: 'auto' });
             });
         });
     }, [columns.length]);
@@ -423,15 +925,29 @@ export default function DataBrowser() {
     const toggleFile = useCallback((path) => {
         setChecked(p => { const n = new Set(p); n.has(path) ? n.delete(path) : n.add(path); return n; });
     }, []);
-    const toggleDirAll = useCallback((dir, files) => {
+    const togglePaths = useCallback((paths) => {
         setChecked(p => {
             const n = new Set(p);
-            const all = files.every(f => n.has(f));
-            if (all) files.forEach(f => n.delete(f)); else files.forEach(f => n.add(f));
+            const all = paths.every(path => n.has(path));
+            if (all) paths.forEach(path => n.delete(path)); else paths.forEach(path => n.add(path));
             return n;
         });
     }, []);
+    const toggleDirAll = useCallback((_dir, files) => {
+        togglePaths(files);
+    }, [togglePaths]);
     const clearAll = useCallback(() => setChecked(new Set()), []);
+
+    const handleGlobalSearchToggle = useCallback((event) => {
+        clearExitColumns();
+        setSearchMode(event.target.checked ? 'global' : 'browse');
+    }, [clearExitColumns]);
+
+    const openDirectoryFromGlobalSearch = useCallback((dir) => {
+        clearExitColumns();
+        setColumns(buildColumnsFromDir(dir));
+        setSearchMode('browse');
+    }, [clearExitColumns]);
 
     const allVisibleFiles = useMemo(() => {
         const all = [];
@@ -454,11 +970,21 @@ export default function DataBrowser() {
 
     const ctxVal = useMemo(() => ({ checked, toggleFile, toggleDirAll, clearAll }), [checked, toggleFile, toggleDirAll, clearAll]);
 
-    const showIntro = columns.length === 1 && exitingCols.length === 0;
+    const showIntro = isGlobalSearch || (columns.length === 1 && exitingCols.length === 0);
+    const compactBrowseLayout = !isGlobalSearch && columns.length === 1 && exitingCols.length === 0;
 
     return (
         <SelectionCtx.Provider value={ctxVal}>
-            <Box sx={{ maxWidth: '100%', mx: 'auto', p: '20px', height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{
+                width: isGlobalSearch ? '100%' : 'fit-content',
+                maxWidth: '100%',
+                minWidth: 0,
+                mx: isGlobalSearch ? 0 : 'auto',
+                p: '20px',
+                height: 'calc(100vh - 80px)',
+                display: 'flex',
+                flexDirection: 'column',
+            }}>
                 {/* intro */}
                 <Box sx={{
                     overflow: 'hidden',
@@ -468,94 +994,134 @@ export default function DataBrowser() {
                     mb: showIntro ? 0 : 0,
                 }}>
                     <Box sx={{ pb: 2 }}>
-                        <Typography variant="h4" sx={{ fontWeight: 700, color: '#111', mb: 0.5 }}>Data Browser</Typography>
-                        <Typography variant="body2" color="text.secondary">Browse and download pipeline output files</Typography>
+                        <Typography variant="h4" sx={{ fontWeight: 700, color: '#111', mb: 0.5 }}>
+                            {isGlobalSearch ? 'Global Search' : 'Data Browser'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {isGlobalSearch
+                                ? 'Search across all indexed files and folders with a flat results view.'
+                                : 'Browse and download pipeline output files'}
+                        </Typography>
                     </Box>
                 </Box>
 
                 {/* toolbar */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexShrink: 0, flexWrap: 'wrap' }}>
-                    <TextField placeholder="Filter by name..." size="small"
+                <Box sx={{
+                    display: 'flex',
+                    flexDirection: compactBrowseLayout ? 'column' : { xs: 'column', sm: 'row' },
+                    alignItems: compactBrowseLayout ? 'stretch' : { xs: 'stretch', sm: 'center' },
+                    gap: 1.5,
+                    mb: 2,
+                    flexShrink: 0,
+                    flexWrap: compactBrowseLayout ? 'nowrap' : 'wrap',
+                }}>
+                    <TextField placeholder={isGlobalSearch ? 'Search all files and folders...' : 'Filter by name...'} size="small"
                         value={filter} onChange={e => setFilter(e.target.value)}
-                        sx={{ width: 260 }}
+                        sx={{ width: { xs: '100%', sm: isGlobalSearch ? 440 : 320 } }}
                         InputProps={{
                             startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 18, color: '#aaa' }} /></InputAdornment>,
-                            endAdornment: filter && (
-                                <InputAdornment position="end">
-                                    <IconButton size="small" onClick={() => setFilter('')} sx={{ p: 0.3 }}><Close sx={{ fontSize: 16 }} /></IconButton>
+                            endAdornment: (
+                                <InputAdornment position="end" sx={{ ml: 0.4 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.35 }}>
+                                        {filter && (
+                                            <IconButton size="small" onClick={() => setFilter('')} sx={{ p: 0.3 }}>
+                                                <Close sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                        )}
+                                        <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: '#e5e7eb', mx: 0.25 }} />
+                                        <Checkbox
+                                            size="small"
+                                            checked={isGlobalSearch}
+                                            onChange={handleGlobalSearchToggle}
+                                            sx={{ p: 0.35, color: '#94a3b8', '&.Mui-checked': { color: '#2563eb' } }}
+                                        />
+                                        <Typography variant="caption" sx={{ color: isGlobalSearch ? '#2563eb' : '#64748b', fontWeight: 700, pr: 0.2 }}>
+                                            Global
+                                        </Typography>
+                                    </Box>
                                 </InputAdornment>
                             ),
                         }}
                     />
 
-                    {/* breadcrumb */}
-                    <Box sx={{
-                        display: 'flex', alignItems: 'center', gap: 0.3, overflowX: 'auto', flex: 1, py: 0.5,
-                        '&::-webkit-scrollbar': { height: 3 }, '&::-webkit-scrollbar-thumb': { background: '#eee', borderRadius: 2 },
-                    }}>
-                        {columns.map((c, i) => (
-                            <React.Fragment key={c.id}>
-                                {i > 0 && <ChevronRight sx={{ fontSize: 13, color: '#ccc', flexShrink: 0, transition: 'transform .15s' }} />}
-                                <Chip label={c.dir.split('/').pop() || 'data'} size="small"
-                                    variant={i === columns.length - 1 ? 'filled' : 'outlined'}
-                                    color={i === columns.length - 1 ? 'primary' : 'default'}
-                                    onClick={() => backTo(i)}
-                                    sx={{
-                                        cursor: 'pointer', fontWeight: i === columns.length - 1 ? 600 : 400, flexShrink: 0,
-                                        transition: 'all .18s ease',
-                                        '&:hover': { transform: 'translateY(-1px)' },
-                                        '&:active': { transform: 'scale(0.96)' },
-                                    }} />
-                            </React.Fragment>
-                        ))}
-                    </Box>
-
-                    {/* batch actions */}
-                    {visCk.length > 0 && (
+                    {!isGlobalSearch && (
                         <Box sx={{
-                            display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0,
-                            animation: 'fadeIn .2s ease both',
-                            '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateX(6px)' }, to: { opacity: 1, transform: 'none' } },
+                            display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, flexWrap: 'wrap',
                         }}>
-                            <Checkbox size="small" sx={{ p: 0.3 }} checked={allVisCk} indeterminate={someVisCk} onChange={toggleAllVis} title="Select all visible" />
-                            <Chip label={visCk.length} size="small" color="primary" onDelete={clearAll} sx={{ fontSize: '0.72rem' }} />
-                            <Button size="small" variant="contained"
-                                sx={{ minWidth: 0, px: 1.5, py: 0.3, fontSize: '0.7rem', textTransform: 'none', boxShadow: 'none' }}
-                                onClick={() => {
-                                    [...visCk].forEach((p, i) => {
-                                        setTimeout(() => {
-                                            const a = document.createElement('a');
-                                            a.href = `/api/data/download?path=${encodeURIComponent(p)}`;
-                                            a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                                        }, i * 200);
-                                    });
+                            {/* breadcrumb */}
+                            <Box sx={{
+                                display: 'flex', alignItems: 'center', gap: 0.3, overflowX: 'auto', flex: 1, py: 0.5,
+                                '&::-webkit-scrollbar': { height: 3 }, '&::-webkit-scrollbar-thumb': { background: '#eee', borderRadius: 2 },
+                            }}>
+                                {columns.map((c, i) => (
+                                    <React.Fragment key={c.id}>
+                                        {i > 0 && <ChevronRight sx={{ fontSize: 13, color: '#ccc', flexShrink: 0, transition: 'transform .15s' }} />}
+                                        <Chip label={c.dir.split('/').pop() || 'data'} size="small"
+                                            variant={i === columns.length - 1 ? 'filled' : 'outlined'}
+                                            color={i === columns.length - 1 ? 'primary' : 'default'}
+                                            onClick={() => backTo(i)}
+                                            sx={{
+                                                cursor: 'pointer', fontWeight: i === columns.length - 1 ? 600 : 400, flexShrink: 0,
+                                                transition: 'all .18s ease',
+                                                '&:hover': { transform: 'translateY(-1px)' },
+                                                '&:active': { transform: 'scale(0.96)' },
+                                            }} />
+                                    </React.Fragment>
+                                ))}
+                            </Box>
+
+                            {/* batch actions */}
+                            {visCk.length > 0 && (
+                                <Box sx={{
+                                    display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0,
+                                    animation: 'fadeIn .2s ease both',
+                                    '@keyframes fadeIn': { from: { opacity: 0, transform: 'translateX(6px)' }, to: { opacity: 1, transform: 'none' } },
                                 }}>
-                                <FileDownload sx={{ fontSize: 14, mr: 0.3 }} /> Download
-                            </Button>
+                                    <Checkbox size="small" sx={{ p: 0.3 }} checked={allVisCk} indeterminate={someVisCk} onChange={toggleAllVis} title="Select all visible" />
+                                    <Chip label={visCk.length} size="small" color="primary" onDelete={clearAll} sx={{ fontSize: '0.72rem' }} />
+                                    <Button size="small" variant="contained"
+                                        sx={{ minWidth: 0, px: 1.5, py: 0.3, fontSize: '0.7rem', textTransform: 'none', boxShadow: 'none' }}
+                                        onClick={() => {
+                                            void downloadPaths([...visCk], { step: 160, filename: 'data-selection.zip' });
+                                        }}>
+                                        <FileDownload sx={{ fontSize: 14, mr: 0.3 }} /> Download
+                                    </Button>
+                                </Box>
+                            )}
                         </Box>
                     )}
                 </Box>
 
-                {/* columns container */}
-                <Paper elevation={0} sx={{ border: '1px solid rgba(0,0,0,.06)', borderRadius: 3, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <Box ref={scrollRef} sx={{
-                        display: 'flex', flex: 1, minHeight: 0,
-                        overflowX: 'auto', overflowY: 'hidden',
-                        '&::-webkit-scrollbar': { height: 6 },
-                        '&::-webkit-scrollbar-thumb': { background: '#ddd', borderRadius: 3 },
-                    }}>
-                        {/* active columns */}
-                        {columns.map((c, i) => (
-                            <DirColumn key={c.id} dir={c.dir} filter={filter} onFiles={onFiles}
-                                animState="enter"
-                                onEnter={(subPath) => enterDir(i, subPath)} />
-                        ))}
-                        {/* pure back navigation keeps trailing columns exiting on the right */}
-                        {exitingCols.map(c => (
-                            <ExitingColumnGhost key={`x-${c.id}`} dir={c.dir} />
-                        ))}
-                    </Box>
-                </Paper>
+                {isGlobalSearch ? (
+                    <GlobalSearchResults
+                        query={filter}
+                        checked={checked}
+                        toggleFile={toggleFile}
+                        togglePaths={togglePaths}
+                        clearAll={clearAll}
+                        onOpenDirectory={openDirectoryFromGlobalSearch}
+                    />
+                ) : (
+                    <Paper elevation={0} sx={{ border: '1px solid rgba(0,0,0,.06)', borderRadius: 3, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <Box ref={scrollRef} sx={{
+                            display: 'flex', flex: 1, minHeight: 0,
+                            overflowX: 'auto', overflowY: 'hidden',
+                            '&::-webkit-scrollbar': { height: 6 },
+                            '&::-webkit-scrollbar-thumb': { background: '#ddd', borderRadius: 3 },
+                        }}>
+                            {/* active columns */}
+                            {columns.map((c, i) => (
+                                <DirColumn key={c.id} dir={c.dir} filter={filter} onFiles={onFiles}
+                                    animState="enter"
+                                    onEnter={(subPath) => enterDir(i, subPath)} />
+                            ))}
+                            {/* pure back navigation keeps trailing columns exiting on the right */}
+                            {exitingCols.map(c => (
+                                <ExitingColumnGhost key={`x-${c.id}`} dir={c.dir} />
+                            ))}
+                        </Box>
+                    </Paper>
+                )}
             </Box>
         </SelectionCtx.Provider>
     );

@@ -1,21 +1,80 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Box, Typography, Card, CardContent, Button, TextField, Checkbox,
-    InputAdornment, Paper, List, ListItemButton, ListItemIcon,
+    Box, Typography, Card, CardActionArea, CardContent, Button, TextField,
+    Checkbox, InputAdornment, Paper, List, ListItemButton, ListItemIcon,
     ListItemText, ClickAwayListener, Chip, CircularProgress, IconButton,
+    Divider, Skeleton, Stack,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
     Search, Folder, InsertDriveFile, ArrowForward,
     Close, FileDownload, Dns, Science, Storage,
 } from '@mui/icons-material';
 import axios from 'axios';
 
+const SEARCH_API = axios.create({ baseURL: '/api/data' });
+const SEARCH_CACHE = new Map();
+const SEARCH_DEBOUNCE_MS = 220;
+const SEARCH_CACHE_TTL_MS = 90 * 1000;
+const ZIP_THRESHOLD = 10;
+
 function fmtSize(bytes) {
     if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+function triggerDownload(path) {
+    const link = document.createElement('a');
+    link.href = `/api/data/download?path=${encodeURIComponent(path)}`;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function getFilenameFromDisposition(disposition, fallback) {
+    const match = disposition?.match(/filename="?([^"]+)"?/i);
+    return match?.[1] || fallback;
+}
+
+function getCachedSearchResult(query) {
+    const cached = SEARCH_CACHE.get(query);
+    if (!cached) return null;
+    if (Date.now() - cached.cachedAt > SEARCH_CACHE_TTL_MS) {
+        SEARCH_CACHE.delete(query);
+        return null;
+    }
+    return cached;
+}
+
+async function triggerBatchDownload(paths, filename) {
+    const response = await SEARCH_API.post('/download-batch', { paths, filename }, { responseType: 'blob' });
+    const blobUrl = window.URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = getFilenameFromDisposition(response.headers['content-disposition'], filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+}
+
+async function downloadPaths(paths, options = {}) {
+    const { filename = 'data-search.zip', step = 140, zipThreshold = ZIP_THRESHOLD } = options;
+    const uniquePaths = [...new Set(paths.filter(Boolean))];
+    if (uniquePaths.length === 0) return;
+
+    if (uniquePaths.length > zipThreshold) {
+        await triggerBatchDownload(uniquePaths, filename);
+        return;
+    }
+
+    uniquePaths.forEach((path, index) => {
+        window.setTimeout(() => triggerDownload(path), index * step);
+    });
 }
 
 const stats = [
@@ -31,164 +90,519 @@ export default function Home() {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [checked, setChecked] = useState(new Set());
+    const [meta, setMeta] = useState({ totalCount: 0, truncated: false });
     const timerRef = useRef(null);
     const abortRef = useRef(null);
 
-    const search = useCallback((query) => {
-        if (!query || query.length < 2) { setResults([]); setOpen(false); return; }
-        setLoading(true); setChecked(new Set());
-        if (abortRef.current) abortRef.current.abort();
-        const ctrl = new AbortController(); abortRef.current = ctrl;
-        axios.get('/api/data/search', { params: { q: query }, signal: ctrl.signal })
-            .then(r => { setResults(r.data.results || []); setOpen(true); })
-            .catch((e) => { if (!axios.isCancel(e)) console.error(e); })
-            .finally(() => { if (abortRef.current === ctrl) setLoading(false); });
-    }, []);
+    const trimmedQ = q.trim();
+    const canSearch = trimmedQ.length >= 2;
+
+    const fileResults = useMemo(
+        () => results.filter((item) => item.type === 'file'),
+        [results],
+    );
+    const folderResults = useMemo(
+        () => results.filter((item) => item.type === 'dir'),
+        [results],
+    );
+    const checkedFiles = useMemo(
+        () => fileResults.filter((item) => checked.has(item.path)),
+        [checked, fileResults],
+    );
+    const allFilesChecked = fileResults.length > 0 && checkedFiles.length === fileResults.length;
+    const someFilesChecked = checkedFiles.length > 0 && !allFilesChecked;
+    const panelOpen = open && canSearch;
+    const resultsSummary = meta.truncated
+        ? `Showing ${results.length} of ${meta.totalCount} matches`
+        : `${meta.totalCount} matches`;
 
     useEffect(() => {
-        clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => search(q), 150);
-        return () => clearTimeout(timerRef.current);
-    }, [q, search]);
+        window.clearTimeout(timerRef.current);
 
-    useEffect(() => () => { if (abortRef.current) abortRef.current.abort(); }, []);
+        if (abortRef.current) {
+            abortRef.current.abort();
+            abortRef.current = null;
+        }
 
-    const toggle = (path) => {
-        setChecked(prev => { const n = new Set(prev); n.has(path) ? n.delete(path) : n.add(path); return n; });
-    };
-    const toggleAll = () => {
-        if (checked.size === results.length) setChecked(new Set());
-        else setChecked(new Set(results.map(r => r.path)));
-    };
+        if (!canSearch) {
+            setLoading(false);
+            setOpen(false);
+            setResults([]);
+            setMeta({ totalCount: 0, truncated: false });
+            setChecked(new Set());
+            return;
+        }
 
-    const downloadChecked = () => {
-        [...checked].forEach((p, i) => {
-            setTimeout(() => {
-                const a = document.createElement('a');
-                a.href = `/api/data/download?path=${encodeURIComponent(p)}`;
-                a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            }, i * 200);
+        timerRef.current = window.setTimeout(() => {
+            const cacheKey = trimmedQ.toLowerCase();
+            const cached = getCachedSearchResult(cacheKey);
+
+            setChecked(new Set());
+            setOpen(true);
+
+            if (cached) {
+                setResults(cached.results);
+                setMeta({ totalCount: cached.totalCount, truncated: cached.truncated });
+                setLoading(false);
+                return;
+            }
+
+            const ctrl = new AbortController();
+            abortRef.current = ctrl;
+            setLoading(true);
+
+            SEARCH_API.get('/search', {
+                params: { q: trimmedQ, limit: 60 },
+                signal: ctrl.signal,
+            })
+                .then(({ data }) => {
+                    const nextResults = data.results || [];
+                    const nextMeta = {
+                        totalCount: data.totalCount ?? nextResults.length,
+                        truncated: Boolean(data.truncated),
+                    };
+
+                    SEARCH_CACHE.set(cacheKey, { results: nextResults, cachedAt: Date.now(), ...nextMeta });
+                    setResults(nextResults);
+                    setMeta(nextMeta);
+                    setOpen(true);
+                })
+                .catch((error) => {
+                    if (!axios.isCancel(error) && error.code !== 'ERR_CANCELED') {
+                        console.error(error);
+                    }
+                })
+                .finally(() => {
+                    if (abortRef.current === ctrl) {
+                        abortRef.current = null;
+                        setLoading(false);
+                    }
+                });
+        }, SEARCH_DEBOUNCE_MS);
+
+        return () => window.clearTimeout(timerRef.current);
+    }, [canSearch, trimmedQ]);
+
+    useEffect(() => () => {
+        window.clearTimeout(timerRef.current);
+        if (abortRef.current) abortRef.current.abort();
+    }, []);
+
+    const toggleFile = (path) => {
+        setChecked((prev) => {
+            const next = new Set(prev);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            return next;
         });
+    };
+
+    const toggleAllFiles = () => {
+        if (allFilesChecked) {
+            setChecked(new Set());
+            return;
+        }
+        setChecked(new Set(fileResults.map((item) => item.path)));
+    };
+
+    const clearSearch = () => {
+        setQ('');
+        setOpen(false);
+        setResults([]);
+        setMeta({ totalCount: 0, truncated: false });
+        setChecked(new Set());
     };
 
     const handleSelect = (item) => {
         setOpen(false);
         const dir = item.type === 'dir' ? item.path : item.path.split('/').slice(0, -1).join('/');
-        const params = new URLSearchParams({ dir });
-        if (q) params.set('q', q);
+        const params = new URLSearchParams();
+        if (dir) params.set('dir', dir);
+        if (trimmedQ) params.set('q', trimmedQ);
         navigate(`/data?${params.toString()}`);
     };
 
-    return (
-        <Box sx={{ maxWidth: 900, mx: 'auto', py: 5, px: 2 }}>
-            {/* 标题 */}
-            <Typography variant="h3" sx={{ fontWeight: 800, color: '#111', mb: 1, textAlign: 'center' }}>
-                GWAS Data Browser
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4, textAlign: 'center' }}>
-                全基因组关联分析数据浏览与可视化平台
-            </Typography>
+    const openResultsInBrowser = () => {
+        if (!trimmedQ) return;
+        const params = new URLSearchParams({ q: trimmedQ, mode: 'global' });
+        navigate(`/data?${params.toString()}`);
+        setOpen(false);
+    };
 
-            {/* 数据总览卡片 */}
-            <Box sx={{ display: 'flex', gap: 2, mb: 5, flexWrap: 'wrap', justifyContent: 'center' }}>
-                {stats.map(s => (
-                    <Card key={s.label}
-                        component="a" href={s.to}
-                        sx={{
-                            flex: '1 1 180px', maxWidth: 220, borderRadius: 3, cursor: 'pointer',
-                            textDecoration: 'none', border: '1px solid rgba(0,0,0,.04)',
-                            boxShadow: '0 1px 3px rgba(0,0,0,.04)',
-                            transition: 'transform .15s, box-shadow .15s',
-                            '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,.08)' },
-                        }}>
-                        <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                            <Box sx={{ color: s.color, mb: 1 }}>{s.icon}</Box>
-                            <Typography variant="h4" sx={{ fontWeight: 700, color: '#111', mb: 0.5 }}>
-                                {s.value}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">{s.label}</Typography>
-                        </CardContent>
-                    </Card>
-                ))}
+    const handleDownloadSelection = async () => {
+        await downloadPaths(
+            checkedFiles.map((item) => item.path),
+            { filename: `${trimmedQ || 'data-search'}-files.zip`, step: 160 },
+        );
+    };
+
+    const helperText = !trimmedQ
+        ? 'Search file names, folder names, GCST accessions, and program outputs.'
+        : canSearch
+            ? 'Press Enter to open all matches in Data Browser.'
+            : 'Type at least 2 characters.';
+
+    return (
+        <Box sx={{ maxWidth: 1180, mx: 'auto', py: { xs: 3, md: 4 }, px: { xs: 1.5, md: 2 } }}>
+            <Box sx={{ mb: 2.5 }}>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: '#1f2937', mb: 0.6 }}>
+                    GWAS Data Browser
+                </Typography>
+                <Typography variant="body1" sx={{ color: '#5b6472', maxWidth: 900, lineHeight: 1.7 }}>
+                    Search study-associated files and directories by filename, GCST accession, or program label.
+                    Use the home search for quick lookup, then continue in the full Data Browser for browsing and download.
+                </Typography>
             </Box>
 
-            {/* 搜索框 */}
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, textAlign: 'center' }}>
-                Search Data Files
-            </Typography>
-            <ClickAwayListener onClickAway={() => setOpen(false)}>
-                <Box sx={{ position: 'relative', mb: 5 }}>
-                    <TextField
-                        fullWidth placeholder="Search by filename, GCST ID, program..."
-                        value={q} onChange={e => setQ(e.target.value)}
-                        onFocus={() => { if (results.length > 0) setOpen(true); }}
-                        size="medium"
-                        InputProps={{
-                            startAdornment: <InputAdornment position="start"><Search sx={{ color: '#aaa', fontSize: 22 }} /></InputAdornment>,
-                            endAdornment: loading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : (q && <IconButton size="small" onClick={() => setQ('')}><Close fontSize="small" /></IconButton>),
-                            sx: { fontSize: '1rem', py: 0.5, borderRadius: 3 },
-                        }}
-                    />
+            <Paper elevation={0} sx={{
+                border: '1px solid rgba(15,23,36,0.08)',
+                borderRadius: 2.5,
+                overflow: 'visible',
+                bgcolor: '#fff',
+            }}>
+                <Box sx={{ px: { xs: 1.5, md: 2 }, py: { xs: 1.5, md: 1.8 }, borderBottom: '1px solid #eef2f7' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1f2937', mb: 0.4 }}>
+                        File Search
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#6b7280', mb: 1.3 }}>
+                        Search returns both files and folders. File selections can be downloaded directly; folder hits open in the corresponding directory.
+                    </Typography>
 
-                    {open && results.length > 0 && (
-                        <Paper elevation={4} sx={{
-                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-                            mt: 0.5, maxHeight: 460, overflow: 'auto', borderRadius: 3,
-                        }}>
-                            {/* 结果头部 */}
-                            <Box sx={{ px: 2, py: 1, bgcolor: '#fafbfc', borderBottom: '1px solid #eee',
-                                display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Checkbox size="small" sx={{ p: 0.3 }}
-                                    checked={results.length > 0 && checked.size === results.length}
-                                    indeterminate={checked.size > 0 && checked.size < results.length}
-                                    onChange={toggleAll} />
-                                <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-                                    {results.length} results
-                                </Typography>
-                                {checked.size > 0 && (
-                                    <>
-                                        <Chip label={checked.size} size="small" color="primary"
-                                            onDelete={() => setChecked(new Set())} />
-                                        <Button size="small" variant="contained"
-                                            sx={{ minWidth: 0, px: 1.5, py: 0.2, fontSize: '0.7rem', textTransform: 'none' }}
-                                            onClick={downloadChecked}>
-                                            <FileDownload sx={{ fontSize: 14, mr: 0.3 }} /> Download
-                                        </Button>
-                                    </>
-                                )}
-                            </Box>
-                            {/* 结果列表 */}
-                            <List dense disablePadding>
-                                {results.map(item => (
-                                    <ListItemButton key={item.path}
-                                        onClick={() => handleSelect(item)}
-                                        sx={{ py: 0.7, px: 1.5 }}>
-                                        <Checkbox size="small" sx={{ p: 0.3, mr: 0.5 }}
-                                            checked={checked.has(item.path)}
-                                            onChange={(e) => { e.stopPropagation(); toggle(item.path); }}
-                                            onClick={(e) => e.stopPropagation()} />
-                                        <ListItemIcon sx={{ minWidth: 32 }}>
-                                            {item.type === 'dir'
-                                                ? <Folder sx={{ fontSize: 18, color: '#6b9fd4' }} />
-                                                : <InsertDriveFile sx={{ fontSize: 16, color: '#ccc' }} />}
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={item.name}
-                                            secondary={item.path}
-                                            primaryTypographyProps={{ fontSize: '0.83rem', fontFamily: 'monospace' }}
-                                            secondaryTypographyProps={{ fontSize: '0.7rem' }}
-                                        />
-                                        {item.type === 'file' && (
-                                            <Chip label={fmtSize(item.size)} size="small"
-                                                sx={{ fontSize: '0.62rem', mr: 0.5, height: 20 }} />
-                                        )}
-                                    </ListItemButton>
-                                ))}
-                            </List>
-                        </Paper>
-                    )}
+                    <ClickAwayListener onClickAway={() => setOpen(false)}>
+                        <Box sx={{ position: 'relative' }}>
+                            <TextField
+                                fullWidth
+                                placeholder="Search by filename, GCST ID, program, or folder"
+                                value={q}
+                                onChange={(event) => setQ(event.target.value)}
+                                onFocus={() => { if (canSearch) setOpen(true); }}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Escape') {
+                                        setOpen(false);
+                                    }
+                                    if (event.key === 'Enter' && canSearch) {
+                                        event.preventDefault();
+                                        openResultsInBrowser();
+                                    }
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search sx={{ color: '#7b8794', fontSize: 20 }} />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: loading
+                                        ? <CircularProgress size={18} sx={{ mr: 1 }} />
+                                        : (q && (
+                                            <IconButton size="small" onClick={clearSearch}>
+                                                <Close fontSize="small" />
+                                            </IconButton>
+                                        )),
+                                    sx: {
+                                        bgcolor: '#fff',
+                                        '& fieldset': { borderColor: '#d7dde6' },
+                                        '&:hover fieldset': { borderColor: '#b8c2cf' },
+                                    },
+                                }}
+                                helperText={helperText}
+                            />
+
+                            <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+                                <Chip label="Files and folders" size="small" variant="outlined" sx={{ borderColor: '#d8e2ee', color: '#4b5563' }} />
+                                <Chip label="ZIP for >10 files" size="small" variant="outlined" sx={{ borderColor: '#d8e2ee', color: '#4b5563' }} />
+                                <Chip label="Enter to open full results" size="small" variant="outlined" sx={{ borderColor: '#d8e2ee', color: '#4b5563' }} />
+                            </Stack>
+
+                            {panelOpen && (
+                                <Paper elevation={0} sx={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 10px)',
+                                    left: 0,
+                                    right: 0,
+                                    zIndex: 20,
+                                    overflow: 'hidden',
+                                    borderRadius: 2,
+                                    border: '1px solid #dbe3ec',
+                                    boxShadow: '0 10px 28px rgba(15,23,36,0.10)',
+                                    bgcolor: '#fff',
+                                }}>
+                                    <Box sx={{
+                                        px: 2,
+                                        py: 1.1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 1,
+                                        flexWrap: 'wrap',
+                                        bgcolor: '#f8fafc',
+                                        borderBottom: '1px solid #edf2f7',
+                                    }}>
+                                        <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
+                                            <Chip label={resultsSummary} size="small" sx={{ bgcolor: '#eef2f7', color: '#475569' }} />
+                                            <Chip label={`${fileResults.length} files`} size="small" sx={{ bgcolor: '#eef4ff', color: '#315ea8' }} />
+                                            {folderResults.length > 0 && (
+                                                <Chip label={`${folderResults.length} folders`} size="small" sx={{ bgcolor: '#eef2f7', color: '#475569' }} />
+                                            )}
+                                        </Stack>
+                                        <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
+                                            {checkedFiles.length > 0 && (
+                                                <>
+                                                    <Chip
+                                                        label={`${checkedFiles.length} selected`}
+                                                        size="small"
+                                                        color="primary"
+                                                        onDelete={() => setChecked(new Set())}
+                                                    />
+                                                    <Button
+                                                        size="small"
+                                                        variant="contained"
+                                                        sx={{ textTransform: 'none', boxShadow: 'none' }}
+                                                        onClick={() => { void handleDownloadSelection(); }}
+                                                    >
+                                                        <FileDownload sx={{ fontSize: 16, mr: 0.5 }} />
+                                                        Download
+                                                    </Button>
+                                                </>
+                                            )}
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                endIcon={<ArrowForward sx={{ fontSize: 15 }} />}
+                                                sx={{ textTransform: 'none' }}
+                                                onClick={openResultsInBrowser}
+                                            >
+                                                Open Data Browser
+                                            </Button>
+                                        </Stack>
+                                    </Box>
+
+                                    {loading ? (
+                                        <Box sx={{ px: 2, py: 1.6 }}>
+                                            {[0, 1, 2, 3].map((item) => (
+                                                <Box key={item} sx={{ display: 'flex', alignItems: 'center', gap: 1.2, py: 1 }}>
+                                                    <Skeleton variant="rounded" width={18} height={18} />
+                                                    <Skeleton variant="circular" width={18} height={18} />
+                                                    <Box sx={{ flex: 1 }}>
+                                                        <Skeleton variant="text" width="42%" height={24} />
+                                                        <Skeleton variant="text" width="72%" height={18} />
+                                                    </Box>
+                                                    <Skeleton variant="rounded" width={72} height={22} />
+                                                </Box>
+                                            ))}
+                                        </Box>
+                                    ) : results.length > 0 ? (
+                                        <Box sx={{ maxHeight: 460, overflowY: 'auto' }}>
+                                            <List disablePadding>
+                                                {fileResults.length > 0 && (
+                                                    <>
+                                                        <Box sx={{
+                                                            px: 2,
+                                                            py: 0.8,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 1,
+                                                            bgcolor: '#fbfcfd',
+                                                            borderBottom: '1px solid #eef2f7',
+                                                        }}>
+                                                            <Checkbox
+                                                                size="small"
+                                                                sx={{ p: 0.3 }}
+                                                                checked={allFilesChecked}
+                                                                indeterminate={someFilesChecked}
+                                                                onChange={toggleAllFiles}
+                                                            />
+                                                            <Typography variant="overline" sx={{ fontWeight: 700, color: '#6b7280', letterSpacing: '0.08em' }}>
+                                                                Files
+                                                            </Typography>
+                                                        </Box>
+                                                        {fileResults.map((item) => (
+                                                            <ListItemButton
+                                                                key={item.path}
+                                                                onClick={() => handleSelect(item)}
+                                                                sx={{
+                                                                    px: 1.75,
+                                                                    py: 1,
+                                                                    alignItems: 'center',
+                                                                    borderBottom: '1px solid #f4f6f8',
+                                                                    '&:hover': { bgcolor: '#fafbfd' },
+                                                                }}
+                                                            >
+                                                                <Checkbox
+                                                                    size="small"
+                                                                    sx={{ p: 0.3, mr: 0.8 }}
+                                                                    checked={checked.has(item.path)}
+                                                                    onChange={(event) => {
+                                                                        event.stopPropagation();
+                                                                        toggleFile(item.path);
+                                                                    }}
+                                                                    onClick={(event) => event.stopPropagation()}
+                                                                />
+                                                                <ListItemIcon sx={{ minWidth: 30 }}>
+                                                                    <InsertDriveFile sx={{ fontSize: 17, color: '#94a3b8' }} />
+                                                                </ListItemIcon>
+                                                                <ListItemText
+                                                                    primary={item.name}
+                                                                    secondary={item.path}
+                                                                    primaryTypographyProps={{
+                                                                        fontSize: '0.84rem',
+                                                                        fontWeight: 600,
+                                                                        color: '#1f2937',
+                                                                        title: item.name,
+                                                                    }}
+                                                                    secondaryTypographyProps={{
+                                                                        fontSize: '0.73rem',
+                                                                        color: '#6b7280',
+                                                                        noWrap: true,
+                                                                        title: item.path,
+                                                                    }}
+                                                                />
+                                                                <Stack direction="row" spacing={0.7} alignItems="center">
+                                                                    <Chip
+                                                                        label={fmtSize(item.size)}
+                                                                        size="small"
+                                                                        sx={{ fontSize: '0.66rem', height: 22, bgcolor: '#f8fafc', color: '#4b5563' }}
+                                                                    />
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            triggerDownload(item.path);
+                                                                        }}
+                                                                        sx={{
+                                                                            color: '#315ea8',
+                                                                            '&:hover': { bgcolor: '#eff4fb' },
+                                                                        }}
+                                                                    >
+                                                                        <FileDownload sx={{ fontSize: 16 }} />
+                                                                    </IconButton>
+                                                                </Stack>
+                                                            </ListItemButton>
+                                                        ))}
+                                                    </>
+                                                )}
+
+                                                {folderResults.length > 0 && (
+                                                    <>
+                                                        {fileResults.length > 0 && <Divider />}
+                                                        <Box sx={{
+                                                            px: 2,
+                                                            py: 0.8,
+                                                            bgcolor: '#fbfcfd',
+                                                            borderBottom: '1px solid #eef2f7',
+                                                        }}>
+                                                            <Typography variant="overline" sx={{ fontWeight: 700, color: '#6b7280', letterSpacing: '0.08em' }}>
+                                                                Folders
+                                                            </Typography>
+                                                        </Box>
+                                                        {folderResults.map((item) => (
+                                                            <ListItemButton
+                                                                key={item.path}
+                                                                onClick={() => handleSelect(item)}
+                                                                sx={{
+                                                                    px: 1.75,
+                                                                    py: 1,
+                                                                    alignItems: 'center',
+                                                                    borderBottom: '1px solid #f4f6f8',
+                                                                    '&:hover': { bgcolor: '#fafbfd' },
+                                                                }}
+                                                            >
+                                                                <Box sx={{ width: 30, mr: 0.8 }} />
+                                                                <ListItemIcon sx={{ minWidth: 30 }}>
+                                                                    <Folder sx={{ fontSize: 18, color: '#6b9fd4' }} />
+                                                                </ListItemIcon>
+                                                                <ListItemText
+                                                                    primary={item.name}
+                                                                    secondary={item.path}
+                                                                    primaryTypographyProps={{
+                                                                        fontSize: '0.84rem',
+                                                                        fontWeight: 600,
+                                                                        color: '#1f2937',
+                                                                        title: item.name,
+                                                                    }}
+                                                                    secondaryTypographyProps={{
+                                                                        fontSize: '0.73rem',
+                                                                        color: '#6b7280',
+                                                                        noWrap: true,
+                                                                        title: item.path,
+                                                                    }}
+                                                                />
+                                                                <Chip
+                                                                    label="Open folder"
+                                                                    size="small"
+                                                                    sx={{ fontSize: '0.66rem', height: 22, bgcolor: '#f3f6f9', color: '#4b5563' }}
+                                                                />
+                                                            </ListItemButton>
+                                                        ))}
+                                                    </>
+                                                )}
+                                            </List>
+                                        </Box>
+                                    ) : (
+                                        <Box sx={{
+                                            px: 2.5,
+                                            py: 4.5,
+                                            textAlign: 'center',
+                                        }}>
+                                            <Search sx={{ fontSize: 30, color: '#cbd5e1', mb: 1 }} />
+                                            <Typography sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>
+                                                No matches for "{trimmedQ}"
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                                                Try a shorter filename fragment, a GCST accession, or continue in the full Data Browser.
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Paper>
+                            )}
+                        </Box>
+                    </ClickAwayListener>
                 </Box>
-            </ClickAwayListener>
+
+                <Box sx={{
+                    px: { xs: 1.5, md: 2 },
+                    py: { xs: 1.5, md: 1.8 },
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+                    gap: 1.5,
+                }}>
+                    {stats.map((item) => (
+                        <Card
+                            key={item.label}
+                            elevation={0}
+                            sx={{
+                                borderRadius: 2,
+                                border: '1px solid rgba(15,23,36,0.08)',
+                                boxShadow: 'none',
+                            }}
+                        >
+                            <CardActionArea onClick={() => navigate(item.to)}>
+                                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.25, py: 1.8 }}>
+                                    <Box sx={{
+                                        width: 42,
+                                        height: 42,
+                                        borderRadius: 2,
+                                        display: 'grid',
+                                        placeItems: 'center',
+                                        bgcolor: alpha(item.color, 0.10),
+                                        color: item.color,
+                                        flexShrink: 0,
+                                    }}>
+                                        {item.icon}
+                                    </Box>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937', lineHeight: 1.05 }}>
+                                            {item.value}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#6b7280', mt: 0.2 }}>
+                                            {item.label}
+                                        </Typography>
+                                    </Box>
+                                </CardContent>
+                            </CardActionArea>
+                        </Card>
+                    ))}
+                </Box>
+            </Paper>
         </Box>
     );
 }
