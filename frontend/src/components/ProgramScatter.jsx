@@ -36,20 +36,20 @@ const CATEGORY_SIZE_SCALE = {
 };
 const TABLE_TONES = {
     program: {
-        headerBg: 'rgba(230,159,0,0.12)',
-        headerBorder: 'rgba(230,159,0,0.34)',
+        headerBg: '#fbf1d8',
+        headerBorder: '#e5c57b',
         headerColor: '#9A5A00',
-        cellStrong: 'rgba(230,159,0,0.065)',
-        cellSoft: 'rgba(230,159,0,0.038)',
-        rankCell: 'rgba(230,159,0,0.095)',
+        cellStrong: '#fcf6e8',
+        cellSoft: '#fdf9ef',
+        rankCell: '#f8ebc9',
     },
     regulator: {
-        headerBg: 'rgba(0,114,178,0.12)',
-        headerBorder: 'rgba(0,114,178,0.3)',
+        headerBg: '#e4f1f8',
+        headerBorder: '#93bfd6',
         headerColor: '#0B5C89',
-        cellStrong: 'rgba(0,114,178,0.06)',
-        cellSoft: 'rgba(0,114,178,0.035)',
-        rankCell: 'rgba(0,114,178,0.09)',
+        cellStrong: '#eff7fb',
+        cellSoft: '#f7fbfd',
+        rankCell: '#dceef7',
     },
 };
 

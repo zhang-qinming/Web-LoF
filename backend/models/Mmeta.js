@@ -51,9 +51,9 @@ async function getTraitMeta(fileId) {
          FROM file_metadata fm
          LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id
          LEFT JOIN lof_meta lm ON lm.file_id = fm.file_id
-         WHERE fm.file_id = ?
+         WHERE fm.file_id = ? OR fm.gwas_id = ?
          LIMIT 1`,
-        [fileId]
+        [fileId, fileId]
     );
     return rows[0] || null;
 }

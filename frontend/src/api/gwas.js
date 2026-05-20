@@ -35,3 +35,38 @@ export async function getTraitData(traitName) {
         return { data: [] };
     }
 }
+
+export async function getTraitManhattanHits(traitName, { variant = 'hits' } = {}) {
+    try {
+        const res = await axios.get(`${API_BASE}/trait/manhattan/${encodeURIComponent(traitName)}`, {
+            params: { variant },
+        });
+        return res.data;
+    } catch (err) {
+        console.error(`获取 Trait "${traitName}" Manhattan 数据失败:`, err);
+        return {
+            fileId: traitName,
+            variant,
+            requestedVariant: variant,
+            resolvedVariant: variant,
+            fallbackUsed: false,
+            availableVariants: { hits: false, full: false },
+            hasData: false,
+            data: [],
+            summary: {
+                totalRows: 0,
+                withProgram: 0,
+                withGeneset: 0,
+                withoutProgram: 0,
+                withoutGeneset: 0,
+                distanceBuckets: { in_gene: 0, near: 0, moderate: 0, distal: 0, unknown: 0 },
+                topPrograms: [],
+                topGenesets: [],
+            },
+            notes: {
+                distance_to_gene: '',
+                fullVariantPlaceholder: '',
+            },
+        };
+    }
+}

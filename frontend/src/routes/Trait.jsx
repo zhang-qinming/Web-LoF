@@ -13,6 +13,7 @@ import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import ProgramScatter from '../components/ProgramScatter';
 import GwasDataList from '../components/GwasDataList';
+import TraitHitManhattan from '../components/TraitHitManhattan';
 
 // ---- 骨架屏 ----
 function MetaSkeleton() {
@@ -170,7 +171,10 @@ export default function Trait() {
     const fileId = traitName;
     const [tab, setTab] = React.useState(0);
     const { data: listData } = useSWR('/api/programs/list', fetcher);
+    const { data: metaData } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
     const hasProgram = listData?.files?.includes(fileId);
+    const meta = (metaData && !metaData.error) ? metaData : null;
+    const gwasId = metaData === undefined ? '' : (meta?.gwas_id || fileId);
 
     if (!fileId) {
         return (
@@ -208,7 +212,7 @@ export default function Trait() {
                     '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
                 }}>
                 <Tab label="Program Scatter" disabled={!hasProgram} />
-                <Tab label="Manhattan" disabled />
+                <Tab label="Manhattan" />
                 <Tab label="LoF Volcano" disabled />
             </Tabs>
 
@@ -220,7 +224,15 @@ export default function Trait() {
                         <Typography color="text.secondary">No Program enrichment data for this trait</Typography>
                     </Card>
                 )}
-                {tab > 0 && (
+                {tab === 1 && (
+                    <TraitHitManhattan
+                        key={`manhattan-${fileId}-${gwasId}`}
+                        fileId={fileId}
+                        gwasId={gwasId}
+                        traitLabel={meta?.trait_name || fileId}
+                    />
+                )}
+                {tab === 2 && (
                     <Card variant="outlined" sx={{ py: 8, textAlign: 'center', borderRadius: 3, bgcolor: '#fafbfc' }}>
                         <Science sx={{ fontSize: 48, color: '#ddd', mb: 2 }} />
                         <Typography color="text.secondary">Coming soon</Typography>
