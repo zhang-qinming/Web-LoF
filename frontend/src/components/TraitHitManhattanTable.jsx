@@ -168,6 +168,7 @@ function renderCellContent({ column, row, programColorMap, formatDistance, forma
 }
 
 export default function TraitHitManhattanTable({
+    tableSectionRef,
     processedRows,
     sortedRows,
     pagedRows,
@@ -194,6 +195,7 @@ export default function TraitHitManhattanTable({
 
     return (
         <Paper
+            ref={tableSectionRef}
             variant="outlined"
             sx={{
                 mt: 2,
@@ -311,9 +313,9 @@ export default function TraitHitManhattanTable({
                                         }}
                                         sx={{
                                             bgcolor: isHighlighted ? '#fff5bf' : (even ? '#ffffff' : '#fbfcfd'),
-                                            boxShadow: isHighlighted ? 'inset 0 0 0 1px rgba(217,119,6,0.12)' : 'none',
+                                            boxShadow: isHighlighted ? 'inset 0 0 0 1px rgba(217,119,6,0.16), 0 0 0 2px rgba(245,158,11,0.12)' : 'none',
                                             '& td': {
-                                                transition: 'background-color 0.14s ease, box-shadow 0.14s ease',
+                                                transition: 'background-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease',
                                             },
                                             '&:hover td': {
                                                 bgcolor: isHighlighted ? '#ffef9f' : '#f3f6fa',
@@ -351,6 +353,9 @@ export default function TraitHitManhattanTable({
                                             }
                                             if (column.key === 'primaryProgram') {
                                                 sx.bgcolor = TONES.program.cellSoft;
+                                            }
+                                            if (isHighlighted) {
+                                                sx.fontWeight = ['snp', 'nearestGene', 'primaryProgram', 'primaryGeneset', 'logp'].includes(column.key) ? 700 : Math.max(500, sx.fontWeight || 400);
                                             }
 
                                             return (

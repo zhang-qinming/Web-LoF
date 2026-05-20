@@ -171,6 +171,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     const navigate = useNavigate();
     const tableRowRefs = useRef({});
     const plotRef = useRef(null);
+    const tableSectionRef = useRef(null);
 
     const [loading, setLoading] = useState(true);
     const [payload, setPayload] = useState(null);
@@ -628,6 +629,11 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         }
 
         const timeoutId = window.setTimeout(() => {
+            const tableSection = tableSectionRef.current;
+            if (tableSection) {
+                const top = tableSection.getBoundingClientRect().top + window.scrollY - 84;
+                window.scrollTo({ top, behavior: 'smooth' });
+            }
             const el = tableRowRefs.current[highlight.rowKey];
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 180);
@@ -932,6 +938,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 </CardContent>
             </Card>
             <TraitHitManhattanTable
+                tableSectionRef={tableSectionRef}
                 processedRows={processedRows}
                 sortedRows={sortedRows}
                 pagedRows={pagedRows}

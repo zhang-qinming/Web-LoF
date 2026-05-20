@@ -12,6 +12,7 @@ import {
 import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
+import ProgramScatterTable from './ProgramScatterTable';
 
 const COLORS = {
     other: '#b8c0cc',
@@ -161,8 +162,6 @@ const thSx = (align) => ({
     bgcolor: '#f7f7f7', borderBottom: '2px solid #d0d0d0', color: '#555',
     textAlign: align, whiteSpace: 'nowrap',
 });
-
-const sortLabelSx = { fontSize: '0.7rem' };
 
 const tdSx = (align, fontFamily, fontWeight, bgcolor) => ({
     fontSize: '0.73rem', py: 0.55, px: 1.3,
@@ -826,133 +825,25 @@ export default function ProgramScatter({ fileId }) {
                 </Dialog>
             </>)}
 
-            {/* ==================== 数据表格 ==================== */}
-            {rows.length > 0 && (
-                <Paper variant="outlined" sx={{ mt: 2, border: '1px solid #e8e8ec', borderRadius: 2, overflow: 'hidden' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.2, bgcolor: '#fafbfc', borderBottom: tableOpen ? '1px solid #eee' : 'none' }}>
-                        <Button
-                            onClick={() => { setTableOpen((v) => !v); setHighlight({ program: null, key: 0 }); }}
-                            endIcon={tableOpen ? <ExpandLess /> : <ExpandMore />}
-                            sx={{ textTransform: 'none', color: '#444', fontWeight: 500, fontSize: '0.82rem' }}
-                        >
-                            Data Table <Chip label={rows.length} size="small" sx={{ ml: 1, height: 20, fontSize: '0.7rem', bgcolor: '#e0e0e0', color: '#555' }} />
-                        </Button>
-                        <Box sx={{ flex: 1 }} />
-                        {tableOpen && (
-                            <Button size="small" startIcon={<Download />}
-                                onClick={downloadCSV}
-                                sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#777' }}>
-                                CSV
-                            </Button>
-                        )}
-                    </Box>
-                    <Collapse in={tableOpen}>
-                        <TableContainer sx={{ maxHeight: 460 }}>
-                            <Table stickyHeader size="small" sx={{ tableLayout: 'auto' }}>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell colSpan={2}
-                                            sx={{ fontWeight: 600, fontSize: '0.68rem', py: 0.6, bgcolor: '#f7f7f7',
-                                                  borderBottom: '2px solid #d0d0d0', textAlign: 'center', color: '#888',
-                                                  textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                            Info
-                                        </TableCell>
-                                        <TableCell colSpan={4}
-                                            sx={{ fontWeight: 600, fontSize: '0.68rem', py: 0.6, bgcolor: TABLE_TONES.program.headerBg,
-                                                  borderBottom: `2px solid ${TABLE_TONES.program.headerBorder}`, textAlign: 'center', color: TABLE_TONES.program.headerColor,
-                                                  textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                            Program
-                                        </TableCell>
-                                        <TableCell colSpan={4}
-                                            sx={{ fontWeight: 600, fontSize: '0.68rem', py: 0.6, bgcolor: TABLE_TONES.regulator.headerBg,
-                                                  borderBottom: `2px solid ${TABLE_TONES.regulator.headerBorder}`, textAlign: 'center', color: TABLE_TONES.regulator.headerColor,
-                                                  textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                            Regulator
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        {[
-                                            ['program',  'Program',  'left'],
-                                            ['color',    'Category', 'left'],
-                                        ].map(([key, label, align]) => (
-                                            <TableCell key={key} sx={thSx(align)}>
-                                                <TableSortLabel active={sortBy === key} direction={sortBy === key ? sortDir : 'asc'}
-                                                    onClick={() => handleSort(key)} sx={sortLabelSx}>{label}</TableSortLabel>
-                                            </TableCell>
-                                        ))}
-                                        {[
-                                            ['progScore',  'Signed −log₁₀(P)',  'right'],
-                                            ['rankProg',   'Rank',              'center'],
-                                            ['progP',      'P-value',           'right'],
-                                            ['progGamma',  'γ (Gamma)',         'right'],
-                                        ].map(([key, label, align]) => (
-                                            <TableCell key={key} sx={{ ...thSx(align), bgcolor: TABLE_TONES.program.headerBg, borderBottom: `2px solid ${TABLE_TONES.program.headerBorder}`, color: TABLE_TONES.program.headerColor }}>
-                                                <TableSortLabel active={sortBy === key} direction={sortBy === key ? sortDir : 'asc'}
-                                                    onClick={() => handleSort(key)} sx={sortLabelSx}>{label}</TableSortLabel>
-                                            </TableCell>
-                                        ))}
-                                        {[
-                                            ['regScore',  'Signed −log₁₀(P)',  'right'],
-                                            ['rankReg',   'Rank',              'center'],
-                                            ['regP',      'P-value',           'right'],
-                                            ['regBeta',   'β (Beta)',          'right'],
-                                        ].map(([key, label, align]) => (
-                                            <TableCell key={key} sx={{ ...thSx(align), bgcolor: TABLE_TONES.regulator.headerBg, borderBottom: `2px solid ${TABLE_TONES.regulator.headerBorder}`, color: TABLE_TONES.regulator.headerColor }}>
-                                                <TableSortLabel active={sortBy === key} direction={sortBy === key ? sortDir : 'asc'}
-                                                    onClick={() => handleSort(key)} sx={sortLabelSx}>{label}</TableSortLabel>
-                                            </TableCell>
-                                        ))}
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {sortedRows.map((row, idx) => {
-                                        const isHL = highlight.program === row.program;
-                                        const even = idx % 2 === 0;
-                                        const isTopProg = Number.isFinite(row.rankProg) && row.rankProg <= 3;
-                                        const isTopReg = Number.isFinite(row.rankReg) && row.rankReg <= 3;
-                                        return (
-                                            <TableRow
-                                                key={row.program}
-                                                ref={(el) => { if (el) tableRowRefs.current[row.program] = el; }}
-                                                sx={{
-                                                    bgcolor: isHL ? '#FFF9C4' : (even ? '#fff' : '#f7f7f8'),
-                                                    transition: 'background-color 0.15s',
-                                                    '&:hover': { bgcolor: isHL ? '#FFEB3B' : '#eeeff2 !important' },
-                                                }}
-                                            >
-                                                <TableCell sx={{ ...tdSx('left', 'monospace', 500), cursor: 'pointer', color: '#1976D2', '&:hover': { color: '#0D47A1', textDecoration: 'underline' } }}
-                                                    onClick={() => {
-                                                        const num = row.program.match(/\d+/);
-                                                        if (num) navigate(`/programs/${num[0]}`);
-                                                    }}
-                                                    title="Go to gene regulation view">
-                                                    {row.program}
-                                                </TableCell>
-                                                <TableCell sx={tdSx('left')}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
-                                                        <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: COLORS[row.color], flexShrink: 0 }} />
-                                                        <Box component="span" sx={{ color: row.color === 'other' ? '#667085' : COLORS[row.color], fontWeight: row.color === 'other' ? 400 : 600 }}>
-                                                            {LEGEND_LABELS[row.color]}
-                                                        </Box>
-                                                    </Box>
-                                                </TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progScore?.toFixed(3) ?? '—'}</TableCell>
-                                                <TableCell sx={{ ...tdSx('center', undefined, isTopProg ? 700 : 400, TABLE_TONES.program.rankCell), color: isTopProg ? TABLE_TONES.program.headerColor : '#888' }}>{row.rankProg ?? '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellSoft)}>{row.progP != null ? row.progP.toExponential(2) : '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progGamma?.toFixed(4) ?? '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regScore?.toFixed(3) ?? '—'}</TableCell>
-                                                <TableCell sx={{ ...tdSx('center', undefined, isTopReg ? 700 : 400, TABLE_TONES.regulator.rankCell), color: isTopReg ? TABLE_TONES.regulator.headerColor : '#888' }}>{row.rankReg ?? '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellSoft)}>{row.regP != null ? row.regP.toExponential(2) : '—'}</TableCell>
-                                                <TableCell sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regBeta?.toFixed(4) ?? '—'}</TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </Collapse>
-                </Paper>
-            )}
+            <ProgramScatterTable
+                rows={rows}
+                tableOpen={tableOpen}
+                setTableOpen={setTableOpen}
+                setHighlight={setHighlight}
+                downloadCSV={downloadCSV}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                handleSort={handleSort}
+                sortedRows={sortedRows}
+                highlight={highlight}
+                tableRowRefs={tableRowRefs}
+                COLORS={COLORS}
+                LEGEND_LABELS={LEGEND_LABELS}
+                TABLE_TONES={TABLE_TONES}
+                thSx={thSx}
+                tdSx={tdSx}
+                navigate={navigate}
+            />
 
         </Box>
     );
