@@ -70,3 +70,13 @@ export async function getTraitManhattanHits(traitName, { variant = 'hits' } = {}
         };
     }
 }
+
+export async function getBurdenVolcano(fileId) {
+    try {
+        const res = await axios.get(`${API_BASE}/burden-volcano/${encodeURIComponent(fileId)}`);
+        return res.data;
+    } catch (err) {
+        console.error(`获取 Trait "${fileId}" LoF Volcano 数据失败:`, err);
+        return { data: [] };
+    }
+}

@@ -6,6 +6,7 @@ const programModel = require('../models/Mprogram');
 const router = express.Router();
 
 const DATA_DIR = process.env.PROGRAM_DATA_DIR || path.join(__dirname, '..', 'data', 'program_regulator');
+const BURDEN_VOLCANO_DIR = process.env.BURDEN_VOLCANO_DIR || path.join(__dirname, '..', 'data', 'burden_volcano');
 
 async function parseTSV(filePath) {
     if (!fs.existsSync(filePath)) return null;
@@ -57,6 +58,17 @@ router.get('/api/programs/list', (req, res) => {
 router.get('/api/programs/:fileId', async (req, res) => {
     try {
         const filePath = path.join(DATA_DIR, `${req.params.fileId}.tsv`);
+        const data = await parseTSV(filePath);
+        if (!data) return res.status(404).json({ error: 'Not found' });
+        res.json({ data });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/api/burden-volcano/:fileId', async (req, res) => {
+    try {
+        const filePath = path.join(BURDEN_VOLCANO_DIR, `${req.params.fileId}_hits.tsv`);
         const data = await parseTSV(filePath);
         if (!data) return res.status(404).json({ error: 'Not found' });
         res.json({ data });

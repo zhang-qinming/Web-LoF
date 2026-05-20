@@ -14,6 +14,7 @@ import { fetcher } from '../api/gwas';
 import ProgramScatter from '../components/ProgramScatter';
 import GwasDataList from '../components/GwasDataList';
 import TraitHitManhattan from '../components/TraitHitManhattan';
+import BurdenVolcano from '../components/BurdenVolcano';
 
 // ---- 骨架屏 ----
 function MetaSkeleton() {
@@ -175,6 +176,8 @@ export default function Trait() {
     const hasProgram = listData?.files?.includes(fileId);
     const meta = (metaData && !metaData.error) ? metaData : null;
     const gwasId = metaData === undefined ? '' : (meta?.gwas_id || fileId);
+    const { data: volcanoData } = useSWR(fileId ? `/api/burden-volcano/${encodeURIComponent(fileId)}` : null, fetcher);
+    const hasVolcano = Array.isArray(volcanoData?.data) && volcanoData.data.length > 0;
 
     if (!fileId) {
         return (
@@ -213,7 +216,7 @@ export default function Trait() {
                 }}>
                 <Tab label="Program Scatter" disabled={!hasProgram} />
                 <Tab label="Manhattan" />
-                <Tab label="LoF Volcano" disabled />
+                <Tab label="LoF Volcano" disabled={!gwasId} />
             </Tabs>
 
             <Box sx={{ minHeight: 400 }}>
@@ -233,10 +236,19 @@ export default function Trait() {
                     />
                 )}
                 {tab === 2 && (
-                    <Card variant="outlined" sx={{ py: 8, textAlign: 'center', borderRadius: 3, bgcolor: '#fafbfc' }}>
-                        <Science sx={{ fontSize: 48, color: '#ddd', mb: 2 }} />
-                        <Typography color="text.secondary">Coming soon</Typography>
-                    </Card>
+                    hasVolcano ? (
+                        <BurdenVolcano
+                            key={`volcano-${fileId}`}
+                            fileId={fileId}
+                            gwasId={fileId}
+                            traitLabel={meta?.trait_name || fileId}
+                        />
+                    ) : (
+                        <Card variant="outlined" sx={{ py: 8, textAlign: 'center', borderRadius: 3, bgcolor: '#fafbfc' }}>
+                            <Science sx={{ fontSize: 48, color: '#ddd', mb: 2 }} />
+                            <Typography color="text.secondary">No LoF volcano data for this trait</Typography>
+                        </Card>
+                    )
                 )}
             </Box>
         </Box>
