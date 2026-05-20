@@ -49,6 +49,9 @@ const sortLabelSx = {
     },
 };
 
+const ROW_HIGHLIGHT_BASE = '#fff1b8';
+const ROW_HIGHLIGHT_FLASH = '#ffe082';
+
 function renderCell(column, row, helpers) {
     const {
         COLORS,
@@ -218,18 +221,33 @@ export default function ProgramScatterTable({
                             {sortedRows.map((row, idx) => {
                                 const isHL = highlight.program === row.program;
                                 const even = idx % 2 === 0;
+                                const flashAnimation = isHL
+                                    ? `${highlight.key % 2 === 0 ? 'programRowFlashA' : 'programRowFlashB'} 1.15s ease-out`
+                                    : 'none';
                                 return (
                                     <TableRow
                                         key={row.program}
                                         ref={(el) => { if (el) tableRowRefs.current[row.program] = el; }}
                                         sx={{
-                                            bgcolor: isHL ? '#FFF3B8' : (even ? '#fff' : '#f7f7f8'),
-                                            boxShadow: isHL ? 'inset 0 0 0 1px rgba(217,119,6,0.14)' : 'none',
+                                            '@keyframes programRowFlashA': {
+                                                '0%': { backgroundColor: ROW_HIGHLIGHT_FLASH },
+                                                '28%': { backgroundColor: '#ffef99' },
+                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
+                                            },
+                                            '@keyframes programRowFlashB': {
+                                                '0%': { backgroundColor: '#ffd969' },
+                                                '28%': { backgroundColor: '#ffeb8a' },
+                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
+                                            },
+                                            bgcolor: isHL ? ROW_HIGHLIGHT_BASE : (even ? '#fff' : '#f7f7f8'),
+                                            boxShadow: isHL ? 'inset 0 0 0 1px rgba(217,119,6,0.18), 0 0 0 2px rgba(245,158,11,0.1)' : 'none',
                                             '& td': {
+                                                backgroundColor: isHL ? `${ROW_HIGHLIGHT_BASE} !important` : undefined,
                                                 transition: 'background-color 0.15s ease, box-shadow 0.15s ease',
+                                                animation: flashAnimation,
                                             },
                                             '&:hover td': {
-                                                bgcolor: isHL ? '#ffe78d' : '#eeeff2',
+                                                bgcolor: isHL ? `${ROW_HIGHLIGHT_BASE} !important` : '#eeeff2',
                                                 boxShadow: 'inset 0 -1px 0 rgba(226,232,240,0.78)',
                                             },
                                         }}

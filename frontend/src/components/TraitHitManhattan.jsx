@@ -38,18 +38,18 @@ import { getTraitManhattanHits } from '../api/gwas';
 import TraitHitManhattanLegend from './TraitHitManhattanLegend';
 import TraitHitManhattanTable from './TraitHitManhattanTable';
 
-const UNASSIGNED_COLOR = '#94a3b8';
+const UNASSIGNED_COLOR = '#6f7d90';
 const DEFAULT_EXPORT_WIDTH = 1400;
 const DEFAULT_EXPORT_HEIGHT = 760;
 const PROGRAM_COLORS = [
-    '#2457C5', '#B84A6A', '#0F8C79', '#D96F1A', '#6A4FBF', '#C03E4C', '#0086A7', '#8E6B10',
-    '#C44E8B', '#2C7A50', '#5C6BC0', '#A8582B', '#0E7490', '#9A3F6B', '#6B8E23', '#7B52B9',
-    '#BD5A2F', '#1D7F84', '#A8445B', '#4E7E2B', '#4C6EDB', '#B26A12', '#8A4C9E', '#147E68',
-    '#CC5C3A', '#2D62A8', '#A84D88', '#4C8F4B', '#A33E3E', '#1472B0', '#92721D', '#7B5AC8',
-    '#B75474', '#087F8C', '#9A6536', '#4059B5', '#9B4F54', '#26825D', '#8858A8', '#C06A14',
-    '#0D6E90', '#A34773', '#5D7D2F', '#3E5FC9', '#BE5F49', '#177D75', '#8F4A95', '#A46821',
-    '#2E73A8', '#B54862', '#4B8652', '#6E57B8', '#CB6A2B', '#176C9A', '#9D5A2D', '#7C4D9F',
-    '#B34D4D', '#0E8575', '#6D78D6', '#A85F8A',
+    '#5194D6', '#D66351', '#51D6AA', '#D69451', '#9851D6', '#D65187', '#51BCD6', '#63D651',
+    '#6351D6', '#D67E51', '#51D689', '#D651D6', '#51D6CD', '#D6C551', '#5175D6', '#D65168',
+    '#51D663', '#B751D6', '#51AED6', '#9DD651', '#3C82C8', '#C84F3C', '#3CC899', '#C8823C',
+    '#873CC8', '#C83C74', '#3CACC8', '#4FC83C', '#4F3CC8', '#C86B3C', '#3CC876', '#C83CC8',
+    '#3CC8BF', '#C8B53C', '#3C61C8', '#C83C53', '#3CC84F', '#A73CC8', '#3C9EC8', '#8BC83C',
+    '#73A1CE', '#CE7F73', '#73CEB0', '#CEA173', '#A473CE', '#CE7398', '#73BCCE', '#7FCE73',
+    '#7F73CE', '#CE9273', '#73CE99', '#CE73CE', '#73CEC8', '#CEC273', '#738CCE', '#CE7382',
+    '#73CE7F', '#B973CE', '#73B3CE', '#A7CE73',
 ];
 const HOVER_TEMPLATE = [
     '<b>%{customdata[1]}</b>',
@@ -96,6 +96,47 @@ const CHROM_LENGTHS = {
 
 const CHROM_GAP = 3000000;
 const GWAS_HIT_LOGP = -Math.log10(5e-8);
+const TOOLBAR_SX = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 1.25,
+    px: 2,
+    py: 1.45,
+    bgcolor: '#f9f9fb',
+    borderRadius: 2,
+    border: '1px solid #e8e8ec',
+};
+
+const COMPACT_TOGGLE_SX = {
+    '& .MuiToggleButton-root': {
+        px: 1.75,
+        py: 0.42,
+        textTransform: 'none',
+        fontWeight: 500,
+        fontSize: '0.8rem',
+        letterSpacing: 0.2,
+        color: '#6b7280',
+        borderColor: '#d9dde3',
+        '&.Mui-selected': {
+            color: '#1f2937',
+            bgcolor: '#e9edf3',
+            fontWeight: 600,
+        },
+        '&:hover': {
+            bgcolor: '#f1f4f8',
+        },
+    },
+};
+
+const SUMMARY_CHIP_SX = {
+    height: 24,
+    fontSize: '0.72rem',
+    fontWeight: 600,
+    '& .MuiChip-icon': {
+        fontSize: 15,
+    },
+};
 
 function sanitizeFileNamePart(value) {
     return String(value || 'plot').replace(/[\\/:*?"<>|]+/g, '_');
@@ -134,16 +175,16 @@ function getProgramColor(index) {
     return PROGRAM_COLORS[index % PROGRAM_COLORS.length];
 }
 
-function buildProgramColorMap(rows) {
-    const programs = [...new Set(
+function buildCategoryColorMap(rows, field) {
+    const categories = [...new Set(
         rows
-            .map((item) => item.primaryProgram)
+            .map((item) => item[field])
             .filter(Boolean),
     )].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
     const colorMap = new Map();
-    programs.forEach((program, index) => {
-        colorMap.set(program, getProgramColor(index));
+    categories.forEach((category, index) => {
+        colorMap.set(category, getProgramColor(index));
     });
     return colorMap;
 }
@@ -190,6 +231,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     const [exportWidth, setExportWidth] = useState(DEFAULT_EXPORT_WIDTH);
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
+    const [colorMode, setColorMode] = useState('program');
     const [legendCollapsed, setLegendCollapsed] = useState(true);
     const [tablePage, setTablePage] = useState(0);
     const [tableRowsPerPage, setTableRowsPerPage] = useState(50);
@@ -343,7 +385,9 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         })
         .filter(Boolean), [chromosomeOffsets, filteredRows]);
 
-    const programColorMap = useMemo(() => buildProgramColorMap(processedRows), [processedRows]);
+    const colorField = colorMode === 'geneset' ? 'primaryGeneset' : 'primaryProgram';
+    const colorModeTitle = colorMode === 'geneset' ? 'Genesets' : 'Programs';
+    const colorMap = useMemo(() => buildCategoryColorMap(processedRows, colorField), [colorField, processedRows]);
 
     const yAxisRange = useMemo(() => {
         if (processedRows.length === 0) return [GWAS_HIT_LOGP - 0.3, GWAS_HIT_LOGP + 1.7];
@@ -373,11 +417,11 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
 
         processedRows.forEach((row) => {
             const pointData = buildPointCustomdata(row);
-            if (row.primaryProgram) {
+            if (row[colorField]) {
                 assigned.x.push(row.genomePos);
                 assigned.y.push(row.logp);
                 assigned.customdata.push(pointData);
-                assigned.colors.push(programColorMap.get(row.primaryProgram) || UNASSIGNED_COLOR);
+                assigned.colors.push(colorMap.get(row[colorField]) || UNASSIGNED_COLOR);
                 return;
             }
 
@@ -398,10 +442,10 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 showlegend: false,
                 hovertemplate: HOVER_TEMPLATE,
                 marker: {
-                    size: 6,
+                    size: 5.4,
                     color: UNASSIGNED_COLOR,
-                    opacity: 0.18,
-                    line: { width: 0 },
+                    opacity: 0.3,
+                    line: { width: 0.35, color: 'rgba(255,255,255,0.42)' },
                 },
             });
         }
@@ -417,21 +461,21 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 showlegend: false,
                 hovertemplate: HOVER_TEMPLATE,
                 marker: {
-                    size: 8,
+                    size: 7.5,
                     color: assigned.colors,
-                    opacity: 1,
-                    line: { width: 0.3, color: 'rgba(15,23,42,0.1)' },
+                    opacity: 0.96,
+                    line: { width: 0.7, color: 'rgba(255,255,255,0.78)' },
                 },
             });
         }
 
         return traces;
-    }, [processedRows, programColorMap]);
+    }, [colorField, colorMap, processedRows]);
 
     const legendItems = useMemo(() => {
         const counts = new Map();
         processedRows.forEach((row) => {
-            const key = row.primaryProgram || '__unassigned__';
+            const key = row[colorField] || '__unassigned__';
             counts.set(key, (counts.get(key) || 0) + 1);
         });
 
@@ -439,25 +483,25 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         if (counts.has('__unassigned__')) {
             items.push({
                 key: '__unassigned__',
-                label: 'No program',
+                label: 'others',
                 count: counts.get('__unassigned__'),
                 color: UNASSIGNED_COLOR,
             });
         }
 
-        [...programColorMap.entries()]
+        [...colorMap.entries()]
             .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }))
-            .forEach(([program, color]) => {
+            .forEach(([category, color]) => {
                 items.push({
-                    key: program,
-                    label: program,
-                    count: counts.get(program) || 0,
+                    key: category,
+                    label: category,
+                    count: counts.get(category) || 0,
                     color,
                 });
             });
 
         return items;
-    }, [processedRows, programColorMap]);
+    }, [colorField, colorMap, processedRows]);
 
     const highlightedPoint = useMemo(() => {
         if (!highlight.rowKey) return [];
@@ -481,48 +525,48 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
 
     const layout = useMemo(() => ({
         title: {
-            text: `${traitLabel || fileId} — GWAS Manhattan`,
-            x: 0.02,
-            font: { size: 18, family: 'Inter, "Segoe UI", system-ui, sans-serif', color: '#111827', weight: 700 },
+            text: `${traitLabel || fileId} — Manhattan`,
+            x: 0.01,
+            font: { size: 18, family: 'system-ui, -apple-system, sans-serif', color: '#333' },
         },
         xaxis: {
-            title: { text: 'Chromosome', font: { color: '#374151', size: 14, family: 'Inter, "Segoe UI", system-ui, sans-serif', weight: 600 } },
+            title: { text: 'Chromosome', font: { color: '#374151', size: 14, family: 'system-ui, -apple-system, sans-serif' } },
             tickmode: 'array',
             tickvals: chromosomeRanges.map((range) => range.mid),
             ticktext: chromosomeRanges.map((range) => range.chrom),
             showgrid: false,
             zeroline: false,
-            tickfont: { size: 12, color: '#6b7280', family: 'Inter, "Segoe UI", system-ui, sans-serif', weight: 600 },
+            tickfont: { size: 12, color: '#666', family: 'system-ui, -apple-system, sans-serif' },
             range: [0, chromosomeRanges[chromosomeRanges.length - 1]?.end || 1],
             fixedrange: true,
             linewidth: 1,
-            linecolor: '#d1d5db',
+            linecolor: '#ccc',
         },
         yaxis: {
-            title: { text: '-log<sub>10</sub>(P)', font: { color: '#374151', size: 14, family: 'Inter, "Segoe UI", system-ui, sans-serif', weight: 600 } },
+            title: { text: '-log<sub>10</sub>(P)', font: { color: '#374151', size: 14, family: 'system-ui, -apple-system, sans-serif' } },
             showgrid: true,
             gridcolor: 'rgba(156,163,175,0.15)',
             gridwidth: 0.5,
             zeroline: false,
-            tickfont: { size: 12, color: '#6b7280', family: 'Inter, "Segoe UI", system-ui, sans-serif' },
+            tickfont: { size: 12, color: '#666', family: 'system-ui, -apple-system, sans-serif' },
             range: yAxisRange,
             linewidth: 1,
-            linecolor: '#d1d5db',
+            linecolor: '#ccc',
             ticks: 'outside',
             ticklen: 4,
-            tickcolor: '#d1d5db',
+            tickcolor: '#ccc',
         },
         hovermode: 'closest',
         hoverlabel: {
             bgcolor: 'rgba(255,255,255,0.97)',
-            bordercolor: '#e5e7eb',
-            font: { size: 12, color: '#1f2937', family: 'Inter, system-ui, sans-serif' },
+            bordercolor: '#cbd5e1',
+            font: { size: 12, color: '#1f2937', family: 'system-ui, -apple-system, sans-serif' },
             align: 'left',
         },
         showlegend: false,
         paper_bgcolor: '#ffffff',
-        plot_bgcolor: '#ffffff',
-        margin: { l: 68, r: 24, t: 72, b: 64 },
+        plot_bgcolor: '#fcfcfd',
+        margin: { l: 80, r: 40, t: 62, b: 60 },
         shapes: [
             ...chromosomeRanges.flatMap((range, index) => ([
                 {
@@ -533,7 +577,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     x1: range.end,
                     y0: 0,
                     y1: 1,
-                    fillcolor: index % 2 === 0 ? 'rgba(243,244,246,0.65)' : 'rgba(255,255,255,0)',
+                    fillcolor: index % 2 === 0 ? 'rgba(241,245,249,0.72)' : 'rgba(255,255,255,0)',
                     line: { width: 0 },
                     layer: 'below',
                 },
@@ -560,7 +604,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 yanchor: 'bottom',
                 showarrow: false,
                 text: '<b>5×10⁻⁸</b>',
-                font: { size: 11, color: '#ef4444', family: 'Inter, system-ui, sans-serif' },
+                font: { size: 11, color: '#ef4444', family: 'system-ui, -apple-system, sans-serif' },
             },
         ],
     }), [chromosomeRanges, fileId, traitLabel, yAxisRange]);
@@ -690,200 +734,178 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     }), []);
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            <Card elevation={0} sx={{
-                border: '1px solid rgba(0,0,0,0.06)',
-                borderRadius: 3,
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,250,251,0.9) 100%)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
-                backdropFilter: 'blur(12px)',
-                position: 'relative',
-                overflow: 'hidden',
-                '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 3,
-                    background: 'linear-gradient(90deg, #2563eb 0%, #7c3aed 40%, #059669 70%, #d97706 100%)',
-                },
-            }}>
-                <CardContent sx={{ p: 3, pt: 3.5 }}>
-                    <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'stretch', lg: 'flex-start' }}>
-                        <Box>
-                            <Typography sx={{
-                                fontSize: '0.7rem',
-                                fontWeight: 700,
-                                letterSpacing: '0.2em',
-                                textTransform: 'uppercase',
-                                color: '#6366f1',
-                                mb: 0.5,
-                            }}>
-                                Trait Manhattan
-                            </Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#111827', mb: 0.4, fontFamily: 'Inter, system-ui, sans-serif', fontSize: '1.4rem' }}>
-                                GWAS Hit Loci Overview
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: '#6b7280', lineHeight: 1.7, maxWidth: 860, fontSize: '0.88rem' }}>
-                                Each program has a unique color in both the plot legend and table. Click a point to highlight its row. Use filters below to refine the view.
-                            </Typography>
-                        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={TOOLBAR_SX}>
+                <Box sx={{ minWidth: 220, mr: 0.5 }}>
+                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#64748b', mb: 0.35 }}>
+                        Trait Manhattan
+                    </Typography>
+                    <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: '#1f2937', lineHeight: 1.25 }}>
+                        GWAS Hit Loci Overview
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
+                        Program / Geneset coloring for trait-associated loci. Click a point to focus its table row.
+                    </Typography>
+                </Box>
 
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
-                            <ToggleButtonGroup
-                                exclusive
-                                size="small"
-                                value={variant}
-                                onChange={(_, value) => { if (value) setVariant(value); }}
-                                sx={{
-                                    '& .MuiToggleButton-root': {
-                                        px: 1.6,
-                                        textTransform: 'none',
-                                        borderColor: '#e5e7eb',
-                                        color: '#6b7280',
-                                        fontWeight: 500,
-                                        fontSize: '0.82rem',
-                                    },
-                                    '& .Mui-selected': {
-                                        bgcolor: '#111827 !important',
-                                        color: '#fff !important',
-                                        fontWeight: 600,
-                                    },
-                                }}
-                            >
-                                <ToggleButton value="hits">Hits TSV</ToggleButton>
-                                <ToggleButton value="full" disabled={Boolean(payload) && !payload?.availableVariants?.full}>Full TSV</ToggleButton>
-                            </ToggleButtonGroup>
-                        </Stack>
-                    </Stack>
+                <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={variant}
+                    onChange={(_, value) => { if (value) setVariant(value); }}
+                    sx={COMPACT_TOGGLE_SX}
+                >
+                    <ToggleButton value="hits">Hits TSV</ToggleButton>
+                    <ToggleButton value="full" disabled={Boolean(payload) && !payload?.availableVariants?.full}>Full TSV</ToggleButton>
+                </ToggleButtonGroup>
 
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
-                        <Chip icon={<ScatterPlot sx={{ fontSize: 15 }} />} label={`${summary.totalRows.toLocaleString()} hits`} size="small" sx={{ bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 600, border: '1px solid #dbeafe' }} />
-                        <Chip icon={<Insights sx={{ fontSize: 15 }} />} label={`${summary.withProgram.toLocaleString()} with program`} size="small" sx={{ bgcolor: '#ecfdf5', color: '#059669', fontWeight: 600, border: '1px solid #d1fae5' }} />
-                        <Chip icon={<Timeline sx={{ fontSize: 15 }} />} label={`${summary.withGeneset.toLocaleString()} with geneset`} size="small" sx={{ bgcolor: '#fef3c7', color: '#b45309', fontWeight: 600, border: '1px solid #fde68a' }} />
-                        <Chip icon={<Place sx={{ fontSize: 15 }} />} label={`${summary.distanceBuckets.in_gene.toLocaleString()} in gene`} size="small" sx={{ bgcolor: '#f0fdf4', color: '#166534', fontWeight: 600, border: '1px solid #bbf7d0' }} />
-                        <Chip label={`GWAS ${gwasId || 'NA'}`} size="small" sx={{ bgcolor: '#f8fafc', fontFamily: 'monospace', color: '#64748b', fontSize: '0.72rem', border: '1px solid #e2e8f0' }} />
-                    </Stack>
-                </CardContent>
-            </Card>
+                <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={colorMode}
+                    onChange={(_, value) => { if (value) setColorMode(value); }}
+                    sx={COMPACT_TOGGLE_SX}
+                >
+                    <ToggleButton value="program">Program</ToggleButton>
+                    <ToggleButton value="geneset">Geneset</ToggleButton>
+                </ToggleButtonGroup>
 
-            <Card elevation={0} sx={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 3,
-                bgcolor: '#ffffff',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
-            }}>
-                <CardContent sx={{ p: 2.5 }}>
-                    <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', lg: 'center' }} flexWrap="wrap" useFlexGap>
-                        <FormControl size="small" sx={{ minWidth: 160 }}>
-                            <InputLabel id="chromosome-select-label">Chromosome</InputLabel>
-                            <Select
-                                labelId="chromosome-select-label"
-                                multiple
-                                value={selectedChromosomes}
-                                onChange={(event) => setSelectedChromosomes(event.target.value)}
-                                input={<OutlinedInput label="Chromosome" />}
-                                renderValue={(selected) => selected.length ? selected.join(', ') : 'Chromosome'}
-                            >
-                                {chromosomeOptions.map((chromosome) => (
-                                    <MenuItem key={chromosome} value={chromosome}>
-                                        <Checkbox checked={selectedChromosomes.includes(chromosome)} />
-                                        <ListItemText primary={`Chr ${chromosome}`} />
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                <Chip
+                    icon={<ScatterPlot sx={{ fontSize: 15 }} />}
+                    label={`${summary.totalRows.toLocaleString()} hits`}
+                    size="small"
+                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' }}
+                />
+                <Chip
+                    icon={<Insights sx={{ fontSize: 15 }} />}
+                    label={`${summary.withProgram.toLocaleString()} with program`}
+                    size="small"
+                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#edf6ff', color: '#245089', border: '1px solid #d6e7fb' }}
+                />
+                <Chip
+                    icon={<Timeline sx={{ fontSize: 15 }} />}
+                    label={`${summary.withGeneset.toLocaleString()} with geneset`}
+                    size="small"
+                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#f5f3ff', color: '#5b3f86', border: '1px solid #e5ddfb' }}
+                />
+                <Chip
+                    icon={<Place sx={{ fontSize: 15 }} />}
+                    label={`${summary.distanceBuckets.in_gene.toLocaleString()} in gene`}
+                    size="small"
+                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#eefbf3', color: '#2f6a49', border: '1px solid #d7eee0' }}
+                />
+                <Chip
+                    label={`GWAS ${gwasId || 'NA'}`}
+                    size="small"
+                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#ffffff', color: '#64748b', border: '1px solid #d9dde3', fontFamily: 'monospace' }}
+                />
+            </Box>
 
-                        <FormControl size="small" sx={{ minWidth: 200 }}>
-                            <InputLabel id="program-select-label">Program filter</InputLabel>
-                            <Select
-                                labelId="program-select-label"
-                                multiple
-                                value={selectedPrograms}
-                                onChange={(event) => setSelectedPrograms(event.target.value)}
-                                input={<OutlinedInput label="Program filter" />}
-                                renderValue={(selected) => selected.length ? `${selected.length} programs selected` : 'Program filter'}
-                            >
-                                {programOptions.map((program) => (
-                                    <MenuItem key={program} value={program}>
-                                        <Checkbox checked={selectedPrograms.includes(program)} />
-                                        <ListItemText primary={program} />
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+            <Box sx={TOOLBAR_SX}>
+                <FormControl size="small" sx={{ minWidth: 150, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}>
+                    <InputLabel id="chromosome-select-label">Chromosome</InputLabel>
+                    <Select
+                        labelId="chromosome-select-label"
+                        multiple
+                        value={selectedChromosomes}
+                        onChange={(event) => setSelectedChromosomes(event.target.value)}
+                        input={<OutlinedInput label="Chromosome" />}
+                        renderValue={(selected) => selected.length ? selected.join(', ') : 'Chromosome'}
+                    >
+                        {chromosomeOptions.map((chromosome) => (
+                            <MenuItem key={chromosome} value={chromosome}>
+                                <Checkbox checked={selectedChromosomes.includes(chromosome)} />
+                                <ListItemText primary={`Chr ${chromosome}`} />
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
 
-                        <FormControl size="small" sx={{ minWidth: 260 }}>
-                            <InputLabel id="geneset-select-label">Geneset filter</InputLabel>
-                            <Select
-                                labelId="geneset-select-label"
-                                multiple
-                                value={selectedGenesets}
-                                onChange={(event) => setSelectedGenesets(event.target.value)}
-                                input={<OutlinedInput label="Geneset filter" />}
-                                renderValue={(selected) => selected.length ? `${selected.length} genesets selected` : 'Geneset filter'}
-                            >
-                                {genesetOptions.map((geneset) => (
-                                    <MenuItem key={geneset} value={geneset}>
-                                        <Checkbox checked={selectedGenesets.includes(geneset)} />
-                                        <ListItemText primary={geneset} />
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                <FormControl size="small" sx={{ minWidth: 200, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}>
+                    <InputLabel id="program-select-label">Program filter</InputLabel>
+                    <Select
+                        labelId="program-select-label"
+                        multiple
+                        value={selectedPrograms}
+                        onChange={(event) => setSelectedPrograms(event.target.value)}
+                        input={<OutlinedInput label="Program filter" />}
+                        renderValue={(selected) => selected.length ? `${selected.length} programs selected` : 'Program filter'}
+                    >
+                        {programOptions.map((program) => (
+                            <MenuItem key={program} value={program}>
+                                <Checkbox checked={selectedPrograms.includes(program)} />
+                                <ListItemText primary={program} />
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
 
-                        <FormControl size="small" sx={{ minWidth: 190 }}>
-                            <InputLabel id="distance-mode-label">distance_to_gene</InputLabel>
-                            <Select
-                                labelId="distance-mode-label"
-                                value={distanceMode}
-                                label="distance_to_gene"
-                                onChange={(event) => setDistanceMode(event.target.value)}
-                            >
-                                <MenuItem value="all">All distances</MenuItem>
-                                <MenuItem value="in_gene">In gene</MenuItem>
-                                <MenuItem value="near">Near gene</MenuItem>
-                                <MenuItem value="moderate">Moderate distance</MenuItem>
-                                <MenuItem value="distal">Distal</MenuItem>
-                            </Select>
-                        </FormControl>
+                <FormControl size="small" sx={{ minWidth: 250, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}>
+                    <InputLabel id="geneset-select-label">Geneset filter</InputLabel>
+                    <Select
+                        labelId="geneset-select-label"
+                        multiple
+                        value={selectedGenesets}
+                        onChange={(event) => setSelectedGenesets(event.target.value)}
+                        input={<OutlinedInput label="Geneset filter" />}
+                        renderValue={(selected) => selected.length ? `${selected.length} genesets selected` : 'Geneset filter'}
+                    >
+                        {genesetOptions.map((geneset) => (
+                            <MenuItem key={geneset} value={geneset}>
+                                <Checkbox checked={selectedGenesets.includes(geneset)} />
+                                <ListItemText primary={geneset} />
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
 
-                        <TextField
-                            size="small"
-                            label="Gene / rsID"
-                            value={geneQuery}
-                            onChange={(event) => setGeneQuery(event.target.value)}
-                            placeholder="e.g. NADK or rs35301881"
-                            sx={{ width: 190 }}
-                        />
+                <FormControl size="small" sx={{ minWidth: 180, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}>
+                    <InputLabel id="distance-mode-label">distance_to_gene</InputLabel>
+                    <Select
+                        labelId="distance-mode-label"
+                        value={distanceMode}
+                        label="distance_to_gene"
+                        onChange={(event) => setDistanceMode(event.target.value)}
+                    >
+                        <MenuItem value="all">All distances</MenuItem>
+                        <MenuItem value="in_gene">In gene</MenuItem>
+                        <MenuItem value="near">Near gene</MenuItem>
+                        <MenuItem value="moderate">Moderate distance</MenuItem>
+                        <MenuItem value="distal">Distal</MenuItem>
+                    </Select>
+                </FormControl>
 
-                        <Box sx={{ display: 'inline-flex', alignItems: 'center', px: 1.1, py: 0.6, borderRadius: 2.2, border: '1px solid rgba(49,66,91,0.12)', bgcolor: programOnly ? 'rgba(35,64,107,0.08)' : 'rgba(255,255,255,0.8)' }}>
-                            <Checkbox checked={programOnly} onChange={(event) => setProgramOnly(event.target.checked)} sx={{ p: 0.3, mr: 0.4 }} />
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
-                                Program only
-                            </Typography>
-                        </Box>
+                <TextField
+                    size="small"
+                    label="Gene / rsID"
+                    value={geneQuery}
+                    onChange={(event) => setGeneQuery(event.target.value)}
+                    placeholder="e.g. NADK or rs35301881"
+                    sx={{ width: 190, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}
+                />
 
-                        <Button variant="text" startIcon={<RestartAlt />} onClick={handleResetFilters} sx={{ textTransform: 'none', color: '#23406b', fontWeight: 600 }}>
-                            Reset filters
-                        </Button>
-                    </Stack>
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', px: 1.1, py: 0.55, borderRadius: 2, border: '1px solid #d9dde3', bgcolor: programOnly ? '#eef2f7' : '#fff' }}>
+                    <Checkbox checked={programOnly} onChange={(event) => setProgramOnly(event.target.checked)} sx={{ p: 0.3, mr: 0.4 }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                        Program only
+                    </Typography>
+                </Box>
 
-                    <Alert severity="info" sx={{ mt: 2, borderRadius: 2, bgcolor: '#f0f9ff', color: '#1e40af', border: '1px solid #bfdbfe', '& .MuiAlert-icon': { color: '#3b82f6' } }}>
-                        <Typography variant="body2" sx={{ mb: 0.3, fontSize: '0.82rem' }}>
-                            <strong>distance_to_gene:</strong> 0 = in gene body; 100s–1000s bp = near; 10000+ bp = distal.
-                        </Typography>
-                    </Alert>
-                </CardContent>
-            </Card>
+                <Button variant="text" startIcon={<RestartAlt />} onClick={handleResetFilters} sx={{ textTransform: 'none', color: '#475569', fontWeight: 600, minHeight: 38 }}>
+                    Reset filters
+                </Button>
+
+                <Typography sx={{ width: '100%', fontSize: '0.74rem', color: '#6b7280', lineHeight: 1.4 }}>
+                    <strong>distance_to_gene:</strong> 0 = in gene body; 100s–1000s bp = near; 10000+ bp = distal.
+                </Typography>
+            </Box>
 
             <Card elevation={0} sx={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 3,
+                border: '1px solid #e8e8ec',
+                borderRadius: 2,
                 overflow: 'hidden',
                 bgcolor: '#ffffff',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
+                boxShadow: '0 10px 24px rgba(15,23,42,0.05)',
             }}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {loading && (
@@ -901,6 +923,14 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                         <Box sx={{ minHeight: 460, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No Manhattan rows are currently available for this trait.</Typography>
+                            </Alert>
+                        </Box>
+                    )}
+
+                    {!loading && rows.length > 0 && processedRows.length === 0 && (
+                        <Box sx={{ minHeight: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                            <Alert severity="info" sx={{ maxWidth: 760 }}>
+                                <Typography variant="body2">No loci match the current filters.</Typography>
                             </Alert>
                         </Box>
                     )}
@@ -932,6 +962,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                                 items={legendItems}
                                 collapsed={legendCollapsed}
                                 onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
+                                title={colorModeTitle}
                             />
                         </Box>
                     )}
@@ -956,7 +987,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 tableRowRefs={tableRowRefs}
                 navigate={navigate}
                 getProgramRoute={getProgramRoute}
-                programColorMap={programColorMap}
+                programColorMap={colorMap}
                 formatDistance={formatDistance}
                 formatP={formatP}
                 gwasHitLogp={GWAS_HIT_LOGP}

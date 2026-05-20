@@ -31,8 +31,7 @@ const COLUMN_SPECS = [
 const GROUPS = [
     { label: 'Locus', span: 5, tone: 'locus' },
     { label: 'Annotation', span: 2, tone: 'annotation' },
-    { label: 'Program', span: 1, tone: 'program' },
-    { label: 'Regulator', span: 1, tone: 'program' },
+    { label: 'Mapping', span: 2, tone: 'program' },
 ];
 
 const TONES = {
@@ -108,6 +107,9 @@ const sortLabelSx = {
         margin: 0,
     },
 };
+
+const ROW_HIGHLIGHT_BASE = '#fff1b8';
+const ROW_HIGHLIGHT_FLASH = '#ffe082';
 
 function renderCellContent({ column, row, programColorMap, formatDistance, formatP, getProgramRoute, navigate }) {
     if (column.key === 'snp') return row.snp || '—';
@@ -304,6 +306,9 @@ export default function TraitHitManhattanTable({
                                 const isHighlighted = highlight.rowKey === row.rowKey;
                                 const absoluteIndex = (tablePage * tableRowsPerPage) + index;
                                 const even = absoluteIndex % 2 === 0;
+                                const flashAnimation = isHighlighted
+                                    ? `${highlight.key % 2 === 0 ? 'traitRowFlashA' : 'traitRowFlashB'} 1.15s ease-out`
+                                    : 'none';
 
                                 return (
                                     <TableRow
@@ -312,13 +317,25 @@ export default function TraitHitManhattanTable({
                                             if (el) tableRowRefs.current[row.rowKey] = el;
                                         }}
                                         sx={{
-                                            bgcolor: isHighlighted ? '#fff5bf' : (even ? '#ffffff' : '#fbfcfd'),
-                                            boxShadow: isHighlighted ? 'inset 0 0 0 1px rgba(217,119,6,0.16), 0 0 0 2px rgba(245,158,11,0.12)' : 'none',
+                                            '@keyframes traitRowFlashA': {
+                                                '0%': { backgroundColor: ROW_HIGHLIGHT_FLASH },
+                                                '28%': { backgroundColor: '#ffef99' },
+                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
+                                            },
+                                            '@keyframes traitRowFlashB': {
+                                                '0%': { backgroundColor: '#ffd969' },
+                                                '28%': { backgroundColor: '#ffeb8a' },
+                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
+                                            },
+                                            bgcolor: isHighlighted ? ROW_HIGHLIGHT_BASE : (even ? '#ffffff' : '#fbfcfd'),
+                                            boxShadow: isHighlighted ? 'inset 0 0 0 1px rgba(217,119,6,0.18), 0 0 0 2px rgba(245,158,11,0.12)' : 'none',
                                             '& td': {
+                                                backgroundColor: isHighlighted ? `${ROW_HIGHLIGHT_BASE} !important` : undefined,
                                                 transition: 'background-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease',
+                                                animation: flashAnimation,
                                             },
                                             '&:hover td': {
-                                                bgcolor: isHighlighted ? '#ffef9f' : '#f3f6fa',
+                                                bgcolor: isHighlighted ? `${ROW_HIGHLIGHT_BASE} !important` : '#f3f6fa',
                                                 boxShadow: 'inset 0 -1px 0 rgba(226,232,240,0.78)',
                                             },
                                         }}

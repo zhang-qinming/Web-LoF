@@ -5,11 +5,8 @@ import Plotly from 'plotly.js-basic-dist';
 import {
     Box, Typography, Alert, CircularProgress, ToggleButtonGroup, ToggleButton,
     Slider, FormControlLabel, Switch, Button, Dialog, DialogTitle,
-    DialogContent, DialogActions, TextField, Chip,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    TableSortLabel, Paper, Collapse,
+    DialogContent, DialogActions, TextField, Chip, Paper,
 } from '@mui/material';
-import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import ProgramScatterTable from './ProgramScatterTable';
@@ -608,7 +605,7 @@ export default function ProgramScatter({ fileId }) {
     const hasVisiblePoints = plotData.some((trace) => Array.isArray(trace.x) && trace.x.length > 0);
 
     return (
-        <Box sx={{ position: 'relative' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {rows.length > 0 && (
                 <Box sx={{
                     display: 'flex',
@@ -762,68 +759,84 @@ export default function ProgramScatter({ fileId }) {
                 </Box>
             )}
 
-            {isLoading && (
-                <Box sx={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: 'rgba(255,255,255,0.7)',
-                    zIndex: 10,
-                    borderRadius: 2,
-                }}>
-                    <CircularProgress size={40} />
-                </Box>
-            )}
-
-            {!isLoading && rows.length > 0 && !hasVisiblePoints && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                    No valid points are available for the current mode.
-                </Alert>
-            )}
-
-            {hasVisiblePoints && (<>
-                <Plot
-                    onInitialized={onInitialized}
-                    onUpdate={onUpdate}
-                    onClick={(evt) => {
-                        if (!evt?.points?.length) return;
-                        const program = evt.points[0].customdata?.[0];
-                        if (program) {
-                            setHighlight((prev) => ({ program, key: prev.key + 1 }));
-                            setTableOpen(true);
-                        }
+            {(isLoading || rows.length > 0) && (
+                <Paper
+                    variant="outlined"
+                    sx={{
+                        position: 'relative',
+                        minHeight: isLoading || hasVisiblePoints ? 620 : undefined,
+                        border: '1px solid #e8e8ec',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        bgcolor: '#fff',
+                        boxShadow: '0 10px 24px rgba(15,23,42,0.05)',
                     }}
-                    data={plotData}
-                    layout={layout}
-                    config={plotConfig}
-                    revision={plotRevision}
-                    useResizeHandler
-                    style={{ width: '100%', height: 620 }}
-                />
-
-                <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
-                    <DialogTitle>Export Plot</DialogTitle>
-                    <DialogContent>
-                        <ToggleButtonGroup value={expFmt} exclusive size="small"
-                            onChange={(e, v) => v && setExpFmt(v)} sx={{ mb: 2 }}>
-                            <ToggleButton value="svg">SVG</ToggleButton>
-                            <ToggleButton value="png">PNG</ToggleButton>
-                        </ToggleButtonGroup>
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                            <TextField label="Width" type="number" value={expW}
-                                onChange={e => setExpW(Number(e.target.value))} size="small" />
-                            <TextField label="Height" type="number" value={expH}
-                                onChange={e => setExpH(Number(e.target.value))} size="small" />
+                >
+                    {isLoading && (
+                        <Box sx={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            bgcolor: 'rgba(255,255,255,0.7)',
+                            zIndex: 10,
+                        }}>
+                            <CircularProgress size={40} />
                         </Box>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setExportOpen(false)}>Cancel</Button>
-                        <Button variant="contained" onClick={() => { doExport(); setExportOpen(false); }}>Export</Button>
-                    </DialogActions>
-                </Dialog>
-            </>)}
+                    )}
+
+                    {!isLoading && rows.length > 0 && !hasVisiblePoints && (
+                        <Box sx={{ px: 2.5, py: 2 }}>
+                            <Alert severity="info">
+                                No valid points are available for the current mode.
+                            </Alert>
+                        </Box>
+                    )}
+
+                    {hasVisiblePoints && (
+                        <Plot
+                            onInitialized={onInitialized}
+                            onUpdate={onUpdate}
+                            onClick={(evt) => {
+                                if (!evt?.points?.length) return;
+                                const program = evt.points[0].customdata?.[0];
+                                if (program) {
+                                    setHighlight((prev) => ({ program, key: prev.key + 1 }));
+                                    setTableOpen(true);
+                                }
+                            }}
+                            data={plotData}
+                            layout={layout}
+                            config={plotConfig}
+                            revision={plotRevision}
+                            useResizeHandler
+                            style={{ width: '100%', height: 620 }}
+                        />
+                    )}
+                </Paper>
+            )}
+
+            <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
+                <DialogTitle>Export Plot</DialogTitle>
+                <DialogContent>
+                    <ToggleButtonGroup value={expFmt} exclusive size="small"
+                        onChange={(e, v) => v && setExpFmt(v)} sx={{ mb: 2 }}>
+                        <ToggleButton value="svg">SVG</ToggleButton>
+                        <ToggleButton value="png">PNG</ToggleButton>
+                    </ToggleButtonGroup>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <TextField label="Width" type="number" value={expW}
+                            onChange={e => setExpW(Number(e.target.value))} size="small" />
+                        <TextField label="Height" type="number" value={expH}
+                            onChange={e => setExpH(Number(e.target.value))} size="small" />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setExportOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={() => { doExport(); setExportOpen(false); }}>Export</Button>
+                </DialogActions>
+            </Dialog>
 
             <ProgramScatterTable
                 rows={rows}
