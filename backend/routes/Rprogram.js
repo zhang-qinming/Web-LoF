@@ -1,37 +1,30 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
-const readline = require('readline');
 const programModel = require('../models/Mprogram');
+const { createFileStore } = require('../lib/fileStore');
+const { parseTsvStream } = require('../lib/tsv');
+
 const router = express.Router();
 
-const DATA_DIR = process.env.PROGRAM_DATA_DIR || path.join(__dirname, '..', 'data', 'program_regulator');
-const BURDEN_VOLCANO_DIR = process.env.BURDEN_VOLCANO_DIR || path.join(__dirname, '..', 'data', 'burden_volcano');
+const programStore = createFileStore(process.env.PROGRAM_DATA_DIR || path.join(__dirname, '..', 'data', 'program_regulator'));
+const burdenVolcanoStore = createFileStore(process.env.BURDEN_VOLCANO_DIR || path.join(__dirname, '..', 'data', 'burden_volcano'));
 
-async function parseTSV(filePath) {
-    if (!fs.existsSync(filePath)) return null;
-    const rows = [];
-    const rl = readline.createInterface({
-        input: fs.createReadStream(filePath),
-        crlfDelay: Infinity,
-    });
-    let header = true;
-    let headers = [];
-    for await (const line of rl) {
-        const cols = line.split('\t');
-        if (header) {
-            headers = cols.map(c => c.trim().replace(/^﻿/, ''));
-            header = false;
-            continue;
-        }
-        const row = {};
-        headers.forEach((h, i) => { row[h] = (cols[i] || '').trim(); });
-        rows.push(row);
-    }
-    return rows;
+function sanitizeBaseName(value) {
+    const cleaned = String(value || '').trim();
+    return /^[A-Za-z0-9._-]+$/.test(cleaned) ? cleaned : null;
 }
 
-// Program 注释信息（必须在 /:fileId 之前，否则 Express 把 /info 当成 :fileId）
+async function parseTsvFromStore(store, relativeName) {
+    const fullPath = store.resolve(relativeName);
+    if (!fullPath) return null;
+
+    const stat = await store.stat(fullPath);
+    if (!stat || !stat.isFile) return null;
+
+    const stream = await store.createReadStream(fullPath);
+    return parseTsvStream(stream);
+}
+
 router.get('/api/programs/info', async (req, res) => {
     try {
         const map = await programModel.getProgramInfo();
@@ -41,25 +34,29 @@ router.get('/api/programs/info', async (req, res) => {
     }
 });
 
-// 列出可用的 Program TSV
-router.get('/api/programs/list', (req, res) => {
+router.get('/api/programs/list', async (req, res) => {
     try {
-        if (!fs.existsSync(DATA_DIR)) return res.json({ files: [] });
-        const files = fs.readdirSync(DATA_DIR)
-            .filter(f => f.endsWith('.tsv'))
-            .map(f => f.replace('.tsv', ''));
+        const exists = await programStore.exists(programStore.rootPath);
+        if (!exists) return res.json({ files: [] });
+
+        const files = (await programStore.list(programStore.rootPath))
+            .filter((entry) => entry.type === 'file' && entry.name.endsWith('.tsv'))
+            .map((entry) => entry.name.replace(/\.tsv$/i, ''));
+
         res.json({ files });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// 获取某个 trait 的 Program scatter 数据
 router.get('/api/programs/:fileId', async (req, res) => {
     try {
-        const filePath = path.join(DATA_DIR, `${req.params.fileId}.tsv`);
-        const data = await parseTSV(filePath);
+        const safeFileId = sanitizeBaseName(req.params.fileId);
+        if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
+
+        const data = await parseTsvFromStore(programStore, `${safeFileId}.tsv`);
         if (!data) return res.status(404).json({ error: 'Not found' });
+
         res.json({ data });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -68,9 +65,12 @@ router.get('/api/programs/:fileId', async (req, res) => {
 
 router.get('/api/burden-volcano/:fileId', async (req, res) => {
     try {
-        const filePath = path.join(BURDEN_VOLCANO_DIR, `${req.params.fileId}_hits.tsv`);
-        const data = await parseTSV(filePath);
+        const safeFileId = sanitizeBaseName(req.params.fileId);
+        if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
+
+        const data = await parseTsvFromStore(burdenVolcanoStore, `${safeFileId}_hits.tsv`);
         if (!data) return res.status(404).json({ error: 'Not found' });
+
         res.json({ data });
     } catch (err) {
         res.status(500).json({ error: err.message });

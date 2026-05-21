@@ -1,24 +1,32 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
-const { ZipArchive } = require('archiver');
+const archiver = require('archiver');
+const { createFileStore, buildHttpError } = require('../lib/fileStore');
+
 const router = express.Router();
+const dataStore = createFileStore(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
 
-const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
+const SEARCH_INDEX_TTL_MS = 2 * 60 * 1000;
+let searchIndexCache = null;
+let searchIndexBuiltAt = 0;
+let searchIndexPromise = null;
 
-function safePath(subPath) {
-    // 归一化：去掉所有 .. 和 . 段，防路径穿越
-    const clean = subPath
-        .split(/[\\/]/)
-        .filter(s => s && s !== '.' && s !== '..')
-        .join(path.sep);
+function resolveRelativePath(relPath = '') {
+    const fullPath = dataStore.resolve(relPath);
+    if (!fullPath) throw buildHttpError(403, 'Forbidden');
+    return fullPath;
+}
 
-    const resolved = path.resolve(DATA_DIR, clean);
-    // 确保解析后的绝对路径在 DATA_DIR 内
-    if (!resolved.startsWith(DATA_DIR + path.sep) && resolved !== DATA_DIR) {
-        return null;
-    }
-    return resolved;
+function toRelativePath(fullPath) {
+    const normalizedRoot = dataStore.rootPath;
+    if (fullPath === normalizedRoot) return '';
+
+    const relative = fullPath.slice(normalizedRoot.length).replace(/^[\\/]+/, '');
+    return relative.split(/[\\/]/).filter(Boolean).join('/');
+}
+
+function isoFromMtime(mtimeMs) {
+    return mtimeMs ? new Date(mtimeMs).toISOString() : null;
 }
 
 function getArchiveEntryName(relPath, usedNames) {
@@ -46,11 +54,6 @@ function getArchiveEntryName(relPath, usedNames) {
     return candidate;
 }
 
-const SEARCH_INDEX_TTL_MS = 2 * 60 * 1000;
-let searchIndexCache = null;
-let searchIndexBuiltAt = 0;
-let searchIndexPromise = null;
-
 function getSearchRank(entry, query) {
     if (entry.nameLower === query) return 0;
     if (entry.nameLower.startsWith(query)) return 1;
@@ -62,55 +65,40 @@ function getSearchRank(entry, query) {
 async function buildSearchIndex() {
     const entries = [];
 
-    async function scan(dir, base) {
+    async function scan(fullPath) {
         let dirEntries = [];
         try {
-            dirEntries = await fs.promises.readdir(dir, { withFileTypes: true });
+            dirEntries = await dataStore.list(fullPath);
         } catch (err) {
             return;
         }
 
-        dirEntries.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+        dirEntries.sort((a, b) => Number(b.type === 'dir') - Number(a.type === 'dir') || a.name.localeCompare(b.name));
 
         for (const entry of dirEntries) {
-            if (!entry.isDirectory() && !entry.isFile()) continue;
-
-            const relPath = base ? `${base}/${entry.name}` : entry.name;
-            const fullPath = path.join(dir, entry.name);
-            let size = 0;
-
-            if (entry.isFile()) {
-                try {
-                    const stat = await fs.promises.stat(fullPath);
-                    size = stat.size;
-                } catch (err) {
-                    size = 0;
-                }
-            }
+            const childPath = dataStore.pathImpl.join(fullPath, entry.name);
+            const relPath = toRelativePath(childPath);
 
             entries.push({
                 name: entry.name,
                 path: relPath,
-                type: entry.isDirectory() ? 'dir' : 'file',
-                size,
-                depth: relPath.split('/').length,
+                type: entry.type,
+                size: entry.size || 0,
+                depth: relPath ? relPath.split('/').length : 0,
                 nameLower: entry.name.toLowerCase(),
                 pathLower: relPath.toLowerCase(),
             });
 
-            if (entry.isDirectory()) {
-                await scan(fullPath, relPath);
+            if (entry.type === 'dir') {
+                await scan(childPath);
             }
         }
     }
 
-    try {
-        await fs.promises.access(DATA_DIR);
-        await scan(DATA_DIR, '');
-    } catch (err) {
-        return [];
-    }
+    const rootStat = await dataStore.stat(dataStore.rootPath);
+    if (!rootStat || !rootStat.isDirectory) return [];
 
+    await scan(dataStore.rootPath);
     return entries;
 }
 
@@ -135,97 +123,109 @@ async function getSearchIndex(forceRefresh = false) {
 
 router.get('/api/data/list', async (req, res) => {
     try {
-        const full = safePath(req.query.dir || '');
-        if (!full) return res.status(403).json({ error: 'Forbidden' });
-        if (!fs.existsSync(full)) return res.status(404).json({ error: 'Not found' });
+        const fullPath = resolveRelativePath(req.query.dir || '');
+        const stat = await dataStore.stat(fullPath);
+        if (!stat) return res.status(404).json({ error: 'Not found' });
+        if (!stat.isDirectory) return res.status(400).json({ error: 'Not a directory' });
 
-        const entries = await fs.promises.readdir(full, { withFileTypes: true });
-        const searchQ = (req.query.search || '').toLowerCase();
-        const filteredEntries = entries.filter((e) => !searchQ || e.name.toLowerCase().includes(searchQ));
-        filteredEntries.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+        const searchQ = String(req.query.search || '').toLowerCase();
+        const entries = await dataStore.list(fullPath);
+        const filteredEntries = entries.filter((entry) => !searchQ || entry.name.toLowerCase().includes(searchQ));
+        filteredEntries.sort((a, b) => Number(b.type === 'dir') - Number(a.type === 'dir') || a.name.localeCompare(b.name));
 
-        const p = Math.max(1, parseInt(req.query.page) || 1);
-        const l = Math.min(200, Math.max(5, parseInt(req.query.limit) || 50));
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(200, Math.max(5, parseInt(req.query.limit, 10) || 50));
         const total = filteredEntries.length;
-        const pageEntries = filteredEntries.slice((p - 1) * l, p * l);
-        const data = await Promise.all(pageEntries.map(async (e) => {
-            const stat = await fs.promises.stat(path.join(full, e.name));
-            return {
-                name: e.name,
-                type: e.isDirectory() ? 'dir' : 'file',
-                path: req.query.dir ? `${req.query.dir}/${e.name}` : e.name,
-                size: e.isFile() ? stat.size : 0,
-                mtime: stat.mtime.toISOString(),
-            };
+        const pageEntries = filteredEntries.slice((page - 1) * limit, page * limit);
+        const parentRel = req.query.dir ? String(req.query.dir).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') : '';
+
+        const data = pageEntries.map((entry) => ({
+            name: entry.name,
+            type: entry.type,
+            path: parentRel ? `${parentRel}/${entry.name}` : entry.name,
+            size: entry.type === 'file' ? (entry.size || 0) : 0,
+            mtime: isoFromMtime(entry.mtimeMs),
         }));
 
-        res.json({ data, totalCount: total, page: p, totalPages: Math.ceil(total / l) });
+        res.json({ data, totalCount: total, page, totalPages: Math.ceil(total / limit) });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message });
     }
 });
 
 router.get('/api/data/file-paths', async (req, res) => {
     try {
-        const full = safePath(req.query.dir || '');
-        if (!full) return res.status(403).json({ error: 'Forbidden' });
-        if (!fs.existsSync(full)) return res.status(404).json({ error: 'Not found' });
+        const fullPath = resolveRelativePath(req.query.dir || '');
+        const stat = await dataStore.stat(fullPath);
+        if (!stat) return res.status(404).json({ error: 'Not found' });
+        if (!stat.isDirectory) return res.status(400).json({ error: 'Not a directory' });
 
-        const entries = await fs.promises.readdir(full, { withFileTypes: true });
-        const searchQ = (req.query.search || '').toLowerCase();
-        const files = entries
-            .filter((entry) => entry.isFile() && (!searchQ || entry.name.toLowerCase().includes(searchQ)))
+        const searchQ = String(req.query.search || '').toLowerCase();
+        const parentRel = req.query.dir ? String(req.query.dir).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') : '';
+        const files = (await dataStore.list(fullPath))
+            .filter((entry) => entry.type === 'file' && (!searchQ || entry.name.toLowerCase().includes(searchQ)))
             .sort((a, b) => a.name.localeCompare(b.name))
-            .map((entry) => (req.query.dir ? `${req.query.dir}/${entry.name}` : entry.name));
+            .map((entry) => (parentRel ? `${parentRel}/${entry.name}` : entry.name));
 
         res.json({ paths: files, totalCount: files.length });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message });
     }
 });
 
-router.get('/api/data/breadcrumb', (req, res) => {
+router.get('/api/data/breadcrumb', async (req, res) => {
     try {
-        const full = safePath(req.query.dir || '');
-        if (!full) return res.status(403).json({ error: 'Forbidden' });
+        resolveRelativePath(req.query.dir || '');
 
-        const parts = (req.query.dir || '').split('/').filter(Boolean);
+        const parts = String(req.query.dir || '').split('/').filter(Boolean);
         const crumbs = [{ name: 'data', path: '' }];
         let acc = '';
-        for (const p of parts) {
-            acc = acc ? `${acc}/${p}` : p;
-            crumbs.push({ name: p, path: acc });
+        for (const part of parts) {
+            acc = acc ? `${acc}/${part}` : part;
+            crumbs.push({ name: part, path: acc });
         }
         res.json({ crumbs });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message });
     }
 });
 
-router.get('/api/data/download', (req, res) => {
+router.get('/api/data/download', async (req, res) => {
     try {
-        const fp = safePath(req.query.path || '');
-        if (!fp) return res.status(403).json({ error: 'Forbidden' });
-        if (!fs.existsSync(fp)) return res.status(404).send('Not found');
+        const fullPath = resolveRelativePath(req.query.path || '');
+        const stat = await dataStore.stat(fullPath);
+        if (!stat) return res.status(404).send('Not found');
 
-        // 文件夹 → zip
-        if (fs.statSync(fp).isDirectory()) {
-            const dirName = path.basename(fp);
+        const baseName = dataStore.basename(fullPath);
+        if (stat.isDirectory) {
             res.setHeader('Content-Type', 'application/zip');
-            res.setHeader('Content-Disposition', `attachment; filename="${dirName}.zip"`);
-            const archive = new ZipArchive({ zlib: { level: 6 } });
-            archive.on('error', () => { 
-                if (!res.headersSent) res.status(500).end(); 
+            res.setHeader('Content-Disposition', `attachment; filename="${baseName}.zip"`);
+
+            const archive = archiver('zip', { zlib: { level: 6 } });
+            archive.on('error', () => {
+                if (!res.headersSent) res.status(500).end();
+                else res.end();
             });
             archive.pipe(res);
-            archive.directory(fp, dirName);
-            archive.finalize();
+            await dataStore.appendToArchive(archive, fullPath, baseName);
+            await archive.finalize();
             return;
         }
 
-        res.download(fp);
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${baseName}"`);
+        const stream = await dataStore.createReadStream(fullPath);
+        stream.on('error', () => {
+            if (!res.headersSent) res.status(500).end();
+            else res.end();
+        });
+        stream.pipe(res);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message });
     }
 });
 
@@ -238,30 +238,18 @@ router.post('/api/data/download-batch', async (req, res) => {
         const zipBaseName = (typeof req.body?.filename === 'string' ? req.body.filename.trim() : '')
             .replace(/\.zip$/i, '') || 'data-selection';
 
-        const resolvedItems = await Promise.all(uniquePaths.map(async (relPath) => {
-            const fullPath = safePath(relPath);
-            if (!fullPath) {
-                const err = new Error('Forbidden');
-                err.status = 403;
-                throw err;
-            }
-
-            let stat;
-            try {
-                stat = await fs.promises.stat(fullPath);
-            } catch (err) {
-                const notFound = new Error('Not found');
-                notFound.status = 404;
-                throw notFound;
-            }
-
-            return { relPath, fullPath, stat };
-        }));
+        const resolvedItems = [];
+        for (const relPath of uniquePaths) {
+            const fullPath = resolveRelativePath(relPath);
+            const stat = await dataStore.stat(fullPath);
+            if (!stat) return res.status(404).json({ error: 'Not found' });
+            resolvedItems.push({ relPath, fullPath, stat });
+        }
 
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${zipBaseName}.zip"`);
 
-        const archive = new ZipArchive({ zlib: { level: 6 } });
+        const archive = archiver('zip', { zlib: { level: 6 } });
         archive.on('error', () => {
             if (!res.headersSent) res.status(500).end();
             else res.end();
@@ -271,11 +259,10 @@ router.post('/api/data/download-batch', async (req, res) => {
         const usedNames = new Set();
         for (const item of resolvedItems) {
             const entryName = getArchiveEntryName(item.relPath, usedNames);
-            if (item.stat.isDirectory()) archive.directory(item.fullPath, entryName);
-            else archive.file(item.fullPath, { name: entryName });
+            await dataStore.appendToArchive(archive, item.fullPath, entryName);
         }
 
-        archive.finalize();
+        await archive.finalize();
     } catch (err) {
         const status = err.status || 500;
         res.status(status).json({ error: err.message });
@@ -285,7 +272,7 @@ router.post('/api/data/download-batch', async (req, res) => {
 router.get('/api/data/search', async (req, res) => {
     try {
         const q = String(req.query.q || '').trim().toLowerCase();
-        if (!q || q.length < 2) return res.json({ results: [] });
+        if (!q || q.length < 2) return res.json({ results: [], totalCount: 0, truncated: false });
 
         const limit = Math.min(200, Math.max(10, parseInt(req.query.limit, 10) || 60));
         const searchIndex = await getSearchIndex(req.query.refresh === '1');
@@ -312,7 +299,8 @@ router.get('/api/data/search', async (req, res) => {
             truncated: matches.length > limit,
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message });
     }
 });
 

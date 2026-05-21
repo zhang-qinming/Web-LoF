@@ -1,14 +1,17 @@
 const express = require('express');
-const router = express.Router();
-const gwasModel = require('../models/MgetGwasByTrait');
-const fs = require('fs');
 const path = require('path');
+const gwasModel = require('../models/MgetGwasByTrait');
+const { createFileStore } = require('../lib/fileStore');
+const { stripUtf8Bom } = require('../lib/tsv');
 
-const MANHATTAN_DATA_DIR = process.env.GWAS_MANHATTAN_DATA_DIR || path.join(__dirname, '..', 'data', 'gwas_manhattan');
+const router = express.Router();
+
+const manhattanStore = createFileStore(process.env.GWAS_MANHATTAN_DATA_DIR || path.join(__dirname, '..', 'data', 'gwas_manhattan'));
 const TSV_CACHE = new Map();
 
 function normalizeTraitFileId(traitName) {
-    return String(traitName || '').trim();
+    const cleaned = String(traitName || '').trim();
+    return /^[A-Za-z0-9._-]+$/.test(cleaned) ? cleaned : null;
 }
 
 function parseOptionalNumber(value) {
@@ -62,19 +65,21 @@ function toTsvRow(row) {
     };
 }
 
-async function readDelimitedTsv(filePath) {
-    const stat = await fs.promises.stat(filePath);
-    const cached = TSV_CACHE.get(filePath);
+async function readDelimitedTsv(fullPath) {
+    const stat = await manhattanStore.stat(fullPath);
+    if (!stat || !stat.isFile) return [];
+
+    const cached = TSV_CACHE.get(fullPath);
     if (cached && cached.mtimeMs === stat.mtimeMs) return cached.rows;
 
-    const raw = await fs.promises.readFile(filePath, 'utf8');
+    const raw = await manhattanStore.readFile(fullPath, 'utf8');
     const lines = raw.split(/\r?\n/).filter(Boolean);
     if (lines.length <= 1) {
-        TSV_CACHE.set(filePath, { mtimeMs: stat.mtimeMs, rows: [] });
+        TSV_CACHE.set(fullPath, { mtimeMs: stat.mtimeMs, rows: [] });
         return [];
     }
 
-    const headers = lines[0].split('\t');
+    const headers = lines[0].split('\t').map((header) => stripUtf8Bom(header));
     const rows = lines.slice(1).map((line) => {
         const cols = line.split('\t');
         const row = {};
@@ -84,20 +89,22 @@ async function readDelimitedTsv(filePath) {
         return toTsvRow(row);
     }).filter((row) => row.chr && row.bp != null && row.p != null);
 
-    TSV_CACHE.set(filePath, { mtimeMs: stat.mtimeMs, rows });
+    TSV_CACHE.set(fullPath, { mtimeMs: stat.mtimeMs, rows });
     return rows;
 }
 
 async function getManhattanRows(fileId, variant = 'hits') {
     const suffix = variant === 'full' ? '_full.tsv' : '_hits.tsv';
-    const filePath = path.join(MANHATTAN_DATA_DIR, `${fileId}${suffix}`);
-    try {
-        await fs.promises.access(filePath, fs.constants.F_OK);
-        const rows = await readDelimitedTsv(filePath);
-        return { filePath, rows, exists: true };
-    } catch {
+    const filePath = manhattanStore.resolve(`${fileId}${suffix}`);
+    if (!filePath) return { filePath: null, rows: [], exists: false };
+
+    const stat = await manhattanStore.stat(filePath);
+    if (!stat || !stat.isFile) {
         return { filePath, rows: [], exists: false };
     }
+
+    const rows = await readDelimitedTsv(filePath);
+    return { filePath, rows, exists: true };
 }
 
 function collectTopCounts(rows, key) {
@@ -143,8 +150,8 @@ function buildManhattanSummary(rows) {
 
 function parseOptions(query) {
     return {
-        page: parseInt(query.page) || 1,
-        limit: parseInt(query.limit) || 50,
+        page: parseInt(query.page, 10) || 1,
+        limit: parseInt(query.limit, 10) || 50,
         sortBy: query.sortBy || 'CHR',
         order: query.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
     };
@@ -185,16 +192,15 @@ router.get('/api/trait/filtergwas/:traitName', async (req, res) => {
 router.get('/api/trait/manhattan/:traitName', async (req, res) => {
     try {
         const fileId = normalizeTraitFileId(req.params.traitName);
+        if (!fileId) return res.status(400).json({ error: 'Invalid traitName' });
+
         const variant = req.query.variant === 'full' ? 'full' : 'hits';
         const { rows, exists } = await getManhattanRows(fileId, variant);
         const fallback = variant === 'full' ? await getManhattanRows(fileId, 'hits') : null;
         const effectiveRows = exists ? rows : (fallback?.rows || []);
-        const usingFallback = !exists && variant === 'full' && (fallback?.exists || false);
-
-        const availableVariants = {
-            hits: (await getManhattanRows(fileId, 'hits')).exists,
-            full: variant === 'full' ? exists : (await getManhattanRows(fileId, 'full')).exists,
-        };
+        const usingFallback = !exists && variant === 'full' && Boolean(fallback?.exists);
+        const hitsVariant = variant === 'hits' ? exists : (await getManhattanRows(fileId, 'hits')).exists;
+        const fullVariant = variant === 'full' ? exists : (await getManhattanRows(fileId, 'full')).exists;
 
         res.json({
             fileId,
@@ -202,7 +208,10 @@ router.get('/api/trait/manhattan/:traitName', async (req, res) => {
             requestedVariant: variant,
             resolvedVariant: exists ? variant : (usingFallback ? 'hits' : variant),
             fallbackUsed: usingFallback,
-            availableVariants,
+            availableVariants: {
+                hits: hitsVariant,
+                full: fullVariant,
+            },
             hasData: effectiveRows.length > 0,
             data: effectiveRows,
             summary: buildManhattanSummary(effectiveRows),
