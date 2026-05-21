@@ -2,6 +2,9 @@ const express = require('express');
 const path = require('path');
 const gwasModel = require('../models/MgetGwasByTrait');
 const { createFileStore } = require('../lib/fileStore');
+const { config } = require('../lib/config');
+const { asyncRoute } = require('../lib/http');
+const { parsePageOptions } = require('../lib/request');
 const { stripUtf8Bom } = require('../lib/tsv');
 
 const router = express.Router();
@@ -12,6 +15,27 @@ const TSV_CACHE = new Map();
 function normalizeTraitFileId(traitName) {
     const cleaned = String(traitName || '').trim();
     return /^[A-Za-z0-9._-]+$/.test(cleaned) ? cleaned : null;
+}
+
+function uniqueValues(values) {
+    return [...new Set(values.filter(Boolean))];
+}
+
+function buildVariantFileNames(fileId, variant) {
+    const base = String(fileId || '').replace(/\.tsv$/i, '');
+    const withoutVariant = base.replace(/_(hits|full)$/i, '');
+    const suffix = variant === 'full' ? '_full.tsv' : '_hits.tsv';
+
+    return uniqueValues([
+        `${withoutVariant}${suffix}`,
+        `${base}${suffix}`,
+        `${base}.tsv`,
+    ]);
+}
+
+function normalizeTraitName(traitName) {
+    const cleaned = String(traitName || '').trim();
+    return cleaned && cleaned.length <= 500 ? cleaned : null;
 }
 
 function parseOptionalNumber(value) {
@@ -68,6 +92,12 @@ function toTsvRow(row) {
 async function readDelimitedTsv(fullPath) {
     const stat = await manhattanStore.stat(fullPath);
     if (!stat || !stat.isFile) return [];
+    if (stat.size > config.data.maxManhattanFileBytes) {
+        const err = new Error('Manhattan TSV file is too large');
+        err.status = 413;
+        err.expose = true;
+        throw err;
+    }
 
     const cached = TSV_CACHE.get(fullPath);
     if (cached && cached.mtimeMs === stat.mtimeMs) return cached.rows;
@@ -80,7 +110,7 @@ async function readDelimitedTsv(fullPath) {
     }
 
     const headers = lines[0].split('\t').map((header) => stripUtf8Bom(header));
-    const rows = lines.slice(1).map((line) => {
+    const rows = lines.slice(1, config.data.maxManhattanRows + 1).map((line) => {
         const cols = line.split('\t');
         const row = {};
         headers.forEach((header, index) => {
@@ -94,17 +124,20 @@ async function readDelimitedTsv(fullPath) {
 }
 
 async function getManhattanRows(fileId, variant = 'hits') {
-    const suffix = variant === 'full' ? '_full.tsv' : '_hits.tsv';
-    const filePath = manhattanStore.resolve(`${fileId}${suffix}`);
-    if (!filePath) return { filePath: null, rows: [], exists: false };
+    const candidates = buildVariantFileNames(fileId, variant);
 
-    const stat = await manhattanStore.stat(filePath);
-    if (!stat || !stat.isFile) {
-        return { filePath, rows: [], exists: false };
+    for (const fileName of candidates) {
+        const filePath = manhattanStore.resolve(fileName);
+        if (!filePath) continue;
+
+        const stat = await manhattanStore.stat(filePath);
+        if (!stat || !stat.isFile) continue;
+
+        const rows = await readDelimitedTsv(filePath);
+        return { filePath, fileName, rows, exists: true, candidates };
     }
 
-    const rows = await readDelimitedTsv(filePath);
-    return { filePath, rows, exists: true };
+    return { filePath: null, fileName: null, rows: [], exists: false, candidates };
 }
 
 function collectTopCounts(rows, key) {
@@ -149,80 +182,88 @@ function buildManhattanSummary(rows) {
 }
 
 function parseOptions(query) {
-    return {
-        page: parseInt(query.page, 10) || 1,
-        limit: parseInt(query.limit, 10) || 50,
-        sortBy: query.sortBy || 'CHR',
-        order: query.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
-    };
+    const rawLimit = Number(query.limit);
+    if (Number.isFinite(rawLimit) && rawLimit < 1) {
+        return {
+            page: 1,
+            limit: -1,
+            sortBy: query.sortBy || 'CHR',
+            order: query.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
+        };
+    }
+
+    return parsePageOptions(query, {
+        defaultLimit: 50,
+        maxLimit: config.query.maxGwasPageLimit,
+        defaultSortBy: 'CHR',
+    });
 }
 
-router.get('/api/trait/:traitName', async (req, res) => {
-    try {
-        const result = await gwasModel.getGwasDataByTrait(req.params.traitName, parseOptions(req.query));
-        res.json(result);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+router.get('/api/trait/:traitName', asyncRoute(async (req, res) => {
+    const traitName = normalizeTraitName(req.params.traitName);
+    if (!traitName) return res.status(400).json({ error: 'Invalid traitName' });
 
-router.get('/api/trait/allgwas/:traitName', async (req, res) => {
-    try {
-        const result = await gwasModel.getGwasDataByTrait(req.params.traitName);
-        res.json(result);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+    const result = await gwasModel.getGwasDataByTrait(traitName, parseOptions(req.query));
+    res.json(result);
+}));
 
-router.get('/api/trait/filtergwas/:traitName', async (req, res) => {
-    try {
-        const { 'CHR[]': CHR, BP_start, BP_end, P_min, P_max, rsID } = req.query;
-        const result = await gwasModel.getFilteredGwasDataByTrait(
-            req.params.traitName,
-            { CHR, BP_start, BP_end, P_min, P_max, rsID },
-            parseOptions(req.query)
-        );
-        res.json(result);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+router.get('/api/trait/allgwas/:traitName', asyncRoute(async (req, res) => {
+    const traitName = normalizeTraitName(req.params.traitName);
+    if (!traitName) return res.status(400).json({ error: 'Invalid traitName' });
 
-router.get('/api/trait/manhattan/:traitName', async (req, res) => {
-    try {
-        const fileId = normalizeTraitFileId(req.params.traitName);
-        if (!fileId) return res.status(400).json({ error: 'Invalid traitName' });
+    const result = await gwasModel.getGwasDataByTrait(traitName);
+    res.json(result);
+}));
 
-        const variant = req.query.variant === 'full' ? 'full' : 'hits';
-        const { rows, exists } = await getManhattanRows(fileId, variant);
-        const fallback = variant === 'full' ? await getManhattanRows(fileId, 'hits') : null;
-        const effectiveRows = exists ? rows : (fallback?.rows || []);
-        const usingFallback = !exists && variant === 'full' && Boolean(fallback?.exists);
-        const hitsVariant = variant === 'hits' ? exists : (await getManhattanRows(fileId, 'hits')).exists;
-        const fullVariant = variant === 'full' ? exists : (await getManhattanRows(fileId, 'full')).exists;
+router.get('/api/trait/filtergwas/:traitName', asyncRoute(async (req, res) => {
+    const traitName = normalizeTraitName(req.params.traitName);
+    if (!traitName) return res.status(400).json({ error: 'Invalid traitName' });
 
-        res.json({
-            fileId,
-            variant,
-            requestedVariant: variant,
-            resolvedVariant: exists ? variant : (usingFallback ? 'hits' : variant),
-            fallbackUsed: usingFallback,
-            availableVariants: {
-                hits: hitsVariant,
-                full: fullVariant,
-            },
-            hasData: effectiveRows.length > 0,
-            data: effectiveRows,
-            summary: buildManhattanSummary(effectiveRows),
-            notes: {
-                distance_to_gene: '0 means the variant falls within the gene body; hundreds to thousands of bp is usually near; tens of thousands of bp or more is relatively distal.',
-                fullVariantPlaceholder: 'When full-variant TSVs are added later, request variant=full to render all loci.',
-            },
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+    const { 'CHR[]': CHR, CHR: CHRValue, BP_start, BP_end, P_min, P_max, rsID } = req.query;
+    const result = await gwasModel.getFilteredGwasDataByTrait(
+        traitName,
+        { CHR: CHR || CHRValue, BP_start, BP_end, P_min, P_max, rsID },
+        parseOptions(req.query)
+    );
+    res.json(result);
+}));
+
+router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
+    const fileId = normalizeTraitFileId(req.params.traitName);
+    if (!fileId) return res.status(400).json({ error: 'Invalid traitName' });
+
+    const variant = req.query.variant === 'full' ? 'full' : 'hits';
+    const current = await getManhattanRows(fileId, variant);
+    const fallback = variant === 'full' ? await getManhattanRows(fileId, 'hits') : null;
+    const hitsResult = variant === 'hits' ? current : fallback || await getManhattanRows(fileId, 'hits');
+    const fullResult = variant === 'full' ? current : await getManhattanRows(fileId, 'full');
+    const effectiveRows = current.exists ? current.rows : (fallback?.rows || []);
+    const usingFallback = !current.exists && variant === 'full' && Boolean(fallback?.exists);
+
+    res.json({
+        fileId,
+        variant,
+        requestedVariant: variant,
+        resolvedVariant: current.exists ? variant : (usingFallback ? 'hits' : variant),
+        fallbackUsed: usingFallback,
+        fileName: current.exists ? current.fileName : (fallback?.fileName || null),
+        availableVariants: {
+            hits: hitsResult.exists,
+            full: fullResult.exists,
+        },
+        debug: {
+            root: manhattanStore.rootPath,
+            hitsCandidates: hitsResult.candidates || [],
+            fullCandidates: fullResult.candidates || [],
+        },
+        hasData: effectiveRows.length > 0,
+        data: effectiveRows,
+        summary: buildManhattanSummary(effectiveRows),
+        notes: {
+            distance_to_gene: '0 means the variant falls within the gene body; hundreds to thousands of bp is usually near; tens of thousands of bp or more is relatively distal.',
+            variant: 'Use variant=hits for significant loci or variant=full for all loci when a full TSV is available.',
+        },
+    });
+}));
 
 module.exports = router;

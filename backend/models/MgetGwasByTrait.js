@@ -1,4 +1,5 @@
 const pool = require('./db');
+const { config } = require('../lib/config');
 const { buildOrderBy, buildWhereForGwas } = require('./utils');
 
 const GWAS_ALLOWED_COLS = ['CHR', 'BP', 'rsID', 'P', 'BETA', 'SE', 'Zscore', 'EAF', 'MAF'];
@@ -10,16 +11,22 @@ const GWAS_ALLOWED_COLS = ['CHR', 'BP', 'rsID', 'P', 'BETA', 'SE', 'Zscore', 'EA
  * @param {Object} options - { page, limit, sortBy, order }
  */
 async function queryGwasData(traitName, filters = {}, { page = 1, limit, sortBy = 'CHR', order = 'ASC' } = {}) {
+    const safeTraitName = String(traitName || '').trim();
+    if (!safeTraitName || safeTraitName.length > 500) {
+        return limit ? { data: [], totalCount: 0, page: 1, totalPages: 0 } : { data: [] };
+    }
+
     const orderBySql = buildOrderBy(sortBy, order, GWAS_ALLOWED_COLS, 'CHR');
-    const { whereSql, params } = buildWhereForGwas(traitName, filters);
-    const isPaged = limit && limit > 0;
+    const { whereSql, params } = buildWhereForGwas(safeTraitName, filters);
+    const numericLimit = Number(limit);
+    const isPaged = Number.isFinite(numericLimit) && numericLimit > 0;
 
     let query = `SELECT * FROM gwas_data ${whereSql} ${orderBySql}`;
     const queryParams = [...params];
 
     if (isPaged) {
-        const l = Math.min(5000, Math.max(1, Number(limit)));
-        const p = Math.max(1, Number(page));
+        const l = Math.min(config.query.maxGwasPageLimit, Math.max(1, numericLimit));
+        const p = Math.max(1, Number(page) || 1);
         const offset = (p - 1) * l;
         query += ` LIMIT ? OFFSET ?`;
         queryParams.push(l, offset);
@@ -33,8 +40,14 @@ async function queryGwasData(traitName, filters = {}, { page = 1, limit, sortBy 
         return { data: rows, totalCount: total, page: p, totalPages: Math.ceil(total / l) };
     }
 
+    query += ` LIMIT ?`;
+    queryParams.push(config.query.maxUnpagedGwasRows);
     const [rows] = await pool.query(query, queryParams);
-    return { data: rows };
+    return {
+        data: rows,
+        truncated: rows.length >= config.query.maxUnpagedGwasRows,
+        limit: config.query.maxUnpagedGwasRows,
+    };
 }
 
 // 按 Trait 获取全部 GWAS 数据（不分页）

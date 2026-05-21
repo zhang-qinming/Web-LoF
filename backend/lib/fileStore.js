@@ -27,6 +27,7 @@ function isMissingError(err) {
 function buildHttpError(status, message) {
     const err = new Error(message);
     err.status = status;
+    if (status >= 400 && status < 500) err.expose = true;
     return err;
 }
 

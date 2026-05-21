@@ -1,4 +1,5 @@
 const pool = require('./db');
+const { config } = require('../lib/config');
 const { buildOrderBy } = require('./utils');
 
 async function getAllTraitsInfo({ page = 1, limit = 20, sortBy = 'Trait', order = 'ASC' } = {}) {
@@ -6,7 +7,7 @@ async function getAllTraitsInfo({ page = 1, limit = 20, sortBy = 'Trait', order 
     const orderBySql = buildOrderBy(sortBy, order, allowedSortCols, 'Trait');
 
     const p = Math.max(1, Number(page) || 1);
-    const l = Math.max(1, Math.min(1000, Number(limit) || 20));
+    const l = Math.max(1, Math.min(config.query.maxPageLimit, Number(limit) || 20));
     const offset = (p - 1) * l;
 
     const [rows] = await pool.query(

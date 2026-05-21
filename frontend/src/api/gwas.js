@@ -71,12 +71,30 @@ export async function getTraitManhattanHits(traitName, { variant = 'hits' } = {}
     }
 }
 
-export async function getBurdenVolcano(fileId) {
+export async function getBurdenVolcano(fileId, { variant = 'hits' } = {}) {
     try {
-        const res = await axios.get(`${API_BASE}/burden-volcano/${encodeURIComponent(fileId)}`);
+        const res = await axios.get(`${API_BASE}/burden-volcano/${encodeURIComponent(fileId)}`, {
+            params: { variant },
+        });
         return res.data;
     } catch (err) {
         console.error(`获取 Trait "${fileId}" LoF Volcano 数据失败:`, err);
-        return { data: [] };
+        return {
+            fileId,
+            variant,
+            requestedVariant: variant,
+            resolvedVariant: variant,
+            fallbackUsed: false,
+            availableVariants: { hits: false, full: false },
+            hasData: false,
+            data: [],
+            summary: {
+                totalRows: 0,
+                positive: 0,
+                negative: 0,
+                annotatedProgram: 0,
+                annotatedGeneset: 0,
+            },
+        };
     }
 }

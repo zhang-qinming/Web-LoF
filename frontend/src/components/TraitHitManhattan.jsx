@@ -246,10 +246,10 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     }, []);
 
     useEffect(() => {
-        if (!gwasId) return undefined;
+        if (!fileId) return undefined;
         let cancelled = false;
         setLoading(true);
-        getTraitManhattanHits(gwasId, { variant })
+        getTraitManhattanHits(fileId, { variant })
             .then((res) => {
                 if (!cancelled) setPayload(res);
             })
@@ -259,9 +259,11 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         return () => {
             cancelled = true;
         };
-    }, [gwasId, variant]);
+    }, [fileId, variant]);
 
     const rows = useMemo(() => payload?.data || [], [payload]);
+    const resolvedVariant = payload?.resolvedVariant || variant;
+    const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
 
     const summary = payload?.summary || {
         totalRows: 0,
@@ -457,7 +459,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 customdata: assigned.customdata,
                 mode: 'markers',
                 type: 'scattergl',
-                name: 'Program hits',
+                name: 'Program annotated',
                 showlegend: false,
                 hovertemplate: HOVER_TEMPLATE,
                 marker: {
@@ -625,6 +627,19 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         setHighlight({ rowKey: '', key: 0 });
     };
 
+    const handleVariantChange = (_, value) => {
+        if (!value || value === variant) return;
+        setVariant(value);
+        setProgramOnly(false);
+        setSelectedGenesets([]);
+        setDistanceMode('all');
+        setSelectedChromosomes([]);
+        setSelectedPrograms([]);
+        setGeneQuery('');
+        setHighlight({ rowKey: '', key: 0 });
+        setTablePage(0);
+    };
+
     const handleSort = (column) => {
         if (column === sortBy) {
             setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -712,12 +727,12 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `manhattan_hits_${sanitizeFileNamePart(gwasId || fileId)}.csv`;
+        a.download = `manhattan_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }, [processedRows, gwasId, fileId]);
+    }, [processedRows, gwasId, fileId, variantLabel]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -741,10 +756,12 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                         Trait Manhattan
                     </Typography>
                     <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: '#1f2937', lineHeight: 1.25 }}>
-                        GWAS Hit Loci Overview
+                        {variantLabel === 'full' ? 'All GWAS Loci Overview' : 'GWAS Hit Loci Overview'}
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        Program / Geneset coloring for trait-associated loci. Click a point to focus its table row.
+                        {variantLabel === 'full'
+                            ? 'Program / Geneset coloring across the full GWAS TSV. Click a point to focus its table row.'
+                            : 'Program / Geneset coloring for trait-associated loci. Click a point to focus its table row.'}
                     </Typography>
                 </Box>
 
@@ -752,7 +769,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     exclusive
                     size="small"
                     value={variant}
-                    onChange={(_, value) => { if (value) setVariant(value); }}
+                    onChange={handleVariantChange}
                     sx={COMPACT_TOGGLE_SX}
                 >
                     <ToggleButton value="hits">Hits TSV</ToggleButton>
@@ -772,7 +789,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
 
                 <Chip
                     icon={<ScatterPlot sx={{ fontSize: 15 }} />}
-                    label={`${summary.totalRows.toLocaleString()} hits`}
+                    label={`${summary.totalRows.toLocaleString()} ${variantLabel === 'full' ? 'loci' : 'hits'}`}
                     size="small"
                     sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' }}
                 />
@@ -793,6 +810,11 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     label={`${summary.distanceBuckets.in_gene.toLocaleString()} in gene`}
                     size="small"
                     sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#eefbf3', color: '#2f6a49', border: '1px solid #d7eee0' }}
+                />
+                <Chip
+                    label={variantLabel === 'full' ? 'Full TSV' : 'Hits TSV'}
+                    size="small"
+                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: variantLabel === 'full' ? '#ecfeff' : '#ffffff', color: '#0f766e', border: '1px solid #99f6e4', fontFamily: 'monospace' }}
                 />
                 <Chip
                     label={`GWAS ${gwasId || 'NA'}`}

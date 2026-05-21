@@ -4,7 +4,7 @@ function stripUtf8Bom(value = '') {
     return String(value).replace(/^\uFEFF/, '');
 }
 
-async function parseTsvStream(stream) {
+async function parseTsvStream(stream, { maxRows = null } = {}) {
     const rows = [];
     const rl = readline.createInterface({
         input: stream,
@@ -27,6 +27,12 @@ async function parseTsvStream(stream) {
             row[header] = (cols[index] || '').trim();
         });
         rows.push(row);
+
+        if (maxRows && rows.length >= maxRows) {
+            rl.close();
+            stream.destroy();
+            break;
+        }
     }
 
     return rows;

@@ -27,8 +27,7 @@ import {
     Science,
     Timeline,
 } from '@mui/icons-material';
-import useSWR from 'swr';
-import { fetcher } from '../api/gwas';
+import { getBurdenVolcano } from '../api/gwas';
 import BurdenVolcanoTable from './BurdenVolcanoTable';
 
 const COLORS = {
@@ -120,11 +119,10 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
 
-    const { data: payload, error, isLoading } = useSWR(
-        gwasId ? `/api/burden-volcano/${encodeURIComponent(gwasId)}` : null,
-        fetcher,
-    );
-
+    const [payload, setPayload] = useState(null);
+    const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [variant, setVariant] = useState('hits');
     const [effectMode, setEffectMode] = useState(EFFECT_MODES.ALL);
     const [significantOnly, setSignificantOnly] = useState(false);
     const [pointSize, setPointSize] = useState(DEFAULT_POINT_SIZE);
@@ -146,6 +144,34 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
     const onUpdate = useCallback((_figure, graphDiv) => {
         plotRef.current = graphDiv;
     }, []);
+
+    useEffect(() => {
+        if (!fileId) {
+            setPayload(null);
+            return undefined;
+        }
+
+        let cancelled = false;
+        setIsLoading(true);
+        setError(null);
+        getBurdenVolcano(fileId, { variant })
+            .then((res) => {
+                if (!cancelled) setPayload(res);
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setError(err);
+                    setPayload(null);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [fileId, variant]);
 
     const rows = useMemo(() => {
         if (!Array.isArray(payload?.data)) return [];
@@ -174,6 +200,10 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
             };
         }).filter((item) => item.beta != null && item.logp != null);
     }, [payload]);
+
+    const availableVariants = payload?.availableVariants || { hits: false, full: false };
+    const resolvedVariant = payload?.resolvedVariant || variant;
+    const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
 
     const filteredRows = useMemo(() => rows.filter((row) => {
         if (effectMode === EFFECT_MODES.POSITIVE && row.beta < 0) return false;
@@ -366,7 +396,8 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         effectMode,
         significantOnly,
         highlightKey: highlight.key,
-    }), [effectMode, filteredRows.length, highlight.key, pointSize, significantOnly]);
+        variant: variantLabel,
+    }), [effectMode, filteredRows.length, highlight.key, pointSize, significantOnly, variantLabel]);
 
     const handleSort = useCallback((column) => {
         if (column === sortBy) {
@@ -433,6 +464,15 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         setHighlight({ rowKey: '', key: 0 });
     }, []);
 
+    const handleVariantChange = (_, value) => {
+        if (!value || value === variant) return;
+        setVariant(value);
+        setEffectMode(EFFECT_MODES.ALL);
+        setSignificantOnly(false);
+        setHighlight({ rowKey: '', key: 0 });
+        setTablePage(0);
+    };
+
     const handleExport = useCallback(() => {
         const gd = plotRef.current;
         if (!gd) return;
@@ -441,12 +481,12 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         Plotly.toImage(gd, { format: exportFmt, width, height }).then((dataUrl) => {
             const a = document.createElement('a');
             a.href = dataUrl;
-            a.download = `${sanitizeFileNamePart(gwasId || fileId)}-lof-volcano.${exportFmt}`;
+            a.download = `${sanitizeFileNamePart(gwasId || fileId)}-${variantLabel}-lof-volcano.${exportFmt}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
         });
-    }, [exportFmt, exportHeight, exportWidth, fileId, gwasId]);
+    }, [exportFmt, exportHeight, exportWidth, fileId, gwasId, variantLabel]);
 
     const downloadCSV = useCallback(() => {
         const cols = ['Gene', 'ENSG', 'Beta', 'P', '-log10(P)', 'FDR', 'Program', 'Geneset'];
@@ -465,12 +505,12 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `burden_volcano_${sanitizeFileNamePart(gwasId || fileId)}.csv`;
+        a.download = `burden_volcano_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }, [fileId, gwasId, rows]);
+    }, [fileId, gwasId, rows, variantLabel]);
 
     if (error) {
         return <Alert severity="error" sx={{ m: 2 }}>{error.message}</Alert>;
@@ -486,12 +526,25 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
                         LoF Volcano
                     </Typography>
                     <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: '#1f2937', lineHeight: 1.25 }}>
-                        Gene Burden Effect Overview
+                        {variantLabel === 'full' ? 'All Gene Burden Effects' : 'Gene Burden Hit Overview'}
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        Gene-level LoF burden effects for this trait. Click a point to focus its table row.
+                        {variantLabel === 'full'
+                            ? 'Full gene-level LoF burden effects for this trait. Click a point to focus its table row.'
+                            : 'Significant LoF burden hits for this trait. Switch to Full TSV for all genes when available.'}
                     </Typography>
                 </Box>
+
+                <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={variant}
+                    onChange={handleVariantChange}
+                    sx={COMPACT_TOGGLE_SX}
+                >
+                    <ToggleButton value="hits">Hits TSV</ToggleButton>
+                    <ToggleButton value="full" disabled={Boolean(payload) && !availableVariants.full}>Full TSV</ToggleButton>
+                </ToggleButtonGroup>
 
                 <ToggleButtonGroup
                     exclusive
@@ -523,6 +576,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
                 <Chip icon={<Insights />} label={`${counts.significant.toLocaleString()} highlighted`} size="small" sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#fff7ed', color: '#b45309', border: '1px solid #fed7aa' }} />
                 <Chip icon={<Science />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#fff7f2', color: COLORS.positive, border: '1px solid rgba(204,111,60,0.22)' }} />
                 <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#f4f8fd', color: COLORS.negative, border: '1px solid rgba(79,125,168,0.2)' }} />
+                <Chip label={variantLabel === 'full' ? 'Full TSV' : 'Hits TSV'} size="small" sx={{ ...SUMMARY_CHIP_SX, bgcolor: variantLabel === 'full' ? '#ecfeff' : '#ffffff', color: '#0f766e', border: '1px solid #99f6e4', fontFamily: 'monospace' }} />
                 <Chip label={`GWAS ${gwasId || 'NA'}`} size="small" sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#ffffff', color: '#64748b', border: '1px solid #d9dde3', fontFamily: 'monospace' }} />
             </Box>
 

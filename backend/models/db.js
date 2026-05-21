@@ -1,16 +1,21 @@
 const mysql = require('mysql2/promise');
+const { config: appConfig } = require('../lib/config');
 
 const config = {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USER || 'root',
-    database: process.env.DB_NAME || 'gwas',
+    host: appConfig.db.host,
+    port: appConfig.db.port,
+    user: appConfig.db.user,
+    database: appConfig.db.database,
     waitForConnections: true,
-    connectionLimit: parseInt(process.env.DB_POOL_SIZE) || 10,
-    queueLimit: 0,
+    connectionLimit: appConfig.db.connectionLimit,
+    queueLimit: appConfig.db.queueLimit,
+    connectTimeout: appConfig.db.connectTimeout,
+    dateStrings: true,
+    supportBigNumbers: true,
+    bigNumberStrings: true,
 };
 
-if (process.env.DB_PASSWORD) config.password = process.env.DB_PASSWORD;
+if (appConfig.db.password) config.password = appConfig.db.password;
 
 const pool = mysql.createPool(config);
 
