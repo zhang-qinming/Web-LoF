@@ -30,9 +30,27 @@ function normalizeSafeBaseName(value, maxLength = 255) {
     return cleaned && /^[A-Za-z0-9._-]+$/.test(cleaned) ? cleaned : null;
 }
 
+function normalizeSafeBaseNameList(value, maxLength = 255) {
+    const values = Array.isArray(value) ? value : [value];
+    const names = [];
+
+    for (const item of values) {
+        String(item || '')
+            .split(',')
+            .map((part) => normalizeSafeBaseName(part, maxLength))
+            .filter(Boolean)
+            .forEach((name) => {
+                if (!names.includes(name)) names.push(name);
+            });
+    }
+
+    return names;
+}
+
 module.exports = {
     normalizeIdentifier,
     normalizeSafeBaseName,
+    normalizeSafeBaseNameList,
     parsePageOptions,
     parsePositiveInt,
 };

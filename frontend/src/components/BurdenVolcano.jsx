@@ -96,6 +96,12 @@ function sanitizeFileNamePart(value) {
     return String(value || 'plot').replace(/[\\/:*?"<>|]+/g, '_');
 }
 
+function compactFileName(value, maxLength = 42) {
+    const text = String(value || 'not found');
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, 18)}...${text.slice(-18)}`;
+}
+
 function normalizeExportSize(value, fallback) {
     const num = Number(value);
     if (!Number.isFinite(num)) return fallback;
@@ -146,7 +152,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
     }, []);
 
     useEffect(() => {
-        if (!fileId) {
+        if (!gwasId && !fileId) {
             setPayload(null);
             return undefined;
         }
@@ -154,7 +160,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         let cancelled = false;
         setIsLoading(true);
         setError(null);
-        getBurdenVolcano(fileId, { variant })
+        getBurdenVolcano(gwasId || fileId, { variant, aliasId: fileId })
             .then((res) => {
                 if (!cancelled) setPayload(res);
             })
@@ -171,7 +177,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         return () => {
             cancelled = true;
         };
-    }, [fileId, variant]);
+    }, [fileId, gwasId, variant]);
 
     const rows = useMemo(() => {
         if (!Array.isArray(payload?.data)) return [];
@@ -578,6 +584,12 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
                 <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#f4f8fd', color: COLORS.negative, border: '1px solid rgba(79,125,168,0.2)' }} />
                 <Chip label={variantLabel === 'full' ? 'Full TSV' : 'Hits TSV'} size="small" sx={{ ...SUMMARY_CHIP_SX, bgcolor: variantLabel === 'full' ? '#ecfeff' : '#ffffff', color: '#0f766e', border: '1px solid #99f6e4', fontFamily: 'monospace' }} />
                 <Chip label={`GWAS ${gwasId || 'NA'}`} size="small" sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#ffffff', color: '#64748b', border: '1px solid #d9dde3', fontFamily: 'monospace' }} />
+                <Chip
+                    label={`TSV ${compactFileName(payload?.fileName)}`}
+                    title={payload?.fileName || 'No TSV matched on the backend'}
+                    size="small"
+                    sx={{ ...SUMMARY_CHIP_SX, maxWidth: 280, bgcolor: '#ffffff', color: '#64748b', border: '1px solid #d9dde3', fontFamily: 'monospace' }}
+                />
             </Box>
 
             <Box sx={TOOLBAR_SX}>

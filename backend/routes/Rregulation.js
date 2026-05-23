@@ -1,12 +1,11 @@
 const express = require('express');
-const path = require('path');
 const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
 const { parseTsvStream } = require('../lib/tsv');
 
 const router = express.Router();
-const regulationStore = createFileStore(process.env.REGULATION_DATA_DIR || path.join(__dirname, '..', 'data', 'cNMF_regulation'));
+const regulationStore = createFileStore(config.paths.regulationDataDir);
 
 function escapeRegex(value) {
     return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

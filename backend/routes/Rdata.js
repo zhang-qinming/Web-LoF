@@ -6,7 +6,7 @@ const { asyncRoute } = require('../lib/http');
 const { parsePositiveInt } = require('../lib/request');
 
 const router = express.Router();
-const dataStore = createFileStore(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
+const dataStore = createFileStore(config.paths.dataDir);
 
 let searchIndexCache = null;
 let searchIndexBuiltAt = 0;

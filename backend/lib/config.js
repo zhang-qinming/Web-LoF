@@ -33,6 +33,14 @@ function parseBytes(value, fallback) {
     return Math.floor(amount * multiplier);
 }
 
+const paths = {
+    dataDir: process.env.DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs',
+    programDataDir: process.env.PROGRAM_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/run_all/outputs/figures/cnmf/tables/program_regulator',
+    regulationDataDir: process.env.REGULATION_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/run_all/outputs/perturbseq/cnmf_genomewide/cNMF_regulation/K562GW',
+    gwasManhattanDataDir: process.env.GWAS_MANHATTAN_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/gwas_manhattan/tables',
+    burdenVolcanoDir: process.env.BURDEN_VOLCANO_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/burden_volcano/tables',
+};
+
 const config = {
     env: process.env.NODE_ENV || 'development',
     server: {
@@ -42,7 +50,7 @@ const config = {
         jsonLimit: process.env.JSON_BODY_LIMIT || '1mb',
     },
     db: {
-        host: process.env.DB_HOST || 'localhost',
+        host: process.env.DB_HOST || '127.0.0.1',
         port: parseInteger(process.env.DB_PORT, 3306, { min: 1, max: 65535 }),
         user: process.env.DB_USER || 'root',
         password: process.env.DB_PASSWORD || undefined,
@@ -59,6 +67,7 @@ const config = {
         maxChrFilterValues: parseInteger(process.env.MAX_CHR_FILTER_VALUES, 30, { min: 1, max: 200 }),
         maxRsIdLength: parseInteger(process.env.MAX_RSID_LENGTH, 100, { min: 10, max: 500 }),
     },
+    paths,
     data: {
         searchIndexTtlMs: parseInteger(process.env.DATA_SEARCH_INDEX_TTL_MS, 120000, { min: 1000 }),
         allowSearchRefresh: parseBoolean(process.env.DATA_ALLOW_SEARCH_REFRESH, false),

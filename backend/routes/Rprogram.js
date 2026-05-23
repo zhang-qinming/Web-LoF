@@ -1,31 +1,16 @@
 const express = require('express');
-const path = require('path');
 const programModel = require('../models/Mprogram');
 const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
-const { normalizeSafeBaseName } = require('../lib/request');
+const { normalizeSafeBaseName, normalizeSafeBaseNameList } = require('../lib/request');
 const { parseTsvStream } = require('../lib/tsv');
+const { findVariantFile } = require('../lib/variantFiles');
 
 const router = express.Router();
 
-const programStore = createFileStore(process.env.PROGRAM_DATA_DIR || path.join(__dirname, '..', 'data', 'program_regulator'));
-const burdenVolcanoStore = createFileStore(process.env.BURDEN_VOLCANO_DIR || path.join(__dirname, '..', 'data', 'burden_volcano'));
-
-function uniqueValues(values) {
-    return [...new Set(values.filter(Boolean))];
-}
-
-function buildVariantFileNames(fileId, variant, suffix = '.tsv') {
-    const base = String(fileId || '').replace(new RegExp(`${suffix.replace('.', '\\.')}$`, 'i'), '');
-    const withoutVariant = base.replace(/_(hits|full)$/i, '');
-
-    return uniqueValues([
-        `${withoutVariant}_${variant}${suffix}`,
-        `${base}_${variant}${suffix}`,
-        `${base}${suffix}`,
-    ]);
-}
+const programStore = createFileStore(config.paths.programDataDir);
+const burdenVolcanoStore = createFileStore(config.paths.burdenVolcanoDir);
 
 async function parseTsvFromStore(store, relativeName) {
     const fullPath = store.resolve(relativeName);
@@ -44,21 +29,14 @@ async function parseTsvFromStore(store, relativeName) {
     return parseTsvStream(stream, { maxRows: config.data.maxTsvRows });
 }
 
-async function getTsvVariant(store, fileId, variant, suffix) {
-    const candidates = buildVariantFileNames(fileId, variant, suffix);
-
-    for (const relativeName of candidates) {
-        const fullPath = store.resolve(relativeName);
-        if (!fullPath) continue;
-
-        const stat = await store.stat(fullPath);
-        if (!stat || !stat.isFile) continue;
-
-        const data = await parseTsvFromStore(store, relativeName);
-        return { exists: true, data: data || [], fileName: relativeName, candidates };
+async function getTsvVariant(store, fileIds, variant, suffix) {
+    const { fileName } = await findVariantFile(store, fileIds, variant, { suffix });
+    if (fileName) {
+        const data = await parseTsvFromStore(store, fileName);
+        return { exists: true, data: data || [], fileName };
     }
 
-    return { exists: false, data: [], fileName: null, candidates };
+    return { exists: false, data: [], fileName: null };
 }
 
 function summarizeBurdenRows(rows) {
@@ -117,16 +95,17 @@ router.get('/api/burden-volcano/:fileId', asyncRoute(async (req, res) => {
     if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
 
     const variant = req.query.variant === 'full' ? 'full' : 'hits';
-    const current = await getTsvVariant(burdenVolcanoStore, safeFileId, variant, '.tsv');
+    const lookupIds = [safeFileId, ...normalizeSafeBaseNameList(req.query.aliasId)];
+    const current = await getTsvVariant(burdenVolcanoStore, lookupIds, variant, '.tsv');
     const fallback = variant === 'full'
-        ? await getTsvVariant(burdenVolcanoStore, safeFileId, 'hits', '.tsv')
+        ? await getTsvVariant(burdenVolcanoStore, lookupIds, 'hits', '.tsv')
         : null;
     const hitsResult = variant === 'hits'
         ? current
-        : fallback || await getTsvVariant(burdenVolcanoStore, safeFileId, 'hits', '.tsv');
+        : fallback || await getTsvVariant(burdenVolcanoStore, lookupIds, 'hits', '.tsv');
     const fullResult = variant === 'full'
         ? current
-        : await getTsvVariant(burdenVolcanoStore, safeFileId, 'full', '.tsv');
+        : await getTsvVariant(burdenVolcanoStore, lookupIds, 'full', '.tsv');
     const effective = current.exists ? current : (fallback || current);
     const usingFallback = !current.exists && variant === 'full' && Boolean(fallback?.exists);
 
@@ -142,11 +121,6 @@ router.get('/api/burden-volcano/:fileId', asyncRoute(async (req, res) => {
         availableVariants: {
             hits: hitsResult.exists,
             full: fullResult.exists,
-        },
-        debug: {
-            root: burdenVolcanoStore.rootPath,
-            hitsCandidates: hitsResult.candidates || [],
-            fullCandidates: fullResult.candidates || [],
         },
         hasData: effective.data.length > 0,
         data: effective.data,

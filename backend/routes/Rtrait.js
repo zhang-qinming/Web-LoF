@@ -1,36 +1,20 @@
 const express = require('express');
-const path = require('path');
 const gwasModel = require('../models/MgetGwasByTrait');
 const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
-const { parsePageOptions } = require('../lib/request');
+const { normalizeSafeBaseNameList, parsePageOptions } = require('../lib/request');
 const { stripUtf8Bom } = require('../lib/tsv');
+const { findVariantFile } = require('../lib/variantFiles');
 
 const router = express.Router();
 
-const manhattanStore = createFileStore(process.env.GWAS_MANHATTAN_DATA_DIR || path.join(__dirname, '..', 'data', 'gwas_manhattan'));
+const manhattanStore = createFileStore(config.paths.gwasManhattanDataDir);
 const TSV_CACHE = new Map();
 
 function normalizeTraitFileId(traitName) {
     const cleaned = String(traitName || '').trim();
     return /^[A-Za-z0-9._-]+$/.test(cleaned) ? cleaned : null;
-}
-
-function uniqueValues(values) {
-    return [...new Set(values.filter(Boolean))];
-}
-
-function buildVariantFileNames(fileId, variant) {
-    const base = String(fileId || '').replace(/\.tsv$/i, '');
-    const withoutVariant = base.replace(/_(hits|full)$/i, '');
-    const suffix = variant === 'full' ? '_full.tsv' : '_hits.tsv';
-
-    return uniqueValues([
-        `${withoutVariant}${suffix}`,
-        `${base}${suffix}`,
-        `${base}.tsv`,
-    ]);
 }
 
 function normalizeTraitName(traitName) {
@@ -123,21 +107,14 @@ async function readDelimitedTsv(fullPath) {
     return rows;
 }
 
-async function getManhattanRows(fileId, variant = 'hits') {
-    const candidates = buildVariantFileNames(fileId, variant);
-
-    for (const fileName of candidates) {
-        const filePath = manhattanStore.resolve(fileName);
-        if (!filePath) continue;
-
-        const stat = await manhattanStore.stat(filePath);
-        if (!stat || !stat.isFile) continue;
-
+async function getManhattanRows(fileIds, variant = 'hits') {
+    const { filePath, fileName } = await findVariantFile(manhattanStore, fileIds, variant);
+    if (filePath) {
         const rows = await readDelimitedTsv(filePath);
-        return { filePath, fileName, rows, exists: true, candidates };
+        return { filePath, fileName, rows, exists: true };
     }
 
-    return { filePath: null, fileName: null, rows: [], exists: false, candidates };
+    return { filePath: null, fileName: null, rows: [], exists: false };
 }
 
 function collectTopCounts(rows, key) {
@@ -233,10 +210,11 @@ router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
     if (!fileId) return res.status(400).json({ error: 'Invalid traitName' });
 
     const variant = req.query.variant === 'full' ? 'full' : 'hits';
-    const current = await getManhattanRows(fileId, variant);
-    const fallback = variant === 'full' ? await getManhattanRows(fileId, 'hits') : null;
-    const hitsResult = variant === 'hits' ? current : fallback || await getManhattanRows(fileId, 'hits');
-    const fullResult = variant === 'full' ? current : await getManhattanRows(fileId, 'full');
+    const lookupIds = [fileId, ...normalizeSafeBaseNameList(req.query.aliasId)];
+    const current = await getManhattanRows(lookupIds, variant);
+    const fallback = variant === 'full' ? await getManhattanRows(lookupIds, 'hits') : null;
+    const hitsResult = variant === 'hits' ? current : fallback || await getManhattanRows(lookupIds, 'hits');
+    const fullResult = variant === 'full' ? current : await getManhattanRows(lookupIds, 'full');
     const effectiveRows = current.exists ? current.rows : (fallback?.rows || []);
     const usingFallback = !current.exists && variant === 'full' && Boolean(fallback?.exists);
 
@@ -250,11 +228,6 @@ router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
         availableVariants: {
             hits: hitsResult.exists,
             full: fullResult.exists,
-        },
-        debug: {
-            root: manhattanStore.rootPath,
-            hitsCandidates: hitsResult.candidates || [],
-            fullCandidates: fullResult.candidates || [],
         },
         hasData: effectiveRows.length > 0,
         data: effectiveRows,

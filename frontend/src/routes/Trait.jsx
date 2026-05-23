@@ -214,7 +214,7 @@ export default function Trait() {
                 }}>
                 <Tab label="Program Scatter" disabled={!hasProgram} />
                 <Tab label="Manhattan" />
-                <Tab label="LoF Volcano" disabled={!gwasId} />
+                <Tab label="LoF Volcano" />
             </Tabs>
 
             <Box sx={{ minHeight: 400 }}>

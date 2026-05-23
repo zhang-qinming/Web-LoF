@@ -142,6 +142,12 @@ function sanitizeFileNamePart(value) {
     return String(value || 'plot').replace(/[\\/:*?"<>|]+/g, '_');
 }
 
+function compactFileName(value, maxLength = 42) {
+    const text = String(value || 'not found');
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, 18)}...${text.slice(-18)}`;
+}
+
 function normalizeChromosome(value) {
     let text = String(value || '').trim();
     if (!text) return '';
@@ -249,7 +255,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         if (!fileId) return undefined;
         let cancelled = false;
         setLoading(true);
-        getTraitManhattanHits(fileId, { variant })
+        getTraitManhattanHits(fileId, { variant, aliasId: gwasId })
             .then((res) => {
                 if (!cancelled) setPayload(res);
             })
@@ -259,7 +265,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         return () => {
             cancelled = true;
         };
-    }, [fileId, variant]);
+    }, [fileId, gwasId, variant]);
 
     const rows = useMemo(() => payload?.data || [], [payload]);
     const resolvedVariant = payload?.resolvedVariant || variant;
@@ -820,6 +826,12 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     label={`GWAS ${gwasId || 'NA'}`}
                     size="small"
                     sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#ffffff', color: '#64748b', border: '1px solid #d9dde3', fontFamily: 'monospace' }}
+                />
+                <Chip
+                    label={`TSV ${compactFileName(payload?.fileName)}`}
+                    title={payload?.fileName || 'No TSV matched on the backend'}
+                    size="small"
+                    sx={{ ...SUMMARY_CHIP_SX, maxWidth: 280, bgcolor: '#ffffff', color: '#64748b', border: '1px solid #d9dde3', fontFamily: 'monospace' }}
                 />
             </Box>
 

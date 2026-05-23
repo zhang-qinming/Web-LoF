@@ -16,7 +16,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
-!.env.linux.example
 
 # Coverage / cache
 coverage

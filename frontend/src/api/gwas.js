@@ -36,10 +36,10 @@ export async function getTraitData(traitName) {
     }
 }
 
-export async function getTraitManhattanHits(traitName, { variant = 'hits' } = {}) {
+export async function getTraitManhattanHits(traitName, { variant = 'hits', aliasId } = {}) {
     try {
         const res = await axios.get(`${API_BASE}/trait/manhattan/${encodeURIComponent(traitName)}`, {
-            params: { variant },
+            params: { variant, aliasId },
         });
         return res.data;
     } catch (err) {
@@ -65,16 +65,15 @@ export async function getTraitManhattanHits(traitName, { variant = 'hits' } = {}
             },
             notes: {
                 distance_to_gene: '',
-                fullVariantPlaceholder: '',
             },
         };
     }
 }
 
-export async function getBurdenVolcano(fileId, { variant = 'hits' } = {}) {
+export async function getBurdenVolcano(fileId, { variant = 'hits', aliasId } = {}) {
     try {
         const res = await axios.get(`${API_BASE}/burden-volcano/${encodeURIComponent(fileId)}`, {
-            params: { variant },
+            params: { variant, aliasId },
         });
         return res.data;
     } catch (err) {
