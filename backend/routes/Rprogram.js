@@ -57,6 +57,34 @@ async function parseTsvFromStore(store, relativeName) {
     return parseTsvStream(stream, { maxRows: config.data.maxTsvRows });
 }
 
+async function listAvailableTraitProgramGraphFiles() {
+    const exists = await traitProgramGenePanelStore.exists(traitProgramGenePanelStore.rootPath);
+    if (!exists) return [];
+
+    const programFiles = new Set();
+    const geneFiles = new Set();
+    const entries = await traitProgramGenePanelStore.list(traitProgramGenePanelStore.rootPath);
+
+    for (const entry of entries) {
+        if (entry.type !== 'file') continue;
+
+        const programMatch = entry.name.match(/^(.+)_programs\.tsv$/i);
+        if (programMatch) {
+            programFiles.add(programMatch[1]);
+            continue;
+        }
+
+        const geneMatch = entry.name.match(/^(.+)_long\.tsv$/i);
+        if (geneMatch) {
+            geneFiles.add(geneMatch[1]);
+        }
+    }
+
+    return [...programFiles]
+        .filter((fileId) => geneFiles.has(fileId))
+        .sort((a, b) => a.localeCompare(b));
+}
+
 async function getTsvVariant(store, fileIds, variant, suffix, { readRows = true } = {}) {
     const { fileName } = await findVariantFile(store, fileIds, variant, { suffix, aliases: VOLCANO_VARIANT_ALIASES });
     if (fileName) {
@@ -379,6 +407,11 @@ router.get('/api/programs/list', asyncRoute(async (req, res) => {
         .filter((entry) => entry.type === 'file' && entry.name.endsWith('.tsv'))
         .map((entry) => entry.name.replace(/\.tsv$/i, ''));
 
+    res.json({ files });
+}));
+
+router.get('/api/programs/graph-list', asyncRoute(async (req, res) => {
+    const files = await listAvailableTraitProgramGraphFiles();
     res.json({ files });
 }));
 

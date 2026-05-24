@@ -461,7 +461,18 @@ export default function TraitProgramGraph({ fileId }) {
     const [hoverProgram, setHoverProgram] = useState(null);
     const [hoverGene, setHoverGene] = useState(null);
 
-    const transformApi = useGraphTransform();
+    const {
+        transform,
+        isDragging,
+        onPointerDown,
+        onPointerMove,
+        onPointerUp,
+        onWheel,
+        zoomIn,
+        zoomOut,
+        reset,
+        shouldSuppressClick,
+    } = useGraphTransform();
 
     const filters = useMemo(() => ({
         gammaThreshold,
@@ -475,8 +486,8 @@ export default function TraitProgramGraph({ fileId }) {
         setSelectedProgram(null);
         setSelectedGene(null);
         setExpandedPrograms(new Set());
-        transformApi.reset();
-    }, [fileId, transformApi]);
+        reset();
+    }, [fileId, reset]);
 
     const leftPrograms = useMemo(() => graph?.layout?.leftPrograms || [], [graph]);
     const rightPrograms = useMemo(() => graph?.layout?.rightPrograms || [], [graph]);
@@ -562,13 +573,13 @@ export default function TraitProgramGraph({ fileId }) {
     }, []);
 
     const handleSelectProgram = useCallback((program) => {
-        if (transformApi.shouldSuppressClick()) return;
+        if (shouldSuppressClick()) return;
         setSelectedProgram((current) => (current === program ? null : program));
         setSelectedGene(null);
-    }, [transformApi]);
+    }, [shouldSuppressClick]);
 
     const handleSelectGene = useCallback((gene) => {
-        if (transformApi.shouldSuppressClick()) return;
+        if (shouldSuppressClick()) return;
 
         const nextKey = selectedGeneKey === gene.highlightKey ? null : gene.highlightKey;
         setSelectedProgram(null);
@@ -587,7 +598,7 @@ export default function TraitProgramGraph({ fileId }) {
             });
             return next;
         });
-    }, [graph, selectedGeneKey, transformApi]);
+    }, [graph, selectedGeneKey, shouldSuppressClick]);
 
     const clearSelection = useCallback(() => {
         setSelectedProgram(null);
@@ -909,16 +920,16 @@ export default function TraitProgramGraph({ fileId }) {
                             sx={{ minWidth: { xl: 280 } }}
                         >
                             <Tooltip title="Zoom in">
-                                <Button size="small" variant="outlined" onClick={transformApi.zoomIn} startIcon={<ZoomIn />}>
+                                <Button size="small" variant="outlined" onClick={zoomIn} startIcon={<ZoomIn />}>
                                     Zoom
                                 </Button>
                             </Tooltip>
                             <Tooltip title="Zoom out">
-                                <Button size="small" variant="outlined" onClick={transformApi.zoomOut} startIcon={<ZoomOut />}>
+                                <Button size="small" variant="outlined" onClick={zoomOut} startIcon={<ZoomOut />}>
                                     Out
                                 </Button>
                             </Tooltip>
-                            <Button size="small" variant="outlined" onClick={transformApi.reset} startIcon={<RestartAlt />}>
+                            <Button size="small" variant="outlined" onClick={reset} startIcon={<RestartAlt />}>
                                 Reset view
                             </Button>
                             <Button size="small" variant="outlined" onClick={clearSelection}>
@@ -1035,15 +1046,15 @@ export default function TraitProgramGraph({ fileId }) {
                         px: { xs: 1, md: 2 },
                         py: 2,
                         background: 'linear-gradient(180deg, #fbfcfe 0%, #f3f6fb 100%)',
-                        cursor: transformApi.isDragging ? 'grabbing' : 'grab',
+                        cursor: isDragging ? 'grabbing' : 'grab',
                         touchAction: 'none',
                         userSelect: 'none',
                     }}
-                    onPointerDown={transformApi.onPointerDown}
-                    onPointerMove={transformApi.onPointerMove}
-                    onPointerUp={transformApi.onPointerUp}
-                    onPointerLeave={transformApi.onPointerUp}
-                    onWheel={transformApi.onWheel}
+                    onPointerDown={onPointerDown}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={onPointerUp}
+                    onPointerLeave={onPointerUp}
+                    onWheel={onWheel}
                 >
                     <svg
                         ref={svgRef}
@@ -1065,7 +1076,7 @@ export default function TraitProgramGraph({ fileId }) {
                             </linearGradient>
                         </defs>
 
-                        <g transform={`translate(${transformApi.transform.x} ${transformApi.transform.y}) scale(${transformApi.transform.scale})`}>
+                        <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.scale})`}>
                             <text x="92" y="56" fontSize="17" fontWeight="700" fill={SIDE_META.program.accent}>
                                 {SIDE_META.program.label}
                             </text>
