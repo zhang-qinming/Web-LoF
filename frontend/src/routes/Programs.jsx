@@ -32,9 +32,8 @@ export default function Programs() {
         fetch('/api/regulation/list').then(r => r.json()).then(res => setPrograms(res.programs || [])).catch(() => {});
     }, []);
 
-    const infoObj = info || {};
     const rows = useMemo(() => {
-        const items = Object.entries(infoObj).map(([k, v]) => ({ key: k, ...v }));
+        const items = Object.entries(info || {}).map(([k, v]) => ({ key: k, ...v }));
         const dir = sortDir === 'asc' ? 1 : -1;
         items.sort((a, b) => {
             if (sortBy === 'program') return numSort(a.program, b.program) * dir;
@@ -42,7 +41,7 @@ export default function Programs() {
             return String(a[sortBy] || '').localeCompare(String(b[sortBy] || '')) * dir;
         });
         return items;
-    }, [infoObj, sortBy, sortDir]);
+    }, [info, sortBy, sortDir]);
 
     const handleSort = (col) => {
         if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');

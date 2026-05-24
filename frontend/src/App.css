@@ -175,6 +175,7 @@ p {
 .not-found { text-align: center; padding: 40px 20px; }
 .not-found h1 { font-size: 36px; color: var(--muted); margin-bottom: 16px; }
 .not-found p { font-size: 18px; margin-bottom: 30px; }
+.route-loading { padding: 40px 20px; text-align: center; color: var(--muted); }
 
 /* 6) 表格/表单/按钮 */
 .table {

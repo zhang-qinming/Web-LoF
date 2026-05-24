@@ -1,3 +1,5 @@
+const path = require('path');
+
 function parseInteger(value, fallback, { min = null, max = null } = {}) {
     const parsed = Number.parseInt(value, 10);
     let result = Number.isFinite(parsed) ? parsed : fallback;
@@ -33,9 +35,12 @@ function parseBytes(value, fallback) {
     return Math.floor(amount * multiplier);
 }
 
+const dataDir = process.env.DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs';
+
 const paths = {
-    dataDir: process.env.DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs',
+    dataDir,
     programDataDir: process.env.PROGRAM_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/run_all/outputs/figures/cnmf/tables/program_regulator',
+    traitProgramGenePanelDir: process.env.TRAIT_PROGRAM_GENE_PANEL_DIR || path.join(dataDir, 'trait_program_gene_panel', 'tables'),
     regulationDataDir: process.env.REGULATION_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/run_all/outputs/perturbseq/cnmf_genomewide/cNMF_regulation/K562GW',
     gwasManhattanDataDir: process.env.GWAS_MANHATTAN_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/gwas_manhattan/tables',
     burdenVolcanoDir: process.env.BURDEN_VOLCANO_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/burden_volcano/tables',

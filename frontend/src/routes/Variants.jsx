@@ -11,7 +11,7 @@ import {
     FileDownload, CheckBoxOutlineBlank, CheckBox,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { buildApiUrl, submitDownloadForm, triggerNativeDownload } from '../utils/download';
+import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload } from '../utils/download';
 
 const API = axios.create({ baseURL: '/api/data' });
 const PER = 40, COL_W = 440, ANIM = 170;
@@ -72,30 +72,6 @@ function getFilePathsCacheKey(dir, filter) {
 
 function getRequestErrorMessage(err, fallback) {
     return err.response?.data?.error || err.message || fallback;
-}
-
-function getZipName(path, fallback = 'data') {
-    return `${path.split('/').filter(Boolean).pop() || fallback}.zip`;
-}
-
-async function triggerDownload(path) {
-    const response = await API.get('/download-info', { params: { path } });
-    if (response.data?.type === 'dir') {
-        await triggerBatchDownload([path], getZipName(path));
-        return;
-    }
-    triggerNativeDownload(buildApiUrl('/data/download', { path }));
-}
-
-async function triggerBatchDownload(paths, filename) {
-    submitDownloadForm(buildApiUrl('/data/download-batch'), { paths, filename });
-}
-
-async function downloadPaths(paths, options = {}) {
-    const { filename = 'data-selection.zip' } = options;
-    const uniquePaths = [...new Set(paths.filter(Boolean))];
-    if (uniquePaths.length === 0) return;
-    await triggerBatchDownload(uniquePaths, filename);
 }
 
 async function fetchAllFilePaths(dir, filter) {
@@ -214,12 +190,12 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
         try {
             if (searchDownload) {
                 const allMatchingFilePaths = await fetchAllFilePaths(dir, filter);
-                await downloadPaths(allMatchingFilePaths, {
+                await downloadDataPaths(allMatchingFilePaths, {
                     filename: `${dir.split('/').pop() || 'data'}-filtered.zip`,
                 });
                 return;
             }
-            await triggerBatchDownload([dir || ''], getZipName(dir, 'data'));
+            triggerBatchDataDownload([dir || ''], getZipName(dir, 'data'));
         } catch (err) {
             setError(getRequestErrorMessage(err, 'Download failed'));
         } finally {
@@ -363,7 +339,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                                     <IconButton size="small" onClick={() => {
                                                         setDownloading(true);
                                                         setError('');
-                                                        triggerDownload(f.path)
+                                                        triggerDataDownload(f.path)
                                                             .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
                                                             .finally(() => setDownloading(false));
                                                     }}
@@ -376,7 +352,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                                     <IconButton size="small" component="span" onClick={() => {
                                                         setDownloading(true);
                                                         setError('');
-                                                        triggerBatchDownload([f.path], getZipName(f.path))
+                                                        Promise.resolve(triggerBatchDataDownload([f.path], getZipName(f.path)))
                                                             .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
                                                             .finally(() => setDownloading(false));
                                                     }} sx={{ opacity: hovered === f.path ? 0.92 : 0.34, transition: 'opacity .08s linear', '&:hover': { opacity: 1, bgcolor: '#fef7ed' } }}>
@@ -614,7 +590,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
         setDownloading(true);
         setError('');
         try {
-            await downloadPaths(selectedPaths, {
+            await downloadDataPaths(selectedPaths, {
                 filename: `${trimmedQuery || 'data-global-search'}-matches.zip`,
             });
         } catch (err) {
@@ -627,7 +603,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
         setDownloading(true);
         setError('');
         try {
-            await downloadPaths(allFilePaths, {
+            await downloadDataPaths(allFilePaths, {
                 filename: `${trimmedQuery || 'data-global-search'}-files.zip`,
             });
         } catch (err) {
@@ -834,7 +810,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                                     <IconButton size="small" onClick={() => {
                                                                         setDownloading(true);
                                                                         setError('');
-                                                                        triggerDownload(item.path)
+                                                                        triggerDataDownload(item.path)
                                                                             .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
                                                                             .finally(() => setDownloading(false));
                                                                     }} sx={{ '&:hover': { bgcolor: '#eef2ff' } }}>
@@ -847,7 +823,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                                     <IconButton size="small" onClick={() => {
                                                                         setDownloading(true);
                                                                         setError('');
-                                                                        triggerBatchDownload([item.path], getZipName(item.path))
+                                                                        Promise.resolve(triggerBatchDataDownload([item.path], getZipName(item.path)))
                                                                             .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
                                                                             .finally(() => setDownloading(false));
                                                                     }} sx={{ '&:hover': { bgcolor: '#fef7ed' } }}>
@@ -967,9 +943,9 @@ export default function DataBrowser() {
 
     // ── navigation (side effects OUTSIDE state updaters) ──
     const syncUrl = useCallback((cols) => {
-        const dirs = cols.slice(1).map(c => c.dir);
+        const currentDir = cols[cols.length - 1]?.dir || '';
         const params = new URLSearchParams();
-        if (!isGlobalSearch && dirs.length) params.set('dir', dirs.join('/'));
+        if (!isGlobalSearch && currentDir) params.set('dir', currentDir);
         if (filter) params.set('q', filter);
         if (isGlobalSearch) params.set('mode', 'global');
         startTransition(() => {
@@ -1066,7 +1042,7 @@ export default function DataBrowser() {
     const handleDownloadSelection = async () => {
         setDownloadState({ loading: true, error: '' });
         try {
-            await downloadPaths([...visCk], { filename: 'data-selection.zip' });
+            await downloadDataPaths([...visCk], { filename: 'data-selection.zip' });
         } catch (err) {
             setDownloadState({ loading: false, error: getRequestErrorMessage(err, 'Download failed') });
             return;

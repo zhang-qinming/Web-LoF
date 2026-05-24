@@ -13,6 +13,15 @@ import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 
+const CLASS_STYLE = {
+    nodata:      { color: '#ddd',     hoverBg: 'rgba(220,220,220,0.35)', size: 4,  name: 'No data' },
+    ns:          { color: '#b0b0b0',  hoverBg: 'rgba(176,176,176,0.25)', size: 6,  name: 'Not significant' },
+    sig_up:      { color: '#FF7043',  hoverBg: 'rgba(255,112,67,0.2)',   size: 8,  name: 'Up (p<0.05, |ES|>0.1)' },
+    sig_down:    { color: '#42A5F5',  hoverBg: 'rgba(66,165,245,0.2)',   size: 8,  name: 'Down (p<0.05, |ES|>0.1)' },
+    top100_up:   { color: '#D84315',  hoverBg: 'rgba(216,67,21,0.3)',    size: 10, name: 'Top 100 up' },
+    top100_down: { color: '#1565C0',  hoverBg: 'rgba(21,101,192,0.3)',   size: 10, name: 'Top 100 down' },
+};
+
 // ============================================================
 export default function GeneRegulation({ programId, onProgramChange, programs }) {
     const { data, error, isLoading } = useSWR(
@@ -61,14 +70,6 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
         return 'ns';
     }, [top100Cutoff]);
 
-    const CLASS_STYLE = {
-        nodata:      { color: '#ddd',     hoverBg: 'rgba(220,220,220,0.35)', size: 4,  name: 'No data' },
-        ns:          { color: '#b0b0b0',  hoverBg: 'rgba(176,176,176,0.25)', size: 6,  name: 'Not significant' },
-        sig_up:      { color: '#FF7043',  hoverBg: 'rgba(255,112,67,0.2)',   size: 8,  name: 'Up (p<0.05, |ES|>0.1)' },
-        sig_down:    { color: '#42A5F5',  hoverBg: 'rgba(66,165,245,0.2)',   size: 8,  name: 'Down (p<0.05, |ES|>0.1)' },
-        top100_up:   { color: '#D84315',  hoverBg: 'rgba(216,67,21,0.3)',    size: 10, name: 'Top 100 up' },
-        top100_down: { color: '#1565C0',  hoverBg: 'rgba(21,101,192,0.3)',   size: 10, name: 'Top 100 down' },
-    };
 
     // ---- 自动检测断轴 ----
     const breakInfo = useMemo(() => {

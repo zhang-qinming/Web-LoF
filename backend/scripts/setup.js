@@ -156,11 +156,11 @@ async function parseTSV(filePath, onRow, onHeader) {
         if (cols.length < 2) continue;
         cols[0] = cols[0].replace(/^﻿/, ''); // 去 BOM
         if (header) {
-            if (onHeader) onHeader(cols.map(c => c.trim()));
+            if (onHeader) await onHeader(cols.map(c => c.trim()));
             header = false;
             continue;
         }
-        onRow(cols);
+        await onRow(cols);
         count++;
     }
     return count;
@@ -184,22 +184,21 @@ async function stepImportFileIdMap(pool) {
     let total = 0;
 
     await parseTSV(FILES.file_id_map,
-        (cols) => {
+        async (cols) => {
             batch.push([cols[0]?.trim(), cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim()]);
-            if (batch.length >= 200) total += flush();
+            if (batch.length >= 200) total += await flush();
         },
         () => {} // header: id1 id2 path1 path2
     );
-    total += flush();
+    total += await flush();
 
-    function flush() {
+    async function flush() {
         if (batch.length === 0) return 0;
         const placeholders = batch.map(() => '(?,?,?,?)').join(',');
         const vals = batch.flat();
-        pool.query(`INSERT IGNORE INTO file_id_mapping (gwas_id,lof_id,gwas_path,lof_path) VALUES ${placeholders}`, vals)
-            .catch(() => {});
         const n = batch.length;
         batch.length = 0;
+        await pool.query(`INSERT IGNORE INTO file_id_mapping (gwas_id,lof_id,gwas_path,lof_path) VALUES ${placeholders}`, vals);
         return n;
     }
     console.log(`  Imported ${total} rows`);
@@ -235,7 +234,7 @@ async function stepImportGwasMeta(pool) {
         let total = 0;
 
         await parseTSV(filePath,
-            (cols) => {
+            async (cols) => {
                 const row = {};
                 for (const dbCol of GWAS_ALL_COLS) {
                     const idx = headerIndices[dbCol];
@@ -244,7 +243,7 @@ async function stepImportGwasMeta(pool) {
                 row.source_batch = source;
                 if (!row.gwas_id) return;
                 batch.push(row);
-                if (batch.length >= 100) total += flush();
+                if (batch.length >= 100) total += await flush();
             },
             (headers) => {
                 for (let i = 0; i < headers.length; i++) {
@@ -253,11 +252,12 @@ async function stepImportGwasMeta(pool) {
                 }
             }
         );
-        total += flush();
+        total += await flush();
         console.log(`  ${source}: ${total} rows`);
 
-        function flush() {
+        async function flush() {
             if (batch.length === 0) return 0;
+            const rows = batch.splice(0, batch.length);
             const cols = [...GWAS_ALL_COLS, 'source_batch'];
             const singleSql = `INSERT INTO gwas_meta (${cols.join(',')}) VALUES (${cols.map(()=>'?').join(',')})
                 ON DUPLICATE KEY UPDATE
@@ -267,13 +267,17 @@ async function stepImportGwasMeta(pool) {
                     year=VALUES(year), n_variants=VALUES(n_variants), n_sig=VALUES(n_sig), qc_score=VALUES(qc_score),
                     if_ukb=VALUES(if_ukb), collect_date=VALUES(collect_date), url=VALUES(url),
                     file_path=VALUES(file_path), mesh_source=VALUES(mesh_source), source_batch=VALUES(source_batch)`;
-            for (const row of batch) {
+            let inserted = 0;
+            for (const row of rows) {
                 const vals = cols.map(c => row[c] || null);
-                pool.query(singleSql, vals).catch(() => {});
+                try {
+                    await pool.query(singleSql, vals);
+                    inserted += 1;
+                } catch (err) {
+                    console.error(`  [SKIP] ${source} ${row.gwas_id}: ${err.message}`);
+                }
             }
-            const n = batch.length;
-            batch.length = 0;
-            return n;
+            return inserted;
         }
     }
 }
@@ -287,26 +291,26 @@ async function stepImportLofMeta(pool) {
     let total = 0;
 
     await parseTSV(FILES.lof_meta,
-        (cols) => {
+        async (cols) => {
             batch.push([cols[0]?.trim(), cols[1]?.trim(), cols[2]?.trim()]);
-            if (batch.length >= 200) total += flush();
+            if (batch.length >= 200) total += await flush();
         },
         () => {}
     );
 
-    total += flush();
+    total += await flush();
     console.log(`  Imported ${total} rows`);
 
-    function flush() {
+    async function flush() {
         if (batch.length === 0) return 0;
         const placeholders = batch.map(() => '(?,?,?)').join(',');
         const vals = batch.flat();
-        pool.query(
-            `INSERT IGNORE INTO lof_meta (lof_id, gwas_id, trait_name) VALUES ${placeholders}`,
-            vals
-        ).catch(() => {});
         const n = batch.length;
         batch.length = 0;
+        await pool.query(
+            `INSERT IGNORE INTO lof_meta (lof_id, gwas_id, trait_name) VALUES ${placeholders}`,
+            vals
+        );
         return n;
     }
 }

@@ -62,6 +62,48 @@ export function submitDownloadForm(action, fields = {}) {
     document.body.removeChild(form);
 }
 
+export function getZipName(path, fallback = 'data') {
+    return `${String(path || '').split('/').filter(Boolean).pop() || fallback}.zip`;
+}
+
+export async function triggerDataDownload(path) {
+    const response = await fetch(buildApiUrl('/data/download-info', { path }));
+    if (!response.ok) {
+        let message = 'Download failed';
+        try {
+            const payload = await response.json();
+            if (payload?.error) message = payload.error;
+        } catch {
+            message = response.statusText || message;
+        }
+        throw new Error(message);
+    }
+
+    const info = await response.json();
+    if (info?.type === 'dir') {
+        triggerBatchDataDownload([path], getZipName(path));
+        return;
+    }
+    triggerNativeDownload(buildApiUrl('/data/download', { path }));
+}
+
+export function triggerBatchDataDownload(paths, filename = 'data-selection.zip') {
+    submitDownloadForm(buildApiUrl('/data/download-batch'), { paths, filename });
+}
+
+export async function downloadDataPaths(paths, options = {}) {
+    const { filename = 'data-selection.zip', zipThreshold = 1 } = options;
+    const uniquePaths = [...new Set((paths || []).filter(Boolean))];
+    if (uniquePaths.length === 0) return;
+
+    if (uniquePaths.length === 1 && uniquePaths.length <= zipThreshold) {
+        await triggerDataDownload(uniquePaths[0]);
+        return;
+    }
+
+    triggerBatchDataDownload(uniquePaths, filename);
+}
+
 export function downloadBlob(blob, fileName) {
     const url = URL.createObjectURL(blob);
     try {

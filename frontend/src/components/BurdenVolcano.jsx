@@ -270,6 +270,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const availableVariants = payload?.availableVariants || { hits: false, full: false };
     const resolvedVariant = payload?.resolvedVariant || variant;
     const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
+    const variantControlValue = resolvedVariant === 'full' && variant === 'hits' ? 'full' : variant;
 
     const filteredRows = useMemo(() => rows.filter((row) => {
         if (effectMode === EFFECT_MODES.POSITIVE && row.effect < 0) return false;
@@ -607,7 +608,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 <ToggleButtonGroup
                     exclusive
                     size="small"
-                    value={variant}
+                    value={variantControlValue}
                     onChange={handleVariantChange}
                     sx={COMPACT_TOGGLE_SX}
                 >

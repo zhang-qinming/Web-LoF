@@ -1,10 +1,12 @@
-import React from "react";
+import { Box, Typography } from '@mui/material';
 
 export default function About() {
     return (
-        <div>
-            <h1>About Page</h1>
-            <p>This is the About Page.</p>
-        </div>
+        <Box sx={{ maxWidth: 760, mx: 'auto', py: 4 }}>
+            <Typography variant="h4" gutterBottom>About</Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                GWAS Data Browser provides trait-level association browsing, program enrichment views, and downloadable analysis outputs for the project data bundle.
+            </Typography>
+        </Box>
     );
 }

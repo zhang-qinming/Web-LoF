@@ -118,6 +118,14 @@ function JumpToPageControl({totalPages, page, onChange}) {
 
 
 // 数据行组件 - 显示单行GWAS数据
+function formatCellValue(row, columnId) {
+    if (columnId === 'sample_size' || columnId === 'Sample Size') {
+        const value = row[columnId] ?? row.sample_size;
+        return value != null && value !== '' ? Number(value).toLocaleString() : '-';
+    }
+    return row[columnId] || '-';
+}
+
 function TraitRow({row, index, columns}) {
     return (<TableRow
         sx={{
@@ -140,14 +148,14 @@ function TraitRow({row, index, columns}) {
                     underline="hover"
                     sx={{ color: '#2563eb', fontWeight: 500, fontSize: '0.85rem' }}>
                     {String(row[col.id] || '').replace(/^["']+|["']+$/g, '')}
-                </Link>) : col.id === 'Sample Size' ? (// Sample Size列显示为Chip组件，格式化数字
+                </Link>) : (col.id === 'sample_size' || col.id === 'Sample Size') ? (
                 <Chip
-                    label={row[col.id]?.toLocaleString() || "-"}
+                    label={formatCellValue(row, col.id)}
                     size="small"
                     color="primary"
                     variant="outlined"
-                />) : (// 其他列显示原始数据或"-"
-                row[col.id] || "-")}
+                />) : (
+                formatCellValue(row, col.id))}
         </TableCell>))}
     </TableRow>);
 }
@@ -195,7 +203,6 @@ export default function GwasDataList({
         revalidateOnReconnect: false, revalidateIfStale: false, refreshInterval: 0, shouldRetryOnError: false,
     });
 
-// 刷新数据
     // 处理排序 - 重置到第一页
     const handleSort = useCallback((column) => {
         const isAsc = sortBy === column && order === "ASC";
@@ -208,7 +215,7 @@ export default function GwasDataList({
     const handleChangeLimit = useCallback((e) => {
         const newLimit = Number(e.target.value);
         // 限制每页显示数量在合理范围内
-        if (newLimit >= 5 && newLimit <= 100) {
+        if (newLimit >= 5 && newLimit <= 200) {
             setLimit(newLimit);
             setPage(1);
         }
@@ -233,6 +240,11 @@ export default function GwasDataList({
     }
 
     return (<Box sx={{position: 'relative'}}>
+        {title && (
+            <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                {title}
+            </Typography>
+        )}
         <Card elevation={0} sx={{
             border: '1px solid rgba(0,0,0,.06)', borderRadius: 2, overflow: 'hidden',
         }}>

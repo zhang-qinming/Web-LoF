@@ -12,7 +12,7 @@ import {
     Close, FileDownload, Dns, Science, Storage,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { buildApiUrl, submitDownloadForm, triggerNativeDownload } from '../utils/download';
+import { downloadDataPaths } from '../utils/download';
 
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const SEARCH_CACHE = new Map();
@@ -63,41 +63,6 @@ function getCachedSearchResult(query) {
 
 function getRequestErrorMessage(err, fallback) {
     return err.response?.data?.error || err.message || fallback;
-}
-
-function getZipName(path, fallback = 'data') {
-    return `${path.split('/').filter(Boolean).pop() || fallback}.zip`;
-}
-
-async function triggerDownload(path) {
-    const response = await SEARCH_API.get('/download-info', { params: { path } });
-    if (response.data?.type === 'dir') {
-        await triggerBatchDownload([path], getZipName(path));
-        return;
-    }
-    triggerNativeDownload(buildApiUrl('/data/download', { path }));
-}
-
-async function triggerBatchDownload(paths, filename) {
-    submitDownloadForm(buildApiUrl('/data/download-batch'), { paths, filename });
-}
-
-async function downloadPaths(paths, options = {}) {
-    const { filename = 'data-search.zip', zipThreshold = ZIP_THRESHOLD } = options;
-    const uniquePaths = [...new Set(paths.filter(Boolean))];
-    if (uniquePaths.length === 0) return;
-
-    if (uniquePaths.length > zipThreshold) {
-        await triggerBatchDownload(uniquePaths, filename);
-        return;
-    }
-
-    if (uniquePaths.length === 1) {
-        await triggerDownload(uniquePaths[0]);
-        return;
-    }
-
-    await triggerBatchDownload(uniquePaths, filename);
 }
 
 const stats = [
@@ -260,9 +225,9 @@ export default function Home() {
         setDownloading(true);
         setError('');
         try {
-            await downloadPaths(
+            await downloadDataPaths(
                 checkedFiles.map((item) => item.path),
-                { filename: `${trimmedQ || 'data-search'}-files.zip` },
+                { filename: `${trimmedQ || 'data-search'}-files.zip`, zipThreshold: 10 },
             );
         } catch (err) {
             setError(getRequestErrorMessage(err, 'Download failed'));
@@ -511,7 +476,7 @@ export default function Home() {
                                                                             event.stopPropagation();
                                                                             setDownloading(true);
                                                                             setError('');
-                                                                            triggerDownload(item.path)
+                                                                            downloadDataPaths([item.path], { zipThreshold: 1 })
                                                                                 .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
                                                                                 .finally(() => setDownloading(false));
                                                                         }}
@@ -585,7 +550,7 @@ export default function Home() {
                                                                             event.stopPropagation();
                                                                             setDownloading(true);
                                                                             setError('');
-                                                                            triggerBatchDownload([item.path], getZipName(item.path))
+                                                                            downloadDataPaths([item.path], { filename: `${item.name || 'folder'}.zip`, zipThreshold: 0 })
                                                                                 .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
                                                                                 .finally(() => setDownloading(false));
                                                                         }}

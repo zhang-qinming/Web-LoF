@@ -190,7 +190,6 @@ const tdSx = (align, fontFamily, fontWeight, bgcolor) => ({
     color: '#444',
 });
 
-// ============================================================
 export default function ProgramScatter({ fileId }) {
     const navigate = useNavigate();
     const { data, error, isLoading } = useSWR(
@@ -225,7 +224,6 @@ export default function ProgramScatter({ fileId }) {
         plotElRef.current = graphDiv;
     }, []);
 
-    // ---- 数据预处理：保留无效值为 null，避免悄悄落到 (0, 0) ----
     const rows = useMemo(() => {
         if (!Array.isArray(data?.data)) return [];
 
@@ -291,7 +289,6 @@ export default function ProgramScatter({ fileId }) {
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, [highlight, tableOpen]);
 
-    // ---- 当前模式下真正参与显示的点 ----
     const visibleRows = useMemo(() => rows.filter((item) => {
         if (mode === MODES.SCATTER) {
             return item.progScore !== null && item.regScore !== null;
@@ -337,13 +334,11 @@ export default function ProgramScatter({ fileId }) {
         return [...rows].sort((a, b) => {
             const va = a[sortBy];
             const vb = b[sortBy];
-            // program / color — 自然排序（字符串含数字按数值排）
             if (sortBy === 'program' || sortBy === 'color') {
                 const sa = va ?? '';
                 const sb = vb ?? '';
                 return collator.compare(sa, sb) * dir;
             }
-            // 数值列
             const na = va ?? -Infinity;
             const nb = vb ?? -Infinity;
             if (na === nb) return 0;
@@ -602,7 +597,6 @@ export default function ProgramScatter({ fileId }) {
         rows.length,
     ].join('|')), [bubbleScale, effectiveTopN, fileId, markerSize, mode, rows.length, showLabels]);
 
-
     if (!fileId) {
         return (
             <Box sx={{ p: 6, textAlign: 'center' }}>
@@ -662,7 +656,6 @@ export default function ProgramScatter({ fileId }) {
                         <ToggleButton value={MODES.RANK_PROG}>Rank · Program</ToggleButton>
                         <ToggleButton value={MODES.RANK_REG}>Rank · Regulator</ToggleButton>
                     </ToggleButtonGroup>
-
 
                     <FormControlLabel
                         control={(
@@ -731,21 +724,21 @@ export default function ProgramScatter({ fileId }) {
                         >
                             Size
                         </Typography>
-                            <Slider
-                                value={mode === MODES.SCATTER ? markerSize : bubbleScale}
-                                min={mode === MODES.SCATTER ? 3 : 0.5}
-                                max={mode === MODES.SCATTER ? 25 : 2}
-                                step={mode === MODES.SCATTER ? 1 : 0.1}
-                                onChange={(_, value) => mode === MODES.SCATTER
-                                    ? setMarkerSize(Number(value))
-                                    : setBubbleScale(Number(value))}
-                                sx={{
-                                    width: 90,
-                                    color: '#999',
-                                    '& .MuiSlider-thumb': { width: 14, height: 14 },
-                                    '& .MuiSlider-rail': { opacity: 0.25 },
-                                }}
-                            />
+                        <Slider
+                            value={mode === MODES.SCATTER ? markerSize : bubbleScale}
+                            min={mode === MODES.SCATTER ? 3 : 0.5}
+                            max={mode === MODES.SCATTER ? 25 : 2}
+                            step={mode === MODES.SCATTER ? 1 : 0.1}
+                            onChange={(_, value) => mode === MODES.SCATTER
+                                ? setMarkerSize(Number(value))
+                                : setBubbleScale(Number(value))}
+                            sx={{
+                                width: 90,
+                                color: '#999',
+                                '& .MuiSlider-thumb': { width: 14, height: 14 },
+                                '& .MuiSlider-rail': { opacity: 0.25 },
+                            }}
+                        />
                         <Typography variant="caption" sx={{ color: '#999', fontSize: '0.72rem', minWidth: 28 }}>
                             {mode === MODES.SCATTER ? markerSize : `${bubbleScale.toFixed(1)}×`}
                         </Typography>
@@ -770,7 +763,6 @@ export default function ProgramScatter({ fileId }) {
                             />
                         ))}
                     </Box>
-
                 </Box>
             )}
 
@@ -872,7 +864,6 @@ export default function ProgramScatter({ fileId }) {
                 tdSx={tdSx}
                 navigate={navigate}
             />
-
         </Box>
     );
 }

@@ -1,14 +1,16 @@
 import './App.css';
+import React, { Suspense } from 'react';
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { FaHome, FaDna, FaListAlt, FaEnvelope, FaInfoCircle, FaProjectDiagram, FaFolderOpen } from 'react-icons/fa';
 import HamburgerMenu from './components/HamburgerMenu.jsx';
-import Home from './routes/Home.jsx';
-import About from './routes/About.jsx';
-import Contact from './routes/Contact.jsx';
-import Trait from './routes/Trait.jsx';
-import Genes from './routes/Genes.jsx';
-import Variants from './routes/Variants.jsx';
-import Programs from './routes/Programs.jsx';
+
+const Home = React.lazy(() => import('./routes/Home.jsx'));
+const About = React.lazy(() => import('./routes/About.jsx'));
+const Contact = React.lazy(() => import('./routes/Contact.jsx'));
+const Trait = React.lazy(() => import('./routes/Trait.jsx'));
+const Genes = React.lazy(() => import('./routes/Genes.jsx'));
+const Variants = React.lazy(() => import('./routes/Variants.jsx'));
+const Programs = React.lazy(() => import('./routes/Programs.jsx'));
 
 function NotFound() {
     return (
@@ -38,18 +40,20 @@ function App() {
                     <HamburgerMenu />
                 </div>
                 <main className="main">
-                    <Routes>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/about" element={<About />} />
-                        <Route path="/contact" element={<Contact />} />
-                        <Route path="/trait" element={<Trait />} />
-                        <Route path="/trait/:traitName" element={<Trait />} />
-                        <Route path="/genes" element={<Genes />} />
-                        <Route path="/data" element={<Variants />} />
-                        <Route path="/programs" element={<Programs />} />
-                        <Route path="/programs/:programId" element={<Programs />} />
-                        <Route path="*" element={<NotFound />} />
-                    </Routes>
+                    <Suspense fallback={<div className="route-loading">Loading...</div>}>
+                        <Routes>
+                            <Route path="/" element={<Home />} />
+                            <Route path="/about" element={<About />} />
+                            <Route path="/contact" element={<Contact />} />
+                            <Route path="/trait" element={<Trait />} />
+                            <Route path="/trait/:traitName" element={<Trait />} />
+                            <Route path="/genes" element={<Genes />} />
+                            <Route path="/data" element={<Variants />} />
+                            <Route path="/programs" element={<Programs />} />
+                            <Route path="/programs/:programId" element={<Programs />} />
+                            <Route path="*" element={<NotFound />} />
+                        </Routes>
+                    </Suspense>
                     <footer className="footer">
                         &copy; {new Date().getFullYear()}
                     </footer>
