@@ -214,7 +214,8 @@ export default function Trait() {
                 }}>
                 <Tab label="Program Scatter" disabled={!hasProgram} />
                 <Tab label="Manhattan" />
-                <Tab label="LoF Volcano" />
+                <Tab label="Burden Volcano" />
+                <Tab label="Posterior Volcano" />
             </Tabs>
 
             <Box sx={{ minHeight: 400 }}>
@@ -235,10 +236,20 @@ export default function Trait() {
                 )}
                 {tab === 2 && (
                     <BurdenVolcano
-                        key={`volcano-${fileId}`}
+                        key={`burden-volcano-${fileId}`}
                         fileId={fileId}
                         gwasId={gwasId}
                         traitLabel={meta?.trait_name || fileId}
+                        volcanoType="burden"
+                    />
+                )}
+                {tab === 3 && (
+                    <BurdenVolcano
+                        key={`posterior-volcano-${fileId}`}
+                        fileId={fileId}
+                        gwasId={gwasId}
+                        traitLabel={meta?.trait_name || fileId}
+                        volcanoType="posterior"
                     />
                 )}
             </Box>

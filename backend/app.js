@@ -14,8 +14,10 @@ const app = express();
 
 app.use(cors({
     origin: config.server.corsOrigin === '*' ? true : config.server.corsOrigin,
+    exposedHeaders: ['Content-Disposition', 'Content-Length', 'Content-Type'],
 }));
 app.use(express.json({ limit: config.server.jsonLimit }));
+app.use(express.urlencoded({ extended: false, limit: config.server.jsonLimit }));
 
 app.use(browse);
 app.use(trait);

@@ -2,7 +2,18 @@ const DEFAULT_TTL_MS = 60000;
 const DEFAULT_MAX_DEPTH = 3;
 const DEFAULT_MAX_FILES = 100000;
 const DEFAULT_ALIASES = {
-    full: ['full', 'fulltsv', 'all', 'allloci', 'allvariant', 'allvariants', 'allgene', 'allgenes'],
+    full: [
+        'full',
+        'fulltsv',
+        'all',
+        'allloci',
+        'allvariant',
+        'allvariants',
+        'variant',
+        'variants',
+        'allgene',
+        'allgenes',
+    ],
     hits: ['hits', 'hit', 'significant', 'sig'],
 };
 

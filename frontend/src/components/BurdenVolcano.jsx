@@ -27,8 +27,9 @@ import {
     Science,
     Timeline,
 } from '@mui/icons-material';
-import { getBurdenVolcano } from '../api/gwas';
+import { getBurdenVolcano, getPosteriorVolcano } from '../api/gwas';
 import BurdenVolcanoTable from './BurdenVolcanoTable';
+import { downloadBlob, downloadDataUrl } from '../utils/download';
 
 const COLORS = {
     positive: '#cc6f3c',
@@ -45,6 +46,41 @@ const SIGNIFICANCE_LOGP = -Math.log10(0.05);
 const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 800;
 const DEFAULT_POINT_SIZE = 9;
+
+const VOLCANO_CONFIGS = {
+    burden: {
+        api: getBurdenVolcano,
+        effectField: 'beta',
+        effectLabel: 'Beta',
+        effectAxisLabel: 'Effect size (beta)',
+        title: 'Burden Volcano',
+        fullTitle: 'All Gene Burden Effects',
+        hitsTitle: 'Gene Burden Hit Overview',
+        fullDescription: 'Full gene-level LoF burden effects for this trait. Click a point to focus its table row.',
+        hitsDescription: 'Significant LoF burden hits for this trait. Switch to Full TSV for all genes when available.',
+        emptyMessage: 'No burden volcano rows are currently available for this trait.',
+        guideText: 'Y-axis uses -log10(P). Horizontal guide marks nominal significance. Positive beta shifts right; negative beta shifts left.',
+        exportPrefix: 'burden_volcano',
+        plotSuffix: 'burden-volcano',
+        includePosteriorColumns: false,
+    },
+    posterior: {
+        api: getPosteriorVolcano,
+        effectField: 'post_mean',
+        effectLabel: 'Post mean',
+        effectAxisLabel: 'Posterior mean',
+        title: 'Posterior Volcano',
+        fullTitle: 'All Gene Posterior Effects',
+        hitsTitle: 'Gene Posterior Hit Overview',
+        fullDescription: 'Full gene-level posterior effects for this trait. Click a point to focus its table row.',
+        hitsDescription: 'Significant posterior hits for this trait. Switch to Full TSV for all genes when available.',
+        emptyMessage: 'No posterior volcano rows are currently available for this trait.',
+        guideText: 'Y-axis uses -log10(P). Horizontal guide marks nominal significance. Positive posterior mean shifts right; negative posterior mean shifts left.',
+        exportPrefix: 'posterior_volcano',
+        plotSuffix: 'posterior-volcano',
+        includePosteriorColumns: true,
+    },
+};
 
 const TOOLBAR_SX = {
     display: 'flex',
@@ -119,7 +155,24 @@ function getProgramRoute(program) {
     return match ? `/programs/${match[0]}` : null;
 }
 
-export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
+export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType = 'burden' }) {
+    const volcanoConfig = VOLCANO_CONFIGS[volcanoType] || VOLCANO_CONFIGS.burden;
+    const {
+        api: fetchVolcano,
+        effectField,
+        effectLabel,
+        effectAxisLabel,
+        title,
+        fullTitle,
+        hitsTitle,
+        fullDescription,
+        hitsDescription,
+        emptyMessage,
+        guideText,
+        exportPrefix,
+        plotSuffix,
+        includePosteriorColumns,
+    } = volcanoConfig;
     const navigate = useNavigate();
     const plotRef = useRef(null);
     const tableRowRefs = useRef({});
@@ -160,7 +213,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         let cancelled = false;
         setIsLoading(true);
         setError(null);
-        getBurdenVolcano(gwasId || fileId, { variant, aliasId: fileId })
+        fetchVolcano(gwasId || fileId, { variant, aliasId: fileId })
             .then((res) => {
                 if (!cancelled) setPayload(res);
             })
@@ -177,15 +230,18 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         return () => {
             cancelled = true;
         };
-    }, [fileId, gwasId, variant]);
+    }, [fetchVolcano, fileId, gwasId, variant]);
 
     const rows = useMemo(() => {
         if (!Array.isArray(payload?.data)) return [];
         return payload.data.map((item, index) => {
-            const beta = toFiniteNumber(item.beta);
+            const effect = toFiniteNumber(item[effectField]);
             const p = toFiniteNumber(item.p);
             const logp = toFiniteNumber(item.logp);
             const fdr = toFiniteNumber(item.fdr);
+            const posteriorSd = toFiniteNumber(item.posterior_sd);
+            const lower95 = toFiniteNumber(item.lower_95);
+            const upper95 = toFiniteNumber(item.upper_95);
             const gene = String(item.gene || '').trim();
             const ensg = String(item.ensg || '').trim();
             const primaryProgram = String(item.program || '').trim();
@@ -193,27 +249,31 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
             const rowKey = `${ensg || gene || 'gene'}-${index}`;
             return {
                 rowKey,
-                beta,
+                beta: effect,
+                effect,
                 p,
                 logp,
                 fdr,
+                posteriorSd,
+                lower95,
+                upper95,
                 gene,
                 ensg,
                 primaryProgram,
                 primaryGeneset,
-                effectClass: beta == null ? 'neutral' : (beta >= 0 ? 'positive' : 'negative'),
+                effectClass: effect == null ? 'neutral' : (effect >= 0 ? 'positive' : 'negative'),
                 isSignificant: logp != null && logp >= SIGNIFICANCE_LOGP,
             };
-        }).filter((item) => item.beta != null && item.logp != null);
-    }, [payload]);
+        }).filter((item) => item.effect != null && item.logp != null);
+    }, [effectField, payload]);
 
     const availableVariants = payload?.availableVariants || { hits: false, full: false };
     const resolvedVariant = payload?.resolvedVariant || variant;
     const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
 
     const filteredRows = useMemo(() => rows.filter((row) => {
-        if (effectMode === EFFECT_MODES.POSITIVE && row.beta < 0) return false;
-        if (effectMode === EFFECT_MODES.NEGATIVE && row.beta > 0) return false;
+        if (effectMode === EFFECT_MODES.POSITIVE && row.effect < 0) return false;
+        if (effectMode === EFFECT_MODES.NEGATIVE && row.effect > 0) return false;
         if (significantOnly && !row.isSignificant) return false;
         return true;
     }), [effectMode, rows, significantOnly]);
@@ -241,20 +301,28 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
 
         filteredRows.forEach((row) => {
             const key = row.effectClass;
-            grouped[key].x.push(row.beta);
+            grouped[key].x.push(row.effect);
             grouped[key].y.push(row.logp);
             grouped[key].text.push(row.gene || row.ensg || row.rowKey);
             grouped[key].customdata.push([
                 row.rowKey,
                 row.gene || 'NA',
                 row.ensg || 'NA',
-                row.beta,
+                row.effect,
                 row.p,
                 row.fdr,
                 row.primaryProgram || 'others',
                 row.primaryGeneset || 'others',
+                row.posteriorSd,
+                row.lower95,
+                row.upper95,
             ]);
         });
+
+        const posteriorHover = includePosteriorColumns ? [
+            'Posterior SD %{customdata[8]:.4f}',
+            '95% CI [%{customdata[9]:.4f}, %{customdata[10]:.4f}]',
+        ] : [];
 
         return ['negative', 'positive'].map((key) => ({
             x: grouped[key].x,
@@ -273,7 +341,8 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
             hovertemplate: [
                 '<b>%{customdata[1]}</b>',
                 '%{customdata[2]}',
-                'Beta %{customdata[3]:.4f}',
+                `${effectLabel} %{customdata[3]:.4f}`,
+                ...posteriorHover,
                 'P %{customdata[4]:.2e}',
                 'FDR %{customdata[5]:.2e}',
                 'Program: %{customdata[6]}',
@@ -282,14 +351,14 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
             ].join('<br>'),
             showlegend: true,
         })).filter((trace) => trace.x.length > 0);
-    }, [filteredRows, pointSize]);
+    }, [effectLabel, filteredRows, includePosteriorColumns, pointSize]);
 
     const highlightedPoint = useMemo(() => {
         if (!highlight.rowKey) return [];
         const row = filteredRows.find((item) => item.rowKey === highlight.rowKey) || rows.find((item) => item.rowKey === highlight.rowKey);
         if (!row) return [];
         return [{
-            x: [row.beta],
+            x: [row.effect],
             y: [row.logp],
             mode: 'markers',
             type: 'scatter',
@@ -306,12 +375,12 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
 
     const layout = useMemo(() => ({
         title: {
-            text: `${traitLabel || fileId} — LoF Volcano`,
+            text: `${traitLabel || fileId} - ${title}`,
             x: 0.01,
             font: { size: 18, family: 'system-ui, -apple-system, sans-serif', color: '#333' },
         },
         xaxis: {
-            title: { text: 'Effect size (beta)', font: { size: 14, color: '#374151', family: 'system-ui, -apple-system, sans-serif' } },
+            title: { text: effectAxisLabel, font: { size: 14, color: '#374151', family: 'system-ui, -apple-system, sans-serif' } },
             zeroline: true,
             zerolinewidth: 1.2,
             zerolinecolor: '#bbb',
@@ -382,7 +451,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
                 font: { size: 11, color: '#b45309', family: 'system-ui, -apple-system, sans-serif' },
             },
         ],
-    }), [fileId, traitLabel]);
+    }), [effectAxisLabel, fileId, title, traitLabel]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -403,7 +472,8 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         significantOnly,
         highlightKey: highlight.key,
         variant: variantLabel,
-    }), [effectMode, filteredRows.length, highlight.key, pointSize, significantOnly, variantLabel]);
+        volcanoType,
+    }), [effectMode, filteredRows.length, highlight.key, pointSize, significantOnly, variantLabel, volcanoType]);
 
     const handleSort = useCallback((column) => {
         if (column === sortBy) {
@@ -485,22 +555,24 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
         const width = normalizeExportSize(exportWidth, DEFAULT_EXPORT_WIDTH);
         const height = normalizeExportSize(exportHeight, DEFAULT_EXPORT_HEIGHT);
         Plotly.toImage(gd, { format: exportFmt, width, height }).then((dataUrl) => {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = `${sanitizeFileNamePart(gwasId || fileId)}-${variantLabel}-lof-volcano.${exportFmt}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            downloadDataUrl(dataUrl, `${sanitizeFileNamePart(gwasId || fileId)}-${variantLabel}-${plotSuffix}.${exportFmt}`);
         });
-    }, [exportFmt, exportHeight, exportWidth, fileId, gwasId, variantLabel]);
+    }, [exportFmt, exportHeight, exportWidth, fileId, gwasId, plotSuffix, variantLabel]);
 
     const downloadCSV = useCallback(() => {
-        const cols = ['Gene', 'ENSG', 'Beta', 'P', '-log10(P)', 'FDR', 'Program', 'Geneset'];
+        const cols = ['Gene', 'ENSG', effectLabel];
+        if (includePosteriorColumns) cols.push('Posterior SD', 'Lower 95', 'Upper 95');
+        cols.push('P', '-log10(P)', 'FDR', 'Program', 'Geneset');
         const header = cols.join(',');
         const body = rows.map((row) => [
             row.gene || '',
             row.ensg || '',
-            row.beta ?? '',
+            row.effect ?? '',
+            ...(includePosteriorColumns ? [
+                row.posteriorSd ?? '',
+                row.lower95 ?? '',
+                row.upper95 ?? '',
+            ] : []),
             row.p ?? '',
             row.logp ?? '',
             row.fdr ?? '',
@@ -508,15 +580,8 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
             row.primaryGeneset || '',
         ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
         const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `burden_volcano_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, [fileId, gwasId, rows, variantLabel]);
+        downloadBlob(blob, `${exportPrefix}_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`);
+    }, [effectLabel, exportPrefix, fileId, gwasId, includePosteriorColumns, rows, variantLabel]);
 
     if (error) {
         return <Alert severity="error" sx={{ m: 2 }}>{error.message}</Alert>;
@@ -529,15 +594,13 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
             <Box sx={TOOLBAR_SX}>
                 <Box sx={{ minWidth: 220, mr: 0.5 }}>
                     <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#64748b', mb: 0.35 }}>
-                        LoF Volcano
+                        {title}
                     </Typography>
                     <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: '#1f2937', lineHeight: 1.25 }}>
-                        {variantLabel === 'full' ? 'All Gene Burden Effects' : 'Gene Burden Hit Overview'}
+                        {variantLabel === 'full' ? fullTitle : hitsTitle}
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        {variantLabel === 'full'
-                            ? 'Full gene-level LoF burden effects for this trait. Click a point to focus its table row.'
-                            : 'Significant LoF burden hits for this trait. Switch to Full TSV for all genes when available.'}
+                        {variantLabel === 'full' ? fullDescription : hitsDescription}
                     </Typography>
                 </Box>
 
@@ -629,7 +692,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
                 </Button>
 
                 <Typography sx={{ width: '100%', fontSize: '0.74rem', color: '#6b7280', lineHeight: 1.4 }}>
-                    Y-axis uses <strong>-log10(P)</strong>. Horizontal guide marks nominal significance. Positive beta shifts right; negative beta shifts left.
+                    {guideText}
                 </Typography>
             </Box>
 
@@ -646,7 +709,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: '#6b7280' }}>
-                                    Loading LoF volcano data...
+                                    Loading {title.toLowerCase()} data...
                                 </Typography>
                             </Box>
                         </Box>
@@ -655,7 +718,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
                     {!isLoading && rows.length === 0 && (
                         <Box sx={{ minHeight: 460, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
-                                <Typography variant="body2">No burden volcano rows are currently available for this trait.</Typography>
+                                <Typography variant="body2">{emptyMessage}</Typography>
                             </Alert>
                         </Box>
                     )}
@@ -708,6 +771,8 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel }) {
                 tableRowRefs={tableRowRefs}
                 navigate={navigate}
                 getProgramRoute={getProgramRoute}
+                effectLabel={effectLabel}
+                includePosteriorColumns={includePosteriorColumns}
             />
 
             <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>

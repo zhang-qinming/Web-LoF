@@ -8,10 +8,6 @@ export async function fetcher(url, params) {
     return res.data;
 }
 
-/**
- * 获取按性状筛选/分页/排序后的 GWAS 数据
- * filters: { CHR, BP_start, BP_end, P_min, P_max, rsID }
- */
 export async function getFilteredGwasDataByTrait(traitName, { page, limit, sortBy, order } = {}, filters = {}) {
     try {
         const params = { page, limit, sortBy, order, ...filters };
@@ -21,7 +17,7 @@ export async function getFilteredGwasDataByTrait(traitName, { page, limit, sortB
         });
         return res.data;
     } catch (err) {
-        console.error(`获取 Trait "${traitName}" 的过滤数据失败:`, err);
+        console.error(`Failed to fetch filtered GWAS data for trait "${traitName}":`, err);
         return { data: [], totalCount: 0, page: 1, totalPages: 1 };
     }
 }
@@ -31,7 +27,7 @@ export async function getTraitData(traitName) {
         const res = await axios.get(`${API_BASE}/trait/allgwas/${traitName}`);
         return res.data;
     } catch (err) {
-        console.error(`获取 Trait "${traitName}" 失败:`, err);
+        console.error(`Failed to fetch trait "${traitName}":`, err);
         return { data: [] };
     }
 }
@@ -43,7 +39,7 @@ export async function getTraitManhattanHits(traitName, { variant = 'hits', alias
         });
         return res.data;
     } catch (err) {
-        console.error(`获取 Trait "${traitName}" Manhattan 数据失败:`, err);
+        console.error(`Failed to fetch Manhattan data for trait "${traitName}":`, err);
         return {
             fileId: traitName,
             variant,
@@ -70,30 +66,50 @@ export async function getTraitManhattanHits(traitName, { variant = 'hits', alias
     }
 }
 
-export async function getBurdenVolcano(fileId, { variant = 'hits', aliasId } = {}) {
+function emptyVolcanoResponse(fileId, variant, volcanoType, effectField) {
+    return {
+        fileId,
+        volcanoType,
+        effectField,
+        variant,
+        requestedVariant: variant,
+        resolvedVariant: variant,
+        fallbackUsed: false,
+        availableVariants: { hits: false, full: false },
+        hasData: false,
+        data: [],
+        summary: {
+            totalRows: 0,
+            positive: 0,
+            negative: 0,
+            annotatedProgram: 0,
+            annotatedGeneset: 0,
+        },
+    };
+}
+
+async function getVolcano(endpoint, fileId, { variant = 'hits', aliasId } = {}, { volcanoType, effectField }) {
     try {
-        const res = await axios.get(`${API_BASE}/burden-volcano/${encodeURIComponent(fileId)}`, {
+        const res = await axios.get(`${API_BASE}/${endpoint}/${encodeURIComponent(fileId)}`, {
             params: { variant, aliasId },
         });
         return res.data;
     } catch (err) {
-        console.error(`获取 Trait "${fileId}" LoF Volcano 数据失败:`, err);
-        return {
-            fileId,
-            variant,
-            requestedVariant: variant,
-            resolvedVariant: variant,
-            fallbackUsed: false,
-            availableVariants: { hits: false, full: false },
-            hasData: false,
-            data: [],
-            summary: {
-                totalRows: 0,
-                positive: 0,
-                negative: 0,
-                annotatedProgram: 0,
-                annotatedGeneset: 0,
-            },
-        };
+        console.error(`Failed to fetch ${volcanoType} volcano data for trait "${fileId}":`, err);
+        return emptyVolcanoResponse(fileId, variant, volcanoType, effectField);
     }
+}
+
+export async function getBurdenVolcano(fileId, opts = {}) {
+    return getVolcano('burden-volcano', fileId, opts, {
+        volcanoType: 'burden',
+        effectField: 'beta',
+    });
+}
+
+export async function getPosteriorVolcano(fileId, opts = {}) {
+    return getVolcano('posterior-volcano', fileId, opts, {
+        volcanoType: 'posterior',
+        effectField: 'post_mean',
+    });
 }

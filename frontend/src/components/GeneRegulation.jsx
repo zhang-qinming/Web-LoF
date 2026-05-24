@@ -11,6 +11,7 @@ import {
 import { Download, ExpandLess, ExpandMore, Fullscreen, FullscreenExit } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
+import { downloadBlob, downloadDataUrl } from '../utils/download';
 
 // ============================================================
 export default function GeneRegulation({ programId, onProgramChange, programs }) {
@@ -224,13 +225,8 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
     const doExport = useCallback(() => {
         const gd = plotGdRef.current;
         if (!gd) return;
-        Plotly.toImage(gd, { format: expFmt, width: expW, height: expH }).then(dataUrl => {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = `program_${programId || 'plot'}.${expFmt}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+        Plotly.toImage(gd, { format: expFmt, width: expW, height: expH }).then((dataUrl) => {
+            downloadDataUrl(dataUrl, `program_${programId || 'plot'}.${expFmt}`);
         });
     }, [expFmt, expW, expH, programId]);
 
@@ -324,13 +320,8 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
         const hdr = 'Gene,Effect Size (lm_es),P-value (lm_p),-log10(P)';
         const body = rows.map(r => [r.gene, r.es, r.p, r.negLogP].join(',')).join('\n');
         const blob = new Blob([hdr + '\n' + body], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
         const baseName = (data?.fileName || `program${programId}.txt`).replace(/\.txt$/, '');
-        a.download = `${baseName}.csv`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `${baseName}.csv`);
     }, [rows, data?.fileName, programId]);
 
     // ---- 统计 ----

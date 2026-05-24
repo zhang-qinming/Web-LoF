@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const { createFileStore, buildHttpError } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
@@ -11,6 +12,16 @@ const dataStore = createFileStore(config.paths.dataDir);
 let searchIndexCache = null;
 let searchIndexBuiltAt = 0;
 let searchIndexPromise = null;
+const batchDownloadTokens = new Map();
+const BATCH_DOWNLOAD_TTL_MS = 5 * 60 * 1000;
+let searchIndexStats = {
+    status: 'idle',
+    entries: 0,
+    dirs: 0,
+    startedAt: null,
+    finishedAt: null,
+    error: null,
+};
 
 function resolveRelativePath(relPath = '') {
     const fullPath = dataStore.resolve(relPath);
@@ -28,6 +39,14 @@ function toRelativePath(fullPath) {
 
 function isoFromMtime(mtimeMs) {
     return mtimeMs ? new Date(mtimeMs).toISOString() : null;
+}
+
+function encodeDownloadFilename(fileName) {
+    const fallback = String(fileName || 'download')
+        .replace(/[\\/\r\n"]/g, '_')
+        .replace(/[^\x20-\x7E]/g, '_') || 'download';
+    const encoded = encodeURIComponent(String(fileName || 'download'));
+    return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
 function getArchiveEntryName(relPath, usedNames) {
@@ -55,6 +74,37 @@ function getArchiveEntryName(relPath, usedNames) {
     return candidate;
 }
 
+function normalizeRequestedPath(item) {
+    if (typeof item !== 'string') return null;
+    return item
+        .trim()
+        .replace(/\\/g, '/')
+        .replace(/^\/+|\/+$/g, '');
+}
+
+function toPathList(value) {
+    if (Array.isArray(value)) return value;
+    if (value == null) return [];
+    return [value];
+}
+
+function cleanupBatchDownloadTokens() {
+    const now = Date.now();
+    for (const [token, item] of batchDownloadTokens.entries()) {
+        if (!item || item.expiresAt <= now) batchDownloadTokens.delete(token);
+    }
+}
+
+function createBatchDownloadToken(payload) {
+    cleanupBatchDownloadTokens();
+    const token = crypto.randomBytes(18).toString('base64url');
+    batchDownloadTokens.set(token, {
+        ...payload,
+        expiresAt: Date.now() + BATCH_DOWNLOAD_TTL_MS,
+    });
+    return token;
+}
+
 function getSearchRank(entry, query) {
     if (entry.nameLower === query) return 0;
     if (entry.nameLower.startsWith(query)) return 1;
@@ -66,7 +116,16 @@ function getSearchRank(entry, query) {
 async function createZipArchive(options) {
     const archiverModule = await import('archiver');
     const archiver = archiverModule.default || archiverModule;
-    return archiver('zip', options);
+
+    if (typeof archiver === 'function') {
+        return archiver('zip', options);
+    }
+
+    if (typeof archiverModule.ZipArchive === 'function') {
+        return new archiverModule.ZipArchive(options);
+    }
+
+    throw new Error('Unsupported archiver module shape');
 }
 
 async function estimateArchive(store, fullPath, counters = { entries: 0, bytes: 0 }) {
@@ -102,13 +161,79 @@ async function estimateArchive(store, fullPath, counters = { entries: 0, bytes: 
     return counters;
 }
 
+async function prepareBatchDownload(rawPaths, rawFilename) {
+    const uniquePaths = [...new Set(
+        rawPaths
+            .map(normalizeRequestedPath)
+            .filter((item) => item !== null),
+    )];
+    if (uniquePaths.length === 0) throw buildHttpError(400, 'No files selected');
+    if (uniquePaths.length > config.data.maxBatchDownloadItems) {
+        throw buildHttpError(413, `Too many files selected; max is ${config.data.maxBatchDownloadItems}`);
+    }
+
+    const zipBaseName = (typeof rawFilename === 'string' ? rawFilename.trim() : '')
+        .replace(/\.zip$/i, '')
+        .replace(/[^\w.-]+/g, '_')
+        .slice(0, 100) || 'data-selection';
+
+    const resolvedItems = [];
+    const archiveEstimate = { entries: 0, bytes: 0 };
+    for (const relPath of uniquePaths) {
+        const fullPath = resolveRelativePath(relPath);
+        const stat = await dataStore.stat(fullPath);
+        if (!stat) throw buildHttpError(404, 'Not found');
+        if (stat.isFile && stat.size > config.data.maxDownloadFileBytes) {
+            throw buildHttpError(413, 'One selected file is too large to download through the API');
+        }
+        await estimateArchive(dataStore, fullPath, archiveEstimate);
+        resolvedItems.push({
+            relPath,
+            archivePath: relPath || dataStore.basename(fullPath) || 'data',
+            fullPath,
+            stat,
+        });
+    }
+
+    return { zipBaseName, resolvedItems };
+}
+
+async function streamBatchDownload(res, zipBaseName, resolvedItems) {
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', encodeDownloadFilename(`${zipBaseName}.zip`));
+
+    const archive = await createZipArchive({ zlib: { level: 6 } });
+    archive.on('error', () => {
+        if (!res.headersSent) res.status(500).end();
+        else res.end();
+    });
+    archive.pipe(res);
+
+    const usedNames = new Set();
+    for (const item of resolvedItems) {
+        const entryName = getArchiveEntryName(item.archivePath || item.relPath, usedNames);
+        await dataStore.appendToArchive(archive, item.fullPath, entryName);
+    }
+
+    await archive.finalize();
+}
+
 async function buildSearchIndex() {
     const entries = [];
+    searchIndexStats = {
+        status: 'building',
+        entries: 0,
+        dirs: 0,
+        startedAt: Date.now(),
+        finishedAt: null,
+        error: null,
+    };
 
     async function scan(fullPath) {
         let dirEntries = [];
         try {
             dirEntries = await dataStore.list(fullPath);
+            searchIndexStats.dirs += 1;
         } catch (err) {
             return;
         }
@@ -128,6 +253,7 @@ async function buildSearchIndex() {
                 nameLower: entry.name.toLowerCase(),
                 pathLower: relPath.toLowerCase(),
             });
+            searchIndexStats.entries = entries.length;
 
             if (entry.type === 'dir') {
                 await scan(childPath);
@@ -136,9 +262,35 @@ async function buildSearchIndex() {
     }
 
     const rootStat = await dataStore.stat(dataStore.rootPath);
-    if (!rootStat || !rootStat.isDirectory) return [];
+    if (!rootStat || !rootStat.isDirectory) {
+        searchIndexStats = {
+            ...searchIndexStats,
+            status: 'ready',
+            entries: 0,
+            finishedAt: Date.now(),
+            error: null,
+        };
+        return [];
+    }
 
-    await scan(dataStore.rootPath);
+    try {
+        await scan(dataStore.rootPath);
+        searchIndexStats = {
+            ...searchIndexStats,
+            status: 'ready',
+            entries: entries.length,
+            finishedAt: Date.now(),
+            error: null,
+        };
+    } catch (err) {
+        searchIndexStats = {
+            ...searchIndexStats,
+            status: 'error',
+            finishedAt: Date.now(),
+            error: err.message || 'Failed to build search index',
+        };
+        throw err;
+    }
     return entries;
 }
 
@@ -189,6 +341,20 @@ router.get('/api/data/list', asyncRoute(async (req, res) => {
     res.json({ data, totalCount: total, page, totalPages: Math.ceil(total / limit) });
 }));
 
+router.get('/api/data/status', asyncRoute(async (req, res) => {
+    const rootStat = await dataStore.stat(dataStore.rootPath);
+    res.json({
+        root: dataStore.rootPath,
+        exists: Boolean(rootStat),
+        isDirectory: Boolean(rootStat?.isDirectory),
+        searchIndex: {
+            ...searchIndexStats,
+            cached: Boolean(searchIndexCache),
+            cacheAgeMs: searchIndexBuiltAt ? Date.now() - searchIndexBuiltAt : null,
+        },
+    });
+}));
+
 router.get('/api/data/file-paths', asyncRoute(async (req, res) => {
     const fullPath = resolveRelativePath(req.query.dir || '');
     const stat = await dataStore.stat(fullPath);
@@ -218,6 +384,26 @@ router.get('/api/data/breadcrumb', asyncRoute(async (req, res) => {
     res.json({ crumbs });
 }));
 
+router.get('/api/data/download-info', asyncRoute(async (req, res) => {
+    const fullPath = resolveRelativePath(req.query.path || '');
+    const stat = await dataStore.stat(fullPath);
+    if (!stat) return res.status(404).json({ error: 'Not found' });
+    if (stat.isFile && stat.size > config.data.maxDownloadFileBytes) {
+        return res.status(413).json({ error: 'File is too large to download through the API' });
+    }
+
+    const baseName = dataStore.basename(fullPath);
+    if (stat.isDirectory) {
+        await estimateArchive(dataStore, fullPath);
+    }
+
+    return res.json({
+        name: baseName,
+        type: stat.isDirectory ? 'dir' : 'file',
+        size: stat.size || 0,
+    });
+}));
+
 router.get('/api/data/download', asyncRoute(async (req, res) => {
     const fullPath = resolveRelativePath(req.query.path || '');
     const stat = await dataStore.stat(fullPath);
@@ -230,7 +416,7 @@ router.get('/api/data/download', asyncRoute(async (req, res) => {
     if (stat.isDirectory) {
         await estimateArchive(dataStore, fullPath);
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename="${baseName}.zip"`);
+        res.setHeader('Content-Disposition', encodeDownloadFilename(`${baseName}.zip`));
 
         const archive = await createZipArchive({ zlib: { level: 6 } });
         archive.on('error', () => {
@@ -244,7 +430,7 @@ router.get('/api/data/download', asyncRoute(async (req, res) => {
     }
 
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${baseName}"`);
+    res.setHeader('Content-Disposition', encodeDownloadFilename(baseName));
     const stream = await dataStore.createReadStream(fullPath);
     stream.on('error', () => {
         if (!res.headersSent) res.status(500).end();
@@ -254,48 +440,29 @@ router.get('/api/data/download', asyncRoute(async (req, res) => {
 }));
 
 router.post('/api/data/download-batch', asyncRoute(async (req, res) => {
-    const rawPaths = Array.isArray(req.body?.paths) ? req.body.paths : [];
-    const uniquePaths = [...new Set(rawPaths.filter((item) => typeof item === 'string' && item.trim()))];
-    if (uniquePaths.length === 0) return res.status(400).json({ error: 'No files selected' });
-    if (uniquePaths.length > config.data.maxBatchDownloadItems) {
-        return res.status(413).json({ error: `Too many files selected; max is ${config.data.maxBatchDownloadItems}` });
-    }
+    const rawPaths = toPathList(req.body?.paths);
+    const { zipBaseName, resolvedItems } = await prepareBatchDownload(rawPaths, req.body?.filename);
+    await streamBatchDownload(res, zipBaseName, resolvedItems);
+}));
 
-    const zipBaseName = (typeof req.body?.filename === 'string' ? req.body.filename.trim() : '')
-        .replace(/\.zip$/i, '')
-        .replace(/[^\w.-]+/g, '_')
-        .slice(0, 100) || 'data-selection';
-
-    const resolvedItems = [];
-    const archiveEstimate = { entries: 0, bytes: 0 };
-    for (const relPath of uniquePaths) {
-        const fullPath = resolveRelativePath(relPath);
-        const stat = await dataStore.stat(fullPath);
-        if (!stat) return res.status(404).json({ error: 'Not found' });
-        if (stat.isFile && stat.size > config.data.maxDownloadFileBytes) {
-            return res.status(413).json({ error: 'One selected file is too large to download through the API' });
-        }
-        await estimateArchive(dataStore, fullPath, archiveEstimate);
-        resolvedItems.push({ relPath, fullPath, stat });
-    }
-
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${zipBaseName}.zip"`);
-
-    const archive = await createZipArchive({ zlib: { level: 6 } });
-    archive.on('error', () => {
-        if (!res.headersSent) res.status(500).end();
-        else res.end();
+router.post('/api/data/download-batch/prepare', asyncRoute(async (req, res) => {
+    const rawPaths = toPathList(req.body?.paths);
+    const prepared = await prepareBatchDownload(rawPaths, req.body?.filename);
+    const token = createBatchDownloadToken(prepared);
+    res.json({
+        token,
+        url: `/api/data/download-batch/${encodeURIComponent(token)}`,
+        expiresInMs: BATCH_DOWNLOAD_TTL_MS,
     });
-    archive.pipe(res);
+}));
 
-    const usedNames = new Set();
-    for (const item of resolvedItems) {
-        const entryName = getArchiveEntryName(item.relPath, usedNames);
-        await dataStore.appendToArchive(archive, item.fullPath, entryName);
-    }
-
-    await archive.finalize();
+router.get('/api/data/download-batch/:token', asyncRoute(async (req, res) => {
+    cleanupBatchDownloadTokens();
+    const token = String(req.params.token || '');
+    const prepared = batchDownloadTokens.get(token);
+    if (!prepared) throw buildHttpError(404, 'Download token expired or not found');
+    batchDownloadTokens.delete(token);
+    await streamBatchDownload(res, prepared.zipBaseName, prepared.resolvedItems);
 }));
 
 router.get('/api/data/search', asyncRoute(async (req, res) => {

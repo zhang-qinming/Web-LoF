@@ -4,6 +4,7 @@ import Plotly from 'plotly.js-basic-dist';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Typography
 } from '@mui/material';
+import { downloadDataUrl } from '../utils/download';
 
 export default function ManhattanPlot({
     data = [],
@@ -178,12 +179,7 @@ export default function ManhattanPlot({
     function exportSVG(gd, w, h, filename) {
         Plotly.toImage(gd, { format: 'svg', width: w, height: h })
             .then(function (dataUrl) {
-                const link = document.createElement('a');
-                link.href = dataUrl;
-                link.download = filename + '.svg';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                downloadDataUrl(dataUrl, `${filename}.svg`);
             })
             .catch(err => {
                 console.error('SVG export failed:', err);

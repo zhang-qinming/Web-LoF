@@ -37,6 +37,7 @@ import {
 import { getTraitManhattanHits } from '../api/gwas';
 import TraitHitManhattanLegend from './TraitHitManhattanLegend';
 import TraitHitManhattanTable from './TraitHitManhattanTable';
+import { downloadBlob, downloadDataUrl } from '../utils/download';
 
 const UNASSIGNED_COLOR = '#6f7d90';
 const DEFAULT_EXPORT_WIDTH = 1400;
@@ -62,6 +63,7 @@ const HOVER_TEMPLATE = [
     '<extra></extra>',
 ].join('<br>');
 
+const DENSE_POINT_ONLY_LIMIT = 200000;
 const CHROM_ORDER = [
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
     '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',
@@ -270,6 +272,9 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     const rows = useMemo(() => payload?.data || [], [payload]);
     const resolvedVariant = payload?.resolvedVariant || variant;
     const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
+    const isTruncated = Boolean(payload?.truncated);
+    const rowLimit = Number(payload?.rowLimit) || rows.length;
+    const sourceRowCount = Number(payload?.sourceRowCount) || null;
 
     const summary = payload?.summary || {
         totalRows: 0,
@@ -395,7 +400,10 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
 
     const colorField = colorMode === 'geneset' ? 'primaryGeneset' : 'primaryProgram';
     const colorModeTitle = colorMode === 'geneset' ? 'Genesets' : 'Programs';
-    const colorMap = useMemo(() => buildCategoryColorMap(processedRows, colorField), [colorField, processedRows]);
+    const densePointOnlyMode = variantLabel === 'full' && processedRows.length > DENSE_POINT_ONLY_LIMIT;
+    const colorMap = useMemo(() => (
+        densePointOnlyMode ? new Map() : buildCategoryColorMap(processedRows, colorField)
+    ), [colorField, densePointOnlyMode, processedRows]);
 
     const yAxisRange = useMemo(() => {
         if (processedRows.length === 0) return [GWAS_HIT_LOGP - 0.3, GWAS_HIT_LOGP + 1.7];
@@ -411,6 +419,24 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     }, [processedRows]);
 
     const plotData = useMemo(() => {
+        if (densePointOnlyMode) {
+            return [{
+                x: processedRows.map((row) => row.genomePos),
+                y: processedRows.map((row) => row.logp),
+                mode: 'markers',
+                type: 'scattergl',
+                name: 'GWAS loci',
+                showlegend: false,
+                hoverinfo: 'skip',
+                marker: {
+                    size: 3.6,
+                    color: UNASSIGNED_COLOR,
+                    opacity: 0.36,
+                    line: { width: 0 },
+                },
+            }];
+        }
+
         const unassigned = {
             x: [],
             y: [],
@@ -478,9 +504,11 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         }
 
         return traces;
-    }, [colorField, colorMap, processedRows]);
+    }, [colorField, colorMap, densePointOnlyMode, processedRows]);
 
     const legendItems = useMemo(() => {
+        if (densePointOnlyMode) return [];
+
         const counts = new Map();
         processedRows.forEach((row) => {
             const key = row[colorField] || '__unassigned__';
@@ -509,9 +537,10 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
             });
 
         return items;
-    }, [colorField, colorMap, processedRows]);
+    }, [colorField, colorMap, densePointOnlyMode, processedRows]);
 
     const highlightedPoint = useMemo(() => {
+        if (densePointOnlyMode) return [];
         if (!highlight.rowKey) return [];
         const row = processedRows.find((item) => item.rowKey === highlight.rowKey);
         if (!row) return [];
@@ -529,7 +558,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 symbol: 'circle-open',
             },
         }];
-    }, [highlight.rowKey, processedRows]);
+    }, [densePointOnlyMode, highlight.rowKey, processedRows]);
 
     const layout = useMemo(() => ({
         title: {
@@ -621,7 +650,8 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         highlightKey: highlight.key,
         rowCount: processedRows.length,
         variant,
-    }), [highlight.key, processedRows.length, variant]);
+        densePointOnlyMode,
+    }), [densePointOnlyMode, highlight.key, processedRows.length, variant]);
 
     const handleResetFilters = () => {
         setProgramOnly(false);
@@ -658,6 +688,8 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     const collator = useMemo(() => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), []);
 
     const sortedRows = useMemo(() => {
+        if (densePointOnlyMode) return [];
+
         const dir = sortDir === 'asc' ? 1 : -1;
         return [...processedRows].sort((a, b) => {
             if (['snp', 'nearestGene', 'normalizedChr', 'primaryProgram', 'primaryGeneset'].includes(sortBy)) {
@@ -668,21 +700,26 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
             if (av === bv) return 0;
             return av > bv ? dir : -dir;
         });
-    }, [collator, processedRows, sortBy, sortDir]);
+    }, [collator, densePointOnlyMode, processedRows, sortBy, sortDir]);
 
     const pagedRows = useMemo(() => {
+        if (densePointOnlyMode) return [];
+
         const start = tablePage * tableRowsPerPage;
         return sortedRows.slice(start, start + tableRowsPerPage);
-    }, [sortedRows, tablePage, tableRowsPerPage]);
+    }, [densePointOnlyMode, sortedRows, tablePage, tableRowsPerPage]);
 
     useEffect(() => {
+        if (densePointOnlyMode) return;
+
         const maxPage = Math.max(0, Math.ceil(sortedRows.length / tableRowsPerPage) - 1);
         if (tablePage > maxPage) {
             setTablePage(maxPage);
         }
-    }, [sortedRows.length, tablePage, tableRowsPerPage]);
+    }, [densePointOnlyMode, sortedRows.length, tablePage, tableRowsPerPage]);
 
     useEffect(() => {
+        if (densePointOnlyMode) return undefined;
         if (!highlight.rowKey || !tableOpen) return undefined;
         const rowIndex = sortedRows.findIndex((item) => item.rowKey === highlight.rowKey);
         if (rowIndex < 0) return;
@@ -704,7 +741,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         }, 180);
 
         return () => window.clearTimeout(timeoutId);
-    }, [highlight, sortedRows, tableOpen, tablePage, tableRowsPerPage]);
+    }, [densePointOnlyMode, highlight, sortedRows, tableOpen, tablePage, tableRowsPerPage]);
 
     const handleExport = useCallback(() => {
         const gd = plotRef.current;
@@ -712,16 +749,13 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         const width = normalizeExportSize(exportWidth, DEFAULT_EXPORT_WIDTH);
         const height = normalizeExportSize(exportHeight, DEFAULT_EXPORT_HEIGHT);
         Plotly.toImage(gd, { format: exportFmt, width, height }).then((dataUrl) => {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = `${sanitizeFileNamePart(gwasId || fileId)}-${variant}-manhattan.${exportFmt}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            downloadDataUrl(dataUrl, `${sanitizeFileNamePart(gwasId || fileId)}-${variant}-manhattan.${exportFmt}`);
         });
     }, [exportFmt, exportHeight, exportWidth, fileId, gwasId, variant]);
 
     const downloadCSV = useCallback(() => {
+        if (densePointOnlyMode) return;
+
         const cols = ['SNP', 'CHR', 'BP', 'P', '-log10(P)', 'Gene', 'distance_to_gene', 'Program', 'Geneset', 'Primary Program', 'Primary Geneset'];
         const header = cols.join(',');
         const body = processedRows.map((row) => [
@@ -730,15 +764,8 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
             row.primaryProgram || '', row.primaryGeneset || '',
         ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
         const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `manhattan_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, [processedRows, gwasId, fileId, variantLabel]);
+        downloadBlob(blob, `manhattan_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`);
+    }, [densePointOnlyMode, processedRows, gwasId, fileId, variantLabel]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -765,7 +792,9 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                         {variantLabel === 'full' ? 'All GWAS Loci Overview' : 'GWAS Hit Loci Overview'}
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        {variantLabel === 'full'
+                        {densePointOnlyMode
+                            ? 'Large full TSV point cloud mode: points only, with hover and click tracing disabled for performance.'
+                            : variantLabel === 'full'
                             ? 'Program / Geneset coloring across the full GWAS TSV. Click a point to focus its table row.'
                             : 'Program / Geneset coloring for trait-associated loci. Click a point to focus its table row.'}
                     </Typography>
@@ -795,10 +824,24 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
 
                 <Chip
                     icon={<ScatterPlot sx={{ fontSize: 15 }} />}
-                    label={`${summary.totalRows.toLocaleString()} ${variantLabel === 'full' ? 'loci' : 'hits'}`}
+                    label={`${summary.totalRows.toLocaleString()} ${isTruncated ? 'loaded' : (variantLabel === 'full' ? 'loci' : 'hits')}`}
                     size="small"
                     sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' }}
                 />
+                {isTruncated && (
+                    <Chip
+                        label={`Sampled ${rowLimit.toLocaleString()}`}
+                        size="small"
+                        sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#fff7ed', color: '#b45309', border: '1px solid #fed7aa', fontFamily: 'monospace' }}
+                    />
+                )}
+                {densePointOnlyMode && (
+                    <Chip
+                        label="Points only"
+                        size="small"
+                        sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#eef2f7', color: '#475569', border: '1px solid #cbd5e1', fontFamily: 'monospace' }}
+                    />
+                )}
                 <Chip
                     icon={<Insights sx={{ fontSize: 15 }} />}
                     label={`${summary.withProgram.toLocaleString()} with program`}
@@ -932,6 +975,17 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 <Typography sx={{ width: '100%', fontSize: '0.74rem', color: '#6b7280', lineHeight: 1.4 }}>
                     <strong>distance_to_gene:</strong> 0 = in gene body; 100s–1000s bp = near; 10000+ bp = distal.
                 </Typography>
+                {isTruncated && (
+                    <Typography sx={{ width: '100%', fontSize: '0.74rem', color: '#9a3412', lineHeight: 1.4 }}>
+                        Full GWAS TSV is very large; the interactive plot renders a uniform sample of up to {rowLimit.toLocaleString()} rows
+                        {sourceRowCount ? ` from ${sourceRowCount.toLocaleString()} source rows` : ''}, plus matched hit rows when available.
+                    </Typography>
+                )}
+                {densePointOnlyMode && (
+                    <Typography sx={{ width: '100%', fontSize: '0.74rem', color: '#475569', lineHeight: 1.4 }}>
+                        More than {DENSE_POINT_ONLY_LIMIT.toLocaleString()} loci are loaded, so hover labels, click-to-table tracing, and category traces are disabled.
+                    </Typography>
+                )}
             </Box>
 
             <Card elevation={0} sx={{
@@ -978,7 +1032,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                                 revision={plotRevision}
                                 onInitialized={onInitialized}
                                 onUpdate={onUpdate}
-                                onClick={(evt) => {
+                                onClick={densePointOnlyMode ? undefined : (evt) => {
                                     const rowKey = evt?.points?.[0]?.customdata?.[0];
                                     if (!rowKey) return;
                                     setHighlight((prev) => {
@@ -992,40 +1046,44 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                                 useResizeHandler
                                 style={{ width: '100%', height: '620px' }}
                             />
-                            <TraitHitManhattanLegend
-                                items={legendItems}
-                                collapsed={legendCollapsed}
-                                onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
-                                title={colorModeTitle}
-                            />
+                            {!densePointOnlyMode && (
+                                <TraitHitManhattanLegend
+                                    items={legendItems}
+                                    collapsed={legendCollapsed}
+                                    onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
+                                    title={colorModeTitle}
+                                />
+                            )}
                         </Box>
                     )}
                 </CardContent>
             </Card>
-            <TraitHitManhattanTable
-                tableSectionRef={tableSectionRef}
-                processedRows={processedRows}
-                sortedRows={sortedRows}
-                pagedRows={pagedRows}
-                highlight={highlight}
-                tableOpen={tableOpen}
-                setTableOpen={setTableOpen}
-                tablePage={tablePage}
-                setTablePage={setTablePage}
-                tableRowsPerPage={tableRowsPerPage}
-                setTableRowsPerPage={setTableRowsPerPage}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                handleSort={handleSort}
-                downloadCSV={downloadCSV}
-                tableRowRefs={tableRowRefs}
-                navigate={navigate}
-                getProgramRoute={getProgramRoute}
-                programColorMap={colorMap}
-                formatDistance={formatDistance}
-                formatP={formatP}
-                gwasHitLogp={GWAS_HIT_LOGP}
-            />
+            {!densePointOnlyMode && (
+                <TraitHitManhattanTable
+                    tableSectionRef={tableSectionRef}
+                    processedRows={processedRows}
+                    sortedRows={sortedRows}
+                    pagedRows={pagedRows}
+                    highlight={highlight}
+                    tableOpen={tableOpen}
+                    setTableOpen={setTableOpen}
+                    tablePage={tablePage}
+                    setTablePage={setTablePage}
+                    tableRowsPerPage={tableRowsPerPage}
+                    setTableRowsPerPage={setTableRowsPerPage}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    handleSort={handleSort}
+                    downloadCSV={downloadCSV}
+                    tableRowRefs={tableRowRefs}
+                    navigate={navigate}
+                    getProgramRoute={getProgramRoute}
+                    programColorMap={colorMap}
+                    formatDistance={formatDistance}
+                    formatP={formatP}
+                    gwasHitLogp={GWAS_HIT_LOGP}
+                />
+            )}
 
             <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
                 <DialogTitle sx={{ fontWeight: 700, color: '#111827', fontFamily: 'Inter, system-ui, sans-serif' }}>Export Plot</DialogTitle>

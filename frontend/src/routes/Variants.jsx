@@ -4,13 +4,14 @@ import {
     Box, Typography, TextField, IconButton, Checkbox,
     Chip, Pagination, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, Paper, InputAdornment, Tooltip, Button,
-    Alert,
+    Alert, LinearProgress,
 } from '@mui/material';
 import {
     Download, Folder, InsertDriveFile, Search, FolderOpen, ChevronRight, Close,
     FileDownload, CheckBoxOutlineBlank, CheckBox,
 } from '@mui/icons-material';
 import axios from 'axios';
+import { buildApiUrl, submitDownloadForm, triggerNativeDownload } from '../utils/download';
 
 const API = axios.create({ baseURL: '/api/data' });
 const PER = 40, COL_W = 440, ANIM = 170;
@@ -37,6 +38,30 @@ const SelectionCtx = createContext({
 const LIST_CACHE = new Map();
 const FILE_PATHS_CACHE = new Map();
 
+const loadingBarSx = {
+    height: 3,
+    bgcolor: 'rgba(226,232,240,0.72)',
+    '& .MuiLinearProgress-bar': {
+        background: 'linear-gradient(90deg, #2563eb, #38bdf8)',
+    },
+};
+
+const shimmerSx = {
+    position: 'relative',
+    overflow: 'hidden',
+    '&::after': {
+        content: '""',
+        position: 'absolute',
+        inset: 0,
+        transform: 'translateX(-100%)',
+        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.82), transparent)',
+        animation: 'dataShimmer 1.25s ease-in-out infinite',
+    },
+    '@keyframes dataShimmer': {
+        '100%': { transform: 'translateX(100%)' },
+    },
+};
+
 function getListCacheKey(dir, page, filter) {
     return `${dir}::${page}::${filter || ''}`;
 }
@@ -45,45 +70,32 @@ function getFilePathsCacheKey(dir, filter) {
     return `${dir}::${filter || ''}`;
 }
 
-function triggerDownload(path) {
-    const a = document.createElement('a');
-    a.href = `/api/data/download?path=${encodeURIComponent(path)}`;
-    a.download = '';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+function getRequestErrorMessage(err, fallback) {
+    return err.response?.data?.error || err.message || fallback;
 }
 
-function getZipFilenameFromHeader(disposition, fallback) {
-    const match = disposition?.match(/filename="?([^"]+)"?/i);
-    return match?.[1] || fallback;
+function getZipName(path, fallback = 'data') {
+    return `${path.split('/').filter(Boolean).pop() || fallback}.zip`;
+}
+
+async function triggerDownload(path) {
+    const response = await API.get('/download-info', { params: { path } });
+    if (response.data?.type === 'dir') {
+        await triggerBatchDownload([path], getZipName(path));
+        return;
+    }
+    triggerNativeDownload(buildApiUrl('/data/download', { path }));
 }
 
 async function triggerBatchDownload(paths, filename) {
-    const response = await API.post('/download-batch', { paths, filename }, { responseType: 'blob' });
-    const blobUrl = window.URL.createObjectURL(response.data);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = getZipFilenameFromHeader(response.headers['content-disposition'], filename);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    submitDownloadForm(buildApiUrl('/data/download-batch'), { paths, filename });
 }
 
 async function downloadPaths(paths, options = {}) {
-    const { step = 120, zipThreshold = 10, filename = 'data-selection.zip' } = options;
+    const { filename = 'data-selection.zip' } = options;
     const uniquePaths = [...new Set(paths.filter(Boolean))];
     if (uniquePaths.length === 0) return;
-
-    if (uniquePaths.length > zipThreshold) {
-        await triggerBatchDownload(uniquePaths, filename);
-        return;
-    }
-
-    uniquePaths.forEach((path, index) => {
-        window.setTimeout(() => triggerDownload(path), index * step);
-    });
+    await triggerBatchDownload(uniquePaths, filename);
 }
 
 async function fetchAllFilePaths(dir, filter) {
@@ -104,6 +116,8 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     const [totalPages, setTotal] = useState(1);
     const [totalCount, setCnt] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [downloading, setDownloading] = useState(false);
+    const [error, setError] = useState('');
     const [hovered, setHov] = useState(null);
     const [sortBy, setSortBy] = useState('name');
     const [sortDir, setSortDir] = useState('asc');
@@ -158,7 +172,9 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                 setCnt(nextCache.totalCount);
                 void syncVisibleFilePaths(nextCache.filePaths);
             })
-            .catch(() => {})
+            .catch((err) => {
+                if (!cancelled) setError(getRequestErrorMessage(err, 'Failed to load directory'));
+            })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [dir, onFiles, page, filter]);
@@ -193,14 +209,22 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
         [filtered, hovered],
     );
     const handleHeaderDownload = async () => {
-        if (searchDownload) {
-            const allMatchingFilePaths = await fetchAllFilePaths(dir, filter);
-            await downloadPaths(allMatchingFilePaths, {
-                filename: `${dir.split('/').pop() || 'data'}-filtered.zip`,
-            });
-            return;
+        setDownloading(true);
+        setError('');
+        try {
+            if (searchDownload) {
+                const allMatchingFilePaths = await fetchAllFilePaths(dir, filter);
+                await downloadPaths(allMatchingFilePaths, {
+                    filename: `${dir.split('/').pop() || 'data'}-filtered.zip`,
+                });
+                return;
+            }
+            await triggerBatchDownload([dir || ''], getZipName(dir, 'data'));
+        } catch (err) {
+            setError(getRequestErrorMessage(err, 'Download failed'));
+        } finally {
+            setDownloading(false);
         }
-        triggerDownload(dir || '');
     };
 
     const anim = animState === 'exit'
@@ -231,12 +255,20 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                     {dir.split('/').pop() || 'data'}
                 </Typography>
                 <Chip label={totalCount} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: '#eef0f2', color: '#888', fontWeight: 600 }} />
-                <Tooltip title={headerDownloadTitle}>
-                    <IconButton size="small" onClick={() => { void handleHeaderDownload(); }} sx={{ color: searchDownload ? '#2563eb' : '#888', '&:hover': { color: searchDownload ? '#1d4ed8' : '#e67e22', bgcolor: searchDownload ? '#eef2ff' : '#fef7ed' } }}>
+                <Tooltip title={downloading ? 'Preparing download...' : headerDownloadTitle}>
+                    <span>
+                    <IconButton size="small" disabled={downloading} onClick={() => { void handleHeaderDownload(); }} sx={{ color: searchDownload ? '#2563eb' : '#888', '&:hover': { color: searchDownload ? '#1d4ed8' : '#e67e22', bgcolor: searchDownload ? '#eef2ff' : '#fef7ed' } }}>
                         <FileDownload sx={{ fontSize: 16 }} />
                     </IconButton>
+                    </span>
                 </Tooltip>
             </Box>
+            {(loading || downloading) && <LinearProgress sx={loadingBarSx} />}
+            {error && (
+                <Alert severity="error" sx={{ m: 1, py: 0.2, fontSize: '0.72rem' }} onClose={() => setError('')}>
+                    {error}
+                </Alert>
+            )}
 
             {/* table */}
             <TableContainer sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }} onMouseLeave={() => setHov(null)}>
@@ -266,6 +298,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                         height: 16, bgcolor: '#f3f4f6', borderRadius: 1,
                                         width: `${55 + i * 8}%`,
                                         opacity: 0.85,
+                                        ...shimmerSx,
                                     }} />
                                 </TableCell></TableRow>
                             ))
@@ -327,7 +360,13 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                         <TableCell align="center" sx={{ borderBottom: '1px solid #f3f4f6' }}>
                                             {isFile ? (
                                                 <Tooltip title="Download">
-                                                    <IconButton size="small" href={`/api/data/download?path=${encodeURIComponent(f.path)}`}
+                                                    <IconButton size="small" onClick={() => {
+                                                        setDownloading(true);
+                                                        setError('');
+                                                        triggerDownload(f.path)
+                                                            .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
+                                                            .finally(() => setDownloading(false));
+                                                    }}
                                                         sx={{ opacity: (hovered === f.path || isCk) ? 0.95 : 0.24, transition: 'opacity .08s linear', '&:hover': { opacity: 1, bgcolor: '#eef2ff' } }}>
                                                         <Download sx={{ fontSize: 16, color: '#2563eb' }} />
                                                     </IconButton>
@@ -335,7 +374,11 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                             ) : !filter ? (
                                                 <Tooltip title="Download as ZIP">
                                                     <IconButton size="small" component="span" onClick={() => {
-                                                        triggerDownload(f.path);
+                                                        setDownloading(true);
+                                                        setError('');
+                                                        triggerBatchDownload([f.path], getZipName(f.path))
+                                                            .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
+                                                            .finally(() => setDownloading(false));
                                                     }} sx={{ opacity: hovered === f.path ? 0.92 : 0.34, transition: 'opacity .08s linear', '&:hover': { opacity: 1, bgcolor: '#fef7ed' } }}>
                                                         <FileDownload sx={{ fontSize: 16, color: '#e67e22' }} />
                                                     </IconButton>
@@ -476,6 +519,8 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
     const [totalCount, setTotalCount] = useState(0);
     const [truncated, setTruncated] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [error, setError] = useState('');
     const [hovered, setHovered] = useState(null);
 
     useEffect(() => {
@@ -494,6 +539,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
         }
 
         setLoading(true);
+        setError('');
         API.get('/search', { params: { q: trimmedQuery, limit: GLOBAL_SEARCH_LIMIT } })
             .then(({ data }) => {
                 if (cancelled) return;
@@ -502,11 +548,12 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                 setTotalCount(data.totalCount ?? nextResults.length);
                 setTruncated(Boolean(data.truncated));
             })
-            .catch(() => {
+            .catch((err) => {
                 if (cancelled) return;
                 setResults([]);
                 setTotalCount(0);
                 setTruncated(false);
+                setError(getRequestErrorMessage(err, 'Search failed'));
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -564,16 +611,30 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
     const handleDownloadChecked = async () => {
         const selectedPaths = fileResults.filter((item) => checked.has(item.path)).map((item) => item.path);
 
-        await downloadPaths(selectedPaths, {
-            filename: `${trimmedQuery || 'data-global-search'}-matches.zip`,
-            step: 160,
-        });
+        setDownloading(true);
+        setError('');
+        try {
+            await downloadPaths(selectedPaths, {
+                filename: `${trimmedQuery || 'data-global-search'}-matches.zip`,
+            });
+        } catch (err) {
+            setError(getRequestErrorMessage(err, 'Download failed'));
+        } finally {
+            setDownloading(false);
+        }
     };
     const handleDownloadAllFiles = async () => {
-        await downloadPaths(allFilePaths, {
-            filename: `${trimmedQuery || 'data-global-search'}-files.zip`,
-            step: 160,
-        });
+        setDownloading(true);
+        setError('');
+        try {
+            await downloadPaths(allFilePaths, {
+                filename: `${trimmedQuery || 'data-global-search'}-files.zip`,
+            });
+        } catch (err) {
+            setError(getRequestErrorMessage(err, 'Download failed'));
+        } finally {
+            setDownloading(false);
+        }
     };
 
     return (
@@ -604,10 +665,11 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                         <Button
                             size="small"
                             variant="outlined"
+                            disabled={downloading}
                             sx={{ minWidth: 0, px: 1.4, py: 0.4, fontSize: '0.74rem', textTransform: 'none', borderColor: '#cbd5e1', color: '#334155' }}
                             onClick={() => { void handleDownloadAllFiles(); }}
                         >
-                            <FileDownload sx={{ fontSize: 14, mr: 0.4 }} /> {truncated ? 'Download loaded' : 'Download all'}
+                            <FileDownload sx={{ fontSize: 14, mr: 0.4 }} /> {downloading ? 'Preparing...' : (truncated ? 'Download loaded' : 'Download all')}
                         </Button>
                         {checkedCount > 0 && (
                             <Chip label={`${checkedCount} selected`} size="small" color="primary" onDelete={clearAll} />
@@ -616,10 +678,11 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                             <Button
                                 size="small"
                                 variant="contained"
+                                disabled={downloading}
                                 sx={{ minWidth: 0, px: 1.5, py: 0.4, fontSize: '0.74rem', textTransform: 'none', boxShadow: 'none' }}
                                 onClick={() => { void handleDownloadChecked(); }}
                             >
-                                <FileDownload sx={{ fontSize: 14, mr: 0.4 }} /> Download selected
+                                <FileDownload sx={{ fontSize: 14, mr: 0.4 }} /> {downloading ? 'Preparing...' : 'Download selected'}
                             </Button>
                         )}
                     </Box>
@@ -631,8 +694,14 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                     Showing the top {results.length} ranked matches out of {totalCount}. "Download loaded" applies to the currently loaded matches.
                 </Alert>
             )}
+            {error && (
+                <Alert severity="error" sx={{ borderRadius: 2 }} onClose={() => setError('')}>
+                    {error}
+                </Alert>
+            )}
 
             <Paper elevation={0} sx={{ border: '1px solid rgba(0,0,0,.06)', borderRadius: 3, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                {(loading || downloading) && <LinearProgress sx={loadingBarSx} />}
                 {!canSearch ? (
                     <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -641,6 +710,13 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                     </Box>
                 ) : (
                     <>
+                        {loading && (
+                            <Box sx={{ px: 2, py: 1, bgcolor: '#f8fafc', borderBottom: '1px solid #eef2f7' }}>
+                                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700 }}>
+                                    Searching server files. The first global search may build the index and take longer.
+                                </Typography>
+                            </Box>
+                        )}
                         <TableContainer sx={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }} onMouseLeave={() => setHovered(null)}>
                             <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', minWidth: { xs: 720, sm: 780 } }}>
                                 <TableHead>
@@ -665,7 +741,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                         Array.from({ length: 8 }, (_, index) => (
                                             <TableRow key={`global-loading-${index}`}>
                                                 <TableCell colSpan={5} sx={{ py: 1.2, px: 2 }}>
-                                                    <Box sx={{ height: 16, bgcolor: '#f3f4f6', borderRadius: 1, width: `${52 + index * 5}%`, opacity: 0.85 }} />
+                                                    <Box sx={{ height: 16, bgcolor: '#f3f4f6', borderRadius: 1, width: `${52 + index * 5}%`, opacity: 0.85, ...shimmerSx }} />
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -755,8 +831,27 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.3 }}>
                                                             {isFile && (
                                                                 <Tooltip title="Download">
-                                                                    <IconButton size="small" href={`/api/data/download?path=${encodeURIComponent(item.path)}`} sx={{ '&:hover': { bgcolor: '#eef2ff' } }}>
+                                                                    <IconButton size="small" onClick={() => {
+                                                                        setDownloading(true);
+                                                                        setError('');
+                                                                        triggerDownload(item.path)
+                                                                            .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
+                                                                            .finally(() => setDownloading(false));
+                                                                    }} sx={{ '&:hover': { bgcolor: '#eef2ff' } }}>
                                                                         <Download sx={{ fontSize: 16, color: '#2563eb' }} />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            )}
+                                                            {!isFile && (
+                                                                <Tooltip title="Download folder as ZIP">
+                                                                    <IconButton size="small" onClick={() => {
+                                                                        setDownloading(true);
+                                                                        setError('');
+                                                                        triggerBatchDownload([item.path], getZipName(item.path))
+                                                                            .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
+                                                                            .finally(() => setDownloading(false));
+                                                                    }} sx={{ '&:hover': { bgcolor: '#fef7ed' } }}>
+                                                                        <FileDownload sx={{ fontSize: 16, color: '#e67e22' }} />
                                                                     </IconButton>
                                                                 </Tooltip>
                                                             )}
@@ -845,6 +940,7 @@ export default function DataBrowser() {
     const [searchMode, setSearchMode] = useState(() => initMode);
     const [checked, setChecked] = useState(new Set());
     const [dirFileMap, setDirFileMap] = useState({});
+    const [downloadState, setDownloadState] = useState({ loading: false, error: '' });
     const scrollRef = useRef(null);
     const exitTimer = useRef(null);
     const columnsRef = useRef(columns);
@@ -967,6 +1063,16 @@ export default function DataBrowser() {
         if (allVisCk) setChecked(p => { const n = new Set(p); allVisibleFiles.forEach(f => n.delete(f)); return n; });
         else setChecked(p => { const n = new Set(p); allVisibleFiles.forEach(f => n.add(f)); return n; });
     };
+    const handleDownloadSelection = async () => {
+        setDownloadState({ loading: true, error: '' });
+        try {
+            await downloadPaths([...visCk], { filename: 'data-selection.zip' });
+        } catch (err) {
+            setDownloadState({ loading: false, error: getRequestErrorMessage(err, 'Download failed') });
+            return;
+        }
+        setDownloadState({ loading: false, error: '' });
+    };
 
     const ctxVal = useMemo(() => ({ checked, toggleFile, toggleDirAll, clearAll }), [checked, toggleFile, toggleDirAll, clearAll]);
 
@@ -1080,17 +1186,22 @@ export default function DataBrowser() {
                                     <Checkbox size="small" sx={{ p: 0.3 }} checked={allVisCk} indeterminate={someVisCk} onChange={toggleAllVis} title="Select all visible" />
                                     <Chip label={visCk.length} size="small" color="primary" onDelete={clearAll} sx={{ fontSize: '0.72rem' }} />
                                     <Button size="small" variant="contained"
+                                        disabled={downloadState.loading}
                                         sx={{ minWidth: 0, px: 1.5, py: 0.3, fontSize: '0.7rem', textTransform: 'none', boxShadow: 'none' }}
-                                        onClick={() => {
-                                            void downloadPaths([...visCk], { step: 160, filename: 'data-selection.zip' });
-                                        }}>
-                                        <FileDownload sx={{ fontSize: 14, mr: 0.3 }} /> Download
+                                        onClick={() => { void handleDownloadSelection(); }}>
+                                        <FileDownload sx={{ fontSize: 14, mr: 0.3 }} /> {downloadState.loading ? 'Preparing...' : 'Download'}
                                     </Button>
                                 </Box>
                             )}
                         </Box>
                     )}
                 </Box>
+                {downloadState.loading && <LinearProgress sx={{ ...loadingBarSx, mb: 1 }} />}
+                {downloadState.error && (
+                    <Alert severity="error" sx={{ mb: 1, borderRadius: 2 }} onClose={() => setDownloadState({ loading: false, error: '' })}>
+                        {downloadState.error}
+                    </Alert>
+                )}
 
                 {isGlobalSearch ? (
                     <GlobalSearchResults

@@ -10,6 +10,7 @@ import {
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import ProgramScatterTable from './ProgramScatterTable';
+import { downloadBlob, downloadDataUrl } from '../utils/download';
 
 const COLORS = {
     other: '#b8c0cc',
@@ -117,6 +118,16 @@ function formatRank(value) {
     return Number.isFinite(value) ? `#${value}` : 'NA';
 }
 
+function formatProgramId(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return 'PNA';
+    return /^P/i.test(raw) ? raw.replace(/^p/i, 'P') : `P${raw}`;
+}
+
+function getProgramLabel(item) {
+    return item.color === 'other' ? '' : formatProgramId(item.program);
+}
+
 function readInfoText(...values) {
     for (const value of values) {
         const text = String(value || '').trim();
@@ -133,21 +144,31 @@ function buildHoverText(item, key, info) {
     const markerCoexpression = readInfoText(info?.marker_coexpression);
 
     const lines = [
-        `<b>P${item.program}</b>`,
+        `<b>${formatProgramId(item.program)}</b>`,
         `<span style="color:${COLORS[key]};font-weight:600">${LEGEND_LABELS[key]}</span>`,
-        annotation,
+        `<span style="color:#475569">${annotation}</span>`,
         '',
-        `<b>Program</b>  score ${formatFixed(item.progScore, 3)}  ·  rank ${formatRank(item.rankProg)}  ·  P ${formatPValue(item.progP)}  ·  γ ${formatFixed(item.progGamma, 4)}`,
-        `<b>Regulator</b>  score ${formatFixed(item.regScore, 3)}  ·  rank ${formatRank(item.rankReg)}  ·  P ${formatPValue(item.regP)}  ·  β ${formatFixed(item.regBeta, 4)}`,
+        '<b>Program burden</b>',
+        `Score: ${formatFixed(item.progScore, 3)}`,
+        `Rank: ${formatRank(item.rankProg)}  ·  P: ${formatPValue(item.progP)}`,
+        `Gamma: ${formatFixed(item.progGamma, 4)}`,
+        '',
+        '<b>Regulator burden</b>',
+        `Score: ${formatFixed(item.regScore, 3)}`,
+        `Rank: ${formatRank(item.rankReg)}  ·  P: ${formatPValue(item.regP)}`,
+        `Beta: ${formatFixed(item.regBeta, 4)}`,
     ];
 
     if (representativeGo) {
+        lines.push('', '<b>Representative annotations</b>');
         lines.push(`GO: ${representativeGo}${info?.go_enrichment_p ? ` (P ${info.go_enrichment_p})` : ''}`);
     }
     if (representativeTf) {
+        if (!representativeGo) lines.push('', '<b>Representative annotations</b>');
         lines.push(`TF: ${representativeTf}${representativeTfClass ? ` · ${representativeTfClass}` : ''}${info?.representative_tf_p ? ` (P ${info.representative_tf_p})` : ''}`);
     }
     if (markerCoexpression) {
+        if (!representativeGo && !representativeTf) lines.push('', '<b>Representative annotations</b>');
         lines.push(`Marker: ${markerCoexpression}`);
     }
 
@@ -182,7 +203,7 @@ export default function ProgramScatter({ fileId }) {
     const [mode, setMode] = useState(MODES.SCATTER);
     const [topN, setTopN] = useState(DEFAULT_TOP_N);
     const [markerSize, setMarkerSize] = useState(10);
-    const [bubbleScale, setBubbleScale] = useState(1.5);
+    const [bubbleScale, setBubbleScale] = useState(1);
     const [showLabels, setShowLabels] = useState(true);
     const [exportOpen, setExportOpen] = useState(false);
     const [expW, setExpW] = useState(1200);
@@ -210,7 +231,6 @@ export default function ProgramScatter({ fileId }) {
 
         const arr = data.data.map((item) => ({
             program: item.Program || '',
-            label: item.label || '',
             color: TRACE_ORDER.includes(item.color) ? item.color : 'other',
             progScore: toFiniteNumber(item.program_score),
             regScore: toFiniteNumber(item.regulator_score),
@@ -342,11 +362,7 @@ export default function ProgramScatter({ fileId }) {
             return v;
         }).join(',')).join('\n');
         const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `program_data_${sanitizeFileNamePart(fileId || 'export')}.csv`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `program_data_${sanitizeFileNamePart(fileId || 'export')}.csv`);
     }, [rows, fileId]);
 
     const counts = useMemo(() => {
@@ -435,7 +451,7 @@ export default function ProgramScatter({ fileId }) {
                 },
             },
             ...(showLabels && {
-                text: pts.map((item) => item.label || ''),
+                text: pts.map(getProgramLabel),
                 textposition: 'top center',
                 textfont: { size: 11, color: key === 'other' ? '#667085' : COLORS[key] },
             }),
@@ -444,7 +460,8 @@ export default function ProgramScatter({ fileId }) {
             showlegend: true,
             hovertemplate: '%{hovertext}<extra></extra>',
             hovertext: pts.map((item) => {
-                const info = programInfo[`P${item.program}`] || programInfo[item.program] || {};
+                const programKey = formatProgramId(item.program);
+                const info = programInfo[programKey] || programInfo[item.program] || {};
                 return buildHoverText(item, key, info);
             }),
             customdata: pts.map((item) => [item.program]),
@@ -559,10 +576,8 @@ export default function ProgramScatter({ fileId }) {
         if (!gd) return;
         const width = normalizeExportSize(expW, DEFAULT_EXPORT_WIDTH);
         const height = normalizeExportSize(expH, DEFAULT_EXPORT_HEIGHT);
-        Plotly.toImage(gd, { format: expFmt, width, height }).then(dataUrl => {
-            const a = document.createElement('a');
-            a.href = dataUrl; a.download = `program_${sanitizeFileNamePart(fileId || 'plot')}.${expFmt}`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        Plotly.toImage(gd, { format: expFmt, width, height }).then((dataUrl) => {
+            downloadDataUrl(dataUrl, `program_${sanitizeFileNamePart(fileId || 'plot')}.${expFmt}`);
         });
     }, [expFmt, expW, expH, fileId]);
 
@@ -718,7 +733,7 @@ export default function ProgramScatter({ fileId }) {
                         </Typography>
                             <Slider
                                 value={mode === MODES.SCATTER ? markerSize : bubbleScale}
-                                min={mode === MODES.SCATTER ? 3 : 0.8}
+                                min={mode === MODES.SCATTER ? 3 : 0.5}
                                 max={mode === MODES.SCATTER ? 25 : 2}
                                 step={mode === MODES.SCATTER ? 1 : 0.1}
                                 onChange={(_, value) => mode === MODES.SCATTER

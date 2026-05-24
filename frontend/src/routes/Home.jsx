@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Box, Typography, Card, CardActionArea, CardContent, Button, TextField,
+    Alert, Box, Typography, Card, CardActionArea, CardContent, Button, TextField,
     Checkbox, InputAdornment, Paper, List, ListItemButton, ListItemIcon,
     ListItemText, ClickAwayListener, Chip, CircularProgress, IconButton,
-    Divider, Skeleton, Stack,
+    Divider, LinearProgress, Skeleton, Stack,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {
@@ -12,6 +12,7 @@ import {
     Close, FileDownload, Dns, Science, Storage,
 } from '@mui/icons-material';
 import axios from 'axios';
+import { buildApiUrl, submitDownloadForm, triggerNativeDownload } from '../utils/download';
 
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const SEARCH_CACHE = new Map();
@@ -19,25 +20,35 @@ const SEARCH_DEBOUNCE_MS = 220;
 const SEARCH_CACHE_TTL_MS = 90 * 1000;
 const ZIP_THRESHOLD = 10;
 
+const loadingBarSx = {
+    height: 3,
+    bgcolor: 'rgba(226,232,240,0.72)',
+    '& .MuiLinearProgress-bar': {
+        background: 'linear-gradient(90deg, #2563eb, #38bdf8)',
+    },
+};
+
+const shimmerSx = {
+    position: 'relative',
+    overflow: 'hidden',
+    '&::after': {
+        content: '""',
+        position: 'absolute',
+        inset: 0,
+        transform: 'translateX(-100%)',
+        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.82), transparent)',
+        animation: 'homeDataShimmer 1.25s ease-in-out infinite',
+    },
+    '@keyframes homeDataShimmer': {
+        '100%': { transform: 'translateX(100%)' },
+    },
+};
+
 function fmtSize(bytes) {
     if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;
-}
-
-function triggerDownload(path) {
-    const link = document.createElement('a');
-    link.href = `/api/data/download?path=${encodeURIComponent(path)}`;
-    link.download = '';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function getFilenameFromDisposition(disposition, fallback) {
-    const match = disposition?.match(/filename="?([^"]+)"?/i);
-    return match?.[1] || fallback;
 }
 
 function getCachedSearchResult(query) {
@@ -50,20 +61,29 @@ function getCachedSearchResult(query) {
     return cached;
 }
 
+function getRequestErrorMessage(err, fallback) {
+    return err.response?.data?.error || err.message || fallback;
+}
+
+function getZipName(path, fallback = 'data') {
+    return `${path.split('/').filter(Boolean).pop() || fallback}.zip`;
+}
+
+async function triggerDownload(path) {
+    const response = await SEARCH_API.get('/download-info', { params: { path } });
+    if (response.data?.type === 'dir') {
+        await triggerBatchDownload([path], getZipName(path));
+        return;
+    }
+    triggerNativeDownload(buildApiUrl('/data/download', { path }));
+}
+
 async function triggerBatchDownload(paths, filename) {
-    const response = await SEARCH_API.post('/download-batch', { paths, filename }, { responseType: 'blob' });
-    const blobUrl = window.URL.createObjectURL(response.data);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = getFilenameFromDisposition(response.headers['content-disposition'], filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    submitDownloadForm(buildApiUrl('/data/download-batch'), { paths, filename });
 }
 
 async function downloadPaths(paths, options = {}) {
-    const { filename = 'data-search.zip', step = 140, zipThreshold = ZIP_THRESHOLD } = options;
+    const { filename = 'data-search.zip', zipThreshold = ZIP_THRESHOLD } = options;
     const uniquePaths = [...new Set(paths.filter(Boolean))];
     if (uniquePaths.length === 0) return;
 
@@ -72,9 +92,12 @@ async function downloadPaths(paths, options = {}) {
         return;
     }
 
-    uniquePaths.forEach((path, index) => {
-        window.setTimeout(() => triggerDownload(path), index * step);
-    });
+    if (uniquePaths.length === 1) {
+        await triggerDownload(uniquePaths[0]);
+        return;
+    }
+
+    await triggerBatchDownload(uniquePaths, filename);
 }
 
 const stats = [
@@ -89,6 +112,8 @@ export default function Home() {
     const [results, setResults] = useState([]);
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [error, setError] = useState('');
     const [checked, setChecked] = useState(new Set());
     const [meta, setMeta] = useState({ totalCount: 0, truncated: false });
     const timerRef = useRef(null);
@@ -150,6 +175,7 @@ export default function Home() {
             const ctrl = new AbortController();
             abortRef.current = ctrl;
             setLoading(true);
+            setError('');
 
             SEARCH_API.get('/search', {
                 params: { q: trimmedQ, limit: 60 },
@@ -170,6 +196,7 @@ export default function Home() {
                 .catch((error) => {
                     if (!axios.isCancel(error) && error.code !== 'ERR_CANCELED') {
                         console.error(error);
+                        setError(getRequestErrorMessage(error, 'Search failed'));
                     }
                 })
                 .finally(() => {
@@ -230,10 +257,18 @@ export default function Home() {
     };
 
     const handleDownloadSelection = async () => {
-        await downloadPaths(
-            checkedFiles.map((item) => item.path),
-            { filename: `${trimmedQ || 'data-search'}-files.zip`, step: 160 },
-        );
+        setDownloading(true);
+        setError('');
+        try {
+            await downloadPaths(
+                checkedFiles.map((item) => item.path),
+                { filename: `${trimmedQ || 'data-search'}-files.zip` },
+            );
+        } catch (err) {
+            setError(getRequestErrorMessage(err, 'Download failed'));
+        } finally {
+            setDownloading(false);
+        }
     };
 
     const helperText = !trimmedQ
@@ -265,7 +300,7 @@ export default function Home() {
                         File Search
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#6b7280', mb: 1.3 }}>
-                        Search returns both files and folders. File selections can be downloaded directly; folder hits open in the corresponding directory.
+                        Search returns both files and folders. File selections download directly; folder hits can be opened or downloaded as ZIP.
                     </Typography>
 
                     <ClickAwayListener onClickAway={() => setOpen(false)}>
@@ -326,6 +361,7 @@ export default function Home() {
                                     boxShadow: '0 10px 28px rgba(15,23,36,0.10)',
                                     bgcolor: '#fff',
                                 }}>
+                                    {(loading || downloading) && <LinearProgress sx={loadingBarSx} />}
                                     <Box sx={{
                                         px: 2,
                                         py: 1.1,
@@ -356,11 +392,12 @@ export default function Home() {
                                                     <Button
                                                         size="small"
                                                         variant="contained"
+                                                        disabled={downloading}
                                                         sx={{ textTransform: 'none', boxShadow: 'none' }}
                                                         onClick={() => { void handleDownloadSelection(); }}
                                                     >
                                                         <FileDownload sx={{ fontSize: 16, mr: 0.5 }} />
-                                                        Download
+                                                        {downloading ? 'Preparing...' : 'Download'}
                                                     </Button>
                                                 </>
                                             )}
@@ -376,17 +413,23 @@ export default function Home() {
                                         </Stack>
                                     </Box>
 
+                                    {error && (
+                                        <Alert severity="error" sx={{ mx: 2, mt: 1, borderRadius: 2 }} onClose={() => setError('')}>
+                                            {error}
+                                        </Alert>
+                                    )}
+
                                     {loading ? (
                                         <Box sx={{ px: 2, py: 1.6 }}>
                                             {[0, 1, 2, 3].map((item) => (
                                                 <Box key={item} sx={{ display: 'flex', alignItems: 'center', gap: 1.2, py: 1 }}>
-                                                    <Skeleton variant="rounded" width={18} height={18} />
-                                                    <Skeleton variant="circular" width={18} height={18} />
+                                                    <Skeleton variant="rounded" width={18} height={18} sx={shimmerSx} />
+                                                    <Skeleton variant="circular" width={18} height={18} sx={shimmerSx} />
                                                     <Box sx={{ flex: 1 }}>
-                                                        <Skeleton variant="text" width="42%" height={24} />
-                                                        <Skeleton variant="text" width="72%" height={18} />
+                                                        <Skeleton variant="text" width="42%" height={24} sx={shimmerSx} />
+                                                        <Skeleton variant="text" width="72%" height={18} sx={shimmerSx} />
                                                     </Box>
-                                                    <Skeleton variant="rounded" width={72} height={22} />
+                                                    <Skeleton variant="rounded" width={72} height={22} sx={shimmerSx} />
                                                 </Box>
                                             ))}
                                         </Box>
@@ -466,7 +509,11 @@ export default function Home() {
                                                                         size="small"
                                                                         onClick={(event) => {
                                                                             event.stopPropagation();
-                                                                            triggerDownload(item.path);
+                                                                            setDownloading(true);
+                                                                            setError('');
+                                                                            triggerDownload(item.path)
+                                                                                .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
+                                                                                .finally(() => setDownloading(false));
                                                                         }}
                                                                         sx={{
                                                                             color: '#315ea8',
@@ -526,11 +573,30 @@ export default function Home() {
                                                                         title: item.path,
                                                                     }}
                                                                 />
-                                                                <Chip
-                                                                    label="Open folder"
-                                                                    size="small"
-                                                                    sx={{ fontSize: '0.66rem', height: 22, bgcolor: '#f3f6f9', color: '#4b5563' }}
-                                                                />
+                                                                <Stack direction="row" spacing={0.7} alignItems="center">
+                                                                    <Chip
+                                                                        label="Open folder"
+                                                                        size="small"
+                                                                        sx={{ fontSize: '0.66rem', height: 22, bgcolor: '#f3f6f9', color: '#4b5563' }}
+                                                                    />
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        onClick={(event) => {
+                                                                            event.stopPropagation();
+                                                                            setDownloading(true);
+                                                                            setError('');
+                                                                            triggerBatchDownload([item.path], getZipName(item.path))
+                                                                                .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
+                                                                                .finally(() => setDownloading(false));
+                                                                        }}
+                                                                        sx={{
+                                                                            color: '#e67e22',
+                                                                            '&:hover': { bgcolor: '#fef7ed' },
+                                                                        }}
+                                                                    >
+                                                                        <FileDownload sx={{ fontSize: 16 }} />
+                                                                    </IconButton>
+                                                                </Stack>
                                                             </ListItemButton>
                                                         ))}
                                                     </>

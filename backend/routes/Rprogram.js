@@ -11,6 +11,11 @@ const router = express.Router();
 
 const programStore = createFileStore(config.paths.programDataDir);
 const burdenVolcanoStore = createFileStore(config.paths.burdenVolcanoDir);
+const posteriorVolcanoStore = createFileStore(config.paths.posteriorVolcanoDir);
+const VOLCANO_VARIANT_ALIASES = {
+    full: ['full', 'fulltsv', 'all', 'allgene', 'allgenes', 'gene', 'genes'],
+    hits: ['hits', 'hit', 'significant', 'sig'],
+};
 
 async function parseTsvFromStore(store, relativeName) {
     const fullPath = store.resolve(relativeName);
@@ -29,9 +34,11 @@ async function parseTsvFromStore(store, relativeName) {
     return parseTsvStream(stream, { maxRows: config.data.maxTsvRows });
 }
 
-async function getTsvVariant(store, fileIds, variant, suffix) {
-    const { fileName } = await findVariantFile(store, fileIds, variant, { suffix });
+async function getTsvVariant(store, fileIds, variant, suffix, { readRows = true } = {}) {
+    const { fileName } = await findVariantFile(store, fileIds, variant, { suffix, aliases: VOLCANO_VARIANT_ALIASES });
     if (fileName) {
+        if (!readRows) return { exists: true, data: [], fileName };
+
         const data = await parseTsvFromStore(store, fileName);
         return { exists: true, data: data || [], fileName };
     }
@@ -39,16 +46,16 @@ async function getTsvVariant(store, fileIds, variant, suffix) {
     return { exists: false, data: [], fileName: null };
 }
 
-function summarizeBurdenRows(rows) {
+function summarizeVolcanoRows(rows, effectField) {
     let positive = 0;
     let negative = 0;
     let annotatedProgram = 0;
     let annotatedGeneset = 0;
 
     for (const row of rows) {
-        const beta = Number(row.beta);
-        if (Number.isFinite(beta)) {
-            if (beta >= 0) positive += 1;
+        const effect = Number(row[effectField]);
+        if (Number.isFinite(effect)) {
+            if (effect >= 0) positive += 1;
             else negative += 1;
         }
         if (String(row.program || '').trim()) annotatedProgram += 1;
@@ -62,6 +69,48 @@ function summarizeBurdenRows(rows) {
         annotatedProgram,
         annotatedGeneset,
     };
+}
+
+function createVolcanoRoute({ store, volcanoType, effectField }) {
+    return asyncRoute(async (req, res) => {
+        const safeFileId = normalizeSafeBaseName(req.params.fileId);
+        if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
+
+        const variant = req.query.variant === 'full' ? 'full' : 'hits';
+        const lookupIds = [safeFileId, ...normalizeSafeBaseNameList(req.query.aliasId)];
+        const current = await getTsvVariant(store, lookupIds, variant, '.tsv');
+        const fallback = variant === 'full'
+            ? await getTsvVariant(store, lookupIds, 'hits', '.tsv')
+            : null;
+        const hitsResult = variant === 'hits'
+            ? current
+            : fallback || await getTsvVariant(store, lookupIds, 'hits', '.tsv');
+        const fullResult = variant === 'full'
+            ? current
+            : await getTsvVariant(store, lookupIds, 'full', '.tsv', { readRows: false });
+        const effective = current.exists ? current : (fallback || current);
+        const usingFallback = !current.exists && variant === 'full' && Boolean(fallback?.exists);
+
+        if (!effective.exists) return res.status(404).json({ error: 'Not found' });
+
+        res.json({
+            fileId: safeFileId,
+            volcanoType,
+            effectField,
+            variant,
+            requestedVariant: variant,
+            resolvedVariant: current.exists ? variant : (usingFallback ? 'hits' : variant),
+            fallbackUsed: usingFallback,
+            fileName: effective.fileName,
+            availableVariants: {
+                hits: hitsResult.exists,
+                full: fullResult.exists,
+            },
+            hasData: effective.data.length > 0,
+            data: effective.data,
+            summary: summarizeVolcanoRows(effective.data, effectField),
+        });
+    });
 }
 
 router.get('/api/programs/info', asyncRoute(async (req, res) => {
@@ -90,42 +139,16 @@ router.get('/api/programs/:fileId', asyncRoute(async (req, res) => {
     res.json({ data });
 }));
 
-router.get('/api/burden-volcano/:fileId', asyncRoute(async (req, res) => {
-    const safeFileId = normalizeSafeBaseName(req.params.fileId);
-    if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
+router.get('/api/burden-volcano/:fileId', createVolcanoRoute({
+    store: burdenVolcanoStore,
+    volcanoType: 'burden',
+    effectField: 'beta',
+}));
 
-    const variant = req.query.variant === 'full' ? 'full' : 'hits';
-    const lookupIds = [safeFileId, ...normalizeSafeBaseNameList(req.query.aliasId)];
-    const current = await getTsvVariant(burdenVolcanoStore, lookupIds, variant, '.tsv');
-    const fallback = variant === 'full'
-        ? await getTsvVariant(burdenVolcanoStore, lookupIds, 'hits', '.tsv')
-        : null;
-    const hitsResult = variant === 'hits'
-        ? current
-        : fallback || await getTsvVariant(burdenVolcanoStore, lookupIds, 'hits', '.tsv');
-    const fullResult = variant === 'full'
-        ? current
-        : await getTsvVariant(burdenVolcanoStore, lookupIds, 'full', '.tsv');
-    const effective = current.exists ? current : (fallback || current);
-    const usingFallback = !current.exists && variant === 'full' && Boolean(fallback?.exists);
-
-    if (!effective.exists) return res.status(404).json({ error: 'Not found' });
-
-    res.json({
-        fileId: safeFileId,
-        variant,
-        requestedVariant: variant,
-        resolvedVariant: current.exists ? variant : (usingFallback ? 'hits' : variant),
-        fallbackUsed: usingFallback,
-        fileName: effective.fileName,
-        availableVariants: {
-            hits: hitsResult.exists,
-            full: fullResult.exists,
-        },
-        hasData: effective.data.length > 0,
-        data: effective.data,
-        summary: summarizeBurdenRows(effective.data),
-    });
+router.get('/api/posterior-volcano/:fileId', createVolcanoRoute({
+    store: posteriorVolcanoStore,
+    volcanoType: 'posterior',
+    effectField: 'post_mean',
 }));
 
 module.exports = router;
