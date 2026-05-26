@@ -98,7 +98,13 @@ export default function Trait() {
                         <Typography color="text.secondary">No Program enrichment data for this trait</Typography>
                     </Card>
                 )}
-                {tab === 1 && hasProgramGraph && <TraitProgramGraph key={`trait-program-graph-${fileId}`} fileId={fileId} />}
+                {tab === 1 && hasProgramGraph && (
+                    <TraitProgramGraph
+                        key={`trait-program-graph-${fileId}`}
+                        fileId={fileId}
+                        traitLabel={meta?.trait_name || fileId}
+                    />
+                )}
                 {tab === 1 && !hasProgramGraph && (
                     <Card variant="outlined" sx={{ py: 8, textAlign: 'center', borderRadius: 3, bgcolor: '#fafbfc' }}>
                         <Timeline sx={{ fontSize: 48, color: '#ccc', mb: 2 }} />

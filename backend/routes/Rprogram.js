@@ -206,6 +206,7 @@ function buildProgramNode(row) {
         traitId: normalizeText(row.trait_id),
         label: normalizeText(row.program_label, program),
         annotation: normalizeText(row.program_annotation),
+        programTraitSign: normalizeText(row.program_trait_sign),
         colorKey: PROGRAM_COLOR_LABELS[row.color] ? row.color : 'other',
         colorLabel: PROGRAM_COLOR_LABELS[row.color] || PROGRAM_COLOR_LABELS.other,
         programScore,
@@ -255,6 +256,7 @@ function buildGeneNode(row) {
     const absGamma = toNullableNumber(row.abs_gamma);
     const membershipScore = toNullableNumber(row.membership_score);
     const displayRank = toNullableNumber(row.display_rank);
+    const displayColumnRank = toNullableNumber(row.display_column_rank);
 
     return {
         id: [normalizeText(row.Program), role, normalizeText(row.ensg), normalizeText(row.gene)].join(':'),
@@ -269,9 +271,16 @@ function buildGeneNode(row) {
         gammaSign: normalizeText(row.gamma_sign, 'unknown'),
         membershipScore,
         rankWithinSide: toNullableNumber(row.rank_within_side),
+        programTraitSign: normalizeText(row.program_trait_sign),
+        regulatorProgramSign: normalizeText(row.regulator_program_sign),
         predictedSign: normalizeText(row.predicted_sign),
         postMeanSign: normalizeText(row.post_mean_sign),
+        isConcordant: row.is_concordant == null ? false : toBoolean(row.is_concordant),
         isDiscordant: toBoolean(row.is_discordant),
+        displayBucket: normalizeText(row.display_bucket),
+        displayBucketLabel: normalizeText(row.display_bucket_label),
+        displayColumn: normalizeText(row.display_column),
+        displayColumnRank: Number.isFinite(displayColumnRank) ? displayColumnRank : Number.MAX_SAFE_INTEGER,
         programLabel: normalizeText(row.program_label),
         geneLabel: normalizeText(row.gene_label, normalizeText(row.gene)),
         displayRank: Number.isFinite(displayRank) ? displayRank : Number.MAX_SAFE_INTEGER,
