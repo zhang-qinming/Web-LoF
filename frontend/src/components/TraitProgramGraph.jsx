@@ -81,10 +81,11 @@ const RIGHT_REGULATOR_W = 310;
 const GENE_ROW_H = 25;
 const MODULE_GAP = 42;
 const REGULATOR_GROUP_GAP = 18;
-const GRAPH_TOP_PADDING = 128;
-const GRAPH_BOTTOM_PADDING = 176;
+const GRAPH_TOP_PADDING = 168;
+const GRAPH_BOTTOM_PADDING = 96;
 const BOX_STROKE = '#8c8c8c';
 const TRAIT_PORT_INSET = 22;
+const EDGE_TARGET_GAP = 28;
 
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
@@ -157,6 +158,32 @@ function effectColorFromGene(gene) {
     return EFFECT_COLORS[effectSignFromGene(gene)];
 }
 
+function programColor(program) {
+    if (program.colorKey && program.colorKey !== 'other') {
+        return PROGRAM_COLORS[program.colorKey] || PROGRAM_COLORS.other;
+    }
+    if (program.selectedByProgram && program.selectedByRegulator) return PROGRAM_COLORS.both_enriched;
+    if (program.selectedByProgram) return PROGRAM_COLORS.program_enriched;
+    if (program.selectedByRegulator) return PROGRAM_COLORS.regulator_enriched;
+    return PROGRAM_COLORS.other;
+}
+
+function displayColumnFromGene(gene) {
+    if (gene.displayColumn === 'left' || gene.displayColumn === 'right') {
+        return gene.displayColumn;
+    }
+
+    return effectSignFromGene(gene) === 'negative' ? 'right' : 'left';
+}
+
+function sortGenesWithinColumn(genes) {
+    return [...genes].sort((a, b) => {
+        const columnRankDelta = (a.displayColumnRank || Number.MAX_SAFE_INTEGER) - (b.displayColumnRank || Number.MAX_SAFE_INTEGER);
+        if (columnRankDelta !== 0) return columnRankDelta;
+        return (a.displayRank || Number.MAX_SAFE_INTEGER) - (b.displayRank || Number.MAX_SAFE_INTEGER);
+    });
+}
+
 function edgeColorFromScore(score) {
     return toFiniteNumber(score, 0) >= 0 ? EFFECT_COLORS.positive : EFFECT_COLORS.negative;
 }
@@ -185,17 +212,28 @@ function directionFromSign(sign, fallbackScore) {
 }
 
 function splitGenesByEffect(genes) {
-    return genes.reduce((columns, gene) => {
-        const sign = effectSignFromGene(gene);
-        if (sign === 'negative') columns.right.push(gene);
-        else columns.left.push(gene);
-        return columns;
+    const columns = genes.reduce((acc, gene) => {
+        const column = displayColumnFromGene(gene);
+        if (column === 'right') acc.right.push(gene);
+        else acc.left.push(gene);
+        return acc;
     }, { left: [], right: [] });
+
+    return {
+        left: sortGenesWithinColumn(columns.left),
+        right: sortGenesWithinColumn(columns.right),
+    };
+}
+
+function regulatorSignFromGene(gene) {
+    if (gene.displayBucket === 'negative_regulators') return 'negative';
+    if (gene.displayBucket === 'positive_regulators') return 'positive';
+    return gene.regulatorProgramSign === 'negative' ? 'negative' : 'positive';
 }
 
 function groupRegulatorGenesByBucket(genes) {
     const groups = genes.reduce((map, gene) => {
-        const regulatorSign = gene.regulatorProgramSign === 'negative' ? 'negative' : 'positive';
+        const regulatorSign = regulatorSignFromGene(gene);
         const bucket = `${regulatorSign}_regulators`;
         if (!map.has(bucket)) {
             map.set(bucket, {
@@ -220,9 +258,9 @@ function groupRegulatorGenesByBucket(genes) {
         });
 }
 
-function geneBoxHeight(columns) {
+function geneBoxHeight(columns, titleRows = 1) {
     const rows = Math.max(columns.left.length, columns.right.length, 1);
-    return 50 + (rows * GENE_ROW_H);
+    return (titleRows > 1 ? 78 : 52) + (rows * GENE_ROW_H);
 }
 
 function splitTextLines(value, maxChars = 22, maxLines = 2) {
@@ -290,12 +328,13 @@ function ArrowOrCap({
     direction,
     opacity = 1,
     width = 3,
+    targetGap = EDGE_TARGET_GAP,
 }) {
     const angle = Math.atan2(y2 - y1, x2 - x1);
     const headLength = 14;
     const headWidth = 9;
     const capHalf = 12;
-    const tip = edgeEndpoint(x1, y1, x2, y2, direction === 'arrow' ? 0 : 2);
+    const tip = edgeEndpoint(x1, y1, x2, y2, targetGap);
     const base = {
         x: tip.x - (Math.cos(angle) * headLength),
         y: tip.y - (Math.sin(angle) * headLength),
@@ -342,16 +381,20 @@ function ArrowOrCap({
 function EffectLegend({ x, y }) {
     return (
         <g>
-            <text x={x} y={y} fontSize="28" fontWeight="800" fill="#111">
-                Sign of effects, top genes
-            </text>
-            <rect x={x + 4} y={y + 24} width="28" height="28" rx="6" fill={EFFECT_COLORS.positive} />
-            <text x={x + 44} y={y + 47} fontSize="27" fill="#111">Positive</text>
-            <rect x={x + 4} y={y + 66} width="28" height="28" rx="6" fill={EFFECT_COLORS.negative} />
-            <text x={x + 44} y={y + 89} fontSize="27" fill="#111">Negative</text>
-            <text x={x - 52} y={y + 132} fontSize="24" fill="#111">
-                (x): genes discordant to the whole model
-            </text>
+            <text x={x} y={y} fontSize="20" fontWeight="900" fill="#111">Legend</text>
+            <text x={x + 78} y={y} fontSize="17" fontWeight="800" fill="#475467">Gene:</text>
+            <rect x={x + 132} y={y - 14} width="20" height="20" rx="5" fill={EFFECT_COLORS.positive} />
+            <text x={x + 160} y={y + 1} fontSize="17" fontWeight="700" fill="#111">post_mean +</text>
+            <rect x={x + 278} y={y - 14} width="20" height="20" rx="5" fill={EFFECT_COLORS.negative} />
+            <text x={x + 306} y={y + 1} fontSize="17" fontWeight="700" fill="#111">post_mean -</text>
+
+            <text x={x + 78} y={y + 30} fontSize="17" fontWeight="800" fill="#475467">Program:</text>
+            <rect x={x + 164} y={y + 16} width="20" height="20" rx="5" fill={PROGRAM_COLORS.program_enriched} />
+            <text x={x + 192} y={y + 31} fontSize="17" fontWeight="700" fill="#111">program</text>
+            <rect x={x + 270} y={y + 16} width="20" height="20" rx="5" fill={PROGRAM_COLORS.regulator_enriched} />
+            <text x={x + 298} y={y + 31} fontSize="17" fontWeight="700" fill="#111">regulator</text>
+            <rect x={x + 390} y={y + 16} width="20" height="20" rx="5" fill={PROGRAM_COLORS.both_enriched} />
+            <text x={x + 418} y={y + 31} fontSize="17" fontWeight="700" fill="#111">both</text>
         </g>
     );
 }
@@ -678,6 +721,7 @@ function buildModuleBlueprints(programs, side, filters, expandedPrograms) {
         const visibleGenes = expanded ? filteredGenes : filteredGenes.slice(0, maxGenes);
         const geneColumns = splitGenesByEffect(visibleGenes);
         const regulatorGroups = side === 'regulator' ? groupRegulatorGenesByBucket(visibleGenes) : null;
+        const titleRows = programDisplayLines(program, 19).length || 1;
         const regulatorGroupHeights = regulatorGroups
             ? regulatorGroups.reduce((acc, group) => {
                 acc[group.key] = geneBoxHeight(splitGenesByEffect(group.genes));
@@ -693,7 +737,7 @@ function buildModuleBlueprints(programs, side, filters, expandedPrograms) {
             ? 74
             : side === 'regulator'
                 ? Math.max(RIGHT_PROGRAM_H + 34, regulatorGroupsHeight)
-                : geneBoxHeight(geneColumns);
+                : geneBoxHeight(geneColumns, titleRows);
 
         return {
             ...program,
@@ -938,18 +982,19 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         height,
         textAnchor = 'start',
         selectedProgramName,
+        titleRows = 1,
     }) => {
         const columnGap = 12;
         const dividerX = x + (width / 2);
         const leftTextX = x + 14;
         const rightTextX = x + width - 14;
-        const startY = y + 52;
+        const rowStartY = y + (titleRows > 1 ? 78 : 52);
 
         const renderGene = (gene, column, index) => {
             const geneMatched = Boolean(selectedGeneKey) && gene.highlightKey === selectedGeneKey;
             const geneProgramSelected = selectedProgram === selectedProgramName;
             const geneMuted = (Boolean(selectedProgram) && !geneProgramSelected) || (Boolean(selectedGeneKey) && !geneMatched);
-            const rowY = startY + (index * GENE_ROW_H);
+            const rowY = rowStartY + (index * GENE_ROW_H);
             const textX = column === 'left'
                 ? (textAnchor === 'end' ? dividerX - columnGap : leftTextX)
                 : (textAnchor === 'end' ? rightTextX : dividerX + columnGap);
@@ -1016,13 +1061,14 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, leftLayout.modules.length);
         const boxHeight = module.height;
         const titleLines = programDisplayLines(module, 19);
+        const nodeColor = programColor(module);
 
         return (
             <g key={`${module.program}:program`}>
                 <ArrowOrCap
-                    x1={LEFT_PROGRAM_X + LEFT_PROGRAM_W + 6}
+                    x1={LEFT_PROGRAM_X + LEFT_PROGRAM_W}
                     y1={centerY}
-                    x2={traitLeftX - 8}
+                    x2={traitLeftX}
                     y2={traitTargetY}
                     color={edgeColorFromSign(module.programTraitSign, score)}
                     direction={direction}
@@ -1045,8 +1091,8 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         rx="6"
                         fill="#fff"
                         fillOpacity={muted ? 0.38 : 1}
-                        stroke={isProgramSelected ? '#111' : BOX_STROKE}
-                        strokeWidth={isProgramSelected ? 3 : 2.2}
+                        stroke={isProgramSelected ? '#111' : nodeColor}
+                        strokeWidth={isProgramSelected ? 3.2 : 2.6}
                     />
                     {titleLines.map((line, index) => (
                         <text
@@ -1073,6 +1119,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         height: boxHeight,
                         textAnchor: 'start',
                         selectedProgramName: module.program,
+                        titleRows: titleLines.length,
                     })}
                     <title>{formatProgramTooltip(module)}</title>
                 </g>
@@ -1109,7 +1156,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                     stroke={groupColor}
                     strokeWidth="2.6"
                 />
-                <text x={RIGHT_REGULATOR_X + 14} y={yTop + 28} fontSize="26" fontWeight="900" fill={groupColor}>
+                <text x={RIGHT_REGULATOR_X + 14} y={yTop + 28} fontSize="24" fontWeight="900" fill={groupColor}>
                     {group.title}
                 </text>
                 {group.genes.length ? renderGeneColumns({
@@ -1143,6 +1190,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         const traitRightX = TRAIT_CENTER_X + (TRAIT_NODE_W / 2);
         const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, rightLayout.modules.length);
         const programLines = programDisplayLines(module, 19);
+        const nodeColor = programColor(module);
         const groupLayouts = [];
         let cursorY = module.yTop;
         (module.regulatorGroups || []).forEach((group, index) => {
@@ -1159,9 +1207,9 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         return (
             <g key={`${module.program}:regulator`}>
                 <ArrowOrCap
-                    x1={RIGHT_PROGRAM_X - 8}
+                    x1={RIGHT_PROGRAM_X}
                     y1={programY}
-                    x2={traitRightX + 8}
+                    x2={traitRightX}
                     y2={traitTargetY}
                     color={edgeColorFromSign(module.programTraitSign, programScore)}
                     direction={directionFromSign(module.programTraitSign, programScore)}
@@ -1180,9 +1228,9 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                     return (
                         <ArrowOrCap
                             key={`${module.program}:${group.key}:edge`}
-                            x1={RIGHT_REGULATOR_X - 8}
+                            x1={RIGHT_REGULATOR_X}
                             y1={group.centerY}
-                            x2={RIGHT_PROGRAM_X + RIGHT_PROGRAM_W + 8}
+                            x2={RIGHT_PROGRAM_X + RIGHT_PROGRAM_W}
                             y2={programY + ((index - ((groupLayouts.length - 1) / 2)) * 14)}
                             color={bucketColor}
                             direction={bucketDirection}
@@ -1207,8 +1255,8 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         rx="5"
                         fill="#fff"
                         fillOpacity={muted ? 0.38 : 1}
-                        stroke={isProgramSelected ? '#111' : BOX_STROKE}
-                        strokeWidth={isProgramSelected ? 3 : 2}
+                        stroke={isProgramSelected ? '#111' : nodeColor}
+                        strokeWidth={isProgramSelected ? 3.2 : 2.4}
                     />
                     {programLines.map((line, index) => (
                         <text
@@ -1511,6 +1559,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                             <text x="8" y="62" className="section-title">
                                 program burden effects
                             </text>
+                            <EffectLegend x={394} y={38} />
                             <text
                                 x={RIGHT_PROGRAM_X}
                                 y="36"
@@ -1569,7 +1618,6 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                                 y={traitCenterY - 310}
                                 lines={['Directions determined by', 'program-trait and regulator-program signs']}
                             />
-                            <EffectLegend x={370} y={svgHeight - 140} />
                         </g>
                     </svg>
                 </Box>
