@@ -1,0 +1,18 @@
+export function scrollElementNearViewportCenter(element, options = {}) {
+    if (!element || typeof window === 'undefined') return;
+
+    const {
+        behavior = 'smooth',
+        viewportOffset = 0.12,
+    } = options;
+
+    const rect = element.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (!viewportHeight) return;
+
+    const targetTop = rect.top + window.scrollY - ((viewportHeight * 0.5) - (rect.height * 0.5)) - (viewportHeight * viewportOffset);
+    const maxTop = Math.max(0, document.documentElement.scrollHeight - viewportHeight);
+    const top = Math.min(Math.max(targetTop, 0), maxTop);
+
+    window.scrollTo({ top, behavior });
+}

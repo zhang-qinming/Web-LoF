@@ -7,10 +7,22 @@ import {
     Slider, FormControlLabel, Switch, Button, Dialog, DialogTitle,
     DialogContent, DialogActions, TextField, Chip, Paper,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
+import FloatingLegend from './FloatingLegend';
 import ProgramScatterTable from './ProgramScatterTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
+import { scrollElementNearViewportCenter } from '../utils/scroll';
+import {
+    chartLayoutTokens,
+    compactToggleGroupSx,
+    metricChipTone,
+    plotFrameSx,
+    summaryChipSx,
+    tableTone,
+    toolbarSx,
+} from '../themeUtils';
 
 const COLORS = {
     other: '#b8c0cc',
@@ -33,36 +45,11 @@ const CATEGORY_SIZE_SCALE = {
     regulator_enriched: 1.32,
     both_enriched: 1.55,
 };
-const TABLE_TONES = {
-    program: {
-        headerBg: '#fbf1d8',
-        headerBorder: '#e5c57b',
-        headerColor: '#9A5A00',
-        cellStrong: '#fcf6e8',
-        cellSoft: '#fdf9ef',
-        rankCell: '#f8ebc9',
-    },
-    regulator: {
-        headerBg: '#e4f1f8',
-        headerBorder: '#93bfd6',
-        headerColor: '#0B5C89',
-        cellStrong: '#eff7fb',
-        cellSoft: '#f7fbfd',
-        rankCell: '#dceef7',
-    },
-};
 
 const MODES = {
     SCATTER: 'scatter',
     RANK_PROG: 'rankProg',
     RANK_REG: 'rankReg',
-};
-
-const AXIS_STYLE = {
-    zeroline: true, zerolinewidth: 1.2, zerolinecolor: '#bbb',
-    showgrid: true, gridwidth: 0.5, gridcolor: '#eaeaea',
-    showline: true, linewidth: 1, linecolor: '#ccc',
-    ticks: 'inside', tickfont: { size: 13, color: '#666' },
 };
 
 const DEFAULT_TOP_N = 10;
@@ -150,12 +137,12 @@ function buildHoverText(item, key, info) {
         '',
         '<b>Program burden</b>',
         `Score: ${formatFixed(item.progScore, 3)}`,
-        `Rank: ${formatRank(item.rankProg)}  ·  P: ${formatPValue(item.progP)}`,
+        `Rank: ${formatRank(item.rankProg)} | P: ${formatPValue(item.progP)}`,
         `Gamma: ${formatFixed(item.progGamma, 4)}`,
         '',
         '<b>Regulator burden</b>',
         `Score: ${formatFixed(item.regScore, 3)}`,
-        `Rank: ${formatRank(item.rankReg)}  ·  P: ${formatPValue(item.regP)}`,
+        `Rank: ${formatRank(item.rankReg)} | P: ${formatPValue(item.regP)}`,
         `Beta: ${formatFixed(item.regBeta, 4)}`,
     ];
 
@@ -165,7 +152,7 @@ function buildHoverText(item, key, info) {
     }
     if (representativeTf) {
         if (!representativeGo) lines.push('', '<b>Representative annotations</b>');
-        lines.push(`TF: ${representativeTf}${representativeTfClass ? ` · ${representativeTfClass}` : ''}${info?.representative_tf_p ? ` (P ${info.representative_tf_p})` : ''}`);
+        lines.push(`TF: ${representativeTf}${representativeTfClass ? ` | ${representativeTfClass}` : ''}${info?.representative_tf_p ? ` (P ${info.representative_tf_p})` : ''}`);
     }
     if (markerCoexpression) {
         if (!representativeGo && !representativeTf) lines.push('', '<b>Representative annotations</b>');
@@ -191,6 +178,45 @@ const tdSx = (align, fontFamily, fontWeight, bgcolor) => ({
 });
 
 export default function ProgramScatter({ fileId }) {
+    const theme = useTheme();
+    const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
+    const tableTones = useMemo(() => ({
+        program: {
+            ...tableTone(theme, 'warning'),
+            rankCell: alpha(theme.palette.warning.main, 0.14),
+        },
+        regulator: {
+            ...tableTone(theme, 'primary'),
+            rankCell: alpha(theme.palette.primary.main, 0.12),
+        },
+    }), [theme]);
+    const axisStyle = useMemo(() => ({
+        zeroline: true,
+        zerolinewidth: 1.2,
+        zerolinecolor: chartTokens.axisSoft,
+        showgrid: true,
+        gridwidth: 0.5,
+        gridcolor: chartTokens.gridColor,
+        showline: true,
+        linewidth: 1,
+        linecolor: chartTokens.axisSoft,
+        ticks: 'inside',
+        tickfont: { size: 13, color: chartTokens.axisColor, family: theme.typography.fontFamily },
+    }), [chartTokens, theme.typography.fontFamily]);
+    const toolbarStyles = useMemo(() => toolbarSx(theme, { mb: 1.5 }), [theme]);
+    const compactToggleStyles = useMemo(() => compactToggleGroupSx(theme), [theme]);
+    const captionLabelSx = useMemo(() => ({
+        color: theme.palette.text.secondary,
+        fontSize: '0.72rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        fontWeight: 700,
+    }), [theme.palette.text.secondary]);
+    const sliderSx = useMemo(() => ({
+        color: theme.palette.primary.main,
+        '& .MuiSlider-thumb': { width: 14, height: 14 },
+        '& .MuiSlider-rail': { opacity: 0.25 },
+    }), [theme.palette.primary.main]);
     const navigate = useNavigate();
     const { data, error, isLoading } = useSWR(
         fileId ? `/api/programs/${fileId}` : null,
@@ -214,6 +240,7 @@ export default function ProgramScatter({ fileId }) {
     const [sortDir, setSortDir] = useState('desc');
     const [highlight, setHighlight] = useState({ program: null, key: 0 });
     const tableRowRefs = useRef({});
+    const tableSectionRef = useRef(null);
     const plotElRef = useRef(null);
 
     const onInitialized = useCallback((_figure, graphDiv) => {
@@ -285,8 +312,12 @@ export default function ProgramScatter({ fileId }) {
 
     useEffect(() => {
         if (!highlight.program || !tableOpen) return;
-        const el = tableRowRefs.current[highlight.program];
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const timeoutId = window.setTimeout(() => {
+            scrollElementNearViewportCenter(tableSectionRef.current, { viewportOffset: 0.08 });
+            const el = tableRowRefs.current[highlight.program];
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
+        return () => window.clearTimeout(timeoutId);
     }, [highlight, tableOpen]);
 
     const visibleRows = useMemo(() => rows.filter((item) => {
@@ -367,6 +398,14 @@ export default function ProgramScatter({ fileId }) {
         });
         return ct;
     }, [rows]);
+    const legendItems = useMemo(() => TRACE_ORDER
+        .filter((key) => counts[key] > 0)
+        .map((key) => ({
+            key,
+            label: LEGEND_LABELS[key],
+            color: COLORS[key],
+            count: counts[key],
+        })), [counts]);
 
     const bubbleSizeConfig = useMemo(() => {
         if (mode === MODES.SCATTER) return null;
@@ -487,15 +526,17 @@ export default function ProgramScatter({ fileId }) {
     const layout = useMemo(() => {
         const isRank = mode !== MODES.SCATTER;
         const xTitle = mode === MODES.RANK_REG
-            ? 'Regulator-burden correlation, signed −log₁₀(P)'
-            : 'Program burden effect, signed −log₁₀(P)';
-        const yTitle = isRank ? 'Rank' : 'Regulator-burden correlation, signed −log₁₀(P)';
+            ? 'Regulator-burden correlation, signed -log10(P)'
+            : 'Program burden effect, signed -log10(P)';
+        const yTitle = isRank ? 'Rank' : 'Regulator-burden correlation, signed -log10(P)';
+        const titleText = mode === MODES.SCATTER
+            ? 'Program x Regulator'
+            : (mode === MODES.RANK_PROG ? 'Program Rank' : 'Regulator Rank');
 
         return {
             title: {
-                text: `${mode === MODES.SCATTER ? 'Program × Regulator'
-                    : (mode === MODES.RANK_PROG ? 'Program Rank' : 'Regulator Rank')} — ${fileId || ''}`,
-                font: { size: 18, family: 'system-ui, -apple-system, sans-serif', color: '#333' },
+                text: `${titleText} - ${fileId || ''}`,
+                font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
                 x: 0.01,
             },
             transition: {
@@ -504,43 +545,31 @@ export default function ProgramScatter({ fileId }) {
                 ordering: 'traces first',
             },
             xaxis: {
-                ...AXIS_STYLE,
-                title: { text: xTitle, font: { size: 14 } },
+                ...axisStyle,
+                title: { text: xTitle, font: { size: 14, color: chartTokens.axisColor, family: theme.typography.fontFamily } },
                 range: axisRanges.x,
                 autorange: false,
                 fixedrange: false,
             },
             yaxis: {
-                ...AXIS_STYLE,
-                title: { text: yTitle, font: { size: 14 } },
+                ...axisStyle,
+                title: { text: yTitle, font: { size: 14, color: chartTokens.axisColor, family: theme.typography.fontFamily } },
                 range: axisRanges.y,
                 autorange: false,
                 fixedrange: false,
             },
             hovermode: 'closest',
             hoverlabel: {
-                bgcolor: 'rgba(255,255,255,0.98)',
-                bordercolor: '#cbd5e1',
-                font: { size: 12, color: '#1f2937' },
+                bgcolor: chartTokens.hoverBg,
+                bordercolor: chartTokens.hoverBorder,
+                font: { size: 12, color: theme.palette.text.primary, family: theme.typography.fontFamily },
                 align: 'left',
             },
             margin: { l: 80, r: 40, t: 60, b: 60 },
-            plot_bgcolor: '#fcfcfd',
-            paper_bgcolor: 'white',
-            showlegend: true,
+            plot_bgcolor: chartTokens.plotBg,
+            paper_bgcolor: chartTokens.paperBg,
+            showlegend: false,
             uirevision: 'program-scatter',
-            legend: {
-                title: { text: '' },
-                itemsizing: 'constant',
-                x: 0.02,
-                y: 0.98,
-                xanchor: 'left',
-                yanchor: 'top',
-                bgcolor: 'rgba(255,255,255,0.85)',
-                bordercolor: '#e0e0e0',
-                borderwidth: 1,
-                font: { size: 12, color: '#555' },
-            },
             shapes: mode === MODES.SCATTER ? [
                 {
                     type: 'line',
@@ -549,7 +578,7 @@ export default function ProgramScatter({ fileId }) {
                     x1: 1,
                     y0: 0,
                     y1: 0,
-                    line: { color: '#bbb', width: 1.2, dash: '6px,3px' },
+                    line: { color: chartTokens.axisSoft, width: 1.2, dash: '6px,3px' },
                     layer: 'below',
                 },
                 {
@@ -559,12 +588,12 @@ export default function ProgramScatter({ fileId }) {
                     y1: 1,
                     x0: 0,
                     x1: 0,
-                    line: { color: '#bbb', width: 1.2, dash: '6px,3px' },
+                    line: { color: chartTokens.axisSoft, width: 1.2, dash: '6px,3px' },
                     layer: 'below',
                 },
             ] : [],
         };
-    }, [axisRanges.x, axisRanges.y, fileId, mode]);
+    }, [axisRanges.x, axisRanges.y, axisStyle, chartTokens, fileId, mode, theme.palette.text.primary, theme.typography.fontFamily]);
 
     const doExport = useCallback(() => {
         const gd = exportGdRef.current;
@@ -599,9 +628,9 @@ export default function ProgramScatter({ fileId }) {
 
     if (!fileId) {
         return (
-            <Box sx={{ p: 6, textAlign: 'center' }}>
+            <Box sx={plotFrameSx(theme, { p: 6, textAlign: 'center' })}>
                 <Typography color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                    Select a trait to view program × regulator analysis
+                    Select a trait to view program x regulator analysis
                 </Typography>
             </Box>
         );
@@ -616,45 +645,17 @@ export default function ProgramScatter({ fileId }) {
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {rows.length > 0 && (
-                <Box sx={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    px: 2,
-                    py: 1.5,
-                    mb: 1.5,
-                    bgcolor: '#f9f9fb',
-                    borderRadius: 2,
-                    border: '1px solid #e8e8ec',
-                }}>
+                <Box sx={toolbarStyles}>
                     <ToggleButtonGroup
                         value={mode}
                         exclusive
                         size="small"
                         onChange={(_, value) => value && setMode(value)}
-                        sx={{
-                            '& .MuiToggleButton-root': {
-                                px: 1.8,
-                                py: 0.4,
-                                textTransform: 'none',
-                                fontWeight: 500,
-                                fontSize: '0.8rem',
-                                letterSpacing: 0.2,
-                                color: '#777',
-                                borderColor: '#ddd',
-                                '&.Mui-selected': {
-                                    color: '#222',
-                                    bgcolor: '#e8e8ee',
-                                    fontWeight: 600,
-                                },
-                                '&:hover': { bgcolor: '#f0f0f4' },
-                            },
-                        }}
+                        sx={compactToggleStyles}
                     >
                         <ToggleButton value={MODES.SCATTER}>Scatter</ToggleButton>
-                        <ToggleButton value={MODES.RANK_PROG}>Rank · Program</ToggleButton>
-                        <ToggleButton value={MODES.RANK_REG}>Rank · Regulator</ToggleButton>
+                        <ToggleButton value={MODES.RANK_PROG}>Rank | Program</ToggleButton>
+                        <ToggleButton value={MODES.RANK_REG}>Rank | Regulator</ToggleButton>
                     </ToggleButtonGroup>
 
                     <FormControlLabel
@@ -665,7 +666,7 @@ export default function ProgramScatter({ fileId }) {
                                 size="small"
                             />
                         )}
-                        label={<Typography variant="body2" sx={{ fontSize: '0.8rem', color: '#666' }}>Labels</Typography>}
+                        label={<Typography variant="body2" sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>Labels</Typography>}
                         sx={{ mr: 0 }}
                     />
 
@@ -673,13 +674,7 @@ export default function ProgramScatter({ fileId }) {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
                             <Typography
                                 variant="caption"
-                                sx={{
-                                    color: '#888',
-                                    fontSize: '0.72rem',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 0.8,
-                                    fontWeight: 500,
-                                }}
+                                sx={captionLabelSx}
                             >
                                 Top N
                             </Typography>
@@ -689,24 +684,12 @@ export default function ProgramScatter({ fileId }) {
                                 max={maxTopN}
                                 step={1}
                                 onChange={(_, value) => setTopN(Number(value))}
-                                sx={{
-                                    width: 110,
-                                    color: '#999',
-                                    '& .MuiSlider-thumb': { width: 14, height: 14 },
-                                    '& .MuiSlider-rail': { opacity: 0.25 },
-                                }}
+                                sx={{ ...sliderSx, width: 110 }}
                             />
                             <Chip
                                 label={`${effectiveTopN}/${maxTopN}`}
                                 size="small"
-                                sx={{
-                                    minWidth: 52,
-                                    height: 22,
-                                    fontSize: '0.72rem',
-                                    fontWeight: 600,
-                                    bgcolor: '#eee',
-                                    color: '#555',
-                                }}
+                                sx={summaryChipSx(theme, { minWidth: 52, height: 22, ...metricChipTone(theme, 'neutral') })}
                             />
                         </Box>
                     )}
@@ -714,13 +697,7 @@ export default function ProgramScatter({ fileId }) {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: mode !== MODES.SCATTER ? 0 : 1 }}>
                         <Typography
                             variant="caption"
-                            sx={{
-                                color: '#888',
-                                fontSize: '0.72rem',
-                                textTransform: 'uppercase',
-                                letterSpacing: 0.8,
-                                fontWeight: 500,
-                            }}
+                            sx={captionLabelSx}
                         >
                             Size
                         </Typography>
@@ -732,15 +709,10 @@ export default function ProgramScatter({ fileId }) {
                             onChange={(_, value) => mode === MODES.SCATTER
                                 ? setMarkerSize(Number(value))
                                 : setBubbleScale(Number(value))}
-                            sx={{
-                                width: 90,
-                                color: '#999',
-                                '& .MuiSlider-thumb': { width: 14, height: 14 },
-                                '& .MuiSlider-rail': { opacity: 0.25 },
-                            }}
+                            sx={{ ...sliderSx, width: 90 }}
                         />
-                        <Typography variant="caption" sx={{ color: '#999', fontSize: '0.72rem', minWidth: 28 }}>
-                            {mode === MODES.SCATTER ? markerSize : `${bubbleScale.toFixed(1)}×`}
+                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.72rem', minWidth: 28 }}>
+                            {mode === MODES.SCATTER ? markerSize : `${bubbleScale.toFixed(1)}x`}
                         </Typography>
                     </Box>
 
@@ -752,14 +724,13 @@ export default function ProgramScatter({ fileId }) {
                                 key={key}
                                 label={`${LEGEND_LABELS[key]}: ${counts[key]}`}
                                 size="small"
-                                sx={{
+                                sx={summaryChipSx(theme, {
                                     height: 22,
                                     fontSize: '0.7rem',
-                                    bgcolor: `${COLORS[key]}18`,
+                                    backgroundColor: alpha(COLORS[key], 0.1),
                                     color: COLORS[key],
-                                    border: `1px solid ${COLORS[key]}44`,
-                                    fontWeight: 500,
-                                }}
+                                    border: `1px solid ${alpha(COLORS[key], 0.28)}`,
+                                })}
                             />
                         ))}
                     </Box>
@@ -769,15 +740,10 @@ export default function ProgramScatter({ fileId }) {
             {(isLoading || rows.length > 0) && (
                 <Paper
                     variant="outlined"
-                    sx={{
+                    sx={plotFrameSx(theme, {
                         position: 'relative',
                         minHeight: isLoading || hasVisiblePoints ? 620 : undefined,
-                        border: '1px solid #e8e8ec',
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        bgcolor: '#fff',
-                        boxShadow: '0 10px 24px rgba(15,23,42,0.05)',
-                    }}
+                    })}
                 >
                     {isLoading && (
                         <Box sx={{
@@ -786,7 +752,7 @@ export default function ProgramScatter({ fileId }) {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            bgcolor: 'rgba(255,255,255,0.7)',
+                            bgcolor: chartTokens.overlay,
                             zIndex: 10,
                         }}>
                             <CircularProgress size={40} />
@@ -802,33 +768,43 @@ export default function ProgramScatter({ fileId }) {
                     )}
 
                     {hasVisiblePoints && (
-                        <Plot
-                            onInitialized={onInitialized}
-                            onUpdate={onUpdate}
-                            onClick={(evt) => {
-                                if (!evt?.points?.length) return;
-                                const program = evt.points[0].customdata?.[0];
-                                if (program) {
-                                    setHighlight((prev) => ({ program, key: prev.key + 1 }));
-                                    setTableOpen(true);
-                                }
-                            }}
-                            data={plotData}
-                            layout={layout}
-                            config={plotConfig}
-                            revision={plotRevision}
-                            useResizeHandler
-                            style={{ width: '100%', height: 620 }}
-                        />
+                        <>
+                            <Plot
+                                onInitialized={onInitialized}
+                                onUpdate={onUpdate}
+                                onClick={(evt) => {
+                                    if (!evt?.points?.length) return;
+                                    const program = evt.points[0].customdata?.[0];
+                                    if (program) {
+                                        setHighlight((prev) => ({ program, key: prev.key + 1 }));
+                                        setTableOpen(true);
+                                    }
+                                }}
+                                data={plotData}
+                                layout={layout}
+                                config={plotConfig}
+                                revision={plotRevision}
+                                useResizeHandler
+                                style={{ width: '100%', height: 620 }}
+                            />
+                            <FloatingLegend
+                                items={legendItems}
+                                title="Categories"
+                                width={{ expanded: 194, collapsed: 122 }}
+                                defaultPlacement="right"
+                                defaultTop={72}
+                                defaultSideOffset={10}
+                            />
+                        </>
                     )}
                 </Paper>
             )}
 
             <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
-                <DialogTitle>Export Plot</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>
                 <DialogContent>
                     <ToggleButtonGroup value={expFmt} exclusive size="small"
-                        onChange={(e, v) => v && setExpFmt(v)} sx={{ mb: 2 }}>
+                        onChange={(e, v) => v && setExpFmt(v)} sx={{ ...compactToggleStyles, mb: 2 }}>
                         <ToggleButton value="svg">SVG</ToggleButton>
                         <ToggleButton value="png">PNG</ToggleButton>
                     </ToggleButtonGroup>
@@ -857,9 +833,10 @@ export default function ProgramScatter({ fileId }) {
                 sortedRows={sortedRows}
                 highlight={highlight}
                 tableRowRefs={tableRowRefs}
+                tableSectionRef={tableSectionRef}
                 COLORS={COLORS}
                 LEGEND_LABELS={LEGEND_LABELS}
-                TABLE_TONES={TABLE_TONES}
+                TABLE_TONES={tableTones}
                 thSx={thSx}
                 tdSx={tdSx}
                 navigate={navigate}

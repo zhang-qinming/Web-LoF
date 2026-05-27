@@ -1,12 +1,22 @@
-# React + Vite
+# Frontend Notes
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Runtime
 
-Currently, two official plugins are available:
+- The frontend runs on the Linux cluster, typically at port `5173`.
+- The backend runs on the Linux cluster, typically at port `4000`.
+- Local Windows edits in `C:\Users\10553\WebstormProjects` are nearly real-time synced to the Linux cluster.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Default verification workflow
 
-## Expanding the ESLint configuration
+- Do not start local Windows frontend or backend dev servers by default.
+- Prefer Linux-side read-only verification over SSH:
+  - frontend: `curl -I http://127.0.0.1:5173`
+  - backend: call a real API route such as `curl http://127.0.0.1:4000/api/programs/info`
+- Do not use backend `GET /` as the only health signal. `404 Cannot GET /` can be normal for this Express app.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Local-only commands
+
+- `npm run lint`
+- `npm run build`
+
+Use local `npm run dev` only when the user explicitly asks for a local startup workflow.

@@ -4,7 +4,7 @@ const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
 const { normalizeSafeBaseNameList, parsePageOptions } = require('../lib/request');
-const { parseTsvStream, sampleTsvStream } = require('../lib/tsv');
+const { parseTsvStream } = require('../lib/tsv');
 const { findVariantFile } = require('../lib/variantFiles');
 
 const router = express.Router();
@@ -73,35 +73,26 @@ function toTsvRow(row) {
     };
 }
 
-async function readDelimitedTsv(fullPath, { sample = false } = {}) {
+async function readDelimitedTsv(fullPath) {
     const stat = await manhattanStore.stat(fullPath);
     if (!stat || !stat.isFile) return { rows: [], truncated: false, fileSize: 0 };
 
-    const cacheKey = `${fullPath}:${sample ? 'sample' : 'head'}`;
+    const cacheKey = `${fullPath}:all`;
     const cached = TSV_CACHE.get(cacheKey);
     if (cached && cached.mtimeMs === stat.mtimeMs) return cached.result;
 
     const stream = await manhattanStore.createReadStream(fullPath);
-    const parsed = sample
-        ? await sampleTsvStream(stream, { maxRows: config.data.maxManhattanRows })
-        : {
-            rows: await parseTsvStream(stream, { maxRows: config.data.maxManhattanRows + 1 }),
-            totalRows: null,
-            truncated: false,
-        };
-    const rawRows = parsed.rows || [];
-    const truncated = sample ? parsed.truncated : rawRows.length > config.data.maxManhattanRows;
+    const rawRows = await parseTsvStream(stream);
     const rows = rawRows
-        .slice(0, config.data.maxManhattanRows)
         .map(toTsvRow)
         .filter((row) => row.chr && row.bp != null && row.p != null);
     const result = {
         rows,
-        truncated,
-        rowLimit: config.data.maxManhattanRows,
+        truncated: false,
+        rowLimit: null,
         fileSize: stat.size,
-        sampling: sample ? 'reservoir' : 'head',
-        sourceRowCount: parsed.totalRows,
+        sampling: 'all',
+        sourceRowCount: rawRows.length,
     };
 
     TSV_CACHE.set(cacheKey, { mtimeMs: stat.mtimeMs, result });
@@ -119,22 +110,22 @@ async function getManhattanRows(fileIds, variant = 'hits', { readRows = true } =
                 rows: [],
                 exists: true,
                 truncated: false,
-                rowLimit: config.data.maxManhattanRows,
+                rowLimit: null,
                 fileSize: (stat && stat.size) || 0,
                 sampling: null,
                 sourceRowCount: null,
             };
         }
 
-        const result = await readDelimitedTsv(filePath, { sample: variant === 'full' });
+        const result = await readDelimitedTsv(filePath);
         return { filePath, fileName, exists: true, ...result };
     }
 
-    return { filePath: null, fileName: null, rows: [], exists: false, truncated: false, rowLimit: config.data.maxManhattanRows, fileSize: 0, sampling: null, sourceRowCount: null };
+    return { filePath: null, fileName: null, rows: [], exists: false, truncated: false, rowLimit: null, fileSize: 0, sampling: null, sourceRowCount: null };
 }
 
-function mergeManhattanRows(sampleRows, hitRows, maxRows) {
-    if (!hitRows.length) return sampleRows;
+function mergeManhattanRows(rows, hitRows) {
+    if (!hitRows.length) return rows;
 
     const merged = [];
     const seen = new Set();
@@ -146,8 +137,8 @@ function mergeManhattanRows(sampleRows, hitRows, maxRows) {
     };
 
     hitRows.forEach(addRow);
-    sampleRows.forEach(addRow);
-    return merged.slice(0, maxRows);
+    rows.forEach(addRow);
+    return merged;
 }
 
 function collectTopCounts(rows, key) {
@@ -249,7 +240,7 @@ router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
     const hitsResult = variant === 'hits' ? current : fallback || await getManhattanRows(lookupIds, 'hits');
     const fullResult = variant === 'full' ? current : await getManhattanRows(lookupIds, 'full', { readRows: false });
     const effectiveRows = current.exists
-        ? mergeManhattanRows(current.rows, variant === 'full' ? (fallback?.rows || []) : [], config.data.maxManhattanRows)
+        ? mergeManhattanRows(current.rows, variant === 'full' ? (fallback?.rows || []) : [])
         : (fallback?.rows || []);
     const usingFallback = !current.exists && variant === 'full' && Boolean(fallback?.exists);
 
@@ -266,7 +257,7 @@ router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
         },
         hasData: effectiveRows.length > 0,
         truncated: Boolean(current.exists ? current.truncated : fallback?.truncated),
-        rowLimit: current.exists ? current.rowLimit : (fallback?.rowLimit || config.data.maxManhattanRows),
+        rowLimit: current.exists ? current.rowLimit : (fallback?.rowLimit || null),
         fileSize: current.exists ? current.fileSize : (fallback?.fileSize || 0),
         sampling: current.exists ? current.sampling : (fallback?.sampling || null),
         sourceRowCount: current.exists ? current.sourceRowCount : (fallback?.sourceRowCount || null),

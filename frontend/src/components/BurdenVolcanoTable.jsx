@@ -14,7 +14,9 @@ import {
     TableRow,
     TableSortLabel,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
+import { highlightedRowSx, metricChipTone, plotFrameSx, sectionPanelHeaderSx, summaryChipSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
 function getColumnSpecs({ effectLabel = 'Beta', includePosteriorColumns = false } = {}) {
     const effectColumns = [
@@ -52,30 +54,6 @@ function getColumnGroups(includePosteriorColumns = false) {
     ];
 }
 
-const TONES = {
-    info: {
-        headerBg: '#f8fafc',
-        headerBorder: '#d9e2ec',
-        headerColor: '#475569',
-        cellSoft: '#fbfcfd',
-        cellStrong: '#f4f7fa',
-    },
-    effect: {
-        headerBg: '#edf3fb',
-        headerBorder: '#cad9ec',
-        headerColor: '#245089',
-        cellSoft: '#f8fbff',
-        cellStrong: '#f1f6fd',
-    },
-    annotation: {
-        headerBg: '#f5f3ff',
-        headerBorder: '#dfd4fb',
-        headerColor: '#5b3f86',
-        cellSoft: '#fbfaff',
-        cellStrong: '#f5f1ff',
-    },
-};
-
 const sortLabelSx = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -88,11 +66,8 @@ const sortLabelSx = {
     },
 };
 
-const ROW_HIGHLIGHT_BASE = '#fff1b8';
-const ROW_HIGHLIGHT_FLASH = '#ffe082';
-
 function headerCellSx(align, tone) {
-    const palette = TONES[tone];
+    const palette = tone;
     return {
         px: 1,
         py: 0.72,
@@ -107,7 +82,7 @@ function headerCellSx(align, tone) {
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
-    const palette = TONES[tone];
+    const palette = tone;
     return {
         px: 1,
         py: 0.62,
@@ -191,6 +166,12 @@ export default function BurdenVolcanoTable({
     effectLabel = 'Beta',
     includePosteriorColumns = false,
 }) {
+    const theme = useTheme();
+    const TONES = {
+        info: tableTone(theme, 'neutral'),
+        effect: tableTone(theme, 'primary'),
+        annotation: tableTone(theme, 'accent'),
+    };
     if (!rows.length) return null;
 
     const columnSpecs = getColumnSpecs({ effectLabel, includePosteriorColumns });
@@ -201,27 +182,24 @@ export default function BurdenVolcanoTable({
         <Paper
             ref={tableSectionRef}
             variant="outlined"
-            sx={{
+            sx={plotFrameSx(theme, {
                 mt: 2,
-                border: '1px solid #e8edf3',
                 borderRadius: 2,
                 overflow: 'hidden',
-                bgcolor: '#ffffff',
-                boxShadow: '0 10px 26px rgba(15,23,42,0.05)',
-            }}
+            })}
         >
-            <Box sx={{ display: 'flex', alignItems: 'center', px: 1.75, py: 1, bgcolor: '#fafbfc', borderBottom: tableOpen ? '1px solid #e9edf2' : 'none', gap: 1 }}>
+            <Box sx={sectionPanelHeaderSx(theme, { borderBottom: tableOpen ? `1px solid ${theme.custom.border.soft}` : 'none' })}>
                 <Button
                     onClick={() => setTableOpen((prev) => !prev)}
                     endIcon={tableOpen ? <ExpandLess /> : <ExpandMore />}
-                    sx={{ textTransform: 'none', color: '#334155', fontWeight: 600, fontSize: '0.8rem', px: 0.3 }}
+                    sx={{ textTransform: 'none', color: theme.palette.text.primary, fontWeight: 600, fontSize: '0.8rem', px: 0.3 }}
                 >
                     Data Table
                     {!tableOpen && (
                         <Chip
                             label={rows.length.toLocaleString()}
                             size="small"
-                            sx={{ ml: 1, height: 20, fontSize: '0.68rem', bgcolor: '#e9eef5', color: '#526171' }}
+                            sx={summaryChipSx(theme, { ml: 1, height: 20, fontSize: '0.68rem', ...metricChipTone(theme, 'neutral') })}
                         />
                     )}
                 </Button>
@@ -230,7 +208,7 @@ export default function BurdenVolcanoTable({
                     size="small"
                     startIcon={<Download />}
                     onClick={downloadCSV}
-                    sx={{ textTransform: 'none', fontSize: '0.74rem', color: '#475569' }}
+                    sx={{ textTransform: 'none', fontSize: '0.74rem', color: theme.palette.text.secondary }}
                 >
                     CSV
                 </Button>
@@ -292,9 +270,6 @@ export default function BurdenVolcanoTable({
                                 const isHighlighted = highlight.rowKey === row.rowKey;
                                 const absoluteIndex = (tablePage * tableRowsPerPage) + index;
                                 const even = absoluteIndex % 2 === 0;
-                                const flashAnimation = isHighlighted
-                                    ? `${highlight.key % 2 === 0 ? 'volcanoRowFlashA' : 'volcanoRowFlashB'} 1.15s ease-out`
-                                    : 'none';
 
                                 return (
                                     <TableRow
@@ -303,27 +278,8 @@ export default function BurdenVolcanoTable({
                                             if (el) tableRowRefs.current[row.rowKey] = el;
                                         }}
                                         sx={{
-                                            '@keyframes volcanoRowFlashA': {
-                                                '0%': { backgroundColor: ROW_HIGHLIGHT_FLASH },
-                                                '28%': { backgroundColor: '#ffef99' },
-                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
-                                            },
-                                            '@keyframes volcanoRowFlashB': {
-                                                '0%': { backgroundColor: '#ffd969' },
-                                                '28%': { backgroundColor: '#ffeb8a' },
-                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
-                                            },
-                                            bgcolor: isHighlighted ? ROW_HIGHLIGHT_BASE : (even ? '#ffffff' : '#fbfcfd'),
-                                            boxShadow: isHighlighted ? 'inset 0 0 0 1px rgba(217,119,6,0.18), 0 0 0 2px rgba(245,158,11,0.12)' : 'none',
-                                            '& td': {
-                                                backgroundColor: isHighlighted ? `${ROW_HIGHLIGHT_BASE} !important` : undefined,
-                                                transition: 'background-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease',
-                                                animation: flashAnimation,
-                                            },
-                                            '&:hover td': {
-                                                bgcolor: isHighlighted ? `${ROW_HIGHLIGHT_BASE} !important` : '#f3f6fa',
-                                                boxShadow: 'inset 0 -1px 0 rgba(226,232,240,0.78)',
-                                            },
+                                            ...tableRowRevealSx(theme, index),
+                                            ...highlightedRowSx(theme, isHighlighted, even, 'volcanoRowFlashA', 'volcanoRowFlashB', highlight.key),
                                         }}
                                     >
                                         {columnSpecs.map((column) => {

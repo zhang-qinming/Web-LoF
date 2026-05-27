@@ -4,24 +4,49 @@ const { buildOrderBy } = require('./utils');
 
 const ALLOWED_SORT = ['file_id', 'trait_name', 'gwas_id'];
 
-async function getTraits({ page = 1, limit = 20, sortBy = 'trait_name', order = 'ASC' } = {}) {
+function escapeLike(value) {
+    return String(value).replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+function normalizeSearch(value) {
+    const cleaned = String(value || '').trim();
+    return cleaned ? cleaned.slice(0, 200) : '';
+}
+
+async function getTraits({ page = 1, limit = 20, sortBy = 'trait_name', order = 'ASC', search = '' } = {}) {
     const orderBySql = buildOrderBy(sortBy, order, ALLOWED_SORT, 'trait_name');
     const p = Math.max(1, Number(page) || 1);
     const l = Math.max(1, Math.min(config.query.maxPageLimit, Number(limit) || 20));
     const offset = (p - 1) * l;
+    const searchText = normalizeSearch(search);
+    const where = ["trait_name IS NOT NULL", "trait_name != ''"];
+    const params = [];
+
+    if (searchText) {
+        const like = `%${escapeLike(searchText)}%`;
+        where.push(`(
+            trait_name LIKE ? ESCAPE '\\\\'
+            OR file_id LIKE ? ESCAPE '\\\\'
+            OR gwas_id LIKE ? ESCAPE '\\\\'
+        )`);
+        params.push(like, like, like);
+    }
+
+    const whereSql = `WHERE ${where.join(' AND ')}`;
 
     const [rows] = await pool.query(
         `SELECT file_id, gwas_id, trait_name
          FROM file_metadata
-         WHERE trait_name IS NOT NULL AND trait_name != ''
+         ${whereSql}
          ${orderBySql}
          LIMIT ? OFFSET ?`,
-        [l, offset]
+        [...params, l, offset]
     );
 
     const [[{ total }]] = await pool.query(
         `SELECT COUNT(*) AS total FROM file_metadata
-         WHERE trait_name IS NOT NULL AND trait_name != ''`
+         ${whereSql}`,
+        params
     );
 
     return {

@@ -6,8 +6,6 @@ import {
     Alert,
     Box,
     Button,
-    Card,
-    CardContent,
     Checkbox,
     Chip,
     CircularProgress,
@@ -27,6 +25,7 @@ import {
     ToggleButtonGroup,
     Typography,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
     Insights,
     Place,
@@ -38,8 +37,18 @@ import { getTraitManhattanHits } from '../api/gwas';
 import TraitHitManhattanLegend from './TraitHitManhattanLegend';
 import TraitHitManhattanTable from './TraitHitManhattanTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
+import { scrollElementNearViewportCenter } from '../utils/scroll';
+import {
+    chartLayoutTokens,
+    compactToggleGroupSx,
+    metricChipTone,
+    plotFrameSx,
+    summaryChipSx,
+    toolbarSx,
+} from '../themeUtils';
 
 const UNASSIGNED_COLOR = '#6f7d90';
+const FULL_BACKGROUND_CHROM_COLORS = ['#e58d2a', '#3b7fc4'];
 const DEFAULT_EXPORT_WIDTH = 1400;
 const DEFAULT_EXPORT_HEIGHT = 760;
 const PROGRAM_COLORS = [
@@ -55,7 +64,7 @@ const PROGRAM_COLORS = [
 const HOVER_TEMPLATE = [
     '<b>%{customdata[1]}</b>',
     'CHR %{customdata[2]}:%{customdata[3]}',
-    'P %{customdata[4]}  ·  -log₁₀(P) %{y:.2f}',
+    'P %{customdata[4]} | -log10(P) %{y:.2f}',
     'Nearest gene: %{customdata[5]}',
     'distance_to_gene: %{customdata[6]}',
     'Program: %{customdata[7]}',
@@ -63,7 +72,6 @@ const HOVER_TEMPLATE = [
     '<extra></extra>',
 ].join('<br>');
 
-const DENSE_POINT_ONLY_LIMIT = 200000;
 const CHROM_ORDER = [
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
     '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',
@@ -98,47 +106,6 @@ const CHROM_LENGTHS = {
 
 const CHROM_GAP = 3000000;
 const GWAS_HIT_LOGP = -Math.log10(5e-8);
-const TOOLBAR_SX = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 1.25,
-    px: 2,
-    py: 1.45,
-    bgcolor: '#f9f9fb',
-    borderRadius: 2,
-    border: '1px solid #e8e8ec',
-};
-
-const COMPACT_TOGGLE_SX = {
-    '& .MuiToggleButton-root': {
-        px: 1.75,
-        py: 0.42,
-        textTransform: 'none',
-        fontWeight: 500,
-        fontSize: '0.8rem',
-        letterSpacing: 0.2,
-        color: '#6b7280',
-        borderColor: '#d9dde3',
-        '&.Mui-selected': {
-            color: '#1f2937',
-            bgcolor: '#e9edf3',
-            fontWeight: 600,
-        },
-        '&:hover': {
-            bgcolor: '#f1f4f8',
-        },
-    },
-};
-
-const SUMMARY_CHIP_SX = {
-    height: 24,
-    fontSize: '0.72rem',
-    fontWeight: 600,
-    '& .MuiChip-icon': {
-        fontSize: 15,
-    },
-};
 
 function sanitizeFileNamePart(value) {
     return String(value || 'plot').replace(/[\\/:*?"<>|]+/g, '_');
@@ -216,7 +183,18 @@ function getProgramRoute(program) {
     return match ? `/programs/${match[0]}` : null;
 }
 
-export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
+export default function TraitHitManhattan({ fileId, gwasId }) {
+    const theme = useTheme();
+    const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
+    const toolbarStyles = useMemo(() => toolbarSx(theme), [theme]);
+    const compactToggleStyles = useMemo(() => compactToggleGroupSx(theme), [theme]);
+    const baseChipSx = useCallback((tone = 'neutral', overrides = {}) => (
+        summaryChipSx(theme, {
+            '& .MuiChip-icon': { fontSize: 15 },
+            ...metricChipTone(theme, tone),
+            ...overrides,
+        })
+    ), [theme]);
     const navigate = useNavigate();
     const tableRowRefs = useRef({});
     const plotRef = useRef(null);
@@ -273,8 +251,26 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     const resolvedVariant = payload?.resolvedVariant || variant;
     const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
     const isTruncated = Boolean(payload?.truncated);
-    const rowLimit = Number(payload?.rowLimit) || rows.length;
-    const sourceRowCount = Number(payload?.sourceRowCount) || null;
+    const shouldAutoSwitchToFull = (
+        !loading
+        && variant === 'hits'
+        && Boolean(payload?.availableVariants?.full)
+        && rows.length === 0
+    );
+
+    useEffect(() => {
+        if (!shouldAutoSwitchToFull) return;
+
+        setVariant('full');
+        setProgramOnly(false);
+        setSelectedGenesets([]);
+        setDistanceMode('all');
+        setSelectedChromosomes([]);
+        setSelectedPrograms([]);
+        setGeneQuery('');
+        setHighlight({ rowKey: '', key: 0 });
+        setTablePage(0);
+    }, [shouldAutoSwitchToFull]);
 
     const summary = payload?.summary || {
         totalRows: 0,
@@ -400,43 +396,43 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
 
     const colorField = colorMode === 'geneset' ? 'primaryGeneset' : 'primaryProgram';
     const colorModeTitle = colorMode === 'geneset' ? 'Genesets' : 'Programs';
-    const densePointOnlyMode = variantLabel === 'full' && processedRows.length > DENSE_POINT_ONLY_LIMIT;
     const colorMap = useMemo(() => (
-        densePointOnlyMode ? new Map() : buildCategoryColorMap(processedRows, colorField)
-    ), [colorField, densePointOnlyMode, processedRows]);
+        buildCategoryColorMap(processedRows, colorField)
+    ), [colorField, processedRows]);
+    const chromosomeIndexMap = useMemo(() => {
+        const map = {};
+        chromosomeRanges.forEach((range, index) => {
+            map[range.chrom] = index;
+        });
+        return map;
+    }, [chromosomeRanges]);
 
     const yAxisRange = useMemo(() => {
-        if (processedRows.length === 0) return [GWAS_HIT_LOGP - 0.3, GWAS_HIT_LOGP + 1.7];
+        if (processedRows.length === 0) return [0, GWAS_HIT_LOGP + 1.7];
         let minValue = Infinity;
         let maxValue = -Infinity;
         for (const item of processedRows) {
             if (item.logp < minValue) minValue = item.logp;
             if (item.logp > maxValue) maxValue = item.logp;
         }
-        const floor = Math.max(GWAS_HIT_LOGP - 0.35, Math.floor(minValue * 10) / 10 - 0.15);
-        const ceil = Math.max(floor + 0.9, Math.ceil(maxValue * 10) / 10 + 0.35);
-        return [floor, ceil];
-    }, [processedRows]);
 
-    const plotData = useMemo(() => {
-        if (densePointOnlyMode) {
-            return [{
-                x: processedRows.map((row) => row.genomePos),
-                y: processedRows.map((row) => row.logp),
-                mode: 'markers',
-                type: 'scattergl',
-                name: 'GWAS loci',
-                showlegend: false,
-                hoverinfo: 'skip',
-                marker: {
-                    size: 3.6,
-                    color: UNASSIGNED_COLOR,
-                    opacity: 0.36,
-                    line: { width: 0 },
-                },
-            }];
+        const ceil = Math.max(GWAS_HIT_LOGP + 0.35, Math.ceil(maxValue * 10) / 10 + 0.35);
+        if (variantLabel === 'full') {
+            const floor = Math.max(0, Math.floor(minValue * 10) / 10 - 0.15);
+            return [floor, Math.max(floor + 0.9, ceil)];
         }
 
+        const floor = Math.max(GWAS_HIT_LOGP - 0.35, Math.floor(minValue * 10) / 10 - 0.15);
+        return [floor, Math.max(floor + 0.9, ceil)];
+    }, [processedRows, variantLabel]);
+
+    const plotData = useMemo(() => {
+        const fullBackground = {
+            x: [],
+            y: [],
+            customdata: [],
+            colors: [],
+        };
         const unassigned = {
             x: [],
             y: [],
@@ -451,6 +447,15 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
 
         processedRows.forEach((row) => {
             const pointData = buildPointCustomdata(row);
+            if (variantLabel === 'full' && row.logp < GWAS_HIT_LOGP) {
+                const chromIndex = chromosomeIndexMap[row.normalizedChr] ?? 0;
+                fullBackground.x.push(row.genomePos);
+                fullBackground.y.push(row.logp);
+                fullBackground.customdata.push(pointData);
+                fullBackground.colors.push(FULL_BACKGROUND_CHROM_COLORS[chromIndex % FULL_BACKGROUND_CHROM_COLORS.length]);
+                return;
+            }
+
             if (row[colorField]) {
                 assigned.x.push(row.genomePos);
                 assigned.y.push(row.logp);
@@ -465,6 +470,25 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         });
 
         const traces = [];
+        if (fullBackground.x.length > 0) {
+            traces.push({
+                x: fullBackground.x,
+                y: fullBackground.y,
+                customdata: fullBackground.customdata,
+                mode: 'markers',
+                type: 'scattergl',
+                name: 'Below hit threshold',
+                showlegend: false,
+                hovertemplate: HOVER_TEMPLATE,
+                marker: {
+                    size: 5.2,
+                    color: fullBackground.colors,
+                    opacity: 0.52,
+                    line: { width: 0 },
+                },
+            });
+        }
+
         if (unassigned.x.length > 0) {
             traces.push({
                 x: unassigned.x,
@@ -504,18 +528,37 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         }
 
         return traces;
-    }, [colorField, colorMap, densePointOnlyMode, processedRows]);
+    }, [chromosomeIndexMap, colorField, colorMap, processedRows, variantLabel]);
 
     const legendItems = useMemo(() => {
-        if (densePointOnlyMode) return [];
-
         const counts = new Map();
+        const backgroundCounts = [0, 0];
         processedRows.forEach((row) => {
+            if (variantLabel === 'full' && row.logp < GWAS_HIT_LOGP) {
+                const chromIndex = chromosomeIndexMap[row.normalizedChr] ?? 0;
+                backgroundCounts[chromIndex % 2] += 1;
+                return;
+            }
             const key = row[colorField] || '__unassigned__';
             counts.set(key, (counts.get(key) || 0) + 1);
         });
 
         const items = [];
+        if (variantLabel === 'full' && (backgroundCounts[0] > 0 || backgroundCounts[1] > 0)) {
+            items.push({
+                key: '__below_threshold_odd__',
+                label: 'below threshold A',
+                count: backgroundCounts[0],
+                color: FULL_BACKGROUND_CHROM_COLORS[0],
+            });
+            items.push({
+                key: '__below_threshold_even__',
+                label: 'below threshold B',
+                count: backgroundCounts[1],
+                color: FULL_BACKGROUND_CHROM_COLORS[1],
+            });
+        }
+
         if (counts.has('__unassigned__')) {
             items.push({
                 key: '__unassigned__',
@@ -537,10 +580,9 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
             });
 
         return items;
-    }, [colorField, colorMap, densePointOnlyMode, processedRows]);
+    }, [chromosomeIndexMap, colorField, colorMap, processedRows, variantLabel]);
 
     const highlightedPoint = useMemo(() => {
-        if (densePointOnlyMode) return [];
         if (!highlight.rowKey) return [];
         const row = processedRows.find((item) => item.rowKey === highlight.rowKey);
         if (!row) return [];
@@ -554,55 +596,55 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
             marker: {
                 size: 16,
                 color: 'rgba(255,255,255,0)',
-                line: { width: 2.5, color: '#111827' },
+                line: { width: 2.5, color: theme.palette.text.primary },
                 symbol: 'circle-open',
             },
         }];
-    }, [densePointOnlyMode, highlight.rowKey, processedRows]);
+    }, [highlight.rowKey, processedRows, theme.palette.text.primary]);
 
     const layout = useMemo(() => ({
         title: {
-            text: `${traitLabel || fileId} — Manhattan`,
+            text: `${gwasId || fileId} - Manhattan`,
             x: 0.01,
-            font: { size: 18, family: 'system-ui, -apple-system, sans-serif', color: '#333' },
+            font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
         },
         xaxis: {
-            title: { text: 'Chromosome', font: { color: '#374151', size: 14, family: 'system-ui, -apple-system, sans-serif' } },
+            title: { text: 'Chromosome', font: { color: chartTokens.axisColor, size: 14, family: theme.typography.fontFamily } },
             tickmode: 'array',
             tickvals: chromosomeRanges.map((range) => range.mid),
             ticktext: chromosomeRanges.map((range) => range.chrom),
             showgrid: false,
             zeroline: false,
-            tickfont: { size: 12, color: '#666', family: 'system-ui, -apple-system, sans-serif' },
+            tickfont: { size: 12, color: chartTokens.axisSoft, family: theme.typography.fontFamily },
             range: [0, chromosomeRanges[chromosomeRanges.length - 1]?.end || 1],
             fixedrange: true,
             linewidth: 1,
-            linecolor: '#ccc',
+            linecolor: chartTokens.axisSoft,
         },
         yaxis: {
-            title: { text: '-log<sub>10</sub>(P)', font: { color: '#374151', size: 14, family: 'system-ui, -apple-system, sans-serif' } },
+            title: { text: '-log<sub>10</sub>(P)', font: { color: chartTokens.axisColor, size: 14, family: theme.typography.fontFamily } },
             showgrid: true,
-            gridcolor: 'rgba(156,163,175,0.15)',
+            gridcolor: chartTokens.gridColor,
             gridwidth: 0.5,
             zeroline: false,
-            tickfont: { size: 12, color: '#666', family: 'system-ui, -apple-system, sans-serif' },
+            tickfont: { size: 12, color: chartTokens.axisSoft, family: theme.typography.fontFamily },
             range: yAxisRange,
             linewidth: 1,
-            linecolor: '#ccc',
+            linecolor: chartTokens.axisSoft,
             ticks: 'outside',
             ticklen: 4,
-            tickcolor: '#ccc',
+            tickcolor: chartTokens.axisSoft,
         },
         hovermode: 'closest',
         hoverlabel: {
-            bgcolor: 'rgba(255,255,255,0.97)',
-            bordercolor: '#cbd5e1',
-            font: { size: 12, color: '#1f2937', family: 'system-ui, -apple-system, sans-serif' },
+            bgcolor: chartTokens.hoverBg,
+            bordercolor: chartTokens.hoverBorder,
+            font: { size: 12, color: theme.palette.text.primary, family: theme.typography.fontFamily },
             align: 'left',
         },
         showlegend: false,
-        paper_bgcolor: '#ffffff',
-        plot_bgcolor: '#fcfcfd',
+        paper_bgcolor: chartTokens.paperBg,
+        plot_bgcolor: chartTokens.plotBg,
         margin: { l: 80, r: 40, t: 62, b: 60 },
         shapes: [
             ...chromosomeRanges.flatMap((range, index) => ([
@@ -614,7 +656,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     x1: range.end,
                     y0: 0,
                     y1: 1,
-                    fillcolor: index % 2 === 0 ? 'rgba(241,245,249,0.72)' : 'rgba(255,255,255,0)',
+                    fillcolor: index % 2 === 0 ? chartTokens.band : 'rgba(255,255,255,0)',
                     line: { width: 0 },
                     layer: 'below',
                 },
@@ -627,7 +669,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 x1: 1,
                 y0: GWAS_HIT_LOGP,
                 y1: GWAS_HIT_LOGP,
-                line: { width: 1.5, color: '#ef4444', dash: 'dot' },
+                line: { width: 1.5, color: chartTokens.significance, dash: 'dot' },
                 layer: 'below',
             },
         ],
@@ -640,18 +682,17 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                 xanchor: 'right',
                 yanchor: 'bottom',
                 showarrow: false,
-                text: '<b>5×10⁻⁸</b>',
-                font: { size: 11, color: '#ef4444', family: 'system-ui, -apple-system, sans-serif' },
+                text: '<b>5e-8</b>',
+                font: { size: 11, color: chartTokens.significance, family: theme.typography.fontFamily },
             },
         ],
-    }), [chromosomeRanges, fileId, traitLabel, yAxisRange]);
+    }), [chartTokens, chromosomeRanges, fileId, gwasId, theme.palette.text.primary, theme.typography.fontFamily, yAxisRange]);
 
     const plotRevision = useMemo(() => JSON.stringify({
         highlightKey: highlight.key,
         rowCount: processedRows.length,
         variant,
-        densePointOnlyMode,
-    }), [densePointOnlyMode, highlight.key, processedRows.length, variant]);
+    }), [highlight.key, processedRows.length, variant]);
 
     const handleResetFilters = () => {
         setProgramOnly(false);
@@ -688,8 +729,6 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     const collator = useMemo(() => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), []);
 
     const sortedRows = useMemo(() => {
-        if (densePointOnlyMode) return [];
-
         const dir = sortDir === 'asc' ? 1 : -1;
         return [...processedRows].sort((a, b) => {
             if (['snp', 'nearestGene', 'normalizedChr', 'primaryProgram', 'primaryGeneset'].includes(sortBy)) {
@@ -700,26 +739,21 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
             if (av === bv) return 0;
             return av > bv ? dir : -dir;
         });
-    }, [collator, densePointOnlyMode, processedRows, sortBy, sortDir]);
+    }, [collator, processedRows, sortBy, sortDir]);
 
     const pagedRows = useMemo(() => {
-        if (densePointOnlyMode) return [];
-
         const start = tablePage * tableRowsPerPage;
         return sortedRows.slice(start, start + tableRowsPerPage);
-    }, [densePointOnlyMode, sortedRows, tablePage, tableRowsPerPage]);
+    }, [sortedRows, tablePage, tableRowsPerPage]);
 
     useEffect(() => {
-        if (densePointOnlyMode) return;
-
         const maxPage = Math.max(0, Math.ceil(sortedRows.length / tableRowsPerPage) - 1);
         if (tablePage > maxPage) {
             setTablePage(maxPage);
         }
-    }, [densePointOnlyMode, sortedRows.length, tablePage, tableRowsPerPage]);
+    }, [sortedRows.length, tablePage, tableRowsPerPage]);
 
     useEffect(() => {
-        if (densePointOnlyMode) return undefined;
         if (!highlight.rowKey || !tableOpen) return undefined;
         const rowIndex = sortedRows.findIndex((item) => item.rowKey === highlight.rowKey);
         if (rowIndex < 0) return;
@@ -731,17 +765,13 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         }
 
         const timeoutId = window.setTimeout(() => {
-            const tableSection = tableSectionRef.current;
-            if (tableSection) {
-                const top = tableSection.getBoundingClientRect().top + window.scrollY - 84;
-                window.scrollTo({ top, behavior: 'smooth' });
-            }
+            scrollElementNearViewportCenter(tableSectionRef.current, { viewportOffset: 0.08 });
             const el = tableRowRefs.current[highlight.rowKey];
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 180);
 
         return () => window.clearTimeout(timeoutId);
-    }, [densePointOnlyMode, highlight, sortedRows, tableOpen, tablePage, tableRowsPerPage]);
+    }, [highlight, sortedRows, tableOpen, tablePage, tableRowsPerPage]);
 
     const handleExport = useCallback(() => {
         const gd = plotRef.current;
@@ -754,8 +784,6 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
     }, [exportFmt, exportHeight, exportWidth, fileId, gwasId, variant]);
 
     const downloadCSV = useCallback(() => {
-        if (densePointOnlyMode) return;
-
         const cols = ['SNP', 'CHR', 'BP', 'P', '-log10(P)', 'Gene', 'distance_to_gene', 'Program', 'Geneset', 'Primary Program', 'Primary Geneset'];
         const header = cols.join(',');
         const body = processedRows.map((row) => [
@@ -765,7 +793,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
         ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
         const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
         downloadBlob(blob, `manhattan_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`);
-    }, [densePointOnlyMode, processedRows, gwasId, fileId, variantLabel]);
+    }, [processedRows, gwasId, fileId, variantLabel]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -783,18 +811,16 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={TOOLBAR_SX}>
+            <Box sx={toolbarStyles}>
                 <Box sx={{ minWidth: 220, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#64748b', mb: 0.35 }}>
+                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.35 }}>
                         Trait Manhattan
                     </Typography>
-                    <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: '#1f2937', lineHeight: 1.25 }}>
+                    <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.25 }}>
                         {variantLabel === 'full' ? 'All GWAS Loci Overview' : 'GWAS Hit Loci Overview'}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        {densePointOnlyMode
-                            ? 'Large full TSV point cloud mode: points only, with hover and click tracing disabled for performance.'
-                            : variantLabel === 'full'
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
+                        {variantLabel === 'full'
                             ? 'Program / Geneset coloring across the full GWAS TSV. Click a point to focus its table row.'
                             : 'Program / Geneset coloring for trait-associated loci. Click a point to focus its table row.'}
                     </Typography>
@@ -805,7 +831,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     size="small"
                     value={variant}
                     onChange={handleVariantChange}
-                    sx={COMPACT_TOGGLE_SX}
+                    sx={compactToggleStyles}
                 >
                     <ToggleButton value="hits">Hits TSV</ToggleButton>
                     <ToggleButton value="full" disabled={Boolean(payload) && !payload?.availableVariants?.full}>Full TSV</ToggleButton>
@@ -816,7 +842,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     size="small"
                     value={colorMode}
                     onChange={(_, value) => { if (value) setColorMode(value); }}
-                    sx={COMPACT_TOGGLE_SX}
+                    sx={compactToggleStyles}
                 >
                     <ToggleButton value="program">Program</ToggleButton>
                     <ToggleButton value="geneset">Geneset</ToggleButton>
@@ -826,60 +852,46 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     icon={<ScatterPlot sx={{ fontSize: 15 }} />}
                     label={`${summary.totalRows.toLocaleString()} ${isTruncated ? 'loaded' : (variantLabel === 'full' ? 'loci' : 'hits')}`}
                     size="small"
-                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' }}
+                    sx={baseChipSx('neutral')}
                 />
-                {isTruncated && (
-                    <Chip
-                        label={`Sampled ${rowLimit.toLocaleString()}`}
-                        size="small"
-                        sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#fff7ed', color: '#b45309', border: '1px solid #fed7aa', fontFamily: 'monospace' }}
-                    />
-                )}
-                {densePointOnlyMode && (
-                    <Chip
-                        label="Points only"
-                        size="small"
-                        sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#eef2f7', color: '#475569', border: '1px solid #cbd5e1', fontFamily: 'monospace' }}
-                    />
-                )}
                 <Chip
                     icon={<Insights sx={{ fontSize: 15 }} />}
                     label={`${summary.withProgram.toLocaleString()} with program`}
                     size="small"
-                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#edf6ff', color: '#245089', border: '1px solid #d6e7fb' }}
+                    sx={baseChipSx('primary')}
                 />
                 <Chip
                     icon={<Timeline sx={{ fontSize: 15 }} />}
                     label={`${summary.withGeneset.toLocaleString()} with geneset`}
                     size="small"
-                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#f5f3ff', color: '#5b3f86', border: '1px solid #e5ddfb' }}
+                    sx={baseChipSx('accent')}
                 />
                 <Chip
                     icon={<Place sx={{ fontSize: 15 }} />}
                     label={`${summary.distanceBuckets.in_gene.toLocaleString()} in gene`}
                     size="small"
-                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#eefbf3', color: '#2f6a49', border: '1px solid #d7eee0' }}
+                    sx={baseChipSx('success')}
                 />
                 <Chip
                     label={variantLabel === 'full' ? 'Full TSV' : 'Hits TSV'}
                     size="small"
-                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: variantLabel === 'full' ? '#ecfeff' : '#ffffff', color: '#0f766e', border: '1px solid #99f6e4', fontFamily: 'monospace' }}
+                    sx={baseChipSx(variantLabel === 'full' ? 'success' : 'subtle', { fontFamily: 'monospace' })}
                 />
                 <Chip
                     label={`GWAS ${gwasId || 'NA'}`}
                     size="small"
-                    sx={{ ...SUMMARY_CHIP_SX, bgcolor: '#ffffff', color: '#64748b', border: '1px solid #d9dde3', fontFamily: 'monospace' }}
+                    sx={baseChipSx('subtle', { fontFamily: 'monospace' })}
                 />
                 <Chip
                     label={`TSV ${compactFileName(payload?.fileName)}`}
                     title={payload?.fileName || 'No TSV matched on the backend'}
                     size="small"
-                    sx={{ ...SUMMARY_CHIP_SX, maxWidth: 280, bgcolor: '#ffffff', color: '#64748b', border: '1px solid #d9dde3', fontFamily: 'monospace' }}
+                    sx={baseChipSx('subtle', { maxWidth: 280, fontFamily: 'monospace' })}
                 />
             </Box>
 
-            <Box sx={TOOLBAR_SX}>
-                <FormControl size="small" sx={{ minWidth: 150, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}>
+            <Box sx={toolbarStyles}>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
                     <InputLabel id="chromosome-select-label">Chromosome</InputLabel>
                     <Select
                         labelId="chromosome-select-label"
@@ -898,7 +910,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     </Select>
                 </FormControl>
 
-                <FormControl size="small" sx={{ minWidth: 200, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
                     <InputLabel id="program-select-label">Program filter</InputLabel>
                     <Select
                         labelId="program-select-label"
@@ -917,7 +929,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     </Select>
                 </FormControl>
 
-                <FormControl size="small" sx={{ minWidth: 250, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}>
+                <FormControl size="small" sx={{ minWidth: 250 }}>
                     <InputLabel id="geneset-select-label">Geneset filter</InputLabel>
                     <Select
                         labelId="geneset-select-label"
@@ -936,7 +948,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     </Select>
                 </FormControl>
 
-                <FormControl size="small" sx={{ minWidth: 180, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
                     <InputLabel id="distance-mode-label">distance_to_gene</InputLabel>
                     <Select
                         labelId="distance-mode-label"
@@ -958,56 +970,53 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                     value={geneQuery}
                     onChange={(event) => setGeneQuery(event.target.value)}
                     placeholder="e.g. NADK or rs35301881"
-                    sx={{ width: 190, '& .MuiOutlinedInput-root': { bgcolor: '#fff' } }}
+                    sx={{ width: 190 }}
                 />
 
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', px: 1.1, py: 0.55, borderRadius: 2, border: '1px solid #d9dde3', bgcolor: programOnly ? '#eef2f7' : '#fff' }}>
+                <Box sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    px: 1.1,
+                    py: 0.55,
+                    borderRadius: 1,
+                    border: `1px solid ${programOnly ? alpha(theme.palette.primary.main, 0.28) : theme.custom.border.strong}`,
+                    bgcolor: programOnly ? alpha(theme.palette.primary.main, 0.08) : theme.palette.background.paper,
+                    transition: `background-color ${theme.custom.motion.swift}, border-color ${theme.custom.motion.swift}`,
+                }}>
                     <Checkbox checked={programOnly} onChange={(event) => setProgramOnly(event.target.checked)} sx={{ p: 0.3, mr: 0.4 }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.text.primary }}>
                         Program only
                     </Typography>
                 </Box>
 
-                <Button variant="text" startIcon={<RestartAlt />} onClick={handleResetFilters} sx={{ textTransform: 'none', color: '#475569', fontWeight: 600, minHeight: 38 }}>
+                <Button variant="text" startIcon={<RestartAlt />} onClick={handleResetFilters} sx={{ color: theme.palette.text.secondary, minHeight: 38 }}>
                     Reset filters
                 </Button>
 
-                <Typography sx={{ width: '100%', fontSize: '0.74rem', color: '#6b7280', lineHeight: 1.4 }}>
-                    <strong>distance_to_gene:</strong> 0 = in gene body; 100s–1000s bp = near; 10000+ bp = distal.
+                <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
+                    <strong>distance_to_gene:</strong> 0 = in gene body; hundreds or thousands bp = near; 10000+ bp = distal.
                 </Typography>
                 {isTruncated && (
-                    <Typography sx={{ width: '100%', fontSize: '0.74rem', color: '#9a3412', lineHeight: 1.4 }}>
-                        Full GWAS TSV is very large; the interactive plot renders a uniform sample of up to {rowLimit.toLocaleString()} rows
-                        {sourceRowCount ? ` from ${sourceRowCount.toLocaleString()} source rows` : ''}, plus matched hit rows when available.
-                    </Typography>
-                )}
-                {densePointOnlyMode && (
-                    <Typography sx={{ width: '100%', fontSize: '0.74rem', color: '#475569', lineHeight: 1.4 }}>
-                        More than {DENSE_POINT_ONLY_LIMIT.toLocaleString()} loci are loaded, so hover labels, click-to-table tracing, and category traces are disabled.
+                    <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.warning.dark, lineHeight: 1.4 }}>
+                        The backend marked this TSV response as truncated.
                     </Typography>
                 )}
             </Box>
 
-            <Card elevation={0} sx={{
-                border: '1px solid #e8e8ec',
-                borderRadius: 2,
-                overflow: 'hidden',
-                bgcolor: '#ffffff',
-                boxShadow: '0 10px 24px rgba(15,23,42,0.05)',
-            }}>
-                <CardContent sx={{ p: 0, position: 'relative' }}>
-                    {loading && (
+            <Box sx={plotFrameSx(theme, { position: 'relative' })}>
+                <Box sx={{ p: 0, position: 'relative' }}>
+                    {(loading || shouldAutoSwitchToFull) && (
                         <Box sx={{ minHeight: 620, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: '#6b7280' }}>
-                                    Loading Manhattan data from GWAS TSV...
+                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
+                                    {shouldAutoSwitchToFull ? 'Hits TSV is empty; loading Full TSV...' : 'Loading Manhattan data from GWAS TSV...'}
                                 </Typography>
                             </Box>
                         </Box>
                     )}
 
-                    {!loading && rows.length === 0 && (
+                    {!loading && !shouldAutoSwitchToFull && rows.length === 0 && (
                         <Box sx={{ minHeight: 460, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No Manhattan rows are currently available for this trait.</Typography>
@@ -1015,7 +1024,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                         </Box>
                     )}
 
-                    {!loading && rows.length > 0 && processedRows.length === 0 && (
+                    {!loading && !shouldAutoSwitchToFull && rows.length > 0 && processedRows.length === 0 && (
                         <Box sx={{ minHeight: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No loci match the current filters.</Typography>
@@ -1023,7 +1032,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                         </Box>
                     )}
 
-                    {!loading && processedRows.length > 0 && (
+                    {!loading && !shouldAutoSwitchToFull && processedRows.length > 0 && (
                         <Box sx={{ position: 'relative' }}>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}
@@ -1032,7 +1041,7 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                                 revision={plotRevision}
                                 onInitialized={onInitialized}
                                 onUpdate={onUpdate}
-                                onClick={densePointOnlyMode ? undefined : (evt) => {
+                                onClick={(evt) => {
                                     const rowKey = evt?.points?.[0]?.customdata?.[0];
                                     if (!rowKey) return;
                                     setHighlight((prev) => {
@@ -1046,47 +1055,44 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                                 useResizeHandler
                                 style={{ width: '100%', height: '620px' }}
                             />
-                            {!densePointOnlyMode && (
-                                <TraitHitManhattanLegend
-                                    items={legendItems}
-                                    collapsed={legendCollapsed}
-                                    onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
-                                    title={colorModeTitle}
-                                />
-                            )}
+                            <TraitHitManhattanLegend
+                                items={legendItems}
+                                collapsed={legendCollapsed}
+                                onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
+                                title={colorModeTitle}
+                            />
                         </Box>
                     )}
-                </CardContent>
-            </Card>
-            {!densePointOnlyMode && (
-                <TraitHitManhattanTable
-                    tableSectionRef={tableSectionRef}
-                    processedRows={processedRows}
-                    sortedRows={sortedRows}
-                    pagedRows={pagedRows}
-                    highlight={highlight}
-                    tableOpen={tableOpen}
-                    setTableOpen={setTableOpen}
-                    tablePage={tablePage}
-                    setTablePage={setTablePage}
-                    tableRowsPerPage={tableRowsPerPage}
-                    setTableRowsPerPage={setTableRowsPerPage}
-                    sortBy={sortBy}
-                    sortDir={sortDir}
-                    handleSort={handleSort}
-                    downloadCSV={downloadCSV}
-                    tableRowRefs={tableRowRefs}
-                    navigate={navigate}
-                    getProgramRoute={getProgramRoute}
-                    programColorMap={colorMap}
-                    formatDistance={formatDistance}
-                    formatP={formatP}
-                    gwasHitLogp={GWAS_HIT_LOGP}
-                />
-            )}
+                </Box>
+            </Box>
+            <TraitHitManhattanTable
+                tableSectionRef={tableSectionRef}
+                processedRows={processedRows}
+                sortedRows={sortedRows}
+                pagedRows={pagedRows}
+                highlight={highlight}
+                setHighlight={setHighlight}
+                tableOpen={tableOpen}
+                setTableOpen={setTableOpen}
+                tablePage={tablePage}
+                setTablePage={setTablePage}
+                tableRowsPerPage={tableRowsPerPage}
+                setTableRowsPerPage={setTableRowsPerPage}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                handleSort={handleSort}
+                downloadCSV={downloadCSV}
+                tableRowRefs={tableRowRefs}
+                navigate={navigate}
+                getProgramRoute={getProgramRoute}
+                programColorMap={colorMap}
+                formatDistance={formatDistance}
+                formatP={formatP}
+                gwasHitLogp={GWAS_HIT_LOGP}
+            />
 
-            <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: 700, color: '#111827', fontFamily: 'Inter, system-ui, sans-serif' }}>Export Plot</DialogTitle>
+            <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
+                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>
                 <DialogContent sx={{ pt: 1 }}>
                     <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
                         <TextField label="Width" type="number" size="small" value={exportWidth} onChange={(event) => setExportWidth(event.target.value)} />
@@ -1097,18 +1103,15 @@ export default function TraitHitManhattan({ fileId, gwasId, traitLabel }) {
                         size="small"
                         value={exportFmt}
                         onChange={(_, v) => { if (v) setExportFmt(v); }}
-                        sx={{
-                            '& .MuiToggleButton-root': { textTransform: 'none', px: 2.5 },
-                            '& .Mui-selected': { bgcolor: '#111827 !important', color: '#fff !important' },
-                        }}
+                        sx={compactToggleStyles}
                     >
                         <ToggleButton value="svg">SVG</ToggleButton>
                         <ToggleButton value="png">PNG</ToggleButton>
                     </ToggleButtonGroup>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setExportOpen(false)} sx={{ textTransform: 'none', color: '#6b7280' }}>Cancel</Button>
-                    <Button variant="contained" onClick={() => { handleExport(); setExportOpen(false); }} sx={{ textTransform: 'none', bgcolor: '#111827', '&:hover': { bgcolor: '#1f2937' } }}>Export</Button>
+                    <Button onClick={() => setExportOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={() => { handleExport(); setExportOpen(false); }}>Export</Button>
                 </DialogActions>
             </Dialog>
         </Box>

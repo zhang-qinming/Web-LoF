@@ -85,7 +85,6 @@ const config = {
         maxTsvFileBytes: parseBytes(process.env.DATA_MAX_TSV_FILE_BYTES, 100 * 1024 ** 2),
         maxTsvRows: parseInteger(process.env.DATA_MAX_TSV_ROWS, 200000, { min: 1000 }),
         maxManhattanFileBytes: parseBytes(process.env.MANHATTAN_MAX_FILE_BYTES, 200 * 1024 ** 2),
-        maxManhattanRows: parseInteger(process.env.MANHATTAN_MAX_ROWS, 500000, { min: 1000 }),
     },
 };
 

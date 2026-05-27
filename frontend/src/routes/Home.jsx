@@ -6,13 +6,14 @@ import {
     ListItemText, ClickAwayListener, Chip, CircularProgress, IconButton,
     Divider, LinearProgress, Skeleton, Stack,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
     Search, Folder, InsertDriveFile, ArrowForward,
     Close, FileDownload, Dns, Science, Storage,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { downloadDataPaths } from '../utils/download';
+import { captionSx, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
 
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const SEARCH_CACHE = new Map();
@@ -72,6 +73,7 @@ const stats = [
 ];
 
 export default function Home() {
+    const theme = useTheme();
     const navigate = useNavigate();
     const [q, setQ] = useState('');
     const [results, setResults] = useState([]);
@@ -245,26 +247,24 @@ export default function Home() {
     return (
         <Box sx={{ maxWidth: 1180, mx: 'auto', py: { xs: 3, md: 4 }, px: { xs: 1.5, md: 2 } }}>
             <Box sx={{ mb: 2.5 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: '#1f2937', mb: 0.6 }}>
+                <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0.6 })}>
                     GWAS Data Browser
                 </Typography>
-                <Typography variant="body1" sx={{ color: '#5b6472', maxWidth: 900, lineHeight: 1.7 }}>
+                <Typography variant="body1" sx={captionSx(theme, { maxWidth: 900, lineHeight: 1.7 })}>
                     Search study-associated files and directories by filename, GCST accession, or program label.
                     Use the home search for quick lookup, then continue in the full Data Browser for browsing and download.
                 </Typography>
             </Box>
 
             <Paper elevation={0} sx={{
-                border: '1px solid rgba(15,23,36,0.08)',
-                borderRadius: 2.5,
+                ...panelSx(theme, { borderRadius: 3 }),
                 overflow: 'visible',
-                bgcolor: '#fff',
             }}>
-                <Box sx={{ px: { xs: 1.5, md: 2 }, py: { xs: 1.5, md: 1.8 }, borderBottom: '1px solid #eef2f7' }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1f2937', mb: 0.4 }}>
+                <Box sx={{ px: { xs: 1.5, md: 2 }, py: { xs: 1.5, md: 1.8 }, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
+                    <Typography variant="subtitle1" sx={sectionTitleSx(theme, { fontSize: '1rem', mb: 0.4 })}>
                         File Search
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#6b7280', mb: 1.3 }}>
+                    <Typography variant="body2" sx={captionSx(theme, { mb: 1.3 })}>
                         Search returns both files and folders. File selections download directly; folder hits can be opened or downloaded as ZIP.
                     </Typography>
 
@@ -299,18 +299,18 @@ export default function Home() {
                                             </IconButton>
                                         )),
                                     sx: {
-                                        bgcolor: '#fff',
-                                        '& fieldset': { borderColor: '#d7dde6' },
-                                        '&:hover fieldset': { borderColor: '#b8c2cf' },
+                                        bgcolor: theme.palette.background.paper,
+                                        '& fieldset': { borderColor: theme.custom.border.strong },
+                                        '&:hover fieldset': { borderColor: 'rgba(100, 116, 139, 0.34)' },
                                     },
                                 }}
                                 helperText={helperText}
                             />
 
                             <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
-                                <Chip label="Files and folders" size="small" variant="outlined" sx={{ borderColor: '#d8e2ee', color: '#4b5563' }} />
-                                <Chip label="ZIP for >10 files" size="small" variant="outlined" sx={{ borderColor: '#d8e2ee', color: '#4b5563' }} />
-                                <Chip label="Enter to open full results" size="small" variant="outlined" sx={{ borderColor: '#d8e2ee', color: '#4b5563' }} />
+                                <Chip label="Files and folders" size="small" variant="outlined" sx={summaryChipSx(theme)} />
+                                <Chip label="ZIP for >10 files" size="small" variant="outlined" sx={summaryChipSx(theme)} />
+                                <Chip label="Enter to open full results" size="small" variant="outlined" sx={summaryChipSx(theme)} />
                             </Stack>
 
                             {panelOpen && (
@@ -322,9 +322,9 @@ export default function Home() {
                                     zIndex: 20,
                                     overflow: 'hidden',
                                     borderRadius: 2,
-                                    border: '1px solid #dbe3ec',
-                                    boxShadow: '0 10px 28px rgba(15,23,36,0.10)',
-                                    bgcolor: '#fff',
+                                    border: `1px solid ${theme.custom.border.strong}`,
+                                    boxShadow: theme.custom.shadow.float,
+                                    bgcolor: theme.palette.background.paper,
                                 }}>
                                     {(loading || downloading) && <LinearProgress sx={loadingBarSx} />}
                                     <Box sx={{
@@ -335,14 +335,14 @@ export default function Home() {
                                         justifyContent: 'space-between',
                                         gap: 1,
                                         flexWrap: 'wrap',
-                                        bgcolor: '#f8fafc',
-                                        borderBottom: '1px solid #edf2f7',
+                                        bgcolor: theme.custom.surface.subtle,
+                                        borderBottom: `1px solid ${theme.custom.border.soft}`,
                                     }}>
                                         <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
-                                            <Chip label={resultsSummary} size="small" sx={{ bgcolor: '#eef2f7', color: '#475569' }} />
-                                            <Chip label={`${fileResults.length} files`} size="small" sx={{ bgcolor: '#eef4ff', color: '#315ea8' }} />
+                                            <Chip label={resultsSummary} size="small" sx={summaryChipSx(theme)} />
+                                            <Chip label={`${fileResults.length} files`} size="small" sx={summaryChipSx(theme, { color: theme.palette.primary.dark, backgroundColor: theme.custom.surface.accent })} />
                                             {folderResults.length > 0 && (
-                                                <Chip label={`${folderResults.length} folders`} size="small" sx={{ bgcolor: '#eef2f7', color: '#475569' }} />
+                                                <Chip label={`${folderResults.length} folders`} size="small" sx={summaryChipSx(theme)} />
                                             )}
                                         </Stack>
                                         <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
@@ -409,8 +409,8 @@ export default function Home() {
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             gap: 1,
-                                                            bgcolor: '#fbfcfd',
-                                                            borderBottom: '1px solid #eef2f7',
+                                                            bgcolor: theme.custom.surface.subtle,
+                                                            borderBottom: `1px solid ${theme.custom.border.soft}`,
                                                         }}>
                                                             <Checkbox
                                                                 size="small"
@@ -419,7 +419,7 @@ export default function Home() {
                                                                 indeterminate={someFilesChecked}
                                                                 onChange={toggleAllFiles}
                                                             />
-                                                            <Typography variant="overline" sx={{ fontWeight: 700, color: '#6b7280', letterSpacing: '0.08em' }}>
+                                                            <Typography variant="overline" sx={{ fontWeight: 700, color: theme.palette.text.secondary, letterSpacing: '0.08em' }}>
                                                                 Files
                                                             </Typography>
                                                         </Box>
@@ -431,8 +431,9 @@ export default function Home() {
                                                                     px: 1.75,
                                                                     py: 1,
                                                                     alignItems: 'center',
-                                                                    borderBottom: '1px solid #f4f6f8',
-                                                                    '&:hover': { bgcolor: '#fafbfd' },
+                                                                    borderBottom: `1px solid ${theme.custom.border.soft}`,
+                                                                    transition: `background-color ${theme.custom.motion.swift}`,
+                                                                    '&:hover': { bgcolor: theme.custom.surface.subtle },
                                                                 }}
                                                             >
                                                                 <Checkbox
@@ -454,12 +455,12 @@ export default function Home() {
                                                                     primaryTypographyProps={{
                                                                         fontSize: '0.84rem',
                                                                         fontWeight: 600,
-                                                                        color: '#1f2937',
+                                                                        color: theme.palette.text.primary,
                                                                         title: item.name,
                                                                     }}
                                                                     secondaryTypographyProps={{
                                                                         fontSize: '0.73rem',
-                                                                        color: '#6b7280',
+                                                                        color: theme.palette.text.secondary,
                                                                         noWrap: true,
                                                                         title: item.path,
                                                                     }}
@@ -468,7 +469,7 @@ export default function Home() {
                                                                     <Chip
                                                                         label={fmtSize(item.size)}
                                                                         size="small"
-                                                                        sx={{ fontSize: '0.66rem', height: 22, bgcolor: '#f8fafc', color: '#4b5563' }}
+                                                                        sx={summaryChipSx(theme)}
                                                                     />
                                                                     <IconButton
                                                                         size="small"
@@ -481,8 +482,8 @@ export default function Home() {
                                                                                 .finally(() => setDownloading(false));
                                                                         }}
                                                                         sx={{
-                                                                            color: '#315ea8',
-                                                                            '&:hover': { bgcolor: '#eff4fb' },
+                                                                            color: theme.palette.primary.dark,
+                                                                            '&:hover': { bgcolor: theme.custom.surface.accent },
                                                                         }}
                                                                     >
                                                                         <FileDownload sx={{ fontSize: 16 }} />
@@ -499,10 +500,10 @@ export default function Home() {
                                                         <Box sx={{
                                                             px: 2,
                                                             py: 0.8,
-                                                            bgcolor: '#fbfcfd',
-                                                            borderBottom: '1px solid #eef2f7',
+                                                            bgcolor: theme.custom.surface.subtle,
+                                                            borderBottom: `1px solid ${theme.custom.border.soft}`,
                                                         }}>
-                                                            <Typography variant="overline" sx={{ fontWeight: 700, color: '#6b7280', letterSpacing: '0.08em' }}>
+                                                            <Typography variant="overline" sx={{ fontWeight: 700, color: theme.palette.text.secondary, letterSpacing: '0.08em' }}>
                                                                 Folders
                                                             </Typography>
                                                         </Box>
@@ -514,8 +515,9 @@ export default function Home() {
                                                                     px: 1.75,
                                                                     py: 1,
                                                                     alignItems: 'center',
-                                                                    borderBottom: '1px solid #f4f6f8',
-                                                                    '&:hover': { bgcolor: '#fafbfd' },
+                                                                    borderBottom: `1px solid ${theme.custom.border.soft}`,
+                                                                    transition: `background-color ${theme.custom.motion.swift}`,
+                                                                    '&:hover': { bgcolor: theme.custom.surface.subtle },
                                                                 }}
                                                             >
                                                                 <Box sx={{ width: 30, mr: 0.8 }} />
@@ -528,12 +530,12 @@ export default function Home() {
                                                                     primaryTypographyProps={{
                                                                         fontSize: '0.84rem',
                                                                         fontWeight: 600,
-                                                                        color: '#1f2937',
+                                                                        color: theme.palette.text.primary,
                                                                         title: item.name,
                                                                     }}
                                                                     secondaryTypographyProps={{
                                                                         fontSize: '0.73rem',
-                                                                        color: '#6b7280',
+                                                                        color: theme.palette.text.secondary,
                                                                         noWrap: true,
                                                                         title: item.path,
                                                                     }}
@@ -542,7 +544,7 @@ export default function Home() {
                                                                     <Chip
                                                                         label="Open folder"
                                                                         size="small"
-                                                                        sx={{ fontSize: '0.66rem', height: 22, bgcolor: '#f3f6f9', color: '#4b5563' }}
+                                                                        sx={summaryChipSx(theme)}
                                                                     />
                                                                     <IconButton
                                                                         size="small"
@@ -555,8 +557,8 @@ export default function Home() {
                                                                                 .finally(() => setDownloading(false));
                                                                         }}
                                                                         sx={{
-                                                                            color: '#e67e22',
-                                                                            '&:hover': { bgcolor: '#fef7ed' },
+                                                                            color: theme.palette.warning.main,
+                                                                            '&:hover': { bgcolor: 'rgba(180, 83, 9, 0.08)' },
                                                                         }}
                                                                     >
                                                                         <FileDownload sx={{ fontSize: 16 }} />
@@ -575,10 +577,10 @@ export default function Home() {
                                             textAlign: 'center',
                                         }}>
                                             <Search sx={{ fontSize: 30, color: '#cbd5e1', mb: 1 }} />
-                                            <Typography sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>
+                                            <Typography sx={{ fontWeight: 700, color: theme.palette.text.primary, mb: 0.5 }}>
                                                 No matches for "{trimmedQ}"
                                             </Typography>
-                                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                                                 Try a shorter filename fragment, a GCST accession, or continue in the full Data Browser.
                                             </Typography>
                                         </Box>
@@ -601,12 +603,18 @@ export default function Home() {
                             key={item.label}
                             elevation={0}
                             sx={{
-                                borderRadius: 2,
-                                border: '1px solid rgba(15,23,36,0.08)',
-                                boxShadow: 'none',
+                                ...panelSx(theme, { borderRadius: 2.5, boxShadow: 'none' }),
                             }}
                         >
-                            <CardActionArea onClick={() => navigate(item.to)}>
+                            <CardActionArea
+                                onClick={() => navigate(item.to)}
+                                sx={{
+                                    transition: `background-color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
+                                    '&:hover .home-stat-icon': {
+                                        transform: 'translateY(-1px) scale(1.04)',
+                                    },
+                                }}
+                            >
                                 <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.25, py: 1.8 }}>
                                     <Box sx={{
                                         width: 42,
@@ -617,14 +625,15 @@ export default function Home() {
                                         bgcolor: alpha(item.color, 0.10),
                                         color: item.color,
                                         flexShrink: 0,
-                                    }}>
+                                        transition: `transform ${theme.custom.motion.swift}`,
+                                    }} className="home-stat-icon">
                                         {item.icon}
                                     </Box>
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937', lineHeight: 1.05 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.05 }}>
                                             {item.value}
                                         </Typography>
-                                        <Typography variant="body2" sx={{ color: '#6b7280', mt: 0.2 }}>
+                                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mt: 0.2 }}>
                                             {item.label}
                                         </Typography>
                                     </Box>

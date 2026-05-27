@@ -4,21 +4,20 @@ import {
     Box, Typography, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, TableSortLabel, Paper, Skeleton,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import GeneRegulation from '../components/GeneRegulation';
-
-const thSx = {
-    bgcolor: '#f8f9fb', fontWeight: 700, fontSize: '0.75rem',
-    color: '#666', borderBottom: '2px solid #e8eaed', py: 1, px: 1.5,
-    textTransform: 'uppercase', letterSpacing: '0.03em', position: 'sticky', top: 0, zIndex: 1,
-};
+import { PageFrame } from '../components/PageScaffold';
+import { panelSx, sectionTitleSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
 function numSort(a, b) {
     return (parseInt(String(a).replace(/\D/g, '')) || 0) - (parseInt(String(b).replace(/\D/g, '')) || 0);
 }
 
 export default function Programs() {
+    const theme = useTheme();
+    const neutralTone = tableTone(theme, 'neutral');
     const { programId } = useParams();
     const navigate = useNavigate();
     const { data: info, isLoading: loading } = useSWR('/api/programs/info', fetcher, {
@@ -51,8 +50,8 @@ export default function Programs() {
     if (programId) {
         const regId = programId.replace(/^P/i, '');
         return (
-            <Box sx={{ p: 3 }}>
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>Program {programId}</Typography>
+            <Box sx={{ width: '100%', maxWidth: 1440, mx: 'auto', px: { xs: 1, sm: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
+                <Typography variant="h5" sx={sectionTitleSx(theme, { mb: 1.25 })}>Program {programId}</Typography>
                 <GeneRegulation programId={regId} programs={programs}
                     onProgramChange={(id) => navigate(`/programs/P${id}`)} />
             </Box>
@@ -70,36 +69,54 @@ export default function Programs() {
     ));
 
     return (
-        <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3, height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5, flexShrink: 0 }}>
-                Program Annotations
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, flexShrink: 0 }}>
-                Biological annotations and gene sets for cNMF programs
-            </Typography>
-
-            <Paper elevation={0} sx={{
-                border: '1px solid rgba(0,0,0,.06)', borderRadius: 2,
+        <PageFrame
+            title="Program Annotations"
+            subtitle="Biological annotations and gene sets for cNMF programs"
+            maxWidth={1200}
+            compact
+            sx={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}
+        >
+            <Paper elevation={0} sx={panelSx(theme, {
                 overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column',
-            }}>
+            })}>
                 <TableContainer sx={{ flex: 1 }}>
                     <Table stickyHeader size="small">
                         <TableHead>
                             <TableRow>
-                                <TableCell sx={{ ...thSx, width: 80 }}>
+                                <TableCell sx={{
+                                    bgcolor: neutralTone.headerBg, fontWeight: 700, fontSize: '0.75rem',
+                                    color: neutralTone.headerColor, borderBottom: `2px solid ${neutralTone.headerBorder}`, py: 1, px: 1.5,
+                                    textTransform: 'uppercase', letterSpacing: '0.03em', position: 'sticky', top: 0, zIndex: 1, width: 80,
+                                }}>
                                     <TableSortLabel active={sortBy === 'program'} direction={sortDir}
                                         onClick={() => handleSort('program')}>Program</TableSortLabel>
                                 </TableCell>
-                                <TableCell sx={{ ...thSx }}>
+                                <TableCell sx={{
+                                    bgcolor: neutralTone.headerBg, fontWeight: 700, fontSize: '0.75rem',
+                                    color: neutralTone.headerColor, borderBottom: `2px solid ${neutralTone.headerBorder}`, py: 1, px: 1.5,
+                                    textTransform: 'uppercase', letterSpacing: '0.03em', position: 'sticky', top: 0, zIndex: 1,
+                                }}>
                                     <TableSortLabel active={sortBy === 'curated_annotation'} direction={sortDir}
                                         onClick={() => handleSort('curated_annotation')}>Annotation</TableSortLabel>
                                 </TableCell>
-                                <TableCell sx={thSx}>Representative GO</TableCell>
-                                <TableCell sx={{ ...thSx, width: 90 }}>
+                                <TableCell sx={{
+                                    bgcolor: neutralTone.headerBg, fontWeight: 700, fontSize: '0.75rem',
+                                    color: neutralTone.headerColor, borderBottom: `2px solid ${neutralTone.headerBorder}`, py: 1, px: 1.5,
+                                    textTransform: 'uppercase', letterSpacing: '0.03em', position: 'sticky', top: 0, zIndex: 1,
+                                }}>Representative GO</TableCell>
+                                <TableCell sx={{
+                                    bgcolor: neutralTone.headerBg, fontWeight: 700, fontSize: '0.75rem',
+                                    color: neutralTone.headerColor, borderBottom: `2px solid ${neutralTone.headerBorder}`, py: 1, px: 1.5,
+                                    textTransform: 'uppercase', letterSpacing: '0.03em', position: 'sticky', top: 0, zIndex: 1, width: 90,
+                                }}>
                                     <TableSortLabel active={sortBy === 'go_enrichment_p'} direction={sortDir}
                                         onClick={() => handleSort('go_enrichment_p')}>GO P</TableSortLabel>
                                 </TableCell>
-                                <TableCell sx={thSx}>Top Genes</TableCell>
+                                <TableCell sx={{
+                                    bgcolor: neutralTone.headerBg, fontWeight: 700, fontSize: '0.75rem',
+                                    color: neutralTone.headerColor, borderBottom: `2px solid ${neutralTone.headerBorder}`, py: 1, px: 1.5,
+                                    textTransform: 'uppercase', letterSpacing: '0.03em', position: 'sticky', top: 0, zIndex: 1,
+                                }}>Top Genes</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -107,27 +124,25 @@ export default function Programs() {
                                 <TableRow key={r.program} hover
                                     sx={{
                                         '& td': { py: 0.6, px: 1.5, borderBottom: '1px solid #f3f4f6' },
-                                        animation: `rowIn 0.28s ${i * 15}ms cubic-bezier(0.22,1,0.36,1) both`,
-                                        '@keyframes rowIn': {
-                                            from: { opacity: 0, transform: 'translateY(4px)' },
-                                            to: { opacity: 1, transform: 'translateY(0)' },
+                                        ...tableRowRevealSx(theme, i),
+                                        '&:hover td': {
+                                            backgroundColor: alpha(theme.palette.primary.main, 0.035),
                                         },
-                                        willChange: 'opacity, transform',
                                     }}>
-                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem', color: '#2563eb', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem', color: theme.palette.primary.main, whiteSpace: 'nowrap', cursor: 'pointer' }}
                                         onClick={() => navigate(`/programs/${r.program}`)}>
                                         {r.program}
                                     </TableCell>
                                     <TableCell sx={{ fontSize: '0.82rem', lineHeight: 1.4 }}>
                                         {r.curated_annotation}
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.8rem', color: '#555' }}>
+                                    <TableCell sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>
                                         {r.representative_go}
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.78rem', color: '#888', fontFamily: 'monospace' }}>
+                                    <TableCell sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, fontFamily: 'monospace' }}>
                                         {r.go_enrichment_p}
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.78rem', color: '#666', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    <TableCell sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis' }}
                                         title={r.top10_genes}>
                                         {r.top10_genes}
                                     </TableCell>
@@ -137,6 +152,6 @@ export default function Programs() {
                     </Table>
                 </TableContainer>
             </Paper>
-        </Box>
+        </PageFrame>
     );
 }

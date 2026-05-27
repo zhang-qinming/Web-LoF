@@ -1,8 +1,17 @@
 import './App.css';
 import React, { Suspense } from 'react';
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
-import { FaHome, FaDna, FaListAlt, FaEnvelope, FaInfoCircle, FaProjectDiagram, FaFolderOpen } from 'react-icons/fa';
-import HamburgerMenu from './components/HamburgerMenu.jsx';
+import {
+    FaDna,
+    FaEnvelope,
+    FaFolderOpen,
+    FaHome,
+    FaInfoCircle,
+    FaListAlt,
+    FaProjectDiagram,
+} from 'react-icons/fa';
+import MobileNavDrawer from './components/MobileNavDrawer.jsx';
+import { StatePanel } from './components/PageScaffold.jsx';
 
 const Home = React.lazy(() => import('./routes/Home.jsx'));
 const About = React.lazy(() => import('./routes/About.jsx'));
@@ -12,12 +21,24 @@ const Genes = React.lazy(() => import('./routes/Genes.jsx'));
 const Variants = React.lazy(() => import('./routes/Variants.jsx'));
 const Programs = React.lazy(() => import('./routes/Programs.jsx'));
 
+const navLinks = [
+    { to: '/', icon: <FaHome />, label: 'Home' },
+    { to: '/trait', icon: <FaListAlt />, label: 'Trait' },
+    { to: '/programs', icon: <FaProjectDiagram />, label: 'Programs' },
+    { to: '/genes', icon: <FaDna />, label: 'Genes' },
+    { to: '/data', icon: <FaFolderOpen />, label: 'Data' },
+    { to: '/contact', icon: <FaEnvelope />, label: 'Contact' },
+    { to: '/about', icon: <FaInfoCircle />, label: 'About' },
+];
+
 function NotFound() {
     return (
-        <div className="not-found">
-            <h1>404</h1>
-            <p>Page not found</p>
-        </div>
+        <StatePanel
+            severity="warning"
+            title="Page not found"
+            message="The requested route does not exist in this browser."
+            minHeight={360}
+        />
     );
 }
 
@@ -27,20 +48,27 @@ function App() {
             <div className="app-container">
                 <header className="header hidden-mobile">
                     <nav className="nav">
-                        <NavLink to="/" className="nav-link"><FaHome /> Home</NavLink>
-                        <NavLink to="/trait" className="nav-link"><FaListAlt /> Trait</NavLink>
-                        <NavLink to="/programs" className="nav-link"><FaProjectDiagram /> Programs</NavLink>
-                        <NavLink to="/genes" className="nav-link"><FaDna /> Genes</NavLink>
-                        <NavLink to="/data" className="nav-link"><FaFolderOpen /> Data</NavLink>
-                        <NavLink to="/contact" className="nav-link"><FaEnvelope /> Contact</NavLink>
-                        <NavLink to="/about" className="nav-link"><FaInfoCircle /> About</NavLink>
+                        {navLinks.map((link) => (
+                            <NavLink key={link.to} to={link.to} className="nav-link">
+                                {link.icon} {link.label}
+                            </NavLink>
+                        ))}
                     </nav>
                 </header>
                 <div className="mobile-header visible-mobile">
-                    <HamburgerMenu />
+                    <MobileNavDrawer links={navLinks} />
                 </div>
                 <main className="main">
-                    <Suspense fallback={<div className="route-loading">Loading...</div>}>
+                    <Suspense
+                        fallback={(
+                            <StatePanel
+                                loading
+                                title="Loading view"
+                                message="Preparing the requested browser panel."
+                                minHeight={320}
+                            />
+                        )}
+                    >
                         <Routes>
                             <Route path="/" element={<Home />} />
                             <Route path="/about" element={<About />} />

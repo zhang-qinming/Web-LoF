@@ -7,6 +7,45 @@ const { parseTsvStream } = require('../lib/tsv');
 const router = express.Router();
 const regulationStore = createFileStore(config.paths.regulationDataDir);
 
+function parseProgramEntry(fileName) {
+    const exact = String(fileName || '').match(/K(\d+)_program(\d+)_perturb_effects\.txt$/i);
+    if (exact) {
+        return {
+            id: exact[2],
+            rank: Number(exact[1]),
+            file: fileName,
+        };
+    }
+
+    const fallback = String(fileName || '').match(/program(\d+)/i);
+    if (!fallback) return null;
+    return {
+        id: fallback[1],
+        rank: Number.POSITIVE_INFINITY,
+        file: fileName,
+    };
+}
+
+async function listProgramFiles() {
+    const exists = await regulationStore.exists(regulationStore.rootPath);
+    if (!exists) return [];
+
+    const bestByProgram = new Map();
+    const files = (await regulationStore.list(regulationStore.rootPath))
+        .filter((entry) => entry.type === 'file' && entry.name.endsWith('.txt'));
+
+    files.forEach((entry) => {
+        const parsed = parseProgramEntry(entry.name);
+        if (!parsed) return;
+        const current = bestByProgram.get(parsed.id);
+        if (!current || parsed.rank > current.rank || (parsed.rank === current.rank && parsed.file.localeCompare(current.file) > 0)) {
+            bestByProgram.set(parsed.id, parsed);
+        }
+    });
+
+    return [...bestByProgram.values()].sort((a, b) => (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0));
+}
+
 function escapeRegex(value) {
     return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -29,17 +68,7 @@ async function parseTsvFromStore(relativeName) {
 }
 
 router.get('/api/regulation/list', asyncRoute(async (req, res) => {
-    const exists = await regulationStore.exists(regulationStore.rootPath);
-    if (!exists) return res.json({ programs: [] });
-
-    const programs = (await regulationStore.list(regulationStore.rootPath))
-        .filter((entry) => entry.type === 'file' && entry.name.endsWith('.txt'))
-        .map((entry) => {
-            const match = entry.name.match(/program(\d+)/i);
-            return { id: match ? match[1] : entry.name, file: entry.name };
-        })
-        .sort((a, b) => (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0));
-
+    const programs = await listProgramFiles();
     res.json({ programs });
 }));
 
@@ -49,13 +78,11 @@ router.get('/api/regulation/:programId', asyncRoute(async (req, res) => {
         return res.status(400).json({ error: 'Invalid programId' });
     }
 
-    const regex = new RegExp(`program${escapeRegex(safeProgramId)}[_.]`, 'i');
-    const files = (await regulationStore.list(regulationStore.rootPath))
-        .filter((entry) => entry.type === 'file' && regex.test(entry.name));
+    const programs = await listProgramFiles();
+    const match = programs.find((item) => item.id === safeProgramId);
+    if (!match) return res.status(404).json({ error: 'Program not found' });
 
-    if (files.length === 0) return res.status(404).json({ error: 'Program not found' });
-
-    const fileName = files[0].name;
+    const fileName = match.file;
     const data = await parseTsvFromStore(fileName);
     if (!data) return res.status(404).json({ error: 'Failed to parse' });
 

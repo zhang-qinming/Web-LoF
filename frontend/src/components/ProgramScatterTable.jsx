@@ -13,7 +13,9 @@ import {
     TableRow,
     TableSortLabel,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
+import { highlightedRowSx, metricChipTone, plotFrameSx, sectionPanelHeaderSx, summaryChipSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
 const COLUMN_SPECS = [
     { key: 'program', label: 'Program', align: 'left', tone: 'info', width: 118 },
@@ -34,12 +36,6 @@ const GROUPS = [
     { label: 'Regulator Burden', span: 4, tone: 'regulator' },
 ];
 
-const INFO_TONE = {
-    headerBg: '#f8fafc',
-    headerBorder: '#d9e2ec',
-    headerColor: '#475569',
-};
-
 const sortLabelSx = {
     fontSize: '0.69rem',
     m: 0,
@@ -48,9 +44,6 @@ const sortLabelSx = {
         margin: 0,
     },
 };
-
-const ROW_HIGHLIGHT_BASE = '#fff1b8';
-const ROW_HIGHLIGHT_FLASH = '#ffe082';
 
 function renderCell(column, row, helpers) {
     const {
@@ -128,6 +121,7 @@ export default function ProgramScatterTable({
     sortedRows,
     highlight,
     tableRowRefs,
+    tableSectionRef,
     COLORS,
     LEGEND_LABELS,
     TABLE_TONES,
@@ -135,24 +129,26 @@ export default function ProgramScatterTable({
     tdSx,
     navigate,
 }) {
+    const theme = useTheme();
+    const infoTone = tableTone(theme, 'neutral');
     if (!rows.length) return null;
 
     return (
-        <Paper variant="outlined" sx={{ mt: 2, border: '1px solid #e8e8ec', borderRadius: 2, overflow: 'hidden' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.2, bgcolor: '#fafbfc', borderBottom: tableOpen ? '1px solid #eee' : 'none' }}>
+        <Paper ref={tableSectionRef} variant="outlined" sx={plotFrameSx(theme, { mt: 2, borderRadius: 2 })}>
+            <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.2, borderBottom: tableOpen ? `1px solid ${theme.custom.border.soft}` : 'none' })}>
                 <Button
                     onClick={() => { setTableOpen((v) => !v); setHighlight({ program: null, key: 0 }); }}
                     endIcon={tableOpen ? <ExpandLess /> : <ExpandMore />}
-                    sx={{ textTransform: 'none', color: '#444', fontWeight: 500, fontSize: '0.82rem' }}
+                    sx={{ textTransform: 'none', color: theme.palette.text.primary, fontWeight: 500, fontSize: '0.82rem' }}
                 >
-                    Data Table <Chip label={rows.length} size="small" sx={{ ml: 1, height: 20, fontSize: '0.7rem', bgcolor: '#e0e0e0', color: '#555' }} />
+                    Data Table <Chip label={rows.length} size="small" sx={summaryChipSx(theme, { ml: 1, height: 20, fontSize: '0.7rem', ...metricChipTone(theme, 'neutral') })} />
                 </Button>
                 <Box sx={{ flex: 1 }} />
                 <Button
                     size="small"
                     startIcon={<Download />}
                     onClick={downloadCSV}
-                    sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#777' }}
+                    sx={{ textTransform: 'none', fontSize: '0.75rem', color: theme.palette.text.secondary }}
                 >
                     CSV
                 </Button>
@@ -168,7 +164,7 @@ export default function ProgramScatterTable({
                         <TableHead>
                             <TableRow>
                                 {GROUPS.map((group) => {
-                                    const tone = group.tone === 'info' ? INFO_TONE : TABLE_TONES[group.tone];
+                                    const tone = group.tone === 'info' ? infoTone : TABLE_TONES[group.tone];
                                     return (
                                         <TableCell
                                             key={group.label}
@@ -177,6 +173,8 @@ export default function ProgramScatterTable({
                                                 fontWeight: 700,
                                                 fontSize: '0.64rem',
                                                 py: 0.58,
+                                                top: 0,
+                                                zIndex: 3,
                                                 bgcolor: tone.headerBg,
                                                 borderBottom: `2px solid ${tone.headerBorder}`,
                                                 textAlign: 'center',
@@ -192,12 +190,14 @@ export default function ProgramScatterTable({
                             </TableRow>
                             <TableRow>
                                 {COLUMN_SPECS.map((column) => {
-                                    const tone = column.tone === 'info' ? INFO_TONE : TABLE_TONES[column.tone];
+                                    const tone = column.tone === 'info' ? infoTone : TABLE_TONES[column.tone];
                                     return (
                                         <TableCell
                                             key={column.key}
                                             sx={{
                                                 ...thSx(column.align),
+                                                top: 30,
+                                                zIndex: 2,
                                                 bgcolor: tone.headerBg,
                                                 borderBottom: `2px solid ${tone.headerBorder}`,
                                                 color: tone.headerColor,
@@ -221,35 +221,13 @@ export default function ProgramScatterTable({
                             {sortedRows.map((row, idx) => {
                                 const isHL = highlight.program === row.program;
                                 const even = idx % 2 === 0;
-                                const flashAnimation = isHL
-                                    ? `${highlight.key % 2 === 0 ? 'programRowFlashA' : 'programRowFlashB'} 1.15s ease-out`
-                                    : 'none';
                                 return (
                                     <TableRow
                                         key={row.program}
                                         ref={(el) => { if (el) tableRowRefs.current[row.program] = el; }}
                                         sx={{
-                                            '@keyframes programRowFlashA': {
-                                                '0%': { backgroundColor: ROW_HIGHLIGHT_FLASH },
-                                                '28%': { backgroundColor: '#ffef99' },
-                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
-                                            },
-                                            '@keyframes programRowFlashB': {
-                                                '0%': { backgroundColor: '#ffd969' },
-                                                '28%': { backgroundColor: '#ffeb8a' },
-                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
-                                            },
-                                            bgcolor: isHL ? ROW_HIGHLIGHT_BASE : (even ? '#fff' : '#f7f7f8'),
-                                            boxShadow: isHL ? 'inset 0 0 0 1px rgba(217,119,6,0.18), 0 0 0 2px rgba(245,158,11,0.1)' : 'none',
-                                            '& td': {
-                                                backgroundColor: isHL ? `${ROW_HIGHLIGHT_BASE} !important` : undefined,
-                                                transition: 'background-color 0.15s ease, box-shadow 0.15s ease',
-                                                animation: flashAnimation,
-                                            },
-                                            '&:hover td': {
-                                                bgcolor: isHL ? `${ROW_HIGHLIGHT_BASE} !important` : '#eeeff2',
-                                                boxShadow: 'inset 0 -1px 0 rgba(226,232,240,0.78)',
-                                            },
+                                            ...tableRowRevealSx(theme, idx),
+                                            ...highlightedRowSx(theme, isHL, even, 'programRowFlashA', 'programRowFlashB', highlight.key),
                                         }}
                                     >
                                         {COLUMN_SPECS.map((column) => renderCell(column, row, {

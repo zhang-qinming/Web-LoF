@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     Box,
     Button,
     Chip,
     Collapse,
+    InputAdornment,
     Paper,
     Table,
     TableBody,
@@ -13,8 +14,11 @@ import {
     TablePagination,
     TableRow,
     TableSortLabel,
+    TextField,
 } from '@mui/material';
-import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
+import { useTheme } from '@mui/material/styles';
+import { Download, ExpandLess, ExpandMore, Search } from '@mui/icons-material';
+import { highlightedRowSx, metricChipTone, plotFrameSx, sectionPanelHeaderSx, summaryChipSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
 const COLUMN_SPECS = [
     { key: 'snp', label: 'SNP', align: 'left', width: 114, tone: 'locus' },
@@ -34,39 +38,8 @@ const GROUPS = [
     { label: 'Mapping', span: 2, tone: 'program' },
 ];
 
-const TONES = {
-    neutral: {
-        headerBg: '#f8fafc',
-        headerBorder: '#d9e2ec',
-        headerColor: '#475569',
-        cellSoft: '#fbfcfd',
-        cellStrong: '#f5f7fa',
-    },
-    locus: {
-        headerBg: '#edf3fb',
-        headerBorder: '#cad9ec',
-        headerColor: '#245089',
-        cellSoft: '#f8fbff',
-        cellStrong: '#f1f6fd',
-    },
-    annotation: {
-        headerBg: '#eef6f1',
-        headerBorder: '#cbdccc',
-        headerColor: '#2f6a49',
-        cellSoft: '#f8fcf8',
-        cellStrong: '#f1f8f2',
-    },
-    program: {
-        headerBg: '#f4f0fb',
-        headerBorder: '#d9cfee',
-        headerColor: '#5d3f8c',
-        cellSoft: '#faf8fe',
-        cellStrong: '#f4effc',
-    },
-};
-
 function headerCellSx(align, tone) {
-    const palette = TONES[tone];
+    const palette = tone;
     return {
         px: 1,
         py: 0.72,
@@ -81,7 +54,7 @@ function headerCellSx(align, tone) {
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
-    const palette = TONES[tone];
+    const palette = tone;
     return {
         px: 1,
         py: 0.62,
@@ -108,8 +81,21 @@ const sortLabelSx = {
     },
 };
 
-const ROW_HIGHLIGHT_BASE = '#fff1b8';
-const ROW_HIGHLIGHT_FLASH = '#ffe082';
+function buildSearchIndex(row) {
+    return [
+        row.snp,
+        row.normalizedChr,
+        row.bp,
+        row.nearestGene,
+        row.distanceToGene,
+        row.primaryProgram,
+        row.primaryGeneset,
+        ...(Array.isArray(row.genesets) ? row.genesets : []),
+    ]
+        .filter((value) => value !== null && value !== undefined && String(value).trim() !== '')
+        .join(' ')
+        .toLowerCase();
+}
 
 function renderCellContent({ column, row, programColorMap, formatDistance, formatP, getProgramRoute, navigate }) {
     if (column.key === 'snp') return row.snp || '—';
@@ -175,6 +161,7 @@ export default function TraitHitManhattanTable({
     sortedRows,
     pagedRows,
     highlight,
+    setHighlight,
     tableOpen,
     setTableOpen,
     tablePage,
@@ -193,55 +180,122 @@ export default function TraitHitManhattanTable({
     formatP,
     gwasHitLogp,
 }) {
+    const theme = useTheme();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchError, setSearchError] = useState('');
+    const TONES = {
+        neutral: tableTone(theme, 'neutral'),
+        locus: tableTone(theme, 'primary'),
+        annotation: tableTone(theme, 'success'),
+        program: tableTone(theme, 'accent'),
+    };
+
+    const handleLocateRow = useCallback(() => {
+        const normalizedQuery = searchQuery.trim().toLowerCase();
+        if (!normalizedQuery) {
+            setSearchError('');
+            return;
+        }
+
+        const rowIndex = sortedRows.findIndex((row) => buildSearchIndex(row).includes(normalizedQuery));
+        if (rowIndex < 0) {
+            setSearchError('No matching row in the current table.');
+            return;
+        }
+
+        const row = sortedRows[rowIndex];
+        setSearchError('');
+        setTableOpen(true);
+        setTablePage(Math.floor(rowIndex / tableRowsPerPage));
+        setHighlight((prev) => ({ rowKey: row.rowKey, key: prev.key + 1 }));
+    }, [searchQuery, setHighlight, setTableOpen, setTablePage, sortedRows, tableRowsPerPage]);
+
     if (!processedRows.length) return null;
 
     return (
         <Paper
             ref={tableSectionRef}
             variant="outlined"
-            sx={{
+            sx={plotFrameSx(theme, {
                 mt: 2,
-                border: '1px solid #e8edf3',
                 borderRadius: 2,
                 overflow: 'hidden',
-                bgcolor: '#ffffff',
-                boxShadow: '0 10px 26px rgba(15,23,42,0.05)',
-            }}
+            })}
         >
-            <Box
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: 1.75,
-                    py: 1,
-                    bgcolor: '#fafbfc',
-                    borderBottom: tableOpen ? '1px solid #e9edf2' : 'none',
-                    gap: 1,
-                }}
-            >
+            <Box sx={sectionPanelHeaderSx(theme, {
+                borderBottom: tableOpen ? `1px solid ${theme.custom.border.soft}` : 'none',
+            })}>
                 <Button
                     onClick={() => setTableOpen((prev) => !prev)}
                     endIcon={tableOpen ? <ExpandLess /> : <ExpandMore />}
-                    sx={{ textTransform: 'none', color: '#334155', fontWeight: 600, fontSize: '0.8rem', px: 0.3 }}
+                    sx={{ textTransform: 'none', color: theme.palette.text.primary, fontWeight: 600, fontSize: '0.8rem', px: 0.3 }}
                 >
                     Data Table
                     {!tableOpen && (
                         <Chip
                             label={processedRows.length.toLocaleString()}
                             size="small"
-                            sx={{ ml: 1, height: 20, fontSize: '0.68rem', bgcolor: '#e9eef5', color: '#526171' }}
+                            sx={summaryChipSx(theme, { ml: 1, height: 20, fontSize: '0.68rem', ...metricChipTone(theme, 'neutral') })}
                         />
                     )}
                 </Button>
                 <Box sx={{ flex: 1 }} />
-                <Button
-                    size="small"
-                    startIcon={<Download />}
-                    onClick={downloadCSV}
-                    sx={{ textTransform: 'none', fontSize: '0.74rem', color: '#475569' }}
-                >
-                    CSV
-                </Button>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap', maxWidth: '100%' }}>
+                    <TextField
+                        size="small"
+                        value={searchQuery}
+                        placeholder="Search SNP, Gene, Program..."
+                        error={Boolean(searchError)}
+                        helperText={searchError || undefined}
+                        onChange={(event) => {
+                            setSearchQuery(event.target.value);
+                            if (searchError) setSearchError('');
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                                event.preventDefault();
+                                handleLocateRow();
+                            }
+                        }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                                </InputAdornment>
+                            ),
+                        }}
+                        sx={{
+                            width: { xs: '100%', sm: 250, md: 300 },
+                            '& .MuiOutlinedInput-input': {
+                                fontSize: '0.75rem',
+                                py: 0.72,
+                            },
+                            '& .MuiFormHelperText-root': {
+                                mt: 0.45,
+                                fontSize: '0.68rem',
+                                lineHeight: 1.25,
+                            },
+                        }}
+                    />
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Search />}
+                        onClick={handleLocateRow}
+                        disabled={!searchQuery.trim()}
+                        sx={{ textTransform: 'none', fontSize: '0.74rem', minWidth: 88 }}
+                    >
+                        Locate
+                    </Button>
+                    <Button
+                        size="small"
+                        startIcon={<Download />}
+                        onClick={downloadCSV}
+                        sx={{ textTransform: 'none', fontSize: '0.74rem', color: theme.palette.text.secondary }}
+                    >
+                        CSV
+                    </Button>
+                </Box>
             </Box>
 
             <Collapse in={tableOpen}>
@@ -306,9 +360,6 @@ export default function TraitHitManhattanTable({
                                 const isHighlighted = highlight.rowKey === row.rowKey;
                                 const absoluteIndex = (tablePage * tableRowsPerPage) + index;
                                 const even = absoluteIndex % 2 === 0;
-                                const flashAnimation = isHighlighted
-                                    ? `${highlight.key % 2 === 0 ? 'traitRowFlashA' : 'traitRowFlashB'} 1.15s ease-out`
-                                    : 'none';
 
                                 return (
                                     <TableRow
@@ -317,27 +368,8 @@ export default function TraitHitManhattanTable({
                                             if (el) tableRowRefs.current[row.rowKey] = el;
                                         }}
                                         sx={{
-                                            '@keyframes traitRowFlashA': {
-                                                '0%': { backgroundColor: ROW_HIGHLIGHT_FLASH },
-                                                '28%': { backgroundColor: '#ffef99' },
-                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
-                                            },
-                                            '@keyframes traitRowFlashB': {
-                                                '0%': { backgroundColor: '#ffd969' },
-                                                '28%': { backgroundColor: '#ffeb8a' },
-                                                '100%': { backgroundColor: ROW_HIGHLIGHT_BASE },
-                                            },
-                                            bgcolor: isHighlighted ? ROW_HIGHLIGHT_BASE : (even ? '#ffffff' : '#fbfcfd'),
-                                            boxShadow: isHighlighted ? 'inset 0 0 0 1px rgba(217,119,6,0.18), 0 0 0 2px rgba(245,158,11,0.12)' : 'none',
-                                            '& td': {
-                                                backgroundColor: isHighlighted ? `${ROW_HIGHLIGHT_BASE} !important` : undefined,
-                                                transition: 'background-color 0.14s ease, box-shadow 0.14s ease, color 0.14s ease',
-                                                animation: flashAnimation,
-                                            },
-                                            '&:hover td': {
-                                                bgcolor: isHighlighted ? `${ROW_HIGHLIGHT_BASE} !important` : '#f3f6fa',
-                                                boxShadow: 'inset 0 -1px 0 rgba(226,232,240,0.78)',
-                                            },
+                                            ...tableRowRevealSx(theme, index),
+                                            ...highlightedRowSx(theme, isHighlighted, even, 'traitRowFlashA', 'traitRowFlashB', highlight.key),
                                         }}
                                     >
                                         {COLUMN_SPECS.map((column) => {

@@ -88,6 +88,38 @@ function toPathList(value) {
     return [value];
 }
 
+async function getDataRootStat() {
+    return dataStore.stat(dataStore.rootPath);
+}
+
+async function getDirectoryStatOrEmpty(dir = '') {
+    const normalizedDir = String(dir || '').trim();
+    const rootStat = await getDataRootStat();
+
+    if (!rootStat || !rootStat.isDirectory) {
+        if (!normalizedDir) {
+            return {
+                empty: true,
+                fullPath: dataStore.rootPath,
+                stat: null,
+            };
+        }
+        return {
+            empty: false,
+            fullPath: dataStore.rootPath,
+            stat: null,
+        };
+    }
+
+    const fullPath = resolveRelativePath(normalizedDir);
+    const stat = await dataStore.stat(fullPath);
+    return {
+        empty: false,
+        fullPath,
+        stat,
+    };
+}
+
 function cleanupBatchDownloadTokens() {
     const now = Date.now();
     for (const [token, item] of batchDownloadTokens.entries()) {
@@ -314,8 +346,15 @@ async function getSearchIndex(forceRefresh = false) {
 }
 
 router.get('/api/data/list', asyncRoute(async (req, res) => {
-    const fullPath = resolveRelativePath(req.query.dir || '');
-    const stat = await dataStore.stat(fullPath);
+    const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
+    const limit = parsePositiveInt(req.query.limit, 50, 200);
+    const dirInfo = await getDirectoryStatOrEmpty(req.query.dir || '');
+
+    if (dirInfo.empty) {
+        return res.json({ data: [], totalCount: 0, page, totalPages: 1 });
+    }
+
+    const { fullPath, stat } = dirInfo;
     if (!stat) return res.status(404).json({ error: 'Not found' });
     if (!stat.isDirectory) return res.status(400).json({ error: 'Not a directory' });
 
@@ -324,8 +363,6 @@ router.get('/api/data/list', asyncRoute(async (req, res) => {
     const filteredEntries = entries.filter((entry) => !searchQ || entry.name.toLowerCase().includes(searchQ));
     filteredEntries.sort((a, b) => Number(b.type === 'dir') - Number(a.type === 'dir') || a.name.localeCompare(b.name));
 
-    const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
-    const limit = parsePositiveInt(req.query.limit, 50, 200);
     const total = filteredEntries.length;
     const pageEntries = filteredEntries.slice((page - 1) * limit, page * limit);
     const parentRel = req.query.dir ? String(req.query.dir).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') : '';
@@ -342,7 +379,7 @@ router.get('/api/data/list', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/data/status', asyncRoute(async (req, res) => {
-    const rootStat = await dataStore.stat(dataStore.rootPath);
+    const rootStat = await getDataRootStat();
     res.json({
         root: dataStore.rootPath,
         exists: Boolean(rootStat),
@@ -356,8 +393,10 @@ router.get('/api/data/status', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/data/file-paths', asyncRoute(async (req, res) => {
-    const fullPath = resolveRelativePath(req.query.dir || '');
-    const stat = await dataStore.stat(fullPath);
+    const dirInfo = await getDirectoryStatOrEmpty(req.query.dir || '');
+    if (dirInfo.empty) return res.json({ paths: [], totalCount: 0 });
+
+    const { fullPath, stat } = dirInfo;
     if (!stat) return res.status(404).json({ error: 'Not found' });
     if (!stat.isDirectory) return res.status(400).json({ error: 'Not a directory' });
 

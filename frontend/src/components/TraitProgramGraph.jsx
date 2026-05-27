@@ -17,12 +17,6 @@ import {
     Slider,
     Stack,
     Switch,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Tooltip,
     Typography,
 } from '@mui/material';
@@ -35,6 +29,7 @@ import {
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import { downloadBlob } from '../utils/download';
+import TraitProgramGraphSummary from './TraitProgramGraphSummary';
 
 const PROGRAM_COLORS = {
     other: '#98a2b3',
@@ -86,6 +81,24 @@ const GRAPH_BOTTOM_PADDING = 96;
 const BOX_STROKE = '#8c8c8c';
 const TRAIT_PORT_INSET = 22;
 const EDGE_TARGET_GAP = 28;
+
+const INLINE_LEGEND_GROUPS = [
+    {
+        label: 'Gene',
+        items: [
+            { label: 'post_mean +', color: EFFECT_COLORS.positive },
+            { label: 'post_mean -', color: EFFECT_COLORS.negative },
+        ],
+    },
+    {
+        label: 'Program',
+        items: [
+            { label: 'program', color: PROGRAM_COLORS.program_enriched },
+            { label: 'regulator', color: PROGRAM_COLORS.regulator_enriched },
+            { label: 'both', color: PROGRAM_COLORS.both_enriched },
+        ],
+    },
+];
 
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
@@ -378,27 +391,6 @@ function ArrowOrCap({
     );
 }
 
-function EffectLegend({ x, y }) {
-    return (
-        <g>
-            <text x={x} y={y} fontSize="20" fontWeight="900" fill="#111">Legend</text>
-            <text x={x + 78} y={y} fontSize="17" fontWeight="800" fill="#475467">Gene:</text>
-            <rect x={x + 132} y={y - 14} width="20" height="20" rx="5" fill={EFFECT_COLORS.positive} />
-            <text x={x + 160} y={y + 1} fontSize="17" fontWeight="700" fill="#111">post_mean +</text>
-            <rect x={x + 278} y={y - 14} width="20" height="20" rx="5" fill={EFFECT_COLORS.negative} />
-            <text x={x + 306} y={y + 1} fontSize="17" fontWeight="700" fill="#111">post_mean -</text>
-
-            <text x={x + 78} y={y + 30} fontSize="17" fontWeight="800" fill="#475467">Program:</text>
-            <rect x={x + 164} y={y + 16} width="20" height="20" rx="5" fill={PROGRAM_COLORS.program_enriched} />
-            <text x={x + 192} y={y + 31} fontSize="17" fontWeight="700" fill="#111">program</text>
-            <rect x={x + 270} y={y + 16} width="20" height="20" rx="5" fill={PROGRAM_COLORS.regulator_enriched} />
-            <text x={x + 298} y={y + 31} fontSize="17" fontWeight="700" fill="#111">regulator</text>
-            <rect x={x + 390} y={y + 16} width="20" height="20" rx="5" fill={PROGRAM_COLORS.both_enriched} />
-            <text x={x + 418} y={y + 31} fontSize="17" fontWeight="700" fill="#111">both</text>
-        </g>
-    );
-}
-
 function SectionNote({ x, y, lines }) {
     return (
         <g>
@@ -560,136 +552,6 @@ function ControlBlock({ title, children }) {
             </Typography>
             {children}
         </Box>
-    );
-}
-
-function ModuleSummaryTable({
-    title,
-    modules,
-    side,
-    selectedProgram,
-    onSelectProgram,
-    onToggleExpanded,
-}) {
-    const sideMeta = SIDE_META[side];
-    const scoreField = side === 'program' ? 'programScore' : 'regulatorScore';
-    const totalField = side === 'program' ? 'loadingTotalCount' : 'regulatorTotalCount';
-
-    return (
-        <Paper variant="outlined" sx={{ borderRadius: 2.5, borderColor: 'rgba(15,23,42,0.10)', overflow: 'hidden' }}>
-            <Box
-                sx={{
-                    px: 1.5,
-                    py: 1.1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                    bgcolor: sideMeta.softBg,
-                }}
-            >
-                <Typography sx={{ fontWeight: 800, color: sideMeta.accent, fontSize: 13 }}>
-                    {title}
-                </Typography>
-                <Chip
-                    label={`${modules.length} modules`}
-                    size="small"
-                    sx={{ height: 22, fontWeight: 700, color: sideMeta.accent, borderColor: sideMeta.accent }}
-                    variant="outlined"
-                />
-            </Box>
-
-            <TableContainer sx={{ maxHeight: 360 }}>
-                <Table size="small" stickyHeader>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell sx={{ fontWeight: 800, width: 92 }}>Program</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 800 }}>Score</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 800 }}>Genes</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 800 }}>+ / -</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 800 }}>Shown</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {modules.map((module) => {
-                            const selected = selectedProgram === module.program;
-                            const positiveCount = module.visibleGenes?.filter((gene) => effectSignFromGene(gene) === 'positive').length || 0;
-                            const negativeCount = module.visibleGenes?.filter((gene) => effectSignFromGene(gene) === 'negative').length || 0;
-
-                            return (
-                                <TableRow
-                                    key={`${module.program}:${side}`}
-                                    hover
-                                    selected={selected}
-                                    onClick={() => onSelectProgram(module.program)}
-                                    sx={{
-                                        cursor: 'pointer',
-                                        '&.Mui-selected': { bgcolor: sideMeta.softBg },
-                                        '&.Mui-selected:hover': { bgcolor: sideMeta.softBg },
-                                    }}
-                                >
-                                    <TableCell>
-                                        <Stack spacing={0.35}>
-                                            <Typography sx={{ fontWeight: 900, color: '#111827', lineHeight: 1 }}>
-                                                {module.program}
-                                            </Typography>
-                                            <Typography sx={{ fontSize: 11.5, color: '#667085', lineHeight: 1.2 }}>
-                                                {module.colorLabel}
-                                            </Typography>
-                                        </Stack>
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Typography
-                                            sx={{
-                                                fontWeight: 800,
-                                                color: edgeColorFromScore(module[scoreField]),
-                                                fontVariantNumeric: 'tabular-nums',
-                                            }}
-                                        >
-                                            {formatNumber(module[scoreField], 2)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                        {module.totalFilteredGenes}/{module[totalField]}
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                        <Box component="span" sx={{ color: EFFECT_COLORS.positive, fontWeight: 800 }}>{positiveCount}</Box>
-                                        {' / '}
-                                        <Box component="span" sx={{ color: EFFECT_COLORS.negative, fontWeight: 800 }}>{negativeCount}</Box>
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {module.collapsed ? (
-                                            <Typography sx={{ fontSize: 12, color: '#667085' }}>none</Typography>
-                                        ) : (
-                                            <Button
-                                                size="small"
-                                                variant="text"
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    onToggleExpanded(module.program, side);
-                                                }}
-                                                sx={{ minWidth: 0, px: 0.5, textTransform: 'none', fontSize: 12 }}
-                                            >
-                                                {module.expanded ? 'all' : module.visibleGenes.length}
-                                            </Button>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                        {!modules.length && (
-                            <TableRow>
-                                <TableCell colSpan={5}>
-                                    <Typography sx={{ py: 2, textAlign: 'center', color: '#667085', fontSize: 13 }}>
-                                        No modules after current filters
-                                    </Typography>
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
-        </Paper>
     );
 }
 
@@ -1520,6 +1382,38 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                             />
                         )}
                     </Stack>
+
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            flexWrap: 'wrap',
+                            width: '100%',
+                            mt: 1.25,
+                            pt: 1.25,
+                            borderTop: '1px solid rgba(15,23,42,0.06)',
+                        }}
+                    >
+                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>
+                            Legend
+                        </Typography>
+                        {INLINE_LEGEND_GROUPS.map((group) => (
+                            <Box key={group.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                                <Typography sx={{ fontSize: 12.5, color: '#475467', fontWeight: 700 }}>
+                                    {group.label}:
+                                </Typography>
+                                {group.items.map((item) => (
+                                    <Box key={`${group.label}-${item.label}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.45 }}>
+                                        <Box sx={{ width: 12, height: 12, borderRadius: 0.75, bgcolor: item.color, border: '1px solid rgba(15,23,42,0.10)' }} />
+                                        <Typography sx={{ fontSize: 12.5, color: '#475467', fontWeight: 600 }}>
+                                            {item.label}
+                                        </Typography>
+                                    </Box>
+                                ))}
+                            </Box>
+                        ))}
+                    </Box>
                 </Box>
 
                 <Box
@@ -1559,7 +1453,6 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                             <text x="8" y="62" className="section-title">
                                 program burden effects
                             </text>
-                            <EffectLegend x={394} y={38} />
                             <text
                                 x={RIGHT_PROGRAM_X}
                                 y="36"
@@ -1646,24 +1539,34 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         }}
                     >
                         {visibleSides.has('program') && (
-                            <ModuleSummaryTable
+                            <TraitProgramGraphSummary
                                 title="Program burden side"
                                 modules={leftLayout.modules}
                                 side="program"
                                 selectedProgram={selectedProgram}
                                 onSelectProgram={handleSelectProgram}
                                 onToggleExpanded={toggleExpanded}
+                                sideMeta={SIDE_META.program}
+                                effectColors={EFFECT_COLORS}
+                                effectSignFromGene={effectSignFromGene}
+                                edgeColorFromScore={edgeColorFromScore}
+                                formatNumber={formatNumber}
                             />
                         )}
 
                             {visibleSides.has('regulator') && (
-                                <ModuleSummaryTable
+                                <TraitProgramGraphSummary
                                     title="Regulator-program side"
                                     modules={rightLayout.modules}
                                     side="regulator"
                                     selectedProgram={selectedProgram}
                                 onSelectProgram={handleSelectProgram}
                                 onToggleExpanded={toggleExpanded}
+                                sideMeta={SIDE_META.regulator}
+                                effectColors={EFFECT_COLORS}
+                                effectSignFromGene={effectSignFromGene}
+                                edgeColorFromScore={edgeColorFromScore}
+                                formatNumber={formatNumber}
                             />
                         )}
                     </Box>

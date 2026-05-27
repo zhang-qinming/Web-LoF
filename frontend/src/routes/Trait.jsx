@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Box, Typography, Card, Tabs, Tab } from '@mui/material';
+import { Box, Typography, Tabs, Tab } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Timeline } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
@@ -10,9 +11,16 @@ import GwasDataList from '../components/GwasDataList';
 import TraitHitManhattan from '../components/TraitHitManhattan';
 import BurdenVolcano from '../components/BurdenVolcano';
 import TraitMetaCard from '../components/TraitMetaCard';
+import { sectionTitleSx } from '../themeUtils';
+import { PageFrame, StatePanel } from '../components/PageScaffold';
 
-// ---- Trait 页面 ----
+function findAvailableId(files, candidates) {
+    if (!Array.isArray(files)) return '';
+    return candidates.find((candidate) => candidate && files.includes(candidate)) || '';
+}
+
 export default function Trait() {
+    const theme = useTheme();
     const { traitName } = useParams();
     const fileId = traitName;
     const [tab, setTab] = React.useState(2);
@@ -20,12 +28,17 @@ export default function Trait() {
     const { data: scatterListData } = useSWR('/api/programs/list', fetcher);
     const { data: graphListData } = useSWR('/api/programs/graph-list', fetcher);
     const { data: metaData } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
-    const hasProgramScatter = scatterListData?.files?.includes(fileId);
-    const hasProgramGraph = graphListData?.files?.includes(fileId);
     const availabilityReady = scatterListData !== undefined && graphListData !== undefined;
-    const preferredTab = hasProgramScatter ? 0 : hasProgramGraph ? 1 : 2;
     const meta = (metaData && !metaData.error) ? metaData : null;
     const gwasId = metaData === undefined ? '' : (meta?.gwas_id || fileId);
+    const dataIdCandidates = React.useMemo(() => (
+        [...new Set([fileId, gwasId, meta?.file_id].filter(Boolean))]
+    ), [fileId, gwasId, meta?.file_id]);
+    const scatterFileId = findAvailableId(scatterListData?.files, dataIdCandidates);
+    const graphFileId = findAvailableId(graphListData?.files, dataIdCandidates);
+    const hasProgramScatter = Boolean(scatterFileId);
+    const hasProgramGraph = Boolean(graphFileId);
+    const preferredTab = hasProgramScatter ? 0 : hasProgramGraph ? 1 : 2;
 
     React.useEffect(() => {
         userSelectedTabRef.current = false;
@@ -45,11 +58,12 @@ export default function Trait() {
 
     if (!fileId) {
         return (
-            <Box style={{ maxWidth: 1500, margin: '0 auto', padding: '24px 16px' }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>Browse Traits</Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                    Select a trait to explore its GWAS and LoF analysis results.
-                </Typography>
+            <PageFrame
+                title="Browse Traits"
+                subtitle="Select a trait to explore its GWAS and LoF analysis results."
+                maxWidth={1500}
+                compact
+            >
                 <GwasDataList
                     title=""
                     columns={[
@@ -60,7 +74,7 @@ export default function Trait() {
                     defaultSortBy="trait_name"
                     defaultOrder="ASC"
                 />
-            </Box>
+            </PageFrame>
         );
     }
 
@@ -68,8 +82,7 @@ export default function Trait() {
         <Box sx={{ maxWidth: 1560, mx: 'auto', px: { xs: 2, md: 3 }, py: 4 }}>
             <TraitMetaCard fileId={fileId} listData={scatterListData} />
 
-            {/* Figures */}
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#333', mb: 1, mt: 4 }}>
+            <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 1, mt: 4 })}>
                 Figures
             </Typography>
             <Tabs
@@ -91,25 +104,29 @@ export default function Trait() {
             </Tabs>
 
             <Box sx={{ minHeight: 400 }}>
-                {tab === 0 && hasProgramScatter && <ProgramScatter key={fileId} fileId={fileId} />}
+                {tab === 0 && hasProgramScatter && <ProgramScatter key={scatterFileId} fileId={scatterFileId} />}
                 {tab === 0 && !hasProgramScatter && (
-                    <Card variant="outlined" sx={{ py: 8, textAlign: 'center', borderRadius: 3, bgcolor: '#fafbfc' }}>
-                        <Timeline sx={{ fontSize: 48, color: '#ccc', mb: 2 }} />
-                        <Typography color="text.secondary">No Program enrichment data for this trait</Typography>
-                    </Card>
+                    <StatePanel
+                        icon={Timeline}
+                        title="No Program enrichment data"
+                        message="This trait does not have a Program Scatter TSV available."
+                        minHeight={360}
+                    />
                 )}
                 {tab === 1 && hasProgramGraph && (
                     <TraitProgramGraph
-                        key={`trait-program-graph-${fileId}`}
-                        fileId={fileId}
+                        key={`trait-program-graph-${graphFileId}`}
+                        fileId={graphFileId}
                         traitLabel={meta?.trait_name || fileId}
                     />
                 )}
                 {tab === 1 && !hasProgramGraph && (
-                    <Card variant="outlined" sx={{ py: 8, textAlign: 'center', borderRadius: 3, bgcolor: '#fafbfc' }}>
-                        <Timeline sx={{ fontSize: 48, color: '#ccc', mb: 2 }} />
-                        <Typography color="text.secondary">No Trait Program Graph data for this trait</Typography>
-                    </Card>
+                    <StatePanel
+                        icon={Timeline}
+                        title="No Trait Program Graph data"
+                        message="This trait does not have graph-linked program and regulator data available."
+                        minHeight={360}
+                    />
                 )}
                 {tab === 2 && (
                     <TraitHitManhattan

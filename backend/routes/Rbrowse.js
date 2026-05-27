@@ -5,10 +5,13 @@ const { asyncRoute } = require('../lib/http');
 const { normalizeIdentifier, parsePageOptions } = require('../lib/request');
 
 router.get('/api/browse', asyncRoute(async (req, res) => {
-    const result = await metaModel.getTraits(parsePageOptions(req.query, {
+    const result = await metaModel.getTraits({
+        ...parsePageOptions(req.query, {
         defaultLimit: 20,
         defaultSortBy: 'trait_name',
-    }));
+        }),
+        search: req.query.search,
+    });
     res.json(result);
 }));
 
