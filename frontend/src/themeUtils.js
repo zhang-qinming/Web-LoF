@@ -198,6 +198,50 @@ export function plotFrameSx(theme, overrides = {}) {
     });
 }
 
+export function buildPlotHoverTone(theme, color, options = {}) {
+    const {
+        bgAlpha = 0.16,
+        borderAlpha = 0.42,
+        fontColor = theme.palette.text.primary,
+        fontSize = 12,
+        family = theme.typography.fontFamily,
+        align = 'left',
+    } = options;
+
+    return {
+        bgcolor: alpha(color, bgAlpha),
+        bordercolor: alpha(color, borderAlpha),
+        font: {
+            color: fontColor,
+            size: fontSize,
+            family,
+        },
+        align,
+    };
+}
+
+export function buildPlotHoverToneArray(theme, colors, options = {}) {
+    const {
+        bgAlpha = 0.16,
+        borderAlpha = 0.42,
+        fontColor = theme.palette.text.primary,
+        fontSize = 12,
+        family = theme.typography.fontFamily,
+        align = 'left',
+    } = options;
+
+    return {
+        bgcolor: colors.map((color) => alpha(color, bgAlpha)),
+        bordercolor: colors.map((color) => alpha(color, borderAlpha)),
+        font: {
+            color: fontColor,
+            size: fontSize,
+            family,
+        },
+        align,
+    };
+}
+
 export function sectionPanelHeaderSx(theme, overrides = {}) {
     return {
         display: 'flex',

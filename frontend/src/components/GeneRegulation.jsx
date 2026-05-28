@@ -16,6 +16,7 @@ import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import GeneRegulationTable from './GeneRegulationTable';
 import {
+    buildPlotHoverTone,
     chartLayoutTokens,
     compactToggleGroupSx,
     metricChipTone,
@@ -31,12 +32,12 @@ const MIN_EFFECT_SPAN = 0.65;
 const PLOT_HEIGHT = 520;
 
 const CLASS_STYLE = {
-    nodata:      { color: '#d8dde6', hoverBg: 'rgba(216,221,230,0.32)', size: 4, opacity: 0.26, name: 'No data' },
-    ns:          { color: '#c3ccd8', hoverBg: 'rgba(195,204,216,0.22)', size: 6, opacity: 0.44, name: 'Background' },
-    sig_up:      { color: '#fb986d', hoverBg: 'rgba(251,152,109,0.18)', size: 7, opacity: 0.62, name: 'Positive hit' },
-    sig_down:    { color: '#79b9f2', hoverBg: 'rgba(121,185,242,0.18)', size: 7, opacity: 0.62, name: 'Negative hit' },
-    top100_up:   { color: '#dc7141', hoverBg: 'rgba(220,113,65,0.24)',  size: 8, opacity: 0.88, name: 'Top positive' },
-    top100_down: { color: '#4b92df', hoverBg: 'rgba(75,146,223,0.24)',  size: 8, opacity: 0.88, name: 'Top negative' },
+    nodata:      { color: '#d8dde6', size: 4, opacity: 0.26, name: 'No data' },
+    ns:          { color: '#c3ccd8', size: 6, opacity: 0.44, name: 'Background' },
+    sig_up:      { color: '#fb986d', size: 7, opacity: 0.62, name: 'Positive hit' },
+    sig_down:    { color: '#79b9f2', size: 7, opacity: 0.62, name: 'Negative hit' },
+    top100_up:   { color: '#dc7141', size: 8, opacity: 0.88, name: 'Top positive' },
+    top100_down: { color: '#4b92df', size: 8, opacity: 0.88, name: 'Top negative' },
 };
 
 function quantile(sortedValues, ratio) {
@@ -313,7 +314,10 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
                     text: group.text,
                     customdata: group.customdata,
                     hovertemplate: '%{text}<extra></extra>',
-                    hoverlabel: { bgcolor: style.hoverBg, font: { color: theme.palette.text.primary, size: 12, family: theme.typography.fontFamily } },
+                    hoverlabel: buildPlotHoverTone(theme, style.color, {
+                        bgAlpha: category === 'nodata' ? 0.2 : 0.18,
+                        borderAlpha: category.startsWith('top100') ? 0.46 : 0.38,
+                    }),
                     name: style.name,
                     showlegend: show,
                     legendgroup: category,
@@ -355,7 +359,7 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
                 yaxis: { ...baseYaxis, range: [-0.5, maxY * 1.08] },
             },
         };
-    }, [breakInfo, chartTokens, classify, rows, theme.palette.text.primary, theme.typography.fontFamily]);
+    }, [breakInfo, chartTokens, classify, rows, theme]);
 
     const [exportOpen, setExportOpen] = useState(false);
     const [expW, setExpW] = useState(1200);
@@ -395,6 +399,7 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
     const [sortDir, setSortDir] = useState('asc');
     const [highlightGene, setHighlightGene] = useState({ gene: null, key: 0 });
     const [fullscreen, setFullscreen] = useState(false);
+    const [legendCollapsed, setLegendCollapsed] = useState(false);
 
     useEffect(() => {
         if (!fullscreen) return;
@@ -704,11 +709,14 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
                             />
                             <FloatingLegend
                                 items={legendItems}
+                                collapsed={legendCollapsed}
+                                onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
                                 title="Signals"
-                                width={{ expanded: 188, collapsed: 120 }}
+                                width={{ expanded: 192, collapsed: 118 }}
                                 defaultPlacement="right"
-                                defaultTop={84}
+                                defaultTop={78}
                                 defaultSideOffset={10}
+                                anchorPlotRef={plotElRef}
                             />
                             <GeneRegulationTable
                                 rows={rows}
@@ -771,6 +779,8 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
                         data={plotData}
                         layout={{ ...layout, title: titleText, margin: { l: 80, r: 30, t: 50, b: 50 } }}
                         config={plotConfig}
+                        onInitialized={onInitialized}
+                        onUpdate={onInitialized}
                         onClick={(evt) => {
                             if (!evt?.points?.length) return;
                             const gene = evt.points[0].customdata?.[0];
@@ -784,11 +794,14 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
                     />
                     <FloatingLegend
                         items={legendItems}
+                        collapsed={legendCollapsed}
+                        onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
                         title="Signals"
-                        width={{ expanded: 188, collapsed: 120 }}
+                        width={{ expanded: 192, collapsed: 118 }}
                         defaultPlacement="right"
                         defaultTop={58}
                         defaultSideOffset={18}
+                        anchorPlotRef={plotElRef}
                     />
                 </Box>
             )}

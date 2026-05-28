@@ -8,6 +8,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import GeneRegulation from '../components/GeneRegulation';
+import ProgramAssociatedTraits from '../components/ProgramAssociatedTraits';
 import { PageFrame } from '../components/PageScaffold';
 import { panelSx, sectionTitleSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
@@ -52,8 +53,11 @@ export default function Programs() {
         return (
             <Box sx={{ width: '100%', maxWidth: 1440, mx: 'auto', px: { xs: 1, sm: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
                 <Typography variant="h5" sx={sectionTitleSx(theme, { mb: 1.25 })}>Program {programId}</Typography>
-                <GeneRegulation programId={regId} programs={programs}
-                    onProgramChange={(id) => navigate(`/programs/P${id}`)} />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <ProgramAssociatedTraits programId={programId} />
+                    <GeneRegulation programId={regId} programs={programs}
+                        onProgramChange={(id) => navigate(`/programs/P${id}`)} />
+                </Box>
             </Box>
         );
     }

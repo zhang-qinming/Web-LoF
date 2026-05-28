@@ -508,7 +508,6 @@ router.get('/api/data/search', asyncRoute(async (req, res) => {
     const q = String(req.query.q || '').trim().toLowerCase().slice(0, config.data.maxSearchQueryLength);
     if (!q || q.length < 2) return res.json({ results: [], totalCount: 0, truncated: false });
 
-    const limit = parsePositiveInt(req.query.limit, 60, 200);
     const forceRefresh = config.data.allowSearchRefresh && req.query.refresh === '1';
     const searchIndex = await getSearchIndex(forceRefresh);
     const matches = searchIndex.filter((entry) => entry.nameLower.includes(q) || entry.pathLower.includes(q));
@@ -521,7 +520,7 @@ router.get('/api/data/search', asyncRoute(async (req, res) => {
         || a.path.localeCompare(b.path)
     ));
 
-    const results = matches.slice(0, limit).map(({ name, path: relPath, type, size }) => ({
+    const results = matches.map(({ name, path: relPath, type, size }) => ({
         name,
         path: relPath,
         type,
@@ -531,7 +530,7 @@ router.get('/api/data/search', asyncRoute(async (req, res) => {
     res.json({
         results,
         totalCount: matches.length,
-        truncated: matches.length > limit,
+        truncated: false,
     });
 }));
 

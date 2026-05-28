@@ -15,6 +15,7 @@ import ProgramScatterTable from './ProgramScatterTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
+    buildPlotHoverTone,
     chartLayoutTokens,
     compactToggleGroupSx,
     metricChipTone,
@@ -234,6 +235,7 @@ export default function ProgramScatter({ fileId }) {
     const [expW, setExpW] = useState(1200);
     const [expH, setExpH] = useState(800);
     const [expFmt, setExpFmt] = useState('svg');
+    const [legendCollapsed, setLegendCollapsed] = useState(false);
     const exportGdRef = useRef(null);
     const [tableOpen, setTableOpen] = useState(false);
     const [sortBy, setSortBy] = useState('progScore');
@@ -493,6 +495,10 @@ export default function ProgramScatter({ fileId }) {
             legendgroup: key,
             showlegend: true,
             hovertemplate: '%{hovertext}<extra></extra>',
+            hoverlabel: buildPlotHoverTone(theme, COLORS[key], {
+                bgAlpha: key === 'other' ? 0.14 : 0.18,
+                borderAlpha: key === 'other' ? 0.26 : 0.4,
+            }),
             hovertext: pts.map((item) => {
                 const programKey = formatProgramId(item.program);
                 const info = programInfo[programKey] || programInfo[item.program] || {};
@@ -500,7 +506,7 @@ export default function ProgramScatter({ fileId }) {
             }),
             customdata: pts.map((item) => [item.program]),
         };
-    }), [getBubbleSize, markerSize, mode, programInfo, showLabels, visibleRowsByColor]);
+    }), [getBubbleSize, markerSize, mode, programInfo, showLabels, theme, visibleRowsByColor]);
 
     const axisRanges = useMemo(() => {
         if (mode === MODES.SCATTER) {
@@ -789,11 +795,14 @@ export default function ProgramScatter({ fileId }) {
                             />
                             <FloatingLegend
                                 items={legendItems}
+                                collapsed={legendCollapsed}
+                                onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
                                 title="Categories"
-                                width={{ expanded: 194, collapsed: 122 }}
+                                width={{ expanded: 190, collapsed: 118 }}
                                 defaultPlacement="right"
-                                defaultTop={72}
+                                defaultTop={68}
                                 defaultSideOffset={10}
+                                anchorPlotRef={plotElRef}
                             />
                         </>
                     )}

@@ -10,6 +10,8 @@ import TraitProgramGraph from '../components/TraitProgramGraph';
 import GwasDataList from '../components/GwasDataList';
 import TraitHitManhattan from '../components/TraitHitManhattan';
 import BurdenVolcano from '../components/BurdenVolcano';
+import GeneLevelScatter from '../components/GeneLevelScatter';
+import GeneLevelQQ from '../components/GeneLevelQQ';
 import TraitMetaCard from '../components/TraitMetaCard';
 import { sectionTitleSx } from '../themeUtils';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
@@ -101,6 +103,8 @@ export default function Trait() {
                 <Tab label="Manhattan" />
                 <Tab label="Burden Volcano" />
                 <Tab label="Posterior Volcano" />
+                <Tab label="Gene Evidence" />
+                <Tab label="Gene QQ" />
             </Tabs>
 
             <Box sx={{ minHeight: 400 }}>
@@ -152,6 +156,24 @@ export default function Trait() {
                         gwasId={gwasId}
                         traitLabel={meta?.trait_name || fileId}
                         volcanoType="posterior"
+                    />
+                )}
+                {tab === 5 && (
+                    <GeneLevelScatter
+                        key={`gene-level-scatter-${fileId}-${gwasId}`}
+                        fileId={fileId}
+                        gwasId={gwasId}
+                        traitLabel={meta?.trait_name || fileId}
+                        lookupIds={dataIdCandidates}
+                    />
+                )}
+                {tab === 6 && (
+                    <GeneLevelQQ
+                        key={`gene-level-qq-${fileId}-${gwasId}`}
+                        fileId={fileId}
+                        gwasId={gwasId}
+                        traitLabel={meta?.trait_name || fileId}
+                        lookupIds={dataIdCandidates}
                     />
                 )}
             </Box>

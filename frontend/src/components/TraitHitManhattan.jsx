@@ -39,6 +39,8 @@ import TraitHitManhattanTable from './TraitHitManhattanTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
+    buildPlotHoverTone,
+    buildPlotHoverToneArray,
     chartLayoutTokens,
     compactToggleGroupSx,
     metricChipTone,
@@ -109,12 +111,6 @@ const GWAS_HIT_LOGP = -Math.log10(5e-8);
 
 function sanitizeFileNamePart(value) {
     return String(value || 'plot').replace(/[\\/:*?"<>|]+/g, '_');
-}
-
-function compactFileName(value, maxLength = 42) {
-    const text = String(value || 'not found');
-    if (text.length <= maxLength) return text;
-    return `${text.slice(0, 18)}...${text.slice(-18)}`;
 }
 
 function normalizeChromosome(value) {
@@ -218,7 +214,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
     const [colorMode, setColorMode] = useState('program');
-    const [legendCollapsed, setLegendCollapsed] = useState(true);
+    const [legendCollapsed, setLegendCollapsed] = useState(false);
     const [tablePage, setTablePage] = useState(0);
     const [tableRowsPerPage, setTableRowsPerPage] = useState(50);
     const deferredGeneQuery = useDeferredValue(geneQuery);
@@ -480,6 +476,10 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 name: 'Below hit threshold',
                 showlegend: false,
                 hovertemplate: HOVER_TEMPLATE,
+                hoverlabel: buildPlotHoverToneArray(theme, fullBackground.colors, {
+                    bgAlpha: 0.16,
+                    borderAlpha: 0.36,
+                }),
                 marker: {
                     size: 5.2,
                     color: fullBackground.colors,
@@ -499,6 +499,10 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 name: 'No program',
                 showlegend: false,
                 hovertemplate: HOVER_TEMPLATE,
+                hoverlabel: buildPlotHoverTone(theme, UNASSIGNED_COLOR, {
+                    bgAlpha: 0.14,
+                    borderAlpha: 0.28,
+                }),
                 marker: {
                     size: 5.4,
                     color: UNASSIGNED_COLOR,
@@ -518,6 +522,10 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 name: 'Program annotated',
                 showlegend: false,
                 hovertemplate: HOVER_TEMPLATE,
+                hoverlabel: buildPlotHoverToneArray(theme, assigned.colors, {
+                    bgAlpha: 0.18,
+                    borderAlpha: 0.42,
+                }),
                 marker: {
                     size: 7.5,
                     color: assigned.colors,
@@ -528,7 +536,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         }
 
         return traces;
-    }, [chromosomeIndexMap, colorField, colorMap, processedRows, variantLabel]);
+    }, [chromosomeIndexMap, colorField, colorMap, processedRows, theme, variantLabel]);
 
     const legendItems = useMemo(() => {
         const counts = new Map();
@@ -856,37 +864,21 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 />
                 <Chip
                     icon={<Insights sx={{ fontSize: 15 }} />}
-                    label={`${summary.withProgram.toLocaleString()} with program`}
+                    label={`${summary.withProgram.toLocaleString()} program`}
                     size="small"
                     sx={baseChipSx('primary')}
                 />
                 <Chip
                     icon={<Timeline sx={{ fontSize: 15 }} />}
-                    label={`${summary.withGeneset.toLocaleString()} with geneset`}
+                    label={`${summary.withGeneset.toLocaleString()} geneset`}
                     size="small"
                     sx={baseChipSx('accent')}
                 />
                 <Chip
                     icon={<Place sx={{ fontSize: 15 }} />}
-                    label={`${summary.distanceBuckets.in_gene.toLocaleString()} in gene`}
+                    label={`${summary.distanceBuckets.in_gene.toLocaleString()} in-gene`}
                     size="small"
                     sx={baseChipSx('success')}
-                />
-                <Chip
-                    label={variantLabel === 'full' ? 'Full TSV' : 'Hits TSV'}
-                    size="small"
-                    sx={baseChipSx(variantLabel === 'full' ? 'success' : 'subtle', { fontFamily: 'monospace' })}
-                />
-                <Chip
-                    label={`GWAS ${gwasId || 'NA'}`}
-                    size="small"
-                    sx={baseChipSx('subtle', { fontFamily: 'monospace' })}
-                />
-                <Chip
-                    label={`TSV ${compactFileName(payload?.fileName)}`}
-                    title={payload?.fileName || 'No TSV matched on the backend'}
-                    size="small"
-                    sx={baseChipSx('subtle', { maxWidth: 280, fontFamily: 'monospace' })}
                 />
             </Box>
 
@@ -1060,6 +1052,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                                 collapsed={legendCollapsed}
                                 onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
                                 title={colorModeTitle}
+                                anchorPlotRef={plotRef}
                             />
                         </Box>
                     )}

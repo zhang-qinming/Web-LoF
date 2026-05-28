@@ -1,5 +1,6 @@
 const express = require('express');
 const programModel = require('../models/Mprogram');
+const geneProgramModel = require('../models/MgeneProgram');
 const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
@@ -432,6 +433,14 @@ router.get('/api/programs/:fileId', asyncRoute(async (req, res) => {
     if (!data) return res.status(404).json({ error: 'Not found' });
 
     res.json({ data });
+}));
+
+router.get('/api/programs/:programId/traits', asyncRoute(async (req, res) => {
+    const safeProgramId = normalizeSafeBaseName(req.params.programId);
+    if (!safeProgramId) return res.status(400).json({ error: 'Invalid programId' });
+
+    const data = await geneProgramModel.getProgramTraits(safeProgramId);
+    res.json(data);
 }));
 
 router.get('/api/programs/:fileId/graph', asyncRoute(async (req, res) => {

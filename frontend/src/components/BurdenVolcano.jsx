@@ -34,6 +34,7 @@ import FloatingLegend from './FloatingLegend';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
+    buildPlotHoverTone,
     chartLayoutTokens,
     controlFieldSx,
     metricChipTone,
@@ -103,12 +104,6 @@ function sanitizeFileNamePart(value) {
     return String(value || 'plot').replace(/[\\/:*?"<>|]+/g, '_');
 }
 
-function compactFileName(value, maxLength = 42) {
-    const text = String(value || 'not found');
-    if (text.length <= maxLength) return text;
-    return `${text.slice(0, 18)}...${text.slice(-18)}`;
-}
-
 function normalizeExportSize(value, fallback) {
     const num = Number(value);
     if (!Number.isFinite(num)) return fallback;
@@ -168,6 +163,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const [exportWidth, setExportWidth] = useState(DEFAULT_EXPORT_WIDTH);
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
+    const [legendCollapsed, setLegendCollapsed] = useState(false);
 
     const onInitialized = useCallback((_figure, graphDiv) => {
         plotRef.current = graphDiv;
@@ -345,9 +341,13 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 'Geneset: %{customdata[7]}',
                 '<extra></extra>',
             ].join('<br>'),
+            hoverlabel: buildPlotHoverTone(theme, COLORS[key], {
+                bgAlpha: 0.18,
+                borderAlpha: 0.4,
+            }),
             showlegend: true,
         })).filter((trace) => trace.x.length > 0);
-    }, [effectLabel, filteredRows, includePosteriorColumns, pointSize]);
+    }, [effectLabel, filteredRows, includePosteriorColumns, pointSize, theme]);
 
     const highlightedPoint = useMemo(() => {
         if (!highlight.rowKey) return [];
@@ -627,14 +627,6 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 <Chip icon={<Insights />} label={`${counts.significant.toLocaleString()} highlighted`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
                 <Chip icon={<Science />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(theme.palette.warning.main, 0.1), color: COLORS.positive, border: `1px solid ${alpha(COLORS.positive, 0.22)}` })} />
                 <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(theme.palette.primary.main, 0.08), color: COLORS.negative, border: `1px solid ${alpha(COLORS.negative, 0.2)}` })} />
-                <Chip label={variantLabel === 'full' ? 'Full TSV' : 'Hits TSV'} size="small" sx={summaryChipSx(theme, { ...metricChipTone(theme, 'success'), fontFamily: 'monospace' })} />
-                <Chip label={`GWAS ${gwasId || 'NA'}`} size="small" sx={summaryChipSx(theme, { ...metricChipTone(theme, 'subtle'), fontFamily: 'monospace' })} />
-                <Chip
-                    label={`TSV ${compactFileName(payload?.fileName)}`}
-                    title={payload?.fileName || 'No TSV matched on the backend'}
-                    size="small"
-                    sx={summaryChipSx(theme, { maxWidth: 280, ...metricChipTone(theme, 'subtle'), fontFamily: 'monospace' })}
-                />
             </Box>
 
             <Box sx={toolbarSx(theme)}>
@@ -727,11 +719,14 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                             />
                             <FloatingLegend
                                 items={legendItems}
+                                collapsed={legendCollapsed}
+                                onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
                                 title="Effects"
-                                width={{ expanded: 176, collapsed: 118 }}
+                                width={{ expanded: 184, collapsed: 116 }}
                                 defaultPlacement="right"
-                                defaultTop={116}
+                                defaultTop={108}
                                 defaultSideOffset={10}
+                                anchorPlotRef={plotRef}
                             />
                         </>
                     )}

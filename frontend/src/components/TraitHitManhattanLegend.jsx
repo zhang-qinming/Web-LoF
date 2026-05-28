@@ -6,6 +6,7 @@ export default function TraitHitManhattanLegend({
     collapsed,
     onToggleCollapsed,
     title = 'Programs',
+    anchorPlotRef,
 }) {
     return (
         <FloatingLegend
@@ -13,11 +14,12 @@ export default function TraitHitManhattanLegend({
             collapsed={collapsed}
             onToggleCollapsed={onToggleCollapsed}
             title={title}
-            width={{ expanded: 186, collapsed: 120 }}
-            maxHeight={268}
+            width={{ expanded: 196, collapsed: 118 }}
+            maxHeight={282}
             defaultPlacement="right"
-            defaultTop={84}
+            defaultTop={78}
             defaultSideOffset={12}
+            anchorPlotRef={anchorPlotRef}
         />
     );
 }

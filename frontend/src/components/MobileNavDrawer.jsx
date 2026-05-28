@@ -161,7 +161,6 @@ export default function MobileNavDrawer({ links }) {
                 anchor={drawerAnchor}
                 open={open}
                 onClose={toggle(false)}
-                ModalProps={{ keepMounted: true }}
                 PaperProps={{
                     sx: {
                         width: drawerWidth,

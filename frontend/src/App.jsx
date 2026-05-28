@@ -9,6 +9,7 @@ import {
     FaInfoCircle,
     FaListAlt,
     FaProjectDiagram,
+    FaQuestionCircle,
 } from 'react-icons/fa';
 import MobileNavDrawer from './components/MobileNavDrawer.jsx';
 import { StatePanel } from './components/PageScaffold.jsx';
@@ -16,6 +17,7 @@ import { StatePanel } from './components/PageScaffold.jsx';
 const Home = React.lazy(() => import('./routes/Home.jsx'));
 const About = React.lazy(() => import('./routes/About.jsx'));
 const Contact = React.lazy(() => import('./routes/Contact.jsx'));
+const Help = React.lazy(() => import('./routes/Help.jsx'));
 const Trait = React.lazy(() => import('./routes/Trait.jsx'));
 const Genes = React.lazy(() => import('./routes/Genes.jsx'));
 const Variants = React.lazy(() => import('./routes/Variants.jsx'));
@@ -27,6 +29,7 @@ const navLinks = [
     { to: '/programs', icon: <FaProjectDiagram />, label: 'Programs' },
     { to: '/genes', icon: <FaDna />, label: 'Genes' },
     { to: '/data', icon: <FaFolderOpen />, label: 'Data' },
+    { to: '/help', icon: <FaQuestionCircle />, label: 'Guide' },
     { to: '/contact', icon: <FaEnvelope />, label: 'Contact' },
     { to: '/about', icon: <FaInfoCircle />, label: 'About' },
 ];
@@ -77,6 +80,7 @@ function App() {
                             <Route path="/trait/:traitName" element={<Trait />} />
                             <Route path="/genes" element={<Genes />} />
                             <Route path="/data" element={<Variants />} />
+                            <Route path="/help" element={<Help />} />
                             <Route path="/programs" element={<Programs />} />
                             <Route path="/programs/:programId" element={<Programs />} />
                             <Route path="*" element={<NotFound />} />

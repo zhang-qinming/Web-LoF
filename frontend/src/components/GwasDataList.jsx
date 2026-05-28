@@ -356,7 +356,7 @@ export default function GwasDataList({
 
                 <CardContent sx={{ p: 0 }}>
                     <Box sx={{ position: 'relative' }}>
-                        <TableContainer component={Paper} elevation={0} sx={{ border: `1px solid ${theme.custom.border.soft}`, borderRadius: 0, maxHeight: 600, overflow: 'auto' }}>
+                        <TableContainer component={Paper} elevation={0} sx={{ border: 0, borderRadius: 0, maxHeight: 600, overflow: 'auto', boxShadow: 'none', backgroundColor: 'transparent' }}>
                             <Table stickyHeader>
                                 <TableHead>
                                     <TableRow>

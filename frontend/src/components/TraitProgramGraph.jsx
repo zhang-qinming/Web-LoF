@@ -38,6 +38,13 @@ const PROGRAM_COLORS = {
     both_enriched: '#3ca370',
 };
 
+const PROGRAM_SELECTION_LABELS = {
+    other: 'Other',
+    program_enriched: 'program',
+    regulator_enriched: 'regulator',
+    both_enriched: 'both',
+};
+
 const SIDE_META = {
     program: {
         label: 'Program burden selected',
@@ -65,7 +72,7 @@ const DEFAULT_MAX_GENES = 8;
 const SVG_WIDTH = 1680;
 const TRAIT_CENTER_X = 560;
 const TRAIT_NODE_W = 232;
-const TRAIT_NODE_H = 128;
+const TRAIT_NODE_MIN_H = 128;
 const LEFT_PROGRAM_X = 24;
 const LEFT_PROGRAM_W = 266;
 const RIGHT_PROGRAM_X = 820;
@@ -91,7 +98,7 @@ const INLINE_LEGEND_GROUPS = [
         ],
     },
     {
-        label: 'Program',
+        label: 'Selected by',
         items: [
             { label: 'program', color: PROGRAM_COLORS.program_enriched },
             { label: 'regulator', color: PROGRAM_COLORS.regulator_enriched },
@@ -120,6 +127,7 @@ function formatNumber(value, digits = 3) {
 function formatProgramTooltip(program) {
     return [
         `Program: ${program.program}`,
+        `Selected by: ${programSelectionLabel(program)}`,
         `Selected side: ${program.selectedSide}`,
         `Program score: ${formatNumber(program.programScore)}`,
         `Regulator score: ${formatNumber(program.regulatorScore)}`,
@@ -171,14 +179,29 @@ function effectColorFromGene(gene) {
     return EFFECT_COLORS[effectSignFromGene(gene)];
 }
 
+function programSelectionKey(program) {
+    if (program.selectedByProgram && program.selectedByRegulator) return 'both_enriched';
+    if (program.selectedByProgram) return 'program_enriched';
+    if (program.selectedByRegulator) return 'regulator_enriched';
+    return 'other';
+}
+
 function programColor(program) {
-    if (program.colorKey && program.colorKey !== 'other') {
-        return PROGRAM_COLORS[program.colorKey] || PROGRAM_COLORS.other;
-    }
-    if (program.selectedByProgram && program.selectedByRegulator) return PROGRAM_COLORS.both_enriched;
-    if (program.selectedByProgram) return PROGRAM_COLORS.program_enriched;
-    if (program.selectedByRegulator) return PROGRAM_COLORS.regulator_enriched;
-    return PROGRAM_COLORS.other;
+    return PROGRAM_COLORS[programSelectionKey(program)] || PROGRAM_COLORS.other;
+}
+
+function programSelectionLabel(program) {
+    return PROGRAM_SELECTION_LABELS[programSelectionKey(program)] || 'Other';
+}
+
+function programFillOpacity(program, muted) {
+    if (muted) return 0.2;
+    return programSelectionKey(program) === 'other' ? 0.12 : 0.42;
+}
+
+function programStripeOpacity(program, muted) {
+    if (programSelectionKey(program) === 'other') return muted ? 0.18 : 0.32;
+    return muted ? 0.38 : 0.95;
 }
 
 function displayColumnFromGene(gene) {
@@ -305,6 +328,61 @@ function splitTextLines(value, maxChars = 22, maxLines = 2) {
     return limited;
 }
 
+function normalizeTraitLabel(value) {
+    const normalized = String(value || '')
+        .trim()
+        .replace(/^[`"'“”‘’]+|[`"'“”‘’]+$/g, '')
+        .replace(/\s+/g, ' ');
+    return normalized.trim();
+}
+
+function splitTraitTextLines(value, maxChars = 18) {
+    const words = normalizeTraitLabel(value).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+
+    const lines = [];
+    let current = '';
+
+    const pushPiece = (piece) => {
+        if (!current) {
+            current = piece;
+            return;
+        }
+
+        if (`${current} ${piece}`.length <= maxChars) {
+            current = `${current} ${piece}`;
+            return;
+        }
+
+        lines.push(current);
+        current = piece;
+    };
+
+    words.forEach((word) => {
+        if (word.length <= maxChars) {
+            pushPiece(word);
+            return;
+        }
+
+        if (current) {
+            lines.push(current);
+            current = '';
+        }
+
+        for (let index = 0; index < word.length; index += maxChars) {
+            lines.push(word.slice(index, index + maxChars));
+        }
+    });
+
+    if (current) lines.push(current);
+    return lines;
+}
+
+function traitNodeHeight(lines) {
+    const extraLines = Math.max(0, lines.length - 2);
+    return TRAIT_NODE_MIN_H + (extraLines * 22);
+}
+
 function programDisplayLines(module, maxChars = 22) {
     const label = module.annotation ? `${module.program} ${module.annotation}` : module.program;
     return splitTextLines(label, maxChars, 2);
@@ -313,7 +391,9 @@ function programDisplayLines(module, maxChars = 22) {
 function traitTextFontSize(lines) {
     const longest = Math.max(...lines.map((line) => line.length), 0);
     if (lines.length <= 1) return longest <= 8 ? 29 : 24;
-    return longest <= 8 ? 24 : 21;
+    if (lines.length === 2) return longest <= 10 ? 24 : 21;
+    if (lines.length === 3) return longest <= 12 ? 20 : 18;
+    return 17;
 }
 
 function edgeEndpoint(startX, startY, endX, endY, distanceFromEnd) {
@@ -326,9 +406,9 @@ function edgeEndpoint(startX, startY, endX, endY, distanceFromEnd) {
     };
 }
 
-function traitPortY(index, total) {
+function traitPortY(index, total, traitNodeHeightValue) {
     if (total <= 1) return 0;
-    const usableHeight = TRAIT_NODE_H - (TRAIT_PORT_INSET * 2);
+    const usableHeight = traitNodeHeightValue - (TRAIT_PORT_INSET * 2);
     return -usableHeight / 2 + ((usableHeight / (total - 1)) * index);
 }
 
@@ -463,6 +543,22 @@ function useGraphTransform() {
     const dragRef = useRef(null);
     const suppressClickUntilRef = useRef(0);
 
+    const trySetPointerCapture = useCallback((target, pointerId) => {
+        try {
+            target?.setPointerCapture?.(pointerId);
+        } catch {
+            // Ignore invalid pointer capture transitions from rapid browser event sequences.
+        }
+    }, []);
+
+    const tryReleasePointerCapture = useCallback((target, pointerId) => {
+        try {
+            target?.releasePointerCapture?.(pointerId);
+        } catch {
+            // Ignore release calls after the browser already cleared the capture state.
+        }
+    }, []);
+
     const onPointerDown = useCallback((event) => {
         if (event.target.closest?.('[data-graph-clickable="true"]')) return;
 
@@ -475,22 +571,23 @@ function useGraphTransform() {
             moved: false,
         };
         setIsDragging(true);
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-    }, [transform.x, transform.y]);
+        trySetPointerCapture(event.currentTarget, event.pointerId);
+    }, [transform.x, transform.y, trySetPointerCapture]);
 
     const onPointerMove = useCallback((event) => {
-        if (!dragRef.current || dragRef.current.id !== event.pointerId) return;
+        const dragState = dragRef.current;
+        if (!dragState || dragState.id !== event.pointerId) return;
 
-        const dx = event.clientX - dragRef.current.x;
-        const dy = event.clientY - dragRef.current.y;
-        if (!dragRef.current.moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
-            dragRef.current.moved = true;
+        const dx = event.clientX - dragState.x;
+        const dy = event.clientY - dragState.y;
+        if (!dragState.moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+            dragState.moved = true;
         }
 
         setTransform((current) => ({
             ...current,
-            x: dragRef.current.startX + dx,
-            y: dragRef.current.startY + dy,
+            x: dragState.startX + dx,
+            y: dragState.startY + dy,
         }));
     }, []);
 
@@ -501,9 +598,9 @@ function useGraphTransform() {
             }
             dragRef.current = null;
             setIsDragging(false);
-            event.currentTarget.releasePointerCapture?.(event.pointerId);
+            tryReleasePointerCapture(event.currentTarget, event.pointerId);
         }
-    }, []);
+    }, [tryReleasePointerCapture]);
 
     const onWheel = useCallback((event) => {
         if (!event.ctrlKey && !event.metaKey) return;
@@ -668,8 +765,6 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
     const [selectedProgram, setSelectedProgram] = useState(null);
     const [selectedGene, setSelectedGene] = useState(null);
     const [expandedPrograms, setExpandedPrograms] = useState(() => new Set());
-    const [hoverProgram, setHoverProgram] = useState(null);
-    const [hoverGene, setHoverGene] = useState(null);
 
     const {
         transform,
@@ -757,6 +852,10 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         if (sideFilter === 'regulator') return new Set(['regulator']);
         return new Set(['program', 'regulator']);
     }, [sideFilter]);
+    const summaryModules = useMemo(
+        () => allModules.filter((module) => visibleSides.has(module.side)),
+        [allModules, visibleSides],
+    );
 
     useEffect(() => {
         if (!selectedProgram) return;
@@ -815,26 +914,17 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         setSelectedGene(null);
     }, []);
 
-    const selectedProgramNode = useMemo(
-        () => graph?.programs?.find((program) => program.program === selectedProgram) || null,
-        [graph, selectedProgram],
-    );
     const selectedGeneOccurrences = useMemo(
         () => (selectedGeneKey ? (geneOccurrences.get(selectedGeneKey) || []) : []),
         [geneOccurrences, selectedGeneKey],
     );
-    const selectedGenePrograms = useMemo(
-        () => [...new Set(selectedGeneOccurrences.map((gene) => gene.program))],
-        [selectedGeneOccurrences],
-    );
 
-    const inspectorGene = hoverGene || selectedGene;
-    const inspectorProgram = hoverProgram || selectedProgramNode;
     const traitDisplayLines = useMemo(() => {
         const label = traitLabel || graph?.traitNode?.label || fileId;
-        return splitTextLines(label, 13, 2);
+        return splitTraitTextLines(label, 18);
     }, [fileId, graph?.traitNode?.label, traitLabel]);
     const traitFontSize = useMemo(() => traitTextFontSize(traitDisplayLines), [traitDisplayLines]);
+    const traitNodeHeightValue = useMemo(() => traitNodeHeight(traitDisplayLines), [traitDisplayLines]);
 
     const renderGeneColumns = useCallback(({
         columns,
@@ -869,8 +959,6 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                     key={`${gene.id}:${column}`}
                     data-graph-clickable="true"
                     onClick={() => handleSelectGene(gene)}
-                    onMouseEnter={() => setHoverGene(gene)}
-                    onMouseLeave={() => setHoverGene(null)}
                     style={{ cursor: 'pointer' }}
                 >
                     <text
@@ -920,7 +1008,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         const edgeStyle = computeEdgeStyle(score, edgeHighlighted, muted);
         const centerY = module.yCenter;
         const traitLeftX = TRAIT_CENTER_X - (TRAIT_NODE_W / 2);
-        const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, leftLayout.modules.length);
+        const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, leftLayout.modules.length, traitNodeHeightValue);
         const boxHeight = module.height;
         const titleLines = programDisplayLines(module, 19);
         const nodeColor = programColor(module);
@@ -941,8 +1029,6 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 <g
                     data-graph-clickable="true"
                     onClick={() => handleSelectProgram(module.program)}
-                    onMouseEnter={() => setHoverProgram(module)}
-                    onMouseLeave={() => setHoverProgram(null)}
                     style={{ cursor: 'pointer' }}
                 >
                     <rect
@@ -951,10 +1037,20 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         width={LEFT_PROGRAM_W}
                         height={boxHeight}
                         rx="6"
-                        fill="#fff"
-                        fillOpacity={muted ? 0.38 : 1}
+                        fill={nodeColor}
+                        fillOpacity={programFillOpacity(module, muted)}
                         stroke={isProgramSelected ? '#111' : nodeColor}
                         strokeWidth={isProgramSelected ? 3.2 : 2.6}
+                    />
+                    <rect
+                        x={LEFT_PROGRAM_X}
+                        y={module.yTop}
+                        width="12"
+                        height={boxHeight}
+                        rx="6"
+                        fill={nodeColor}
+                        fillOpacity={programStripeOpacity(module, muted)}
+                        pointerEvents="none"
                     />
                     {titleLines.map((line, index) => (
                         <text
@@ -994,6 +1090,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         selectedProgram,
         leftLayout.modules.length,
         traitCenterY,
+        traitNodeHeightValue,
         visibleSides,
     ]);
 
@@ -1050,7 +1147,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         const programY = module.yCenter;
         const programBoxY = programY - (RIGHT_PROGRAM_H / 2);
         const traitRightX = TRAIT_CENTER_X + (TRAIT_NODE_W / 2);
-        const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, rightLayout.modules.length);
+        const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, rightLayout.modules.length, traitNodeHeightValue);
         const programLines = programDisplayLines(module, 19);
         const nodeColor = programColor(module);
         const groupLayouts = [];
@@ -1105,8 +1202,6 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 <g
                     data-graph-clickable="true"
                     onClick={() => handleSelectProgram(module.program)}
-                    onMouseEnter={() => setHoverProgram(module)}
-                    onMouseLeave={() => setHoverProgram(null)}
                     style={{ cursor: 'pointer' }}
                 >
                     <rect
@@ -1115,10 +1210,20 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         width={RIGHT_PROGRAM_W}
                         height={RIGHT_PROGRAM_H}
                         rx="5"
-                        fill="#fff"
-                        fillOpacity={muted ? 0.38 : 1}
+                        fill={nodeColor}
+                        fillOpacity={programFillOpacity(module, muted)}
                         stroke={isProgramSelected ? '#111' : nodeColor}
                         strokeWidth={isProgramSelected ? 3.2 : 2.4}
+                    />
+                    <rect
+                        x={RIGHT_PROGRAM_X}
+                        y={programBoxY}
+                        width="12"
+                        height={RIGHT_PROGRAM_H}
+                        rx="5"
+                        fill={nodeColor}
+                        fillOpacity={programStripeOpacity(module, muted)}
+                        pointerEvents="none"
                     />
                     {programLines.map((line, index) => (
                         <text
@@ -1151,6 +1256,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         selectedProgram,
         rightLayout.modules.length,
         traitCenterY,
+        traitNodeHeightValue,
         visibleSides,
     ]);
 
@@ -1300,24 +1406,24 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                     <Divider sx={{ my: 2 }} />
 
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                        <Chip label={`Programs ${graph.counts.totalPrograms}`} size="small" />
+                        <Chip label={`${graph.counts.totalPrograms} programs`} size="small" />
                         <Chip
-                            label={`Left ${graph.counts.leftPrograms}`}
+                            label={`${graph.counts.leftPrograms} left`}
                             size="small"
                             sx={{ color: SIDE_META.program.accent, borderColor: SIDE_META.program.accent }}
                             variant="outlined"
                         />
                         <Chip
-                            label={`Right ${graph.counts.rightPrograms}`}
+                            label={`${graph.counts.rightPrograms} right`}
                             size="small"
                             sx={{ color: SIDE_META.regulator.accent, borderColor: SIDE_META.regulator.accent }}
                             variant="outlined"
                         />
-                        <Chip label={`Hidden ${graph.counts.hiddenPrograms}`} size="small" variant="outlined" />
-                        <Chip label={`No overlap ${hiddenCollapsedCount}`} size="small" variant="outlined" />
+                        <Chip label={`${graph.counts.hiddenPrograms} hidden`} size="small" variant="outlined" />
+                        <Chip label={`${hiddenCollapsedCount} no overlap`} size="small" variant="outlined" />
                         {selectedProgram && (
                             <Chip
-                                label={`Program ${selectedProgram}`}
+                                label={selectedProgram}
                                 color="warning"
                                 size="small"
                                 onDelete={() => setSelectedProgram(null)}
@@ -1325,7 +1431,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         )}
                         {selectedGeneKey && (
                             <Chip
-                                label={`Gene ${selectedGene?.geneLabel || selectedGene?.gene || selectedGeneKey} in ${selectedGeneOccurrences.length} rows`}
+                                label={`${selectedGene?.geneLabel || selectedGene?.gene || selectedGeneKey} · ${selectedGeneOccurrences.length} rows`}
                                 color="primary"
                                 size="small"
                                 onDelete={() => setSelectedGene(null)}
@@ -1428,6 +1534,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                     onPointerDown={onPointerDown}
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
+                    onPointerCancel={onPointerUp}
                     onPointerLeave={onPointerUp}
                     onWheel={onWheel}
                 >
@@ -1475,9 +1582,9 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                             >
                                 <rect
                                     x={TRAIT_CENTER_X - (TRAIT_NODE_W / 2)}
-                                    y={traitCenterY - (TRAIT_NODE_H / 2)}
+                                    y={traitCenterY - (traitNodeHeightValue / 2)}
                                     width={TRAIT_NODE_W}
-                                    height={TRAIT_NODE_H}
+                                    height={traitNodeHeightValue}
                                     rx="7"
                                     fill="#929b9b"
                                     stroke="#111"
@@ -1487,7 +1594,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                                     <text
                                         key={line}
                                         x={TRAIT_CENTER_X}
-                                        y={traitCenterY + (traitDisplayLines.length === 1 ? 10 : -5) + (index * 24)}
+                                        y={traitCenterY - (((traitDisplayLines.length - 1) * 22) / 2) + 8 + (index * 22)}
                                         textAnchor="middle"
                                         fontSize={traitFontSize}
                                         fontWeight="900"
@@ -1518,10 +1625,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
 
             <Box
                 sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.8fr) minmax(280px, 0.75fr) minmax(260px, 0.65fr)' },
-                    gap: 2.5,
-                    alignItems: 'start',
+                    width: '100%',
                 }}
             >
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: 'rgba(15,23,42,0.10)' }}>
@@ -1531,159 +1635,22 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                     <Typography sx={{ fontSize: 13, color: '#667085', mb: 1.5 }}>
                         Select programs, compare scores, check filtered gene counts, and expand crowded modules.
                     </Typography>
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: { xs: '1fr', lg: visibleSides.size > 1 ? '1fr 1fr' : '1fr' },
-                            gap: 1.5,
-                        }}
-                    >
-                        {visibleSides.has('program') && (
-                            <TraitProgramGraphSummary
-                                title="Program burden side"
-                                modules={leftLayout.modules}
-                                side="program"
-                                selectedProgram={selectedProgram}
-                                onSelectProgram={handleSelectProgram}
-                                onToggleExpanded={toggleExpanded}
-                                sideMeta={SIDE_META.program}
-                                effectColors={EFFECT_COLORS}
-                                effectSignFromGene={effectSignFromGene}
-                                edgeColorFromScore={edgeColorFromScore}
-                                formatNumber={formatNumber}
-                            />
-                        )}
-
-                            {visibleSides.has('regulator') && (
-                                <TraitProgramGraphSummary
-                                    title="Regulator-program side"
-                                    modules={rightLayout.modules}
-                                    side="regulator"
-                                    selectedProgram={selectedProgram}
-                                onSelectProgram={handleSelectProgram}
-                                onToggleExpanded={toggleExpanded}
-                                sideMeta={SIDE_META.regulator}
-                                effectColors={EFFECT_COLORS}
-                                effectSignFromGene={effectSignFromGene}
-                                edgeColorFromScore={edgeColorFromScore}
-                                formatNumber={formatNumber}
-                            />
-                        )}
-                    </Box>
-                </Paper>
-
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: 'rgba(15,23,42,0.10)' }}>
-                    <Typography sx={{ fontWeight: 700, color: '#0f172a', mb: 1.6 }}>
-                        Inspector
-                    </Typography>
-
-                    {inspectorGene ? (
-                        <Stack spacing={1}>
-                            <Typography sx={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
-                                {inspectorGene.gene}
-                            </Typography>
-                            <Typography sx={{ fontSize: 12.5, color: '#667085' }}>
-                                Seen in {selectedGeneOccurrences.length || 1} rows across {selectedGenePrograms.length || 1} programs.
-                            </Typography>
-                            <Divider />
-                            <Typography component="pre" sx={{ m: 0, fontSize: 12, lineHeight: 1.65, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                                {formatGeneTooltip(inspectorGene)}
-                            </Typography>
-                            {selectedGenePrograms.length > 0 && (
-                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                    {selectedGenePrograms.map((program) => (
-                                        <Chip key={program} label={program} size="small" variant="outlined" />
-                                    ))}
-                                </Stack>
-                            )}
-                        </Stack>
-                    ) : inspectorProgram ? (
-                        <Stack spacing={1}>
-                            <Typography sx={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
-                                {inspectorProgram.program}
-                            </Typography>
-                            <Chip
-                                label={inspectorProgram.selectedSide}
-                                size="small"
-                                sx={{
-                                    alignSelf: 'flex-start',
-                                    bgcolor: inspectorProgram.selectedSide === 'program'
-                                        ? SIDE_META.program.softBg
-                                        : SIDE_META.regulator.softBg,
-                                    color: inspectorProgram.selectedSide === 'program'
-                                        ? SIDE_META.program.accent
-                                        : SIDE_META.regulator.accent,
-                                    fontWeight: 700,
-                                }}
-                            />
-                            <Divider />
-                            <Typography component="pre" sx={{ m: 0, fontSize: 12, lineHeight: 1.65, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                                {formatProgramTooltip(inspectorProgram)}
-                            </Typography>
-                        </Stack>
-                    ) : (
-                        <Typography sx={{ fontSize: 13, color: '#667085', lineHeight: 1.7 }}>
-                            Hover a node for quick values, or click a program or gene to lock the inspection panel and highlight the corresponding structure.
-                        </Typography>
-                    )}
-                </Paper>
-
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: 'rgba(15,23,42,0.10)' }}>
-                    <Typography sx={{ fontWeight: 700, color: '#0f172a', mb: 1.6 }}>
-                        Legend
-                    </Typography>
-
-                    <Stack spacing={1.25}>
-                        {Object.entries(PROGRAM_COLORS).map(([key, value]) => (
-                            <Stack key={key} direction="row" spacing={1} alignItems="center">
-                                <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: value }} />
-                                <Typography sx={{ fontSize: 13, color: '#475467' }}>{key}</Typography>
-                            </Stack>
-                        ))}
-
-                        <Divider sx={{ my: 0.25 }} />
-
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Box sx={{ width: 54, height: 18, borderRadius: 1, bgcolor: 'rgb(228,127,127)', border: '1px solid rgba(15,23,42,0.12)' }} />
-                            <Typography sx={{ fontSize: 12.5, color: '#475467' }}>
-                                Positive post_mean
-                            </Typography>
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Box sx={{ width: 54, height: 18, borderRadius: 1, bgcolor: 'rgb(131,158,218)', border: '1px solid rgba(15,23,42,0.12)' }} />
-                            <Typography sx={{ fontSize: 12.5, color: '#475467' }}>
-                                Negative post_mean
-                            </Typography>
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Box sx={{ width: 54, height: 18, borderRadius: 1, bgcolor: 'rgb(218,224,231)', border: '1px solid rgba(15,23,42,0.12)' }} />
-                            <Typography sx={{ fontSize: 12.5, color: '#475467' }}>
-                                Near-zero post_mean
-                            </Typography>
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Box sx={{ width: 54, height: 18, borderRadius: 1, bgcolor: '#f7f7ff', border: '1px dashed #7c3aed' }} />
-                            <Typography sx={{ fontSize: 12.5, color: '#475467' }}>
-                                Discordant gene
-                            </Typography>
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Box sx={{ width: 54, height: 0, borderTop: `3px solid ${EFFECT_COLORS.positive}`, position: 'relative' }}>
-                                <Box sx={{ position: 'absolute', right: -2, top: -6, width: 0, height: 0, borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderLeft: `10px solid ${EFFECT_COLORS.positive}` }} />
-                            </Box>
-                            <Typography sx={{ fontSize: 12.5, color: '#475467' }}>
-                                Positive score: arrow head
-                            </Typography>
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Box sx={{ width: 54, height: 0, borderTop: `3px solid ${EFFECT_COLORS.negative}`, position: 'relative' }}>
-                                <Box sx={{ position: 'absolute', right: -1, top: -8, width: 3, height: 16, bgcolor: EFFECT_COLORS.negative }} />
-                            </Box>
-                            <Typography sx={{ fontSize: 12.5, color: '#475467' }}>
-                                Negative score: flat cap
-                            </Typography>
-                        </Stack>
-                    </Stack>
+                    <TraitProgramGraphSummary
+                        title="Visible modules"
+                        modules={summaryModules}
+                        side="program"
+                        selectedProgram={selectedProgram}
+                        onSelectProgram={handleSelectProgram}
+                        onToggleExpanded={toggleExpanded}
+                        sideMeta={SIDE_META.program}
+                        sideMetaMap={SIDE_META}
+                        programColor={programColor}
+                        programSelectionLabel={programSelectionLabel}
+                        effectColors={EFFECT_COLORS}
+                        effectSignFromGene={effectSignFromGene}
+                        edgeColorFromScore={edgeColorFromScore}
+                        formatNumber={formatNumber}
+                    />
                 </Paper>
             </Box>
         </Stack>

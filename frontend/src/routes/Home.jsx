@@ -9,7 +9,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import {
     Search, Folder, InsertDriveFile, ArrowForward,
-    Close, FileDownload, Dns, Science, Storage,
+    Close, FileDownload, Dns, Science, Storage, InfoOutlined, ContactSupportOutlined,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { downloadDataPaths } from '../utils/download';
@@ -67,9 +67,28 @@ function getRequestErrorMessage(err, fallback) {
 }
 
 const stats = [
-    { label: 'GWAS Traits', value: '2,415', icon: <Dns sx={{ fontSize: 28 }} />, to: '/trait', color: '#2563eb' },
-    { label: 'Programs', value: '60', icon: <Science sx={{ fontSize: 28 }} />, to: '/programs', color: '#34A853' },
-    { label: 'Data Files', value: '100+', icon: <Storage sx={{ fontSize: 28 }} />, to: '/data', color: '#FEA601' },
+    { label: 'Trait Browser', value: '2k+', icon: <Dns sx={{ fontSize: 28 }} />, to: '/trait', color: '#2563eb' },
+    { label: 'Programs', value: '60+', icon: <Science sx={{ fontSize: 28 }} />, to: '/programs', color: '#34A853' },
+    { label: 'Data Outputs', value: '100+', icon: <Storage sx={{ fontSize: 28 }} />, to: '/data', color: '#FEA601' },
+];
+
+const guideCards = [
+    {
+        title: 'Need context first?',
+        body: 'Open About for a concise project overview and Guide for page-by-page usage notes.',
+        actions: [
+            { label: 'About', to: '/about', icon: <InfoOutlined sx={{ fontSize: 16 }} /> },
+            { label: 'Guide', to: '/help', icon: <ArrowForward sx={{ fontSize: 16 }} /> },
+        ],
+    },
+    {
+        title: 'Need help reporting an issue?',
+        body: 'Use Contact to see what details to collect before sending a data or interface report.',
+        actions: [
+            { label: 'Contact', to: '/contact', icon: <ContactSupportOutlined sx={{ fontSize: 16 }} /> },
+            { label: 'Data Browser', to: '/data', icon: <Storage sx={{ fontSize: 16 }} /> },
+        ],
+    },
 ];
 
 export default function Home() {
@@ -252,7 +271,7 @@ export default function Home() {
                 </Typography>
                 <Typography variant="body1" sx={captionSx(theme, { maxWidth: 900, lineHeight: 1.7 })}>
                     Search study-associated files and directories by filename, GCST accession, or program label.
-                    Use the home search for quick lookup, then continue in the full Data Browser for browsing and download.
+                    Use Home for quick lookup, Trait for figure-driven review, and Data Browser for direct file navigation and download.
                 </Typography>
             </Box>
 
@@ -640,6 +659,45 @@ export default function Home() {
                                 </CardContent>
                             </CardActionArea>
                         </Card>
+                    ))}
+                </Box>
+
+                <Box sx={{
+                    px: { xs: 1.5, md: 2 },
+                    pb: { xs: 1.5, md: 1.9 },
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                    gap: 1.5,
+                }}>
+                    {guideCards.map((card) => (
+                        <Paper
+                            key={card.title}
+                            elevation={0}
+                            sx={panelSx(theme, {
+                                p: { xs: 1.5, md: 1.8 },
+                                backgroundColor: theme.custom.surface.raised,
+                            })}
+                        >
+                            <Typography variant="subtitle1" sx={sectionTitleSx(theme, { fontSize: '0.98rem', mb: 0.45 })}>
+                                {card.title}
+                            </Typography>
+                            <Typography variant="body2" sx={captionSx(theme, { mb: 1.2 })}>
+                                {card.body}
+                            </Typography>
+                            <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
+                                {card.actions.map((action) => (
+                                    <Button
+                                        key={action.to}
+                                        onClick={() => navigate(action.to)}
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={action.icon}
+                                    >
+                                        {action.label}
+                                    </Button>
+                                ))}
+                            </Stack>
+                        </Paper>
                     ))}
                 </Box>
             </Paper>

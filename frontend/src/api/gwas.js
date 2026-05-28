@@ -113,3 +113,29 @@ export async function getPosteriorVolcano(fileId, opts = {}) {
         effectField: 'post_mean',
     });
 }
+
+export async function getDataFileText(path) {
+    const res = await axios.get(`${API_BASE}/data/download`, {
+        params: { path },
+        responseType: 'text',
+        transformResponse: [(data) => data],
+    });
+    return res.data;
+}
+
+export async function searchGenes(query, { limit = 20 } = {}) {
+    const res = await axios.get(`${API_BASE}/genes/search`, {
+        params: { q: query, limit },
+    });
+    return res.data;
+}
+
+export async function getGenePrograms(geneId) {
+    const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/programs`);
+    return res.data;
+}
+
+export async function getProgramTraits(programId) {
+    const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/traits`);
+    return res.data;
+}
