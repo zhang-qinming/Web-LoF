@@ -5,6 +5,7 @@ import {
     Box,
     Button,
     Chip,
+    Divider,
     InputAdornment,
     Paper,
     Stack,
@@ -24,11 +25,12 @@ import {
     BiotechOutlined,
     ManageSearchOutlined,
     OpenInNew,
+    SchemaOutlined,
     ScienceOutlined,
     TableChartOutlined,
 } from '@mui/icons-material';
 import useSWR from 'swr';
-import { getGenePrograms, searchGenes } from '../api/gwas';
+import { getGenePrograms, getRecommendedGenes, searchGenes } from '../api/gwas';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
 import {
     captionSx,
@@ -37,6 +39,7 @@ import {
     panelSx,
     sectionPanelHeaderSx,
     sectionTitleSx,
+    stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
     tableTone,
@@ -93,6 +96,23 @@ function SummaryCard({ icon, label, value, tone = 'neutral' }) {
                 </Typography>
             </Box>
         </Paper>
+    );
+}
+
+function GeneChipLink({ gene, tone = 'subtle' }) {
+    const theme = useTheme();
+    const label = typeof gene === 'string' ? gene : (gene.geneSymbol || gene.ensgId || gene.geneLabel);
+    if (!label) return null;
+
+    return (
+        <Chip
+            label={label}
+            size="small"
+            component={RouterLink}
+            clickable
+            to={`/genes?query=${encodeURIComponent(label)}`}
+            sx={summaryChipSx(theme, metricChipTone(theme, tone))}
+        />
     );
 }
 
@@ -154,6 +174,171 @@ function GeneSuggestionList({ suggestions, onSelect }) {
     );
 }
 
+function GeneDiscoveryPanel({ recommended, onSelect }) {
+    const theme = useTheme();
+    const fallbackGenes = ['RPL37', 'RPL36', 'PTMA', 'RPL23', 'RPL24', 'TP53'];
+    const genes = recommended?.genes || [];
+
+    return (
+        <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
+            <Box sx={sectionPanelHeaderSx(theme, { justifyContent: 'space-between', flexWrap: 'wrap' })}>
+                <Box>
+                    <Typography sx={sectionTitleSx(theme, { fontSize: '0.96rem' })}>
+                        High-connectivity genes
+                    </Typography>
+                    <Typography sx={captionSx(theme, { fontSize: '0.74rem' })}>
+                        Genes with the broadest program and trait evidence in the imported index.
+                    </Typography>
+                </Box>
+                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
+                    {fallbackGenes.slice(0, 4).map((gene) => <GeneChipLink key={gene} gene={gene} tone="primary" />)}
+                </Stack>
+            </Box>
+
+            {recommended?.unavailable ? (
+                <Alert severity="warning" sx={{ m: 1.5, borderRadius: 1 }}>
+                    Gene SQL index is not available yet.
+                </Alert>
+            ) : (
+                <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 1 }}>
+                    {(genes.length ? genes : fallbackGenes.map((gene) => ({ geneSymbol: gene }))).map((gene, index) => {
+                        const label = gene.geneSymbol || gene.ensgId || gene.geneLabel;
+                        return (
+                            <Button
+                                key={`${label}-${index}`}
+                                onClick={() => onSelect(label)}
+                                sx={{
+                                    justifyContent: 'space-between',
+                                    textAlign: 'left',
+                                    textTransform: 'none',
+                                    px: 1.25,
+                                    py: 1,
+                                    borderRadius: 1,
+                                    border: `1px solid ${theme.custom.border.soft}`,
+                                    color: theme.palette.text.primary,
+                                    bgcolor: theme.palette.background.paper,
+                                    transition: `background-color ${theme.custom.motion.swift}, border-color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
+                                    ...tableRowRevealSx(theme, index),
+                                    '&:hover': {
+                                        bgcolor: alpha(theme.palette.primary.main, 0.04),
+                                        borderColor: alpha(theme.palette.primary.main, 0.24),
+                                        transform: 'translateY(-1px)',
+                                    },
+                                }}
+                            >
+                                <Box sx={{ minWidth: 0 }}>
+                                    <Typography sx={{ fontSize: '0.92rem', fontWeight: 800, lineHeight: 1.2 }}>
+                                        {label}
+                                    </Typography>
+                                    {gene.ensgId && (
+                                        <Typography sx={{ mt: 0.25, fontSize: '0.68rem', fontFamily: 'monospace', color: theme.palette.text.secondary }} noWrap>
+                                            {gene.ensgId}
+                                        </Typography>
+                                    )}
+                                </Box>
+                                {Number.isFinite(gene.totalTraits) && (
+                                    <Stack direction="row" spacing={0.5} sx={{ ml: 1, flexShrink: 0 }}>
+                                        <Chip label={`${gene.totalTraits} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))} />
+                                        <Chip label={`${gene.totalPrograms} programs`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                                    </Stack>
+                                )}
+                            </Button>
+                        );
+                    })}
+                </Box>
+            )}
+        </Paper>
+    );
+}
+
+function buildTopPrograms(records) {
+    const map = new Map();
+    records.forEach((row) => {
+        if (!row.program) return;
+        if (!map.has(row.program)) {
+            map.set(row.program, {
+                program: row.program,
+                annotation: row.programAnnotation,
+                traits: new Set(),
+                rows: 0,
+                programRows: 0,
+                regulatorRows: 0,
+                concordantRows: 0,
+                discordantRows: 0,
+            });
+        }
+        const item = map.get(row.program);
+        if (row.traitId) item.traits.add(row.traitId);
+        item.rows += 1;
+        if (row.role === 'program') item.programRows += 1;
+        if (row.role === 'regulator') item.regulatorRows += 1;
+        if (row.isConcordant) item.concordantRows += 1;
+        if (row.isDiscordant) item.discordantRows += 1;
+    });
+
+    return [...map.values()]
+        .map((item) => ({ ...item, totalTraits: item.traits.size }))
+        .sort((a, b) => (
+            b.totalTraits - a.totalTraits
+            || b.rows - a.rows
+            || a.program.localeCompare(b.program)
+        ))
+        .slice(0, 8);
+}
+
+function TopProgramsPanel({ records }) {
+    const theme = useTheme();
+    const programs = React.useMemo(() => buildTopPrograms(records), [records]);
+
+    if (!programs.length) return null;
+
+    return (
+        <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
+            <Box sx={sectionPanelHeaderSx(theme)}>
+                <SchemaOutlined sx={{ color: theme.palette.primary.main, fontSize: 18 }} />
+                <Typography sx={sectionTitleSx(theme, { fontSize: '0.92rem' })}>
+                    Top programs for this gene
+                </Typography>
+            </Box>
+            <Box sx={{ p: 1.25, display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, 1fr)' }, gap: 1 }}>
+                {programs.map((program, index) => (
+                    <Button
+                        key={program.program}
+                        component={RouterLink}
+                        to={`/programs/${encodeURIComponent(program.program)}`}
+                        sx={{
+                            justifyContent: 'flex-start',
+                            textAlign: 'left',
+                            textTransform: 'none',
+                            px: 1.25,
+                            py: 1,
+                            borderRadius: 1,
+                            border: `1px solid ${theme.custom.border.soft}`,
+                            color: theme.palette.text.primary,
+                            ...tableRowRevealSx(theme, index),
+                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
+                        }}
+                    >
+                        <Box sx={{ minWidth: 0, width: '100%' }}>
+                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.35 }}>
+                                <Typography sx={{ fontWeight: 850, color: theme.palette.primary.dark }}>{program.program}</Typography>
+                                <Chip label={`${program.totalTraits} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))} />
+                                <Chip label={`${program.rows} rows`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                            </Stack>
+                            <Typography sx={{ fontSize: '0.74rem', color: theme.palette.text.secondary }} noWrap>
+                                {program.annotation || 'No annotation'}
+                            </Typography>
+                            <Typography sx={{ mt: 0.35, fontSize: '0.68rem', color: theme.palette.text.secondary }}>
+                                {program.programRows} program rows / {program.regulatorRows} regulator rows
+                            </Typography>
+                        </Box>
+                    </Button>
+                ))}
+            </Box>
+        </Paper>
+    );
+}
+
 function GeneRecordsTable({ records }) {
     const theme = useTheme();
     const tone = tableTone(theme, 'neutral');
@@ -184,21 +369,17 @@ function GeneRecordsTable({ records }) {
                 </Box>
                 <Chip label={`${records.length.toLocaleString()} total`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
             </Box>
-            <TableContainer sx={{ maxHeight: 620 }}>
+            <TableContainer sx={{ maxHeight: 620, overflowX: 'auto', overflowY: 'auto' }}>
                 <Table stickyHeader size="small">
                     <TableHead>
                         <TableRow>
                             {['Trait', 'Program', 'Role', 'Direction', 'post_mean', 'abs_gamma', 'membership', 'Concordance'].map((label) => (
                                 <TableCell
                                     key={label}
-                                    sx={{
-                                        bgcolor: tone.headerBg,
-                                        borderBottom: `2px solid ${tone.headerBorder}`,
-                                        color: tone.headerColor,
+                                    sx={stickyTableHeaderCellSx(theme, tone, 'left', {
                                         fontSize: '0.72rem',
                                         fontWeight: 800,
-                                        whiteSpace: 'nowrap',
-                                    }}
+                                    })}
                                 >
                                     {label}
                                 </TableCell>
@@ -309,6 +490,12 @@ export default function Genes() {
         { keepPreviousData: true, revalidateOnFocus: false },
     );
 
+    const { data: recommended } = useSWR(
+        !query ? ['recommended-genes'] : null,
+        () => getRecommendedGenes({ limit: 12 }),
+        { keepPreviousData: true, revalidateOnFocus: false },
+    );
+
     const { data: details, isLoading: detailLoading, error } = useSWR(
         query ? ['gene-programs', query] : null,
         ([, q]) => getGenePrograms(q),
@@ -415,8 +602,8 @@ export default function Genes() {
 
                 {query && !detailLoading && records.length > 0 && (
                     <>
-                        <Paper elevation={0} sx={panelSx(theme, { p: 2 })}>
-                            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1.5}>
+                        <Paper elevation={0} sx={panelSx(theme, { p: 1.5 })}>
+                            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1.25} alignItems={{ xs: 'flex-start', md: 'center' }}>
                                 <Box>
                                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.35rem' })}>
                                         {details?.gene?.geneSymbol || query}
@@ -428,20 +615,31 @@ export default function Genes() {
                                 <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
                                     <Chip icon={<ScienceOutlined />} label={`${summary.totalPrograms || 0} programs`} sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
                                     <Chip icon={<AccountTreeOutlined />} label={`${summary.totalTraits || 0} traits`} sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))} />
+                                    <Chip label={`${summary.concordantRows || 0} concordant`} sx={summaryChipSx(theme, metricChipTone(theme, 'success'))} />
+                                    <Chip label={`${summary.discordantRows || 0} discordant`} sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
                                 </Stack>
                             </Stack>
                         </Paper>
 
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(6, 1fr)' }, gap: 1.2 }}>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1 }}>
                             <SummaryCard icon={TableChartOutlined} label="Rows" value={summary.totalRows} />
                             <SummaryCard icon={ScienceOutlined} label="Programs" value={summary.totalPrograms} tone="primary" />
                             <SummaryCard icon={AccountTreeOutlined} label="Traits" value={summary.totalTraits} tone="accent" />
                             <SummaryCard icon={BiotechOutlined} label="Program role" value={summary.programRoleRows} tone="primary" />
-                            <SummaryCard icon={BiotechOutlined} label="Regulator role" value={summary.regulatorRoleRows} tone="accent" />
-                            <SummaryCard icon={TableChartOutlined} label="Discordant" value={summary.discordantRows} tone="warning" />
                         </Box>
 
+                        <TopProgramsPanel records={records} />
                         <GeneRecordsTable records={records} />
+                    </>
+                )}
+
+                {!query && (
+                    <>
+                        <GeneDiscoveryPanel recommended={recommended} onSelect={(gene) => runSearch(gene)} />
+                        <Divider sx={{ borderColor: theme.custom.border.soft }} />
+                        <Typography sx={captionSx(theme, { fontSize: '0.78rem' })}>
+                            Tip: use exact gene symbols for direct lookup, or type two or more characters to search matching gene symbols and ENSG identifiers.
+                        </Typography>
                     </>
                 )}
 

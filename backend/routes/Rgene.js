@@ -14,6 +14,12 @@ router.get('/api/genes/search', asyncRoute(async (req, res) => {
     res.json(result);
 }));
 
+router.get('/api/genes/recommended', asyncRoute(async (req, res) => {
+    const limit = parsePositiveInt(req.query.limit, 12, 50);
+    const result = await geneProgramModel.getRecommendedGenes(limit);
+    res.json(result);
+}));
+
 router.get('/api/genes/:geneId/programs', asyncRoute(async (req, res) => {
     const geneId = normalizeIdentifier(req.params.geneId, 120);
     if (!geneId) return res.status(400).json({ error: 'Invalid geneId' });

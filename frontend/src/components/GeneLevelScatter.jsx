@@ -43,6 +43,7 @@ import {
     summaryChipSx,
     toolbarSx,
 } from '../themeUtils';
+import FloatingLegend from './FloatingLegend';
 import GeneLevelScatterTable from './GeneLevelScatterTable';
 
 const DATA_DIR = 'gene_level_scatter/tables';
@@ -54,26 +55,26 @@ const DEFAULT_LABEL_LIMIT = 10;
 const EVIDENCE_CLASSES = {
     background: {
         label: 'Background',
-        color: '#cbd2dc',
+        color: '#b6c0cf',
         symbol: 'circle',
         rank: 0,
     },
     posterior_high: {
         label: 'High posterior',
-        color: '#7E8DA6',
+        color: '#7a8ca8',
         symbol: 'circle',
         rank: 1,
     },
     regulation_supported: {
         label: 'Concordant regulation',
-        color: '#B40426',
+        color: '#c55f39',
         symbol: 'circle',
         rank: 3,
     },
     direction_discordant: {
         label: 'Discordant regulation',
-        color: '#3B4CC0',
-        symbol: 'triangle-up',
+        color: '#4f7da8',
+        symbol: 'diamond',
         rank: 2,
     },
 };
@@ -216,6 +217,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
     const plotRef = useRef(null);
+    const plotElRef = useRef(null);
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
 
@@ -237,6 +239,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     const [exportWidth, setExportWidth] = useState(DEFAULT_EXPORT_WIDTH);
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
+    const [legendCollapsed, setLegendCollapsed] = useState(false);
 
     const candidateIds = useMemo(() => (
         [...new Set([...(Array.isArray(lookupIds) ? lookupIds : []), fileId, gwasId].filter(Boolean))]
@@ -301,12 +304,14 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
         const base = {
             total: rows.length,
             filtered: filteredRows.length,
+            background: 0,
             supported: 0,
             discordant: 0,
             posteriorHigh: 0,
             labeled: 0,
         };
         rows.forEach((row) => {
+            if (row.evidenceClass === 'background') base.background += 1;
             if (row.evidenceClass === 'regulation_supported') base.supported += 1;
             if (row.evidenceClass === 'direction_discordant') base.discordant += 1;
             if (row.evidenceClass === 'posterior_high') base.posteriorHigh += 1;
@@ -390,8 +395,8 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     size: grouped[key].sizes,
                     opacity: grouped[key].opacity,
                     line: {
-                        color: key === 'background' ? 'rgba(255,255,255,0)' : 'rgba(15,23,42,0.26)',
-                        width: key === 'background' ? 0 : 0.35,
+                        color: key === 'background' ? 'rgba(255,255,255,0)' : 'rgba(15,23,42,0.18)',
+                        width: key === 'background' ? 0 : 0.2,
                     },
                 },
             }));
@@ -437,6 +442,26 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             },
         }];
     }, [highlight.rowKey, pointSize, rows]);
+
+    const legendItems = useMemo(() => (
+        EVIDENCE_ORDER
+            .map((key) => {
+                const count = key === 'background'
+                    ? counts.background
+                    : key === 'posterior_high'
+                        ? counts.posteriorHigh
+                        : key === 'regulation_supported'
+                            ? counts.supported
+                            : counts.discordant;
+                return count > 0 ? {
+                    key,
+                    label: EVIDENCE_CLASSES[key].label,
+                    color: EVIDENCE_CLASSES[key].color,
+                    count,
+                } : null;
+            })
+            .filter(Boolean)
+    ), [counts]);
 
     const layout = useMemo(() => {
         const xRange = computeAxisRange(filteredRows.map((row) => row.postMean), 0.08);
@@ -505,17 +530,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             margin: { l: 76, r: 28, t: 92, b: 70 },
             hovermode: 'closest',
             dragmode: 'pan',
-            legend: {
-                orientation: 'h',
-                x: 0.01,
-                y: 1.1,
-                xanchor: 'left',
-                yanchor: 'bottom',
-                bgcolor: chartTokens.legendBg,
-                bordercolor: chartTokens.legendBorder,
-                borderwidth: 1,
-                font: { size: 12, color: theme.palette.text.secondary, family: theme.typography.fontFamily },
-            },
+            showlegend: false,
             xaxis: {
                 ...axisStyle,
                 title: { text: 'GeneBayes posterior effect (post_mean)', font: { size: 14, color: theme.palette.text.primary } },
@@ -750,7 +765,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     CSV
                 </Button>
                 <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    Red points are FDR-supported genes with matching GeneBayes and perturb-seq signs; blue triangles are significant but direction-discordant. Grey-blue points mark high posterior effect without FDR-supported regulation.
+                    Warm markers indicate concordant signal, cool markers indicate discordant signal, and muted blue-grey points mark posterior-supported genes without regulation support.
                 </Typography>
             </Box>
 
@@ -784,22 +799,41 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     )}
 
                     {!isLoading && hasVisiblePoints && (
-                        <Plot
-                            data={[...plotData, ...labelTrace, ...highlightedPoint]}
-                            layout={layout}
-                            config={plotConfig}
-                            revision={plotRevision}
-                            onInitialized={(_figure, graphDiv) => { plotRef.current = graphDiv; }}
-                            onUpdate={(_figure, graphDiv) => { plotRef.current = graphDiv; }}
-                            onClick={(evt) => {
-                                const rowKey = evt?.points?.[0]?.customdata?.[0];
-                                if (!rowKey) return;
-                                setHighlight((prev) => ({ rowKey, key: prev.key + 1 }));
-                                setTableOpen(true);
-                            }}
-                            useResizeHandler
-                            style={{ width: '100%', height: '640px' }}
-                        />
+                        <>
+                            <Plot
+                                data={[...plotData, ...labelTrace, ...highlightedPoint]}
+                                layout={layout}
+                                config={plotConfig}
+                                revision={plotRevision}
+                                onInitialized={(_figure, graphDiv) => {
+                                    plotRef.current = graphDiv;
+                                    plotElRef.current = graphDiv;
+                                }}
+                                onUpdate={(_figure, graphDiv) => {
+                                    plotRef.current = graphDiv;
+                                    plotElRef.current = graphDiv;
+                                }}
+                                onClick={(evt) => {
+                                    const rowKey = evt?.points?.[0]?.customdata?.[0];
+                                    if (!rowKey) return;
+                                    setHighlight((prev) => ({ rowKey, key: prev.key + 1 }));
+                                    setTableOpen(true);
+                                }}
+                                useResizeHandler
+                                style={{ width: '100%', height: '640px' }}
+                            />
+                            <FloatingLegend
+                                items={legendItems}
+                                collapsed={legendCollapsed}
+                                onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
+                                title="Categories"
+                                width={{ expanded: 206, collapsed: 118 }}
+                                defaultPlacement="right"
+                                defaultTop={68}
+                                defaultSideOffset={10}
+                                anchorPlotRef={plotElRef}
+                            />
+                        </>
                     )}
                 </CardContent>
             </Card>

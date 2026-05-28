@@ -18,7 +18,17 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Download, ExpandLess, ExpandMore, Search } from '@mui/icons-material';
-import { highlightedRowSx, metricChipTone, plotFrameSx, sectionPanelHeaderSx, summaryChipSx, tableRowRevealSx, tableTone } from '../themeUtils';
+import {
+    groupedTableColumnHeaderCellSx,
+    groupedTableHeaderCellSx,
+    highlightedRowSx,
+    metricChipTone,
+    plotFrameSx,
+    sectionPanelHeaderSx,
+    summaryChipSx,
+    tableRowRevealSx,
+    tableTone,
+} from '../themeUtils';
 
 const COLUMN_SPECS = [
     { key: 'snp', label: 'SNP', align: 'left', width: 114, tone: 'locus' },
@@ -38,19 +48,8 @@ const GROUPS = [
     { label: 'Mapping', span: 2, tone: 'program' },
 ];
 
-function headerCellSx(align, tone) {
-    const palette = tone;
-    return {
-        px: 1,
-        py: 0.72,
-        textAlign: align,
-        whiteSpace: 'nowrap',
-        bgcolor: palette.headerBg,
-        borderBottom: `2px solid ${palette.headerBorder}`,
-        color: palette.headerColor,
-        fontWeight: 600,
-        fontSize: '0.67rem',
-    };
+function headerCellSx(theme, align, tone) {
+    return groupedTableColumnHeaderCellSx(theme, tone, align);
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
@@ -320,19 +319,7 @@ export default function TraitHitManhattanTable({
                                         <TableCell
                                             key={group.label}
                                             colSpan={group.span}
-                                            sx={{
-                                                py: 0.58,
-                                                px: 1,
-                                                textAlign: 'center',
-                                                whiteSpace: 'nowrap',
-                                                bgcolor: palette.headerBg,
-                                                borderBottom: `2px solid ${palette.headerBorder}`,
-                                                color: palette.headerColor,
-                                                fontWeight: 700,
-                                                fontSize: '0.64rem',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.08em',
-                                            }}
+                                            sx={groupedTableHeaderCellSx(theme, palette)}
                                         >
                                             {group.label}
                                         </TableCell>
@@ -341,7 +328,7 @@ export default function TraitHitManhattanTable({
                             </TableRow>
                             <TableRow>
                                 {COLUMN_SPECS.map((column) => (
-                                    <TableCell key={column.key} sx={headerCellSx(column.align, column.tone)}>
+                                    <TableCell key={column.key} sx={headerCellSx(theme, column.align, TONES[column.tone])}>
                                         <TableSortLabel
                                             active={sortBy === column.key}
                                             direction={sortBy === column.key ? sortDir : 'asc'}
@@ -374,8 +361,8 @@ export default function TraitHitManhattanTable({
                                     >
                                         {COLUMN_SPECS.map((column) => {
                                             const cellTone = column.tone === 'neutral'
-                                                ? (even ? 'neutral' : 'neutral')
-                                                : column.tone;
+                                                ? TONES.neutral
+                                                : TONES[column.tone];
 
                                             const sx = {
                                                 ...bodyCellSx({

@@ -90,4 +90,12 @@ async function getTraitMeta(fileId) {
     return rows[0] || null;
 }
 
-module.exports = { getTraits, getTraitByName, getTraitMeta };
+async function getTraitCount() {
+    const [[{ total }]] = await pool.query(
+        `SELECT COUNT(*) AS total FROM file_metadata
+         WHERE trait_name IS NOT NULL AND trait_name != ''`
+    );
+    return Number(total) || 0;
+}
+
+module.exports = { getTraits, getTraitByName, getTraitMeta, getTraitCount };

@@ -16,7 +16,17 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
-import { highlightedRowSx, metricChipTone, plotFrameSx, sectionPanelHeaderSx, summaryChipSx, tableRowRevealSx, tableTone } from '../themeUtils';
+import {
+    groupedTableColumnHeaderCellSx,
+    groupedTableHeaderCellSx,
+    highlightedRowSx,
+    metricChipTone,
+    plotFrameSx,
+    sectionPanelHeaderSx,
+    summaryChipSx,
+    tableRowRevealSx,
+    tableTone,
+} from '../themeUtils';
 
 function getColumnSpecs({ effectLabel = 'Beta', includePosteriorColumns = false } = {}) {
     const effectColumns = [
@@ -66,19 +76,8 @@ const sortLabelSx = {
     },
 };
 
-function headerCellSx(align, tone) {
-    const palette = tone;
-    return {
-        px: 1,
-        py: 0.72,
-        textAlign: align,
-        whiteSpace: 'nowrap',
-        bgcolor: palette.headerBg,
-        borderBottom: `2px solid ${palette.headerBorder}`,
-        color: palette.headerColor,
-        fontWeight: 600,
-        fontSize: '0.67rem',
-    };
+function headerCellSx(theme, align, tone) {
+    return groupedTableColumnHeaderCellSx(theme, tone, align);
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
@@ -230,19 +229,7 @@ export default function BurdenVolcanoTable({
                                         <TableCell
                                             key={group.label}
                                             colSpan={group.span}
-                                            sx={{
-                                                py: 0.58,
-                                                px: 1,
-                                                textAlign: 'center',
-                                                whiteSpace: 'nowrap',
-                                                bgcolor: palette.headerBg,
-                                                borderBottom: `2px solid ${palette.headerBorder}`,
-                                                color: palette.headerColor,
-                                                fontWeight: 700,
-                                                fontSize: '0.64rem',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.08em',
-                                            }}
+                                            sx={groupedTableHeaderCellSx(theme, palette)}
                                         >
                                             {group.label}
                                         </TableCell>
@@ -251,7 +238,7 @@ export default function BurdenVolcanoTable({
                             </TableRow>
                             <TableRow>
                                 {columnSpecs.map((column) => (
-                                    <TableCell key={column.key} sx={headerCellSx(column.align, column.tone)}>
+                                    <TableCell key={column.key} sx={headerCellSx(theme, column.align, TONES[column.tone])}>
                                         <TableSortLabel
                                             active={sortBy === column.key}
                                             direction={sortBy === column.key ? sortDir : 'asc'}

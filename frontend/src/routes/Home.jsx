@@ -16,6 +16,7 @@ import { downloadDataPaths } from '../utils/download';
 import { captionSx, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
 
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
+const HOME_API = axios.create({ baseURL: '/api' });
 const SEARCH_CACHE = new Map();
 const SEARCH_DEBOUNCE_MS = 220;
 const SEARCH_CACHE_TTL_MS = 90 * 1000;
@@ -66,10 +67,10 @@ function getRequestErrorMessage(err, fallback) {
     return err.response?.data?.error || err.message || fallback;
 }
 
-const stats = [
-    { label: 'Trait Browser', value: '2k+', icon: <Dns sx={{ fontSize: 28 }} />, to: '/trait', color: '#2563eb' },
-    { label: 'Programs', value: '60+', icon: <Science sx={{ fontSize: 28 }} />, to: '/programs', color: '#34A853' },
-    { label: 'Data Outputs', value: '100+', icon: <Storage sx={{ fontSize: 28 }} />, to: '/data', color: '#FEA601' },
+const statsConfig = [
+    { key: 'traits', label: 'Trait Browser', icon: <Dns sx={{ fontSize: 28 }} />, to: '/trait', color: '#2563eb' },
+    { key: 'programs', label: 'Programs', icon: <Science sx={{ fontSize: 28 }} />, to: '/programs', color: '#34A853' },
+    { key: 'dataOutputs', label: 'Data Outputs', icon: <Storage sx={{ fontSize: 28 }} />, to: '/data', color: '#FEA601' },
 ];
 
 const guideCards = [
@@ -102,6 +103,7 @@ export default function Home() {
     const [error, setError] = useState('');
     const [checked, setChecked] = useState(new Set());
     const [meta, setMeta] = useState({ totalCount: 0, truncated: false });
+    const [homeStats, setHomeStats] = useState({ traits: 0, programs: 0, dataOutputs: 0 });
     const timerRef = useRef(null);
     const abortRef = useRef(null);
 
@@ -201,6 +203,28 @@ export default function Home() {
         if (abortRef.current) abortRef.current.abort();
     }, []);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        HOME_API.get('/home/stats')
+            .then(({ data }) => {
+                if (cancelled) return;
+                setHomeStats({
+                    traits: Number(data?.traits) || 0,
+                    programs: Number(data?.programs) || 0,
+                    dataOutputs: Number(data?.dataOutputs) || 0,
+                });
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setHomeStats({ traits: 0, programs: 0, dataOutputs: 0 });
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const toggleFile = (path) => {
         setChecked((prev) => {
             const next = new Set(prev);
@@ -275,9 +299,12 @@ export default function Home() {
                 </Typography>
             </Box>
 
-            <Paper elevation={0} sx={{
-                ...panelSx(theme, { borderRadius: 3 }),
-                overflow: 'visible',
+            <Box sx={{
+                ...panelSx(theme, {
+                    borderRadius: 3,
+                    p: 0,
+                    overflow: 'visible',
+                }),
             }}>
                 <Box sx={{ px: { xs: 1.5, md: 2 }, py: { xs: 1.5, md: 1.8 }, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
                     <Typography variant="subtitle1" sx={sectionTitleSx(theme, { fontSize: '1rem', mb: 0.4 })}>
@@ -292,6 +319,7 @@ export default function Home() {
                             <TextField
                                 fullWidth
                                 placeholder="Search by filename, GCST ID, program, or folder"
+                                aria-label="Search files and folders"
                                 value={q}
                                 onChange={(event) => setQ(event.target.value)}
                                 onFocus={() => { if (canSearch) setOpen(true); }}
@@ -617,12 +645,14 @@ export default function Home() {
                     gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
                     gap: 1.5,
                 }}>
-                    {stats.map((item) => (
-                        <Card
-                            key={item.label}
-                            elevation={0}
+                    {statsConfig.map((item) => (
+                        <Box
+                            key={item.key}
                             sx={{
-                                ...panelSx(theme, { borderRadius: 2.5, boxShadow: 'none' }),
+                                border: `1px solid ${theme.custom.border.soft}`,
+                                borderRadius: 2.5,
+                                backgroundColor: theme.palette.background.paper,
+                                minWidth: 0,
                             }}
                         >
                             <CardActionArea
@@ -650,7 +680,7 @@ export default function Home() {
                                     </Box>
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.05 }}>
-                                            {item.value}
+                                            {(homeStats[item.key] || 0).toLocaleString()}
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mt: 0.2 }}>
                                             {item.label}
@@ -658,7 +688,7 @@ export default function Home() {
                                     </Box>
                                 </CardContent>
                             </CardActionArea>
-                        </Card>
+                        </Box>
                     ))}
                 </Box>
 
@@ -670,13 +700,15 @@ export default function Home() {
                     gap: 1.5,
                 }}>
                     {guideCards.map((card) => (
-                        <Paper
+                        <Box
                             key={card.title}
-                            elevation={0}
-                            sx={panelSx(theme, {
-                                p: { xs: 1.5, md: 1.8 },
+                            sx={{
+                                border: `1px solid ${theme.custom.border.soft}`,
+                                borderRadius: 2.5,
                                 backgroundColor: theme.custom.surface.raised,
-                            })}
+                                p: { xs: 1.5, md: 1.8 },
+                                minWidth: 0,
+                            }}
                         >
                             <Typography variant="subtitle1" sx={sectionTitleSx(theme, { fontSize: '0.98rem', mb: 0.45 })}>
                                 {card.title}
@@ -697,10 +729,10 @@ export default function Home() {
                                     </Button>
                                 ))}
                             </Stack>
-                        </Paper>
+                        </Box>
                     ))}
                 </Box>
-            </Paper>
+            </Box>
         </Box>
     );
 }

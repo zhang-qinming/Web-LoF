@@ -193,6 +193,51 @@ async function searchGenes(query, limit = 20) {
     }
 }
 
+async function getRecommendedGenes(limit = 12) {
+    const safeLimit = Math.max(1, Math.min(50, Number(limit) || 12));
+
+    try {
+        const [rows] = await pool.query(
+            `SELECT
+                gene_symbol,
+                ensg_id,
+                COUNT(*) AS total_rows,
+                COUNT(DISTINCT program) AS total_programs,
+                COUNT(DISTINCT trait_id) AS total_traits,
+                SUM(role = 'program') AS program_role_rows,
+                SUM(role = 'regulator') AS regulator_role_rows
+             FROM gene_program_trait_edge
+             WHERE COALESCE(NULLIF(gene_symbol, ''), NULLIF(ensg_id, '')) IS NOT NULL
+             GROUP BY gene_symbol, ensg_id
+             ORDER BY
+                total_traits DESC,
+                total_programs DESC,
+                total_rows DESC,
+                gene_symbol ASC
+             LIMIT ?`,
+            [safeLimit],
+        );
+
+        return {
+            genes: rows.map((row) => ({
+                geneSymbol: row.gene_symbol || '',
+                ensgId: row.ensg_id || '',
+                geneLabel: row.gene_symbol || row.ensg_id || '',
+                totalPrograms: Number(row.total_programs) || 0,
+                totalTraits: Number(row.total_traits) || 0,
+                totalRows: Number(row.total_rows) || 0,
+                roles: {
+                    program: Number(row.program_role_rows) || 0,
+                    regulator: Number(row.regulator_role_rows) || 0,
+                },
+            })),
+        };
+    } catch (err) {
+        if (isMissingIndexTableError(err)) return emptyUnavailable({ genes: [] });
+        throw err;
+    }
+}
+
 async function getGenePrograms(geneId) {
     const q = normalizeGeneQuery(geneId);
     if (!q) return { gene: { geneSymbol: '', ensgId: '' }, summary: buildSummary([]), records: [] };
@@ -382,6 +427,7 @@ async function getProgramTraits(programId) {
 }
 
 module.exports = {
+    getRecommendedGenes,
     getGenePrograms,
     getProgramTraits,
     normalizeProgramId,

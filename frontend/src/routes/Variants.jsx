@@ -21,6 +21,7 @@ import {
     plotFrameSx,
     sectionPanelHeaderSx,
     sectionTitleSx,
+    stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
     tableSkeletonCellSx,
@@ -374,16 +375,11 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
         : enterSettledRef.current ? 'none' : `colEnter ${ANIM}ms cubic-bezier(0.22,1,0.36,1) both`;
 
     const thSx = {
-        bgcolor: neutralTone.headerBg,
+        ...stickyTableHeaderCellSx(theme, neutralTone),
         fontWeight: 600,
         fontSize: '0.7rem',
-        color: neutralTone.headerColor,
-        borderBottom: `2px solid ${neutralTone.headerBorder}`,
         py: 0.8,
         px: 1.5,
-        position: 'sticky',
-        top: 0,
-        zIndex: 1,
     };
 
     const loadingBarSx = {
@@ -693,16 +689,11 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
         },
     };
     const thSx = {
-        bgcolor: neutralTone.headerBg,
+        ...stickyTableHeaderCellSx(theme, neutralTone),
         fontWeight: 600,
         fontSize: '0.7rem',
-        color: neutralTone.headerColor,
-        borderBottom: `2px solid ${neutralTone.headerBorder}`,
         py: 0.8,
         px: 1.5,
-        position: 'sticky',
-        top: 0,
-        zIndex: 1,
     };
     const trimmedQuery = query.trim();
     const canSearch = trimmedQuery.length >= 2;

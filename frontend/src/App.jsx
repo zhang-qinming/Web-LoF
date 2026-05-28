@@ -14,7 +14,7 @@ import {
 import MobileNavDrawer from './components/MobileNavDrawer.jsx';
 import { StatePanel } from './components/PageScaffold.jsx';
 
-const Home = React.lazy(() => import('./routes/Home.jsx'));
+import Home from './routes/Home.jsx';
 const About = React.lazy(() => import('./routes/About.jsx'));
 const Contact = React.lazy(() => import('./routes/Contact.jsx'));
 const Help = React.lazy(() => import('./routes/Help.jsx'));
@@ -25,9 +25,9 @@ const Programs = React.lazy(() => import('./routes/Programs.jsx'));
 
 const navLinks = [
     { to: '/', icon: <FaHome />, label: 'Home' },
-    { to: '/trait', icon: <FaListAlt />, label: 'Trait' },
-    { to: '/programs', icon: <FaProjectDiagram />, label: 'Programs' },
     { to: '/genes', icon: <FaDna />, label: 'Genes' },
+    { to: '/programs', icon: <FaProjectDiagram />, label: 'Programs' },
+    { to: '/trait', icon: <FaListAlt />, label: 'Trait' },
     { to: '/data', icon: <FaFolderOpen />, label: 'Data' },
     { to: '/help', icon: <FaQuestionCircle />, label: 'Guide' },
     { to: '/contact', icon: <FaEnvelope />, label: 'Contact' },

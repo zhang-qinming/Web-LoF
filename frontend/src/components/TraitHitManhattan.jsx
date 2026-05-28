@@ -49,8 +49,8 @@ import {
     toolbarSx,
 } from '../themeUtils';
 
-const UNASSIGNED_COLOR = '#6f7d90';
-const FULL_BACKGROUND_CHROM_COLORS = ['#e58d2a', '#3b7fc4'];
+const UNASSIGNED_COLOR = '#8a96a8';
+const FULL_BACKGROUND_CHROM_COLORS = ['rgba(116, 134, 158, 0.34)', 'rgba(168, 179, 194, 0.28)'];
 const DEFAULT_EXPORT_WIDTH = 1400;
 const DEFAULT_EXPORT_HEIGHT = 760;
 const PROGRAM_COLORS = [
@@ -506,8 +506,8 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 marker: {
                     size: 5.4,
                     color: UNASSIGNED_COLOR,
-                    opacity: 0.3,
-                    line: { width: 0.35, color: 'rgba(255,255,255,0.42)' },
+                    opacity: 0.48,
+                    line: { width: 0, color: 'rgba(255,255,255,0)' },
                 },
             });
         }
@@ -530,7 +530,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     size: 7.5,
                     color: assigned.colors,
                     opacity: 0.96,
-                    line: { width: 0.7, color: 'rgba(255,255,255,0.78)' },
+                    line: { width: 0.3, color: 'rgba(255,255,255,0.24)' },
                 },
             });
         }
@@ -554,16 +554,10 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         const items = [];
         if (variantLabel === 'full' && (backgroundCounts[0] > 0 || backgroundCounts[1] > 0)) {
             items.push({
-                key: '__below_threshold_odd__',
-                label: 'below threshold A',
-                count: backgroundCounts[0],
-                color: FULL_BACKGROUND_CHROM_COLORS[0],
-            });
-            items.push({
-                key: '__below_threshold_even__',
-                label: 'below threshold B',
-                count: backgroundCounts[1],
-                color: FULL_BACKGROUND_CHROM_COLORS[1],
+                key: '__below_threshold__',
+                label: 'below threshold',
+                count: backgroundCounts[0] + backgroundCounts[1],
+                color: '#8f9bad',
             });
         }
 

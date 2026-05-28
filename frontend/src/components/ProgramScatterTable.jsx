@@ -15,7 +15,17 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
-import { highlightedRowSx, metricChipTone, plotFrameSx, sectionPanelHeaderSx, summaryChipSx, tableRowRevealSx, tableTone } from '../themeUtils';
+import {
+    groupedTableColumnHeaderCellSx,
+    groupedTableHeaderCellSx,
+    highlightedRowSx,
+    metricChipTone,
+    plotFrameSx,
+    sectionPanelHeaderSx,
+    summaryChipSx,
+    tableRowRevealSx,
+    tableTone,
+} from '../themeUtils';
 
 const COLUMN_SPECS = [
     { key: 'program', label: 'Program', align: 'left', tone: 'info', width: 118 },
@@ -154,7 +164,7 @@ export default function ProgramScatterTable({
                 </Button>
             </Box>
             <Collapse in={tableOpen}>
-                <TableContainer sx={{ maxHeight: 460, overflowX: 'auto' }}>
+                <TableContainer sx={{ maxHeight: 460, overflowX: 'auto', overflowY: 'auto' }}>
                     <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', minWidth: 980 }}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
@@ -170,17 +180,7 @@ export default function ProgramScatterTable({
                                             key={group.label}
                                             colSpan={group.span}
                                             sx={{
-                                                fontWeight: 700,
-                                                fontSize: '0.64rem',
-                                                py: 0.58,
-                                                top: 0,
-                                                zIndex: 3,
-                                                bgcolor: tone.headerBg,
-                                                borderBottom: `2px solid ${tone.headerBorder}`,
-                                                textAlign: 'center',
-                                                color: tone.headerColor,
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.08em',
+                                                ...groupedTableHeaderCellSx(theme, tone),
                                             }}
                                         >
                                             {group.label}
@@ -196,11 +196,7 @@ export default function ProgramScatterTable({
                                             key={column.key}
                                             sx={{
                                                 ...thSx(column.align),
-                                                top: 30,
-                                                zIndex: 2,
-                                                bgcolor: tone.headerBg,
-                                                borderBottom: `2px solid ${tone.headerBorder}`,
-                                                color: tone.headerColor,
+                                                ...groupedTableColumnHeaderCellSx(theme, tone, column.align),
                                             }}
                                         >
                                             <TableSortLabel

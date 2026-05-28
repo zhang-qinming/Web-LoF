@@ -14,7 +14,7 @@ import {
     Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { tableRowRevealSx } from '../themeUtils';
+import { stickyTableHeaderCellSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
 export default function TraitProgramGraphSummary({
     title,
@@ -33,6 +33,7 @@ export default function TraitProgramGraphSummary({
     formatNumber,
 }) {
     const theme = useTheme();
+    const headerTone = tableTone(theme, 'neutral');
     const programCount = modules.filter((module) => (module.side || side) === 'program').length;
     const regulatorCount = modules.filter((module) => (module.side || side) === 'regulator').length;
 
@@ -83,17 +84,17 @@ export default function TraitProgramGraphSummary({
                 </Stack>
             </Box>
 
-            <TableContainer sx={{ maxHeight: 430 }}>
+            <TableContainer sx={{ maxHeight: 430, overflowX: 'auto', overflowY: 'auto' }}>
                 <Table size="small" stickyHeader>
                     <TableHead>
                         <TableRow>
-                            <TableCell sx={{ fontWeight: 800, width: 112 }}>Side</TableCell>
-                            <TableCell sx={{ fontWeight: 800, width: 132 }}>Program</TableCell>
-                            <TableCell sx={{ fontWeight: 800, width: 132 }}>Selected by</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 800 }}>Score</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 800 }}>Genes</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 800 }}>+ / -</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 800 }}>Shown</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, width: 112 })}>Side</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, width: 132 })}>Program</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, width: 132 })}>Selected by</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Score</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Genes</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>+ / -</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Shown</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>

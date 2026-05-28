@@ -130,6 +130,13 @@ export async function searchGenes(query, { limit = 20 } = {}) {
     return res.data;
 }
 
+export async function getRecommendedGenes({ limit = 12 } = {}) {
+    const res = await axios.get(`${API_BASE}/genes/recommended`, {
+        params: { limit },
+    });
+    return res.data;
+}
+
 export async function getGenePrograms(geneId) {
     const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/programs`);
     return res.data;

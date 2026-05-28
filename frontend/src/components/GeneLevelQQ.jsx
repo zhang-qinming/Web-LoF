@@ -43,6 +43,7 @@ import {
     summaryChipSx,
     toolbarSx,
 } from '../themeUtils';
+import FloatingLegend from './FloatingLegend';
 import GeneLevelQQTable from './GeneLevelQQTable';
 
 const DATA_DIR = 'gene_level_qq/tables';
@@ -55,12 +56,12 @@ const NOMINAL_LOGP = -Math.log10(0.05);
 const TAIL_META = {
     negative: {
         label: 'Negative tail',
-        color: '#3B4CC0',
+        color: '#4f7da8',
         symbol: 'circle',
     },
     positive: {
         label: 'Positive tail',
-        color: '#B40426',
+        color: '#c55f39',
         symbol: 'circle',
     },
 };
@@ -287,6 +288,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
     const plotRef = useRef(null);
+    const plotElRef = useRef(null);
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
 
@@ -312,6 +314,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [exportWidth, setExportWidth] = useState(DEFAULT_EXPORT_WIDTH);
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
+    const [legendCollapsed, setLegendCollapsed] = useState(false);
 
     const candidateIds = useMemo(() => (
         [...new Set([...(lookupIds || []), fileId, gwasId].filter(Boolean))]
@@ -425,16 +428,21 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             text: [],
             customdata: [],
             sizes: [],
+            colors: [],
+            opacity: [],
         }]));
 
         filteredRows.forEach((row) => {
             const group = grouped[row.tailSide] || grouped.positive;
             const deviationScale = clamp((row.absDeviation || 0) / 1.8, 0, 2.2);
+            const intensity = clamp((row.absDeviation || 0) / 1.25, 0, 1);
             group.x.push(row.expected);
             group.y.push(row.observed);
             group.text.push(buildHoverText(row));
             group.customdata.push([row.rowKey]);
             group.sizes.push(pointSize + deviationScale);
+            group.colors.push(alpha(TAIL_META[row.tailSide].color, 0.42 + intensity * 0.42));
+            group.opacity.push(0.56 + intensity * 0.26);
         });
 
         return TAIL_ORDER
@@ -449,13 +457,13 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 customdata: grouped[key].customdata,
                 hovertemplate: '%{text}<extra></extra>',
                 marker: {
-                    color: TAIL_META[key].color,
+                    color: grouped[key].colors,
                     symbol: TAIL_META[key].symbol,
                     size: grouped[key].sizes,
-                    opacity: 0.72,
+                    opacity: grouped[key].opacity,
                     line: {
-                        color: 'rgba(15,23,42,0.24)',
-                        width: 0.25,
+                        color: 'rgba(15,23,42,0.14)',
+                        width: 0.15,
                     },
                 },
             }));
@@ -501,6 +509,28 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             },
         }];
     }, [highlight.rowKey, pointSize, rows]);
+
+    const legendItems = useMemo(() => {
+        const items = TAIL_ORDER
+            .filter((key) => counts[key] > 0)
+            .map((key) => ({
+                key,
+                label: TAIL_META[key].label,
+                color: TAIL_META[key].color,
+                count: counts[key],
+            }));
+
+        if (showEnvelope) {
+            items.push({
+                key: 'envelope',
+                label: '95% envelope',
+                color: alpha(theme.palette.text.secondary, 0.68),
+                count: filteredRows.length,
+            });
+        }
+
+        return items;
+    }, [counts, filteredRows.length, showEnvelope, theme.palette.text.secondary]);
 
     const layout = useMemo(() => {
         const axisRange = computeAxisRange(filteredRows);
@@ -558,7 +588,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     x1: axisRange[1],
                     y0: fdrGuide,
                     y1: fdrGuide,
-                    line: { color: '#B40426', width: 1.1, dash: 'dot' },
+                    line: { color: chartTokens.threshold, width: 1.1, dash: 'dot' },
                 },
                 {
                     type: 'line',
@@ -566,7 +596,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     x1: axisRange[1],
                     y0: -fdrGuide,
                     y1: -fdrGuide,
-                    line: { color: '#B40426', width: 1.1, dash: 'dot' },
+                    line: { color: chartTokens.threshold, width: 1.1, dash: 'dot' },
                 },
             );
             annotations.push({
@@ -578,7 +608,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 yanchor: 'bottom',
                 showarrow: false,
                 text: '<b>FDR 0.05</b>',
-                font: { size: 11, color: '#B40426', family: theme.typography.fontFamily },
+                font: { size: 11, color: chartTokens.threshold, family: theme.typography.fontFamily },
             });
         }
 
@@ -594,17 +624,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             margin: { l: 76, r: 28, t: 92, b: 70 },
             hovermode: 'closest',
             dragmode: 'pan',
-            legend: {
-                orientation: 'h',
-                x: 0.01,
-                y: 1.1,
-                xanchor: 'left',
-                yanchor: 'bottom',
-                bgcolor: chartTokens.legendBg,
-                bordercolor: chartTokens.legendBorder,
-                borderwidth: 1,
-                font: { size: 12, color: theme.palette.text.secondary, family: theme.typography.fontFamily },
-            },
+            showlegend: false,
             xaxis: {
                 ...axisStyle,
                 title: { text: 'Expected signed -log10(P)', font: { size: 14, color: theme.palette.text.primary } },
@@ -768,7 +788,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                         Regulation evidence tail inflation
                     </Typography>
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        Signed QQ plot of perturb-seq gene-level P values. Positive and negative tails are separated by beta_withShet.
+                        Signed QQ plot of perturb-seq gene-level P values. Warm and cool tails share the same scale, with stronger departures rendered more prominently.
                     </Typography>
                 </Box>
 
@@ -796,9 +816,9 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 />
 
                 <Chip icon={<Timeline />} label={`${counts.filtered.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                <Chip icon={<Insights />} label={`${counts.fdr.toLocaleString()} FDR hits`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha('#B40426', 0.08), color: '#B40426', border: `1px solid ${alpha('#B40426', 0.22)}` })} />
-                <Chip icon={<FilterAlt />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha('#B40426', 0.08), color: '#B40426', border: `1px solid ${alpha('#B40426', 0.2)}` })} />
-                <Chip icon={<FilterAlt />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha('#3B4CC0', 0.08), color: '#3B4CC0', border: `1px solid ${alpha('#3B4CC0', 0.2)}` })} />
+                <Chip icon={<Insights />} label={`${counts.fdr.toLocaleString()} FDR hits`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(chartTokens.threshold, 0.08), color: chartTokens.threshold, border: `1px solid ${alpha(chartTokens.threshold, 0.22)}` })} />
+                <Chip icon={<FilterAlt />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.positive.color, 0.08), color: TAIL_META.positive.color, border: `1px solid ${alpha(TAIL_META.positive.color, 0.2)}` })} />
+                <Chip icon={<FilterAlt />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.negative.color, 0.08), color: TAIL_META.negative.color, border: `1px solid ${alpha(TAIL_META.negative.color, 0.2)}` })} />
             </Box>
 
             <Box sx={toolbarSx(theme)}>
@@ -882,23 +902,42 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     )}
 
                     {!isLoading && hasVisiblePoints && (
-                        <Plot
-                            key={plotKey}
-                            data={[...envelopeTraces, ...pointTraces, ...labelTrace, ...highlightedPoint]}
-                            layout={layout}
-                            config={plotConfig}
-                            revision={plotRevision}
-                            onInitialized={(_figure, graphDiv) => { plotRef.current = graphDiv; }}
-                            onUpdate={(_figure, graphDiv) => { plotRef.current = graphDiv; }}
-                            onClick={(evt) => {
-                                const rowKey = evt?.points?.[0]?.customdata?.[0];
-                                if (!rowKey) return;
-                                setHighlight((prev) => ({ rowKey, key: prev.key + 1 }));
-                                setTableOpen(true);
-                            }}
-                            useResizeHandler
-                            style={{ width: '100%', height: '640px' }}
-                        />
+                        <>
+                            <Plot
+                                key={plotKey}
+                                data={[...envelopeTraces, ...pointTraces, ...labelTrace, ...highlightedPoint]}
+                                layout={layout}
+                                config={plotConfig}
+                                revision={plotRevision}
+                                onInitialized={(_figure, graphDiv) => {
+                                    plotRef.current = graphDiv;
+                                    plotElRef.current = graphDiv;
+                                }}
+                                onUpdate={(_figure, graphDiv) => {
+                                    plotRef.current = graphDiv;
+                                    plotElRef.current = graphDiv;
+                                }}
+                                onClick={(evt) => {
+                                    const rowKey = evt?.points?.[0]?.customdata?.[0];
+                                    if (!rowKey) return;
+                                    setHighlight((prev) => ({ rowKey, key: prev.key + 1 }));
+                                    setTableOpen(true);
+                                }}
+                                useResizeHandler
+                                style={{ width: '100%', height: '640px' }}
+                            />
+                            <FloatingLegend
+                                items={legendItems}
+                                collapsed={legendCollapsed}
+                                onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
+                                title="Tails"
+                                width={{ expanded: 194, collapsed: 118 }}
+                                defaultPlacement="right"
+                                defaultTop={68}
+                                defaultSideOffset={10}
+                                anchorPlotRef={plotElRef}
+                            />
+                        </>
                     )}
                 </CardContent>
             </Card>

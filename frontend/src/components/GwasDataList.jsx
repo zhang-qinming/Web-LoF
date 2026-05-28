@@ -32,6 +32,7 @@ import { Clear, Search } from '@mui/icons-material';
 import {
     panelSx,
     sectionTitleSx,
+    stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
     tableSkeletonCellSx,
@@ -364,16 +365,17 @@ export default function GwasDataList({
                                             <TableCell
                                                 key={id}
                                                 align={numeric ? 'right' : 'left'}
-                                                sx={{
-                                                    background: theme.custom.surface.subtle,
-                                                    color: '#475569',
+                                                sx={stickyTableHeaderCellSx(theme, {
+                                                    headerBg: theme.custom.surface.subtle,
+                                                    headerBorder: theme.custom.border.strong,
+                                                    headerColor: '#475569',
+                                                }, numeric ? 'right' : 'left', {
                                                     fontSize: '0.8rem',
                                                     fontWeight: 700,
                                                     letterSpacing: '0.03em',
                                                     textTransform: 'uppercase',
-                                                    borderBottom: `2px solid ${theme.custom.border.strong}`,
                                                     py: 1.2,
-                                                }}
+                                                })}
                                             >
                                                 <TableSortLabel
                                                     active={sortBy === id}

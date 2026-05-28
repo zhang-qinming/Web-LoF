@@ -296,6 +296,88 @@ export function tableTone(theme, tone = 'neutral') {
     return tones[tone] || tones.neutral;
 }
 
+export const groupedTableHeaderMetrics = {
+    groupHeight: 30,
+    columnHeight: 36,
+};
+
+export function groupedTableHeaderCellSx(theme, tone, overrides = {}) {
+    return {
+        position: 'sticky',
+        top: 0,
+        zIndex: 5,
+        height: groupedTableHeaderMetrics.groupHeight,
+        minHeight: groupedTableHeaderMetrics.groupHeight,
+        maxHeight: groupedTableHeaderMetrics.groupHeight,
+        py: 0,
+        px: 1,
+        lineHeight: `${groupedTableHeaderMetrics.groupHeight}px`,
+        textAlign: 'center',
+        whiteSpace: 'nowrap',
+        bgcolor: tone.headerBg,
+        backgroundColor: tone.headerBg,
+        borderBottom: `1px solid ${tone.headerBorder}`,
+        color: tone.headerColor,
+        fontWeight: 750,
+        fontSize: '0.64rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        boxShadow: `inset 0 -1px 0 ${tone.headerBorder}`,
+        backgroundClip: 'padding-box',
+        verticalAlign: 'middle',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        ...overrides,
+    };
+}
+
+export function groupedTableColumnHeaderCellSx(theme, tone, align = 'left', overrides = {}) {
+    return {
+        position: 'sticky',
+        top: groupedTableHeaderMetrics.groupHeight,
+        zIndex: 4,
+        height: groupedTableHeaderMetrics.columnHeight,
+        minHeight: groupedTableHeaderMetrics.columnHeight,
+        py: 0,
+        px: 1,
+        lineHeight: 1.15,
+        textAlign: align,
+        whiteSpace: 'nowrap',
+        bgcolor: tone.headerBg,
+        backgroundColor: tone.headerBg,
+        borderBottom: `2px solid ${tone.headerBorder}`,
+        color: tone.headerColor,
+        fontWeight: 650,
+        fontSize: '0.67rem',
+        boxShadow: `0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${tone.headerBorder}`,
+        backgroundClip: 'padding-box',
+        verticalAlign: 'middle',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        ...overrides,
+    };
+}
+
+export function stickyTableHeaderCellSx(theme, tone, align = 'left', overrides = {}) {
+    return {
+        position: 'sticky',
+        top: 0,
+        zIndex: 4,
+        bgcolor: tone.headerBg,
+        backgroundColor: tone.headerBg,
+        color: tone.headerColor,
+        borderBottom: `2px solid ${tone.headerBorder}`,
+        textAlign: align,
+        whiteSpace: 'nowrap',
+        backgroundClip: 'padding-box',
+        boxShadow: `0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${tone.headerBorder}`,
+        verticalAlign: 'middle',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        ...overrides,
+    };
+}
+
 export function highlightedRowSx(theme, isHighlighted, even, animationNameA, animationNameB, key) {
     const base = '#fff1b8';
     const flash = '#ffe082';
@@ -330,15 +412,12 @@ export function tableRowRevealSx(theme, index = 0, overrides = {}) {
         '@keyframes tableRowReveal': {
             from: {
                 opacity: 0,
-                transform: 'translateY(6px)',
             },
             to: {
                 opacity: 1,
-                transform: 'translateY(0)',
             },
         },
-        animation: `tableRowReveal 260ms ${delay}ms cubic-bezier(0.22, 1, 0.36, 1) both`,
-        willChange: 'opacity, transform',
+        animation: `tableRowReveal 260ms ${delay}ms cubic-bezier(0.22, 1, 0.36, 1) backwards`,
         transition: `background-color ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
         ...overrides,
     };

@@ -25,6 +25,7 @@ import {
     metricChipTone,
     plotFrameSx,
     sectionPanelHeaderSx,
+    stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
     tableTone,
@@ -140,7 +141,7 @@ export default function GeneRegulationTable({
                 )}
             </Box>
             <Collapse in={tableOpen}>
-                <TableContainer sx={{ maxHeight: 540, overflowX: 'auto' }}>
+                <TableContainer sx={{ maxHeight: 540, overflowX: 'auto', overflowY: 'auto' }}>
                     <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', minWidth: 620 }}>
                         <colgroup>
                             {COLUMNS.map((column) => (
@@ -152,17 +153,12 @@ export default function GeneRegulationTable({
                                 {COLUMNS.map((column) => (
                                     <TableCell
                                         key={column.key}
-                                        sx={{
+                                        sx={stickyTableHeaderCellSx(theme, tone, column.align, {
                                             fontWeight: 700,
                                             fontSize: '0.72rem',
                                             py: 0.78,
                                             px: 1.5,
-                                            bgcolor: tone.headerBg,
-                                            color: tone.headerColor,
-                                            borderBottom: `2px solid ${tone.headerBorder}`,
-                                            textAlign: column.align,
-                                            whiteSpace: 'nowrap',
-                                        }}
+                                        })}
                                     >
                                         <TableSortLabel
                                             active={sortBy === column.key}

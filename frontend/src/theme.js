@@ -104,7 +104,7 @@ const theme = createTheme({
             regulator: '#3f7fc0',
             overlap: '#2f8f69',
             highlight: '#0f172a',
-            band: 'rgba(37, 99, 235, 0.05)',
+            band: 'rgba(148, 163, 184, 0.08)',
             grid: 'rgba(15, 23, 42, 0.08)',
             axis: '#475569',
             axisSoft: '#94a3b8',

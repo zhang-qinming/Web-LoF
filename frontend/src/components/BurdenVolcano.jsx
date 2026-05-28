@@ -46,8 +46,8 @@ import {
 } from '../themeUtils';
 
 const COLORS = {
-    positive: '#cc6f3c',
-    negative: '#4f7da8',
+    positive: '#c55e3990',
+    negative: '#4f7da890',
 };
 
 const EFFECT_MODES = {
@@ -328,7 +328,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 size: pointSize,
                 color: COLORS[key],
                 opacity: 0.84,
-                line: { width: 0.6, color: 'rgba(255,255,255,0.72)' },
+                line: { width: 0, color: 'rgba(255,255,255,0)' },
             },
             hovertemplate: [
                 '<b>%{customdata[1]}</b>',

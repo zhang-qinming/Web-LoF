@@ -14,6 +14,8 @@ import {
     TableHead,
     TablePagination,
     TableRow,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -23,10 +25,12 @@ import { getProgramTraits } from '../api/gwas';
 import { StatePanel } from './PageScaffold';
 import {
     captionSx,
+    compactToggleGroupSx,
     metricChipTone,
     panelSx,
     sectionPanelHeaderSx,
     sectionTitleSx,
+    stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
     tableTone,
@@ -74,6 +78,7 @@ export default function ProgramAssociatedTraits({ programId }) {
     const tone = tableTone(theme, 'neutral');
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(50);
+    const [filter, setFilter] = React.useState('all');
     const { data, error, isLoading } = useSWR(
         programId ? ['program-traits', programId] : null,
         ([, id]) => getProgramTraits(id),
@@ -83,6 +88,10 @@ export default function ProgramAssociatedTraits({ programId }) {
     React.useEffect(() => {
         setPage(0);
     }, [programId]);
+
+    React.useEffect(() => {
+        setPage(0);
+    }, [filter]);
 
     if (isLoading) {
         return <StatePanel loading title="Loading associated traits" message="Querying the SQL trait-program index." minHeight={240} />;
@@ -101,6 +110,12 @@ export default function ProgramAssociatedTraits({ programId }) {
     }
 
     const traits = data?.traits || [];
+    const filteredTraits = traits.filter((trait) => {
+        if (filter === 'program') return trait.selectedByProgram;
+        if (filter === 'regulator') return trait.selectedByRegulator;
+        if (filter === 'both') return trait.selectedByProgram && trait.selectedByRegulator;
+        return true;
+    });
     if (!traits.length) {
         return (
             <StatePanel
@@ -112,10 +127,10 @@ export default function ProgramAssociatedTraits({ programId }) {
         );
     }
 
-    const pageCount = Math.max(1, Math.ceil(traits.length / rowsPerPage));
+    const pageCount = Math.max(1, Math.ceil(filteredTraits.length / rowsPerPage));
     const currentPage = Math.min(page, pageCount - 1);
     const start = currentPage * rowsPerPage;
-    const visibleTraits = traits.slice(start, start + rowsPerPage);
+    const visibleTraits = filteredTraits.slice(start, start + rowsPerPage);
 
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
@@ -125,26 +140,37 @@ export default function ProgramAssociatedTraits({ programId }) {
                         Associated Traits
                     </Typography>
                     <Typography sx={captionSx(theme, { fontSize: '0.76rem' })}>
-                        Showing {(start + 1).toLocaleString()}-{Math.min(start + rowsPerPage, traits.length).toLocaleString()} of {traits.length.toLocaleString()} traits where {data.program?.id || programId} is selected.
+                        Showing {filteredTraits.length ? (start + 1).toLocaleString() : 0}-{Math.min(start + rowsPerPage, filteredTraits.length).toLocaleString()} of {filteredTraits.length.toLocaleString()} traits.
                     </Typography>
                 </Box>
-                <SummaryStrip summary={data.summary || {}} />
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', md: 'center' }}>
+                    <ToggleButtonGroup
+                        size="small"
+                        exclusive
+                        value={filter}
+                        onChange={(event, value) => value && setFilter(value)}
+                        sx={compactToggleGroupSx(theme)}
+                    >
+                        <ToggleButton value="all">All</ToggleButton>
+                        <ToggleButton value="program">Program</ToggleButton>
+                        <ToggleButton value="regulator">Regulator</ToggleButton>
+                        <ToggleButton value="both">Both</ToggleButton>
+                    </ToggleButtonGroup>
+                    <SummaryStrip summary={data.summary || {}} />
+                </Stack>
             </Box>
 
-            <TableContainer sx={{ maxHeight: 520 }}>
+            <TableContainer sx={{ maxHeight: 520, overflowX: 'auto', overflowY: 'auto' }}>
                 <Table stickyHeader size="small">
                     <TableHead>
                         <TableRow>
                             {['Trait', 'Selection', 'Scores', 'Genes', 'Top genes'].map((label) => (
                                 <TableCell
                                     key={label}
-                                    sx={{
-                                        bgcolor: tone.headerBg,
-                                        borderBottom: `2px solid ${tone.headerBorder}`,
-                                        color: tone.headerColor,
+                                    sx={stickyTableHeaderCellSx(theme, tone, 'left', {
                                         fontSize: '0.72rem',
                                         fontWeight: 800,
-                                    }}
+                                    })}
                                 >
                                     {label}
                                 </TableCell>
@@ -219,7 +245,7 @@ export default function ProgramAssociatedTraits({ programId }) {
             </TableContainer>
             <TablePagination
                 component="div"
-                count={traits.length}
+                count={filteredTraits.length}
                 page={currentPage}
                 onPageChange={(event, nextPage) => setPage(nextPage)}
                 rowsPerPage={rowsPerPage}

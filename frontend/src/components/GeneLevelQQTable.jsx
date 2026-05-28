@@ -17,6 +17,8 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
 import {
+    groupedTableColumnHeaderCellSx,
+    groupedTableHeaderCellSx,
     highlightedRowSx,
     metricChipTone,
     plotFrameSx,
@@ -60,18 +62,8 @@ function sortLabelSx() {
     };
 }
 
-function headerCellSx(align, tone) {
-    return {
-        px: 1,
-        py: 0.72,
-        textAlign: align,
-        whiteSpace: 'nowrap',
-        bgcolor: tone.headerBg,
-        borderBottom: `2px solid ${tone.headerBorder}`,
-        color: tone.headerColor,
-        fontWeight: 600,
-        fontSize: '0.67rem',
-    };
+function headerCellSx(theme, align, tone) {
+    return groupedTableColumnHeaderCellSx(theme, tone, align);
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400 }) {
@@ -191,19 +183,7 @@ export default function GeneLevelQQTable({
                                         <TableCell
                                             key={group.label}
                                             colSpan={group.span}
-                                            sx={{
-                                                py: 0.58,
-                                                px: 1,
-                                                textAlign: 'center',
-                                                whiteSpace: 'nowrap',
-                                                bgcolor: tone.headerBg,
-                                                borderBottom: `2px solid ${tone.headerBorder}`,
-                                                color: tone.headerColor,
-                                                fontWeight: 700,
-                                                fontSize: '0.64rem',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.08em',
-                                            }}
+                                            sx={groupedTableHeaderCellSx(theme, tone)}
                                         >
                                             {group.label}
                                         </TableCell>
@@ -212,7 +192,7 @@ export default function GeneLevelQQTable({
                             </TableRow>
                             <TableRow>
                                 {COLUMN_SPECS.map((column) => (
-                                    <TableCell key={column.key} sx={headerCellSx(column.align, TONES[column.tone])}>
+                                    <TableCell key={column.key} sx={headerCellSx(theme, column.align, TONES[column.tone])}>
                                         <TableSortLabel
                                             active={sortBy === column.key}
                                             direction={sortBy === column.key ? sortDir : 'asc'}
