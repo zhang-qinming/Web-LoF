@@ -375,7 +375,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }, [chromosomeRanges]);
 
     const processedRows = useMemo(() => filteredRows
-        .map((row) => {
+        .map((row, index) => {
             const normalizedChr = normalizeChromosome(row.chr);
             const bp = Number(row.bp);
             const logp = Number(row.logp);
@@ -384,7 +384,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 ...row,
                 normalizedChr,
                 genomePos: bp + (chromosomeOffsets[normalizedChr] || 0),
-                rowKey: `${normalizedChr}-${bp}-${row.snp || row.nearestGene || 'point'}`,
+                rowKey: `${normalizedChr}-${bp}-${row.snp || row.nearestGene || 'point'}-${index}`,
                 logp,
             };
         })

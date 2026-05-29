@@ -23,7 +23,7 @@ export function PageFrame({
                 mx: 'auto',
                 px: { xs: 2, md: 3 },
                 py: compact ? { xs: 2, md: 3 } : { xs: 3, md: 4 },
-                ...fadeUpKeyframes(8),
+                ...fadeUpKeyframes(),
                 animation: `appFadeUp ${theme.custom.motion.smooth} both`,
                 ...sx,
             }}

@@ -219,6 +219,8 @@ export default function TraitHitManhattanTable({
                 mt: 2,
                 borderRadius: 2,
                 overflow: 'hidden',
+                position: 'relative',
+                zIndex: 2,
             })}
         >
             <Box sx={sectionPanelHeaderSx(theme, {

@@ -185,6 +185,8 @@ export default function BurdenVolcanoTable({
                 mt: 2,
                 borderRadius: 2,
                 overflow: 'hidden',
+                position: 'relative',
+                zIndex: 2,
             })}
         >
             <Box sx={sectionPanelHeaderSx(theme, { borderBottom: tableOpen ? `1px solid ${theme.custom.border.soft}` : 'none' })}>

@@ -470,16 +470,14 @@ export function chartLayoutTokens(theme) {
     };
 }
 
-export function fadeUpKeyframes(distance = 10) {
+export function fadeUpKeyframes() {
     return {
         '@keyframes appFadeUp': {
             from: {
                 opacity: 0,
-                transform: `translateY(${distance}px)`,
             },
             to: {
                 opacity: 1,
-                transform: 'translateY(0)',
             },
         },
     };

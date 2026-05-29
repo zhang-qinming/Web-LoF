@@ -290,7 +290,7 @@ export default function GeneRegulationTable({
     }
 
     return (
-        <Paper ref={tablePaperRef} variant="outlined" sx={plotFrameSx(theme, { overflow: 'hidden' })}>
+        <Paper ref={tablePaperRef} variant="outlined" sx={plotFrameSx(theme, { overflow: 'hidden', position: 'relative', zIndex: 2 })}>
             {body}
         </Paper>
     );

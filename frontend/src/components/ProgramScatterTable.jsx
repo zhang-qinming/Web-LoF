@@ -144,7 +144,7 @@ export default function ProgramScatterTable({
     if (!rows.length) return null;
 
     return (
-        <Paper ref={tableSectionRef} variant="outlined" sx={plotFrameSx(theme, { mt: 2, borderRadius: 2 })}>
+        <Paper ref={tableSectionRef} variant="outlined" sx={plotFrameSx(theme, { mt: 2, borderRadius: 2, position: 'relative', zIndex: 2 })}>
             <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.2, borderBottom: tableOpen ? `1px solid ${theme.custom.border.soft}` : 'none' })}>
                 <Button
                     onClick={() => { setTableOpen((v) => !v); setHighlight({ program: null, key: 0 }); }}
