@@ -16,6 +16,7 @@ import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
     buildPlotHoverTone,
+    buildPlotHoverToneNeutral,
     chartLayoutTokens,
     compactToggleGroupSx,
     metricChipTone,
@@ -565,12 +566,11 @@ export default function ProgramScatter({ fileId }) {
                 fixedrange: false,
             },
             hovermode: 'closest',
-            hoverlabel: {
-                bgcolor: chartTokens.hoverBg,
-                bordercolor: chartTokens.hoverBorder,
-                font: { size: 12, color: theme.palette.text.primary, family: theme.typography.fontFamily },
+            hoverlabel: buildPlotHoverToneNeutral(theme, '#6f859d', {
+                fontSize: 12,
+                family: theme.typography.fontFamily,
                 align: 'left',
-            },
+            }),
             margin: { l: 80, r: 40, t: 60, b: 60 },
             plot_bgcolor: chartTokens.plotBg,
             paper_bgcolor: chartTokens.paperBg,
@@ -599,7 +599,7 @@ export default function ProgramScatter({ fileId }) {
                 },
             ] : [],
         };
-    }, [axisRanges.x, axisRanges.y, axisStyle, chartTokens, fileId, mode, theme.palette.text.primary, theme.typography.fontFamily]);
+    }, [axisRanges.x, axisRanges.y, axisStyle, chartTokens, fileId, mode, theme]);
 
     const doExport = useCallback(() => {
         const gd = exportGdRef.current;

@@ -93,6 +93,8 @@ function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'n
         color: '#334155',
         bgcolor: palette.cellSoft,
         borderBottom: '1px solid rgba(226,232,240,0.72)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
     };
 }
 

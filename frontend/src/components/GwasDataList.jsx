@@ -119,6 +119,28 @@ function formatCellValue(row, columnId) {
         const value = row[columnId] ?? row.sample_size;
         return value != null && value !== '' ? Number(value).toLocaleString() : '-';
     }
+    if (columnId === 'n_variants' || columnId === 'Variants') {
+        const value = row[columnId] ?? row.n_variants;
+        return value != null && value !== '' ? Number(value).toLocaleString() : '-';
+    }
+    if (columnId === 'year' || columnId === 'Year') {
+        const value = row[columnId] ?? row.year;
+        return value != null && value !== '' ? String(value) : '-';
+    }
+    if (columnId === 'n_sig' || columnId === 'Significant Loci') {
+        const value = row[columnId] ?? row.n_sig;
+        return value != null && value !== '' ? Number(value).toLocaleString() : '-';
+    }
+    if (columnId === 'qc_score' || columnId === 'QC') {
+        const value = row[columnId] ?? row.qc_score;
+        return value != null && value !== '' ? String(value) : '-';
+    }
+    if (columnId === 'mesh_term' || columnId === 'MeSH term') {
+        return row[columnId] || row.mesh_term || '-';
+    }
+    if (columnId === 'population' || columnId === 'Population') {
+        return row[columnId] || row.population || '-';
+    }
     return row[columnId] || '-';
 }
 
@@ -158,6 +180,30 @@ function TraitRow({ row, index, columns, theme }) {
                             size="small"
                             variant="outlined"
                             sx={summaryChipSx(theme, { color: theme.palette.primary.dark, backgroundColor: 'rgba(37, 99, 235, 0.05)' })}
+                        />
+                    ) : (col.id === 'n_variants' || col.id === 'Variants') ? (
+                        <Chip
+                            label={formatCellValue(row, col.id)}
+                            size="small"
+                            variant="outlined"
+                            sx={summaryChipSx(theme, { color: '#245089', backgroundColor: 'rgba(14, 116, 144, 0.06)' })}
+                        />
+                    ) : (col.id === 'n_sig' || col.id === 'Significant Loci') ? (
+                        <Chip
+                            label={formatCellValue(row, col.id)}
+                            size="small"
+                            variant="outlined"
+                            sx={summaryChipSx(theme, { color: '#7c4d12', backgroundColor: 'rgba(217, 119, 6, 0.08)' })}
+                        />
+                    ) : (col.id === 'qc_score' || col.id === 'QC') ? (
+                        <Chip
+                            label={formatCellValue(row, col.id)}
+                            size="small"
+                            variant="outlined"
+                            sx={summaryChipSx(theme, {
+                                color: Number(row.qc_score) >= 100 ? '#166534' : '#92400e',
+                                backgroundColor: Number(row.qc_score) >= 100 ? 'rgba(21, 128, 61, 0.08)' : 'rgba(180, 83, 9, 0.08)',
+                            })}
                         />
                     ) : (
                         formatCellValue(row, col.id)
@@ -324,7 +370,7 @@ export default function GwasDataList({
                             size="small"
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search trait, LoF ID, GWAS ID"
+                            placeholder="Search trait, LoF ID, MeSH term, population"
                             sx={{
                                 width: { xs: '100%', sm: 280, md: 330 },
                                 ml: { xs: 0, md: 1 },

@@ -17,6 +17,7 @@ import { scrollElementNearViewportCenter } from '../utils/scroll';
 import GeneRegulationTable from './GeneRegulationTable';
 import {
     buildPlotHoverTone,
+    buildPlotHoverToneNeutral,
     chartLayoutTokens,
     compactToggleGroupSx,
     metricChipTone,
@@ -231,11 +232,10 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
         };
         const baseLayout = {
             hovermode: 'closest',
-            hoverlabel: {
-                bgcolor: chartTokens.hoverBg,
-                bordercolor: chartTokens.hoverBorder,
-                font: { size: 12, color: theme.palette.text.primary, family: theme.typography.fontFamily },
-            },
+            hoverlabel: buildPlotHoverToneNeutral(theme, '#7a8798', {
+                fontSize: 12,
+                family: theme.typography.fontFamily,
+            }),
             margin: { l: 74, r: 18, t: 58, b: 56 },
             plot_bgcolor: chartTokens.plotBg,
             paper_bgcolor: chartTokens.paperBg,

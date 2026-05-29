@@ -10,6 +10,7 @@ const program = require('./routes/Rprogram');
 const regulation = require('./routes/Rregulation');
 const gene = require('./routes/Rgene');
 const dataRoute = require('./routes/Rdata');
+const crossTrait = require('./routes/RcrossTrait');
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use(program);
 app.use(regulation);
 app.use(gene);
 app.use(dataRoute);
+app.use(crossTrait);
 
 app.use((err, req, res, next) => {
     if (res.headersSent) return next(err);

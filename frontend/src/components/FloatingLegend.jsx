@@ -171,6 +171,7 @@ export default function FloatingLegend({
     defaultTop = 18,
     defaultSideOffset = DEFAULT_OFFSET,
     anchorPlotRef,
+    showScale = true,
     sx,
 }) {
     const theme = useTheme();
@@ -602,10 +603,18 @@ export default function FloatingLegend({
                         transition: `max-height ${surfaceTransition}, padding ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}`,
                     }}
                 >
-                    {items.map((item) => (
-                        <Box
-                            key={item.key}
-                            sx={{
+                    {items.map((item) => {
+                        const swatchColors = Array.isArray(item.colors) && item.colors.length > 1
+                            ? item.colors
+                            : null;
+                        const swatchBg = swatchColors
+                            ? `linear-gradient(90deg, ${swatchColors[0]} 0 50%, ${swatchColors[1]} 50% 100%)`
+                            : item.color;
+
+                        return (
+                            <Box
+                                key={item.key}
+                                sx={{
                                 position: 'relative',
                                 display: 'flex',
                                 alignItems: 'stretch',
@@ -618,104 +627,124 @@ export default function FloatingLegend({
                                     bgcolor: alpha(theme.palette.primary.main, 0.045),
                                 },
                             }}
-                        >
-                            <Box
-                                sx={{
-                                    alignSelf: 'flex-start',
-                                    mt: 0.24,
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: '50%',
-                                    bgcolor: item.color,
-                                    boxShadow: `0 0 0 2px ${alpha(item.color, 0.18)}`,
-                                    flexShrink: 0,
-                                    transition: `transform ${surfaceTransition}, box-shadow ${surfaceTransition}`,
-                                }}
-                            />
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                            >
                                 <Box
                                     sx={{
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        justifyContent: 'space-between',
-                                        gap: 0.75,
+                                        alignSelf: 'flex-start',
+                                        mt: 0.24,
+                                        width: item.symbol === 'diamond' ? 12 : (swatchColors ? 14 : 10),
+                                        height: 10,
+                                        borderRadius: item.symbol === 'diamond' ? 2 : (swatchColors ? 999 : '50%'),
+                                        bgcolor: swatchColors ? undefined : item.color,
+                                        background: swatchBg,
+                                        boxShadow: `0 0 0 2px ${alpha(item.color, 0.18)}`,
+                                        flexShrink: 0,
+                                        transform: item.symbol === 'diamond' ? 'rotate(45deg) translateY(1px)' : 'none',
+                                        transition: `transform ${surfaceTransition}, box-shadow ${surfaceTransition}`,
                                     }}
-                                >
-                                    <Typography
-                                        sx={{
-                                            minWidth: 0,
-                                            flex: 1,
-                                            fontSize: '0.72rem',
-                                            fontWeight: 600,
-                                            color: theme.palette.text.primary,
-                                            lineHeight: 1.3,
-                                            whiteSpace: 'normal',
-                                            overflow: 'visible',
-                                            textOverflow: 'clip',
-                                            overflowWrap: 'anywhere',
-                                            wordBreak: 'break-word',
-                                            transition: `color ${surfaceTransition}, transform ${surfaceTransition}`,
-                                        }}
-                                    >
-                                        {item.label}
-                                    </Typography>
+                                />
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
                                     <Box
                                         sx={{
-                                            flexShrink: 0,
-                                            mt: 0.02,
-                                            width: countColumnWidth,
-                                            minWidth: countColumnWidth,
-                                            textAlign: 'right',
-                                            transition: `max-width ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}`,
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            justifyContent: 'space-between',
+                                            gap: 0.75,
                                         }}
                                     >
                                         <Typography
                                             sx={{
-                                                display: 'block',
-                                                fontSize: '0.68rem',
-                                                color: theme.palette.text.secondary,
-                                                fontWeight: 700,
-                                                fontVariantNumeric: 'tabular-nums',
-                                                lineHeight: 1.2,
-                                                whiteSpace: 'nowrap',
-                                                textAlign: 'right',
+                                                minWidth: 0,
+                                                flex: 1,
+                                                fontSize: '0.72rem',
+                                                fontWeight: 600,
+                                                color: theme.palette.text.primary,
+                                                lineHeight: 1.3,
+                                                whiteSpace: 'normal',
+                                                overflow: 'visible',
+                                                textOverflow: 'clip',
+                                                overflowWrap: 'anywhere',
+                                                wordBreak: 'break-word',
+                                                transition: `color ${surfaceTransition}, transform ${surfaceTransition}`,
                                             }}
                                         >
-                                            {item.count.toLocaleString()}
+                                            {item.label}
                                         </Typography>
-                                    </Box>
-                                </Box>
-                                <Box
-                                    sx={{
-                                        mt: 0.45,
-                                        maxHeight: 8,
-                                        overflow: 'hidden',
-                                        transition: `max-height ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}, margin-top ${surfaceTransition}`,
-                                    }}
-                                >
-                                    <Box
-                                        sx={{
-                                            height: 4,
-                                            width: '100%',
-                                            borderRadius: 999,
-                                            bgcolor: alpha(item.color, 0.12),
-                                            overflow: 'hidden',
-                                        }}
-                                    >
                                         <Box
                                             sx={{
-                                                height: '100%',
-                                                width: `${Math.max(10, Math.min(100, (item.count / maxItemCount) * 100))}%`,
-                                                borderRadius: 999,
-                                                bgcolor: item.color,
-                                                opacity: 0.92,
+                                                flexShrink: 0,
+                                                mt: 0.02,
+                                                width: countColumnWidth,
+                                                minWidth: countColumnWidth,
+                                                textAlign: 'right',
+                                                transition: `max-width ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}`,
                                             }}
-                                        />
+                                        >
+                                            <Typography
+                                                sx={{
+                                                    display: 'block',
+                                                    fontSize: '0.68rem',
+                                                    color: theme.palette.text.secondary,
+                                                    fontWeight: 700,
+                                                    fontVariantNumeric: 'tabular-nums',
+                                                    lineHeight: 1.2,
+                                                    whiteSpace: 'nowrap',
+                                                    textAlign: 'right',
+                                                }}
+                                            >
+                                                {item.count.toLocaleString()}
+                                            </Typography>
+                                        </Box>
                                     </Box>
+                                    {item.note && (
+                                        <Typography
+                                            sx={{
+                                                mt: 0.18,
+                                                fontSize: '0.64rem',
+                                                lineHeight: 1.25,
+                                                color: theme.palette.text.secondary,
+                                                whiteSpace: 'normal',
+                                                overflowWrap: 'anywhere',
+                                            }}
+                                        >
+                                            {item.note}
+                                        </Typography>
+                                    )}
+                                    {showScale && (
+                                        <Box
+                                            sx={{
+                                                mt: item.note ? 0.38 : 0.45,
+                                                maxHeight: 8,
+                                                overflow: 'hidden',
+                                                transition: `max-height ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}, margin-top ${surfaceTransition}`,
+                                            }}
+                                        >
+                                            <Box
+                                                sx={{
+                                                    height: 4,
+                                                    width: '100%',
+                                                    borderRadius: 999,
+                                                    bgcolor: alpha(item.color, 0.12),
+                                                    overflow: 'hidden',
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        height: '100%',
+                                                        width: `${Math.max(10, Math.min(100, (item.count / maxItemCount) * 100))}%`,
+                                                        borderRadius: 999,
+                                                        bgcolor: swatchColors ? undefined : item.color,
+                                                        background: swatchColors ? swatchBg : undefined,
+                                                        opacity: 0.92,
+                                                    }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    )}
                                 </Box>
                             </Box>
-                        </Box>
-                    ))}
+                        );
+                    })}
                 </Box>
             )}
         </Box>

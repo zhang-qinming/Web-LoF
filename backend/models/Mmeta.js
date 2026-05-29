@@ -1,8 +1,17 @@
 const pool = require('./db');
 const { config } = require('../lib/config');
-const { buildOrderBy } = require('./utils');
-
-const ALLOWED_SORT = ['file_id', 'trait_name', 'gwas_id'];
+const SORT_COLUMN_MAP = {
+    file_id: 'fm.file_id',
+    trait_name: 'fm.trait_name',
+    gwas_id: 'fm.gwas_id',
+    sample_size: 'gm.sample_size',
+    population: 'gm.population',
+    mesh_term: 'gm.mesh_term',
+    year: 'gm.year',
+    n_variants: 'gm.n_variants',
+    n_sig: 'gm.n_sig',
+    qc_score: 'gm.qc_score',
+};
 
 function escapeLike(value) {
     return String(value).replace(/[\\%_]/g, (match) => `\\${match}`);
@@ -13,30 +22,42 @@ function normalizeSearch(value) {
     return cleaned ? cleaned.slice(0, 200) : '';
 }
 
+function buildMetaOrderBy(sortBy, order) {
+    const column = SORT_COLUMN_MAP[sortBy] || SORT_COLUMN_MAP.trait_name;
+    const direction = String(order || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    return `ORDER BY ${column} ${direction}`;
+}
+
 async function getTraits({ page = 1, limit = 20, sortBy = 'trait_name', order = 'ASC', search = '' } = {}) {
-    const orderBySql = buildOrderBy(sortBy, order, ALLOWED_SORT, 'trait_name');
+    const orderBySql = buildMetaOrderBy(sortBy, order);
     const p = Math.max(1, Number(page) || 1);
     const l = Math.max(1, Math.min(config.query.maxPageLimit, Number(limit) || 20));
     const offset = (p - 1) * l;
     const searchText = normalizeSearch(search);
-    const where = ["trait_name IS NOT NULL", "trait_name != ''"];
+    const where = ["fm.trait_name IS NOT NULL", "fm.trait_name != ''"];
     const params = [];
 
     if (searchText) {
         const like = `%${escapeLike(searchText)}%`;
         where.push(`(
-            trait_name LIKE ? ESCAPE '\\\\'
-            OR file_id LIKE ? ESCAPE '\\\\'
-            OR gwas_id LIKE ? ESCAPE '\\\\'
+            fm.trait_name LIKE ? ESCAPE '\\\\'
+            OR fm.file_id LIKE ? ESCAPE '\\\\'
+            OR fm.gwas_id LIKE ? ESCAPE '\\\\'
+            OR gm.mesh_term LIKE ? ESCAPE '\\\\'
+            OR gm.population LIKE ? ESCAPE '\\\\'
         )`);
-        params.push(like, like, like);
+        params.push(like, like, like, like, like);
     }
 
     const whereSql = `WHERE ${where.join(' AND ')}`;
 
     const [rows] = await pool.query(
-        `SELECT file_id, gwas_id, trait_name
-         FROM file_metadata
+        `SELECT fm.file_id, fm.gwas_id, fm.trait_name,
+                gm.sample_size, gm.n_case, gm.n_control, gm.population,
+                gm.first_author, gm.pmid, gm.year, gm.n_variants, gm.n_sig,
+                gm.qc_score, gm.mesh_term, gm.source_batch AS gwas_source_batch
+         FROM file_metadata fm
+         LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id
          ${whereSql}
          ${orderBySql}
          LIMIT ? OFFSET ?`,
@@ -44,7 +65,9 @@ async function getTraits({ page = 1, limit = 20, sortBy = 'trait_name', order = 
     );
 
     const [[{ total }]] = await pool.query(
-        `SELECT COUNT(*) AS total FROM file_metadata
+        `SELECT COUNT(*) AS total
+         FROM file_metadata fm
+         LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id
          ${whereSql}`,
         params
     );

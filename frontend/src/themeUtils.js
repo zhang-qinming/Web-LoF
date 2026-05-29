@@ -68,13 +68,13 @@ export function tableHeaderTone(theme, tone = 'neutral') {
             color: '#475569',
         },
         primary: {
-            bg: alpha(theme.palette.primary.main, 0.08),
-            border: alpha(theme.palette.primary.main, 0.2),
+            bg: '#eaf2ff',
+            border: '#bfd6fb',
             color: '#245089',
         },
         success: {
-            bg: alpha(theme.palette.success.main, 0.08),
-            border: alpha(theme.palette.success.main, 0.22),
+            bg: '#edf8f1',
+            border: '#c5e6d0',
             color: '#2f6a49',
         },
         accent: {
@@ -83,8 +83,8 @@ export function tableHeaderTone(theme, tone = 'neutral') {
             color: '#5d3f8c',
         },
         warning: {
-            bg: alpha(theme.palette.warning.main, 0.09),
-            border: alpha(theme.palette.warning.main, 0.24),
+            bg: '#fff2dd',
+            border: '#edd1a4',
             color: '#8a5b12',
         },
     };
@@ -242,6 +242,14 @@ export function buildPlotHoverToneArray(theme, colors, options = {}) {
     };
 }
 
+export function buildPlotHoverToneNeutral(theme, color = '#64748b', options = {}) {
+    return buildPlotHoverTone(theme, color, {
+        bgAlpha: 0.12,
+        borderAlpha: 0.28,
+        ...options,
+    });
+}
+
 export function sectionPanelHeaderSx(theme, overrides = {}) {
     return {
         display: 'flex',
@@ -265,15 +273,15 @@ export function tableTone(theme, tone = 'neutral') {
             cellStrong: '#f4f7fa',
         },
         primary: {
-            headerBg: alpha(theme.palette.primary.main, 0.08),
-            headerBorder: alpha(theme.palette.primary.main, 0.18),
+            headerBg: '#eaf2ff',
+            headerBorder: '#bfd6fb',
             headerColor: '#245089',
             cellSoft: '#f8fbff',
             cellStrong: '#f1f6fd',
         },
         success: {
-            headerBg: alpha(theme.palette.success.main, 0.08),
-            headerBorder: alpha(theme.palette.success.main, 0.18),
+            headerBg: '#edf8f1',
+            headerBorder: '#c5e6d0',
             headerColor: '#2f6a49',
             cellSoft: '#f8fcf8',
             cellStrong: '#f1f8f2',
@@ -286,8 +294,8 @@ export function tableTone(theme, tone = 'neutral') {
             cellStrong: '#f4effc',
         },
         warning: {
-            headerBg: alpha(theme.palette.warning.main, 0.08),
-            headerBorder: alpha(theme.palette.warning.main, 0.2),
+            headerBg: '#fff2dd',
+            headerBorder: '#edd1a4',
             headerColor: '#8a5b12',
             cellSoft: '#fffaf4',
             cellStrong: '#fdf3e4',
@@ -322,8 +330,8 @@ export function groupedTableHeaderCellSx(theme, tone, overrides = {}) {
         fontSize: '0.64rem',
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
-        boxShadow: `inset 0 -1px 0 ${tone.headerBorder}`,
-        backgroundClip: 'padding-box',
+        boxShadow: `inset 0 -1px 0 ${tone.headerBorder}, 0 1px 0 ${tone.headerBorder}`,
+        backgroundClip: 'border-box',
         verticalAlign: 'middle',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -350,7 +358,7 @@ export function groupedTableColumnHeaderCellSx(theme, tone, align = 'left', over
         fontWeight: 650,
         fontSize: '0.67rem',
         boxShadow: `0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${tone.headerBorder}`,
-        backgroundClip: 'padding-box',
+        backgroundClip: 'border-box',
         verticalAlign: 'middle',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -369,7 +377,7 @@ export function stickyTableHeaderCellSx(theme, tone, align = 'left', overrides =
         borderBottom: `2px solid ${tone.headerBorder}`,
         textAlign: align,
         whiteSpace: 'nowrap',
-        backgroundClip: 'padding-box',
+        backgroundClip: 'border-box',
         boxShadow: `0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${tone.headerBorder}`,
         verticalAlign: 'middle',
         overflow: 'hidden',

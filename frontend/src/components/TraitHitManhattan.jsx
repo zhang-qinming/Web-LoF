@@ -41,6 +41,7 @@ import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneArray,
+    buildPlotHoverToneNeutral,
     chartLayoutTokens,
     compactToggleGroupSx,
     metricChipTone,
@@ -49,8 +50,8 @@ import {
     toolbarSx,
 } from '../themeUtils';
 
-const UNASSIGNED_COLOR = '#8a96a8';
-const FULL_BACKGROUND_CHROM_COLORS = ['rgba(116, 134, 158, 0.34)', 'rgba(168, 179, 194, 0.28)'];
+const UNASSIGNED_COLOR = '#6f7d90';
+const FULL_BACKGROUND_CHROM_COLORS = ['#e58d2a', '#3b7fc4'];
 const DEFAULT_EXPORT_WIDTH = 1400;
 const DEFAULT_EXPORT_HEIGHT = 760;
 const PROGRAM_COLORS = [
@@ -506,8 +507,8 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 marker: {
                     size: 5.4,
                     color: UNASSIGNED_COLOR,
-                    opacity: 0.48,
-                    line: { width: 0, color: 'rgba(255,255,255,0)' },
+                    opacity: 0.3,
+                    line: { width: 0.35, color: 'rgba(255,255,255,0.42)' },
                 },
             });
         }
@@ -557,7 +558,8 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 key: '__below_threshold__',
                 label: 'below threshold',
                 count: backgroundCounts[0] + backgroundCounts[1],
-                color: '#8f9bad',
+                color: FULL_BACKGROUND_CHROM_COLORS[0],
+                colors: FULL_BACKGROUND_CHROM_COLORS,
             });
         }
 
@@ -638,12 +640,11 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             tickcolor: chartTokens.axisSoft,
         },
         hovermode: 'closest',
-        hoverlabel: {
-            bgcolor: chartTokens.hoverBg,
-            bordercolor: chartTokens.hoverBorder,
-            font: { size: 12, color: theme.palette.text.primary, family: theme.typography.fontFamily },
+        hoverlabel: buildPlotHoverToneNeutral(theme, '#7d8b9e', {
+            fontSize: 12,
+            family: theme.typography.fontFamily,
             align: 'left',
-        },
+        }),
         showlegend: false,
         paper_bgcolor: chartTokens.paperBg,
         plot_bgcolor: chartTokens.plotBg,
@@ -688,7 +689,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 font: { size: 11, color: chartTokens.significance, family: theme.typography.fontFamily },
             },
         ],
-    }), [chartTokens, chromosomeRanges, fileId, gwasId, theme.palette.text.primary, theme.typography.fontFamily, yAxisRange]);
+    }), [chartTokens, chromosomeRanges, fileId, gwasId, theme, yAxisRange]);
 
     const plotRevision = useMemo(() => JSON.stringify({
         highlightKey: highlight.key,

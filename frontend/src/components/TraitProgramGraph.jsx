@@ -390,10 +390,10 @@ function programDisplayLines(module, maxChars = 22) {
 
 function traitTextFontSize(lines) {
     const longest = Math.max(...lines.map((line) => line.length), 0);
-    if (lines.length <= 1) return longest <= 8 ? 29 : 24;
-    if (lines.length === 2) return longest <= 10 ? 24 : 21;
-    if (lines.length === 3) return longest <= 12 ? 20 : 18;
-    return 17;
+    if (lines.length <= 1) return longest <= 8 ? 33 : 28;
+    if (lines.length === 2) return longest <= 10 ? 28 : 25;
+    if (lines.length === 3) return longest <= 12 ? 24 : 21;
+    return 20;
 }
 
 function edgeEndpoint(startX, startY, endX, endY, distanceFromEnd) {

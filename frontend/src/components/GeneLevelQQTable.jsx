@@ -29,6 +29,7 @@ import {
 } from '../themeUtils';
 
 const COLUMN_SPECS = [
+    { key: 'sourceTraitName', label: 'Trait', align: 'left', tone: 'trait', width: 190 },
     { key: 'gene', label: 'Gene', align: 'left', tone: 'gene', width: 122 },
     { key: 'ensg', label: 'ENSG', align: 'left', tone: 'gene', width: 150 },
     { key: 'tailSide', label: 'Tail', align: 'left', tone: 'tail', width: 92 },
@@ -42,6 +43,7 @@ const COLUMN_SPECS = [
 ];
 
 const COLUMN_GROUPS = [
+    { label: 'Trait', span: 1, tone: 'trait' },
     { label: 'Gene', span: 2, tone: 'gene' },
     { label: 'Direction', span: 1, tone: 'tail' },
     { label: 'QQ deviation', span: 3, tone: 'qq' },
@@ -78,6 +80,8 @@ function bodyCellSx({ align, tone, fontFamily, fontWeight = 400 }) {
         color: '#334155',
         bgcolor: tone.cellSoft,
         borderBottom: '1px solid rgba(226,232,240,0.72)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
     };
 }
 
@@ -90,6 +94,7 @@ function formatPValue(value) {
 }
 
 function renderCellContent(column, row) {
+    if (column.key === 'sourceTraitName') return row.sourceTraitName || row.sourceGwasId || row.sourceFileId || '-';
     if (column.key === 'gene') return row.gene || row.ensg || '-';
     if (column.key === 'ensg') return row.ensg || '-';
     if (column.key === 'tailSide') return row.tailSide || '-';
@@ -123,6 +128,7 @@ export default function GeneLevelQQTable({
 }) {
     const theme = useTheme();
     const TONES = {
+        trait: tableTone(theme, 'primary'),
         gene: tableTone(theme, 'neutral'),
         tail: tableTone(theme, 'accent'),
         qq: tableTone(theme, 'primary'),
@@ -171,7 +177,7 @@ export default function GeneLevelQQTable({
 
             <Collapse in={tableOpen}>
                 <TableContainer sx={{ maxHeight: 560, overflowX: 'auto', overflowY: 'auto' }}>
-                    <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: 1066 }}>
+                    <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: 1256 }}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />
@@ -231,10 +237,13 @@ export default function GeneLevelQQTable({
                                                     align: column.align,
                                                     tone: TONES[column.tone],
                                                     fontFamily: ['ensg', 'expected', 'observed', 'deviation', 'p', 'fdr', 'beta', 'qqRank'].includes(column.key) ? 'monospace' : undefined,
-                                                    fontWeight: ['gene', 'tailSide', 'deviation'].includes(column.key) ? 600 : 400,
+                                                    fontWeight: ['sourceTraitName', 'gene', 'tailSide', 'deviation'].includes(column.key) ? 600 : 400,
                                                 }),
                                             };
 
+                                            if (column.key === 'sourceTraitName') {
+                                                sx.bgcolor = TONES.trait.cellStrong;
+                                            }
                                             if (['expected', 'observed', 'deviation'].includes(column.key)) {
                                                 sx.bgcolor = TONES.qq.cellStrong;
                                             }
@@ -245,7 +254,7 @@ export default function GeneLevelQQTable({
                                                 sx.color = row.tailSide === 'positive' ? '#9a3412' : '#245089';
                                             }
                                             if (isHighlighted) {
-                                                sx.fontWeight = ['gene', 'ensg', 'observed', 'deviation'].includes(column.key) ? 700 : Math.max(500, sx.fontWeight || 400);
+                                                sx.fontWeight = ['sourceTraitName', 'gene', 'ensg', 'observed', 'deviation'].includes(column.key) ? 700 : Math.max(500, sx.fontWeight || 400);
                                             }
 
                                             return (

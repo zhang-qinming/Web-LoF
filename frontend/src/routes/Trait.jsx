@@ -12,6 +12,7 @@ import TraitHitManhattan from '../components/TraitHitManhattan';
 import BurdenVolcano from '../components/BurdenVolcano';
 import GeneLevelScatter from '../components/GeneLevelScatter';
 import GeneLevelQQ from '../components/GeneLevelQQ';
+import CrossTraitHeatmap from '../components/CrossTraitHeatmap';
 import TraitMetaCard from '../components/TraitMetaCard';
 import { sectionTitleSx } from '../themeUtils';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
@@ -70,8 +71,14 @@ export default function Trait() {
                     title=""
                     columns={[
                         { id: 'file_id', label: 'LoF ID' },
-                        { id: 'gwas_id', label: 'GWAS ID' },
                         { id: 'trait_name', label: 'Trait' },
+                        { id: 'sample_size', label: 'Sample Size', numeric: true },
+                        { id: 'population', label: 'Population' },
+                        { id: 'mesh_term', label: 'MeSH term' },
+                        { id: 'n_sig', label: 'Significant Loci', numeric: true },
+                        { id: 'qc_score', label: 'QC', numeric: true },
+                        { id: 'year', label: 'Year', numeric: true },
+                        { id: 'n_variants', label: 'Variants', numeric: true },
                     ]}
                     defaultSortBy="trait_name"
                     defaultOrder="ASC"
@@ -105,6 +112,7 @@ export default function Trait() {
                 <Tab label="Posterior Volcano" />
                 <Tab label="Gene Evidence" />
                 <Tab label="Gene QQ" />
+                <Tab label="Cross-trait Heatmap" />
             </Tabs>
 
             <Box sx={{ minHeight: 400 }}>
@@ -174,6 +182,14 @@ export default function Trait() {
                         gwasId={gwasId}
                         traitLabel={meta?.trait_name || fileId}
                         lookupIds={dataIdCandidates}
+                    />
+                )}
+                {tab === 7 && (
+                    <CrossTraitHeatmap
+                        key={`cross-trait-heatmap-${fileId}-${gwasId}`}
+                        fileId={fileId}
+                        gwasId={gwasId}
+                        traitLabel={meta?.trait_name || fileId}
                     />
                 )}
             </Box>

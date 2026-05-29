@@ -48,7 +48,7 @@ const TEXT = {
         sectionsAndMethods: (sectionCount, methodCount) => `${sectionCount} sections / ${methodCount} topics`,
         components: (count) => `${count} components`,
         recommendedWorkflow: 'Recommended workflow',
-        workflowText: 'Start from Home or Trait to locate a trait, then inspect Manhattan, program enrichment, and gene-level views inside the Trait page. Use Data Browser for raw file browsing and batch downloads.',
+        workflowText: 'Start from Home or Trait to locate a trait, then inspect Manhattan, program enrichment, graph, gene-level, and cross-trait views inside the Trait page. Use Data Browser for raw file browsing and batch downloads.',
         componentCoverageTitle: 'Component Coverage Index',
         componentCoverageBody: 'Visible routes and user-facing components are mapped to the guide entries below. Pure helpers, formatters, and loading skeletons stay grouped under their parent component.',
         mapped: (count) => `${count} mapped`,
@@ -153,10 +153,11 @@ const TEXT = {
                     {
                         name: 'Trait Figure Tabs',
                         route: '/trait',
-                        role: 'Entry point into Program Scatter, Trait Program Graph, Manhattan, Burden Volcano, and Posterior Volcano.',
+                        role: 'Entry point into Program Scatter, Trait Program Graph, Manhattan, Burden Volcano, Posterior Volcano, Gene Evidence, Gene QQ, and Cross-trait Heatmap.',
                         usage: [
                             'Tabs with available data open normally; tabs without matching files are disabled or replaced with explanatory panels.',
                             'The page prefers available program-centric plots first and otherwise falls back to Manhattan.',
+                            'Gene Evidence, Gene QQ, and Cross-trait Heatmap add gene-level comparison workflows beyond the Manhattan and volcano tabs.',
                         ],
                     },
                 ],
@@ -172,10 +173,10 @@ const TEXT = {
                         route: '/trait',
                         role: 'Trait-level scatter plot comparing program burden with regulator burden.',
                         usage: [
-                            'Use Scatter mode for 2D score comparison and Rank mode for relative ranking views.',
-                            'Colors separate program-enriched, regulator-enriched, both-enriched, and other categories.',
-                            'Top N, marker size, bubble scaling, and label controls adjust density and readability.',
-                            'Selecting a point highlights and scrolls to the matching row in the table below.',
+                            'Each point is one program. In Scatter mode, x is Program burden and y is Regulator burden, so the four quadrants separate programs that are strong on one side, both sides, or neither side.',
+                            'Rank mode keeps the same programs but switches the axes to relative ranking, which is useful when absolute scores vary a lot across traits.',
+                            'Colors encode enrichment class, while marker size or bubble scaling helps you see which programs carry stronger signed signal.',
+                            'Use this plot to find programs that are jointly trait- and regulator-supported, then click a point to focus the matching row in the table below.',
                         ],
                     },
                     {
@@ -193,10 +194,10 @@ const TEXT = {
                         route: '/trait',
                         role: 'Relationship graph linking trait, programs, and regulator genes.',
                         usage: [
-                            'The left side shows trait-program directionality, while the right side shows regulator-program directionality.',
-                            'Gamma threshold, sign filters, max genes per program, visible side, and discordant-only filters control graph density.',
-                            'Zoom controls, reset, and selection clearing manage navigation in the SVG workspace.',
-                            'Download SVG and TSV for publication output or downstream review.',
+                            'This graph answers how the current trait connects to programs and which regulator genes are driving those programs. The center nodes are programs; the two sides show upstream and downstream context.',
+                            'The left side summarizes trait-to-program direction, while the right side summarizes regulator-to-program direction, so you can quickly see whether the same program is supported from both perspectives.',
+                            'Gamma threshold, sign filters, max genes per program, visible side, and discordant-only filters are mainly density controls: raise them when the graph is crowded, lower them when you need more coverage.',
+                            'Use zoom, pan, and row selection together. The graph is best for structure discovery, and the summary table below is best for exact values and row-level follow-up.',
                         ],
                     },
                     {
@@ -213,10 +214,10 @@ const TEXT = {
                         route: '/trait',
                         role: 'Manhattan view for trait-level GWAS loci or full point sets.',
                         usage: [
-                            'Switch between Hits TSV and Full TSV. If the hits file is unavailable, the view falls back automatically.',
-                            'Color points by Program or Geneset, and combine chromosome, program, geneset, distance, gene, or rsID filters.',
-                            'Program-only mode isolates annotated loci. Reset filters restores the default state.',
-                            'The Plotly toolbar supports zoom, pan, and export actions.',
+                            'Each point is a variant. The x axis walks across chromosomes and genomic position, and the y axis is -log10(P), so taller peaks mark more significant loci.',
+                            'Use Hits TSV when you want the condensed lead-signal view, and Full TSV when you need local background context around those peaks. If the hits file is missing, the page falls back automatically.',
+                            'Color by Program or Geneset to see which loci are already annotated; combine chromosome, distance_to_gene, gene, rsID, program, and geneset filters to isolate a region or annotation class.',
+                            'This plot is best for answering where the strongest GWAS signal sits in the genome and whether those loci already map to a program or regulator context.',
                         ],
                     },
                     {
@@ -243,10 +244,10 @@ const TEXT = {
                         route: '/trait',
                         role: 'Shared gene-level plot for Burden Volcano and Posterior Volcano.',
                         usage: [
-                            'Switch between hits and full TSV inputs. The view falls back automatically if a hits file lacks data.',
-                            'Use direction filters, significance filters, and effect-size sliders to refine visible genes.',
-                            'Clicking a point highlights the corresponding gene row in the table.',
-                            'Export the chart as SVG or PNG from the plot controls.',
+                            'Each point is a gene. The x axis is the effect estimate: burden beta in Burden Volcano, or posterior mean in Posterior Volcano. The y axis is -log10(P), so higher points are statistically stronger.',
+                            'Genes on the right have positive effect; genes on the left have negative effect. The horizontal guide helps you judge which genes cross the nominal significance region at a glance.',
+                            'Use hits vs full TSV depending on whether you want the concise significant set or the full gene background. Direction and effect-size filters are useful for separating one-sided signals.',
+                            'This plot is the fastest way to find genes that are both large in magnitude and statistically strong, then inspect their exact values in the synced table.',
                         ],
                     },
                     {
@@ -256,6 +257,57 @@ const TEXT = {
                         usage: [
                             'Review Gene, ENSG, effect, P, FDR, Program, and Geneset fields.',
                             'Sort columns, open Program links, and export the current table as CSV.',
+                        ],
+                    },
+                    {
+                        name: 'GeneLevelScatter',
+                        route: '/trait',
+                        role: 'Gene Evidence plot comparing GeneBayes posterior signal with perturbation support.',
+                        usage: [
+                            'Each point is a gene. The x axis is GeneBayes post_mean and the y axis is signed -log10(P) from perturbation evidence, so the sign of both axes matters, not only the magnitude.',
+                            'Genes far from zero on both axes have stronger combined support. Concordant genes stay in the upper-right or lower-left logic implied by sign, while discordant genes separate toward opposite directions.',
+                            'Color encodes evidence class, so you can distinguish broad background genes from posterior-high, regulation-supported, and direction-discordant genes without opening the table first.',
+                            'Use this figure when you want to compare statistical gene prioritization against perturbation directionality, then click a point to inspect the matched row and labels below.',
+                        ],
+                    },
+                    {
+                        name: 'GeneLevelScatterTable',
+                        route: '/trait',
+                        role: 'Detail table below Gene Evidence.',
+                        usage: [
+                            'Review gene, ENSG, posterior effect, regulation score, FDR, evidence class, and labeling reasons.',
+                            'Sort columns and export the current processed rows as CSV.',
+                        ],
+                    },
+                    {
+                        name: 'GeneLevelQQ',
+                        route: '/trait',
+                        role: 'Gene-level QQ-style comparison view with optional multi-trait overlays.',
+                        usage: [
+                            'This is a signed QQ plot at the gene level. X is expected signal and y is observed signal, so points that rise away from the expected line indicate stronger-than-null enrichment.',
+                            'Positive and negative tails are still separated, which lets you see whether inflation or depletion is happening symmetrically or only on one side.',
+                            'When you add extra traits, color encodes trait identity while marker shape still indicates tail direction. That makes it useful for checking whether multiple traits share the same tail behavior.',
+                            'Use Trait stamp for export-ready comparisons, and use the table below when you need the exact expected, observed, deviation, and tail assignment for selected genes.',
+                        ],
+                    },
+                    {
+                        name: 'GeneLevelQQTable',
+                        route: '/trait',
+                        role: 'Detail table below Gene QQ.',
+                        usage: [
+                            'Review expected, observed, deviation, beta, P-value, and tail assignments for the visible rows.',
+                            'Use sorting and CSV export for downstream review.',
+                        ],
+                    },
+                    {
+                        name: 'CrossTraitHeatmap',
+                        route: '/trait',
+                        role: 'Cross-trait heatmap of top source-trait genes across selected target traits.',
+                        usage: [
+                            'Rows are the current trait\'s top genes and columns are selected target traits. Each cell shows the target trait\'s post_mean for the same gene after gene-level alignment.',
+                            'The color scale is centered at zero: warm cells mean positive post_mean, cool cells mean negative post_mean, and near-neutral cells indicate weak or missing directional effect.',
+                            'Recommended, Recent, and Search are three different ways to build the target trait panel. Reset returns to the recommended starting set instead of the full universe.',
+                            'Use this view to ask whether the same prioritized genes repeat across related traits and whether their effect directions stay consistent. Click a cell or target label to jump into that trait.',
                         ],
                     },
                 ],
@@ -280,9 +332,10 @@ const TEXT = {
                         route: '/programs/P1',
                         role: 'Perturb-seq gene-level regulation plot for a single program.',
                         usage: [
-                            'Use the program picker to switch programs by ID or annotation keyword.',
-                            'The scatter plot maps effect size on x and -log10(P-value) on y, with colors for background and hit classes.',
-                            'Hover for gene details, click to focus rows below, and use the Plotly toolbar for fullscreen or export.',
+                            'Each point is a gene measured within one program context. The x axis is effect size and the y axis is -log10(P-value), so the plot reads like a program-specific volcano view.',
+                            'Genes far to the right are positive regulators; genes far to the left are negative regulators; higher points carry stronger statistical support.',
+                            'Color separates background genes from positive and negative hit classes, which makes it easy to see whether a program is dominated by one regulatory direction or has balanced control.',
+                            'Use the program picker to compare programs quickly, then click points or rows to move between the visual ranking and the exact gene-level table.',
                         ],
                     },
                     {
@@ -376,7 +429,7 @@ const TEXT = {
                     {
                         name: 'FloatingLegend',
                         route: null,
-                        role: 'Reusable floating legend used by Manhattan, Volcano, Program Scatter, and Gene Regulation views.',
+                        role: 'Reusable floating legend used by Manhattan, Volcano, Program Scatter, Gene Regulation, Gene Evidence, and Gene QQ views.',
                         usage: [
                             'Use it to interpret color, marker, and count encodings for the active plot.',
                             'Collapse it when you need to reduce overlap with the chart area.',
@@ -415,6 +468,7 @@ const TEXT = {
                         usage: [
                             'Open the Plotly download control to choose export options.',
                             'Set width, height, and SVG or PNG output. Prefer SVG for publications or vector editing.',
+                            'Trait page plots such as Manhattan, Volcano, Gene Evidence, and Gene QQ support in-place image export from the toolbar.',
                         ],
                     },
                 ],
@@ -459,6 +513,11 @@ const TEXT = {
                     { name: 'TraitHitManhattanTable', target: 'TraitHitManhattanTable' },
                     { name: 'BurdenVolcano', target: 'BurdenVolcano' },
                     { name: 'BurdenVolcanoTable', target: 'BurdenVolcanoTable' },
+                    { name: 'GeneLevelScatter', target: 'GeneLevelScatter' },
+                    { name: 'GeneLevelScatterTable', target: 'GeneLevelScatterTable' },
+                    { name: 'GeneLevelQQ', target: 'GeneLevelQQ' },
+                    { name: 'GeneLevelQQTable', target: 'GeneLevelQQTable' },
+                    { name: 'CrossTraitHeatmap', target: 'CrossTraitHeatmap' },
                 ],
             },
             {
@@ -482,7 +541,7 @@ const TEXT = {
         sectionsAndMethods: (sectionCount, methodCount) => `${sectionCount} 个章节 / ${methodCount} 个主题`,
         components: (count) => `${count} 个组件`,
         recommendedWorkflow: '推荐使用路径',
-        workflowText: '建议先在 Home 或 Trait 定位 trait，再在 Trait 页面查看 Manhattan、program enrichment 和 gene-level 结果；原始文件浏览和批量下载统一使用 Data Browser。',
+        workflowText: '建议先在 Home 或 Trait 定位 trait，再在 Trait 页面查看 Manhattan、program enrichment、graph、gene-level 和 cross-trait 结果；原始文件浏览和批量下载统一使用 Data Browser。',
         componentCoverageTitle: '组件覆盖索引',
         componentCoverageBody: '源码中的页面和可见组件都映射到下方说明条目；纯 helper、格式化函数和 loading skeleton 归入父组件。',
         mapped: (count) => `${count} 个映射`,
@@ -587,10 +646,11 @@ const TEXT = {
                     {
                         name: 'Trait Figure Tabs',
                         route: '/trait',
-                        role: 'Program Scatter、Trait Program Graph、Manhattan、Burden Volcano 和 Posterior Volcano 的入口。',
+                        role: 'Program Scatter、Trait Program Graph、Manhattan、Burden Volcano、Posterior Volcano、Gene Evidence、Gene QQ 和 Cross-trait Heatmap 的入口。',
                         usage: [
                             '有数据的 tab 可正常打开；没有匹配文件的 tab 会禁用或显示说明面板。',
                             '页面会优先展示可用的 program 相关图，否则回退到 Manhattan。',
+                            'Gene Evidence、Gene QQ 和 Cross-trait Heatmap 提供了额外的 gene-level 比较和跨 trait 浏览入口。',
                         ],
                     },
                 ],
@@ -606,10 +666,10 @@ const TEXT = {
                         route: '/trait',
                         role: '比较 program burden 与 regulator burden 的 trait 级散点图。',
                         usage: [
-                            'Scatter 模式用于二维 score 对比，Rank 模式用于相对排名视图。',
-                            '颜色区分 program-enriched、regulator-enriched、both-enriched 和 other。',
-                            'Top N、marker size、bubble scale 和 label 控件用于调节密度和可读性。',
-                            '点击点位会高亮并滚动到下方对应表格行。',
+                            '每个点代表一个 program。Scatter 模式下，x 轴是 Program burden，y 轴是 Regulator burden，因此四个象限天然对应偏 program、偏 regulator、两者都强或两者都弱的 program。',
+                            'Rank 模式保留同一批 program，但把坐标改成相对排名，适合在不同 trait 间绝对分值差异较大时看相对位置。',
+                            '颜色表示 enrichment class，点大小或 bubble scale 用来补充显示信号强弱，而不只是类别。',
+                            '这个图适合先找同时得到 trait 与 regulator 支持的 program，再点击点位到下方表格查看具体数值。',
                         ],
                     },
                     {
@@ -627,10 +687,10 @@ const TEXT = {
                         route: '/trait',
                         role: '连接 trait、program 和 regulator genes 的关系图。',
                         usage: [
-                            '左侧表示 trait-program 方向关系，右侧表示 regulator-program 方向关系。',
-                            'Gamma threshold、sign 过滤、每个 program 展示的基因数、可见侧别和 discordant-only 都会影响图密度。',
-                            '缩放、重置和清空选择用于管理 SVG 工作区视图。',
-                            '可下载 SVG 和 TSV 用于论文或后续核查。',
+                            '这个图回答的是：当前 trait 通过哪些 program 连接到哪些 regulator genes。中间是 program，两侧分别给出上下游关系。',
+                            '左侧概括 trait 到 program 的方向信息，右侧概括 regulator 到 program 的方向信息，因此可以快速判断同一个 program 是否同时得到两侧支持。',
+                            'Gamma threshold、sign 过滤、每个 program 展示的 gene 数、可见侧别和 discordant-only 本质上都是密度控制项；图太挤时提高阈值，想看全时再放宽。',
+                            '这个图更适合看结构和模块关系，图下方汇总表更适合看精确数值和逐行核查，二者应配合使用。',
                         ],
                     },
                     {
@@ -647,10 +707,10 @@ const TEXT = {
                         route: '/trait',
                         role: '展示 trait 级 GWAS loci 或完整点集的 Manhattan 图。',
                         usage: [
-                            '可在 Hits TSV 和 Full TSV 之间切换；如果 hits 文件不可用会自动回退。',
-                            '可按 Program 或 Geneset 着色，并结合 chromosome、program、geneset、distance、gene 或 rsID 过滤。',
-                            'Program-only 模式可只保留带注释的 loci；Reset filters 可恢复默认状态。',
-                            'Plotly 工具栏支持缩放、平移和导出。',
+                            '每个点代表一个 variant。x 轴沿染色体和基因组位置展开，y 轴是 -log10(P)，因此越高的峰代表统计学上越显著的 loci。',
+                            'Hits TSV 适合看浓缩后的 lead signals，Full TSV 适合看这些峰周围的局部背景；如果 hits 文件缺失，页面会自动回退。',
+                            '按 Program 或 Geneset 着色，可以直接看哪些 loci 已经有功能注释；再结合 chromosome、distance_to_gene、gene、rsID、program、geneset 过滤器定位具体区域。',
+                            '这个图最适合回答强 GWAS 信号落在基因组哪里，以及这些 loci 是否已经能映射到 program 或 regulator 语境中。',
                         ],
                     },
                     {
@@ -677,10 +737,10 @@ const TEXT = {
                         route: '/trait',
                         role: 'Burden Volcano 和 Posterior Volcano 共用的 gene-level 图。',
                         usage: [
-                            '可在 hits 和 full TSV 数据间切换；如果 hits 文件没有数据会自动回退。',
-                            '方向过滤、显著性过滤和 effect-size slider 用于筛选可见 gene。',
-                            '点击点位会高亮对应基因并定位下方表格。',
-                            '可通过图形控件导出 SVG 或 PNG。',
+                            '每个点代表一个 gene。x 轴是效应估计：Burden Volcano 用 burden beta，Posterior Volcano 用 posterior mean；y 轴是 -log10(P)，因此越高表示统计证据越强。',
+                            '右侧基因表示正向效应，左侧表示负向效应。横向参考线可以帮助快速判断哪些 gene 已经进入名义显著区域。',
+                            'hits 与 full TSV 的切换分别对应精简显著集和完整背景集；方向过滤与 effect-size 过滤则适合拆开看单侧信号。',
+                            '这个图适合优先找出“效应幅度大且统计支持强”的 gene，再到同步表格里核对具体数值。',
                         ],
                     },
                     {
@@ -690,6 +750,57 @@ const TEXT = {
                         usage: [
                             '查看 Gene、ENSG、effect、P、FDR、Program 和 Geneset 等字段。',
                             '支持按列排序、打开 Program 链接，并导出当前 CSV。',
+                        ],
+                    },
+                    {
+                        name: 'GeneLevelScatter',
+                        route: '/trait',
+                        role: '比较 GeneBayes posterior signal 与 perturbation 支持证据的 Gene Evidence 图。',
+                        usage: [
+                            '每个点都是一个 gene。x 轴是 GeneBayes post_mean，y 轴是扰动证据的 signed -log10(P)，所以这里不仅看绝对值大小，也要看两个轴的正负方向是否一致。',
+                            '同时远离两个轴原点的 gene 往往有更强的联合支持；方向一致的 gene 会落在逻辑上相符的区域，方向冲突的 gene 会分离到相反方向。',
+                            '颜色表示 evidence class，因此不用先展开表格，也能区分背景基因、posterior-high、regulation-supported 和 direction-discordant。',
+                            '这个图适合对比统计优先级和扰动方向是否一致，再点击点位到下方表格查看对应 gene 的详细证据。',
+                        ],
+                    },
+                    {
+                        name: 'GeneLevelScatterTable',
+                        route: '/trait',
+                        role: 'Gene Evidence 下方的明细表。',
+                        usage: [
+                            '查看 gene、ENSG、posterior effect、regulation score、FDR、evidence class 和 label reason 等字段。',
+                            '支持排序，并可导出当前处理后的 CSV。',
+                        ],
+                    },
+                    {
+                        name: 'GeneLevelQQ',
+                        route: '/trait',
+                        role: '支持附加 trait overlay 的 gene-level QQ 对比图。',
+                        usage: [
+                            '这是 gene-level 的 signed QQ 图。x 轴是 expected signal，y 轴是 observed signal，因此点越偏离 expected line，说明偏离空分布越明显。',
+                            '正尾和负尾会分开显示，所以你可以判断信号膨胀或偏离是双侧都有，还是只集中在某一侧。',
+                            '加入额外 trait 后，颜色表示 trait 身份，点形状仍表示 tail 方向，因此很适合比较多个 trait 是否共享相似的尾部行为。',
+                            'Trait stamp 适合做导出图；如果需要精确查看 expected、observed、deviation 和 tail 分类，还是以下方表格为准。',
+                        ],
+                    },
+                    {
+                        name: 'GeneLevelQQTable',
+                        route: '/trait',
+                        role: 'Gene QQ 下方的明细表。',
+                        usage: [
+                            '查看 expected、observed、deviation、beta、P-value 和 tail 分类等字段。',
+                            '支持排序和 CSV 导出，便于后续分析。',
+                        ],
+                    },
+                    {
+                        name: 'CrossTraitHeatmap',
+                        route: '/trait',
+                        role: '展示当前 trait 顶部 genes 在多个 target traits 中 post_mean 的跨 trait 热图。',
+                        usage: [
+                            '行是当前 trait 的 top genes，列是选中的 target traits。每个单元格表示同一个 gene 在目标 trait 中对齐后的 post_mean。',
+                            '配色以 0 为中心：暖色表示正 post_mean，冷色表示负 post_mean，接近中性的颜色表示方向弱或接近缺失。',
+                            'Recommended、Recent 和 Search 是三种构建目标 trait 面板的方式；Reset 不是恢复全量，而是恢复推荐的起始集合。',
+                            '这个图适合回答：当前 trait 优先出来的 gene 是否也在其他 trait 中重复出现，以及方向是否保持一致。点击单元格或目标 trait 标签可继续跳转查看。',
                         ],
                     },
                 ],
@@ -714,9 +825,10 @@ const TEXT = {
                         route: '/programs/P1',
                         role: '单个 program 的 Perturb-seq gene-level regulation 图。',
                         usage: [
-                            '可通过 program picker 按 ID 或注释关键词切换 program。',
-                            '散点图 x 轴为 effect size，y 轴为 -log10(P-value)，颜色区分背景和 hit 类型。',
-                            '悬停查看 gene 细节，点击聚焦下方表格，并可通过 Plotly 工具栏全屏或导出。',
+                            '每个点代表一个 gene，放在单个 program 的上下文里看。x 轴是 effect size，y 轴是 -log10(P-value)，本质上可以把它理解成 program 专属的 volcano 图。',
+                            '越靠右表示正向调控越强，越靠左表示负向调控越强；点越高则统计支持越强。',
+                            '颜色区分背景基因、正向 hit 和负向 hit，因此可以快速判断某个 program 是被单一方向主导，还是存在更平衡的调控结构。',
+                            '用 program picker 快速切换 program，再通过点击点位或表格行在可视排序和精确数值之间来回核查。',
                         ],
                     },
                     {
@@ -810,7 +922,7 @@ const TEXT = {
                     {
                         name: 'FloatingLegend',
                         route: null,
-                        role: 'Manhattan、Volcano、Program Scatter 和 Gene Regulation 共用的浮动图例。',
+                        role: 'Manhattan、Volcano、Program Scatter、Gene Regulation、Gene Evidence 和 Gene QQ 共用的浮动图例。',
                         usage: [
                             '用于解释当前图中的颜色、标记和数量编码。',
                             '当图例遮挡图区时可折叠。',
@@ -849,6 +961,7 @@ const TEXT = {
                         usage: [
                             '通过 Plotly 下载控件打开导出选项。',
                             '设置宽高和 SVG 或 PNG 输出；论文或矢量编辑优先使用 SVG。',
+                            'Trait 页中的 Manhattan、Volcano、Gene Evidence 和 Gene QQ 等图都支持在工具栏中直接导出图片。',
                         ],
                     },
                 ],
@@ -893,6 +1006,11 @@ const TEXT = {
                     { name: 'TraitHitManhattanTable', target: 'TraitHitManhattanTable' },
                     { name: 'BurdenVolcano', target: 'BurdenVolcano' },
                     { name: 'BurdenVolcanoTable', target: 'BurdenVolcanoTable' },
+                    { name: 'GeneLevelScatter', target: 'GeneLevelScatter' },
+                    { name: 'GeneLevelScatterTable', target: 'GeneLevelScatterTable' },
+                    { name: 'GeneLevelQQ', target: 'GeneLevelQQ' },
+                    { name: 'GeneLevelQQTable', target: 'GeneLevelQQTable' },
+                    { name: 'CrossTraitHeatmap', target: 'CrossTraitHeatmap' },
                 ],
             },
             {

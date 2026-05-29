@@ -35,6 +35,7 @@ import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
     buildPlotHoverTone,
+    buildPlotHoverToneNeutral,
     chartLayoutTokens,
     controlFieldSx,
     metricChipTone,
@@ -45,9 +46,10 @@ import {
     toolbarSx,
 } from '../themeUtils';
 
-const COLORS = {
-    positive: '#c55e3990',
-    negative: '#4f7da890',
+const VOLCANO_STYLE = {
+    background: { color: '#c3ccd8', opacity: 0.42, label: 'Background' },
+    positive: { color: '#fb986d', strong: '#dc7141', opacity: 0.66, strongOpacity: 0.9, label: 'Positive hit' },
+    negative: { color: '#79b9f2', strong: '#4b92df', opacity: 0.66, strongOpacity: 0.9, label: 'Negative hit' },
 };
 
 const EFFECT_MODES = {
@@ -59,7 +61,7 @@ const EFFECT_MODES = {
 const SIGNIFICANCE_LOGP = -Math.log10(0.05);
 const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 800;
-const DEFAULT_POINT_SIZE = 9;
+const DEFAULT_POINT_SIZE = 8;
 
 const VOLCANO_CONFIGS = {
     burden: {
@@ -279,24 +281,81 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     }, [filteredRows]);
     const legendItems = useMemo(() => {
         const items = [];
-        if (counts.positive > 0) items.push({ key: 'positive', label: 'Positive effect', color: COLORS.positive, count: counts.positive });
-        if (counts.negative > 0) items.push({ key: 'negative', label: 'Negative effect', color: COLORS.negative, count: counts.negative });
+        if (counts.positive > 0) {
+            items.push({
+                key: 'positive',
+                label: VOLCANO_STYLE.positive.label,
+                note: 'Right of zero; stronger signal uses the deeper positive shade.',
+                color: VOLCANO_STYLE.positive.strong,
+                count: counts.positive,
+            });
+        }
+        if (counts.negative > 0) {
+            items.push({
+                key: 'negative',
+                label: VOLCANO_STYLE.negative.label,
+                note: 'Left of zero; stronger signal uses the deeper negative shade.',
+                color: VOLCANO_STYLE.negative.strong,
+                count: counts.negative,
+            });
+        }
         return items;
     }, [counts]);
 
     const plotData = useMemo(() => {
         const grouped = {
-            negative: { x: [], y: [], text: [], customdata: [] },
-            positive: { x: [], y: [], text: [], customdata: [] },
-            neutral: { x: [], y: [], text: [], customdata: [] },
+            background: { x: [], y: [], text: [], customdata: [], colors: [], sizes: [], opacities: [] },
+            negative_soft: { x: [], y: [], text: [], customdata: [], colors: [], sizes: [], opacities: [] },
+            negative_strong: { x: [], y: [], text: [], customdata: [], colors: [], sizes: [], opacities: [] },
+            positive_soft: { x: [], y: [], text: [], customdata: [], colors: [], sizes: [], opacities: [] },
+            positive_strong: { x: [], y: [], text: [], customdata: [], colors: [], sizes: [], opacities: [] },
         };
+        let maxLogp = 1;
+        let maxEffect = 0.1;
 
         filteredRows.forEach((row) => {
-            const key = row.effectClass;
-            grouped[key].x.push(row.effect);
-            grouped[key].y.push(row.logp);
-            grouped[key].text.push(row.gene || row.ensg || row.rowKey);
-            grouped[key].customdata.push([
+            if (Number.isFinite(row.logp)) maxLogp = Math.max(maxLogp, row.logp);
+            if (Number.isFinite(row.effect)) maxEffect = Math.max(maxEffect, Math.abs(row.effect));
+        });
+
+        const logpSpan = Math.max(maxLogp - SIGNIFICANCE_LOGP, 0.75);
+
+        filteredRows.forEach((row) => {
+            const directionKey = row.effectClass === 'negative' ? 'negative' : 'positive';
+            const effectIntensity = clamp(Math.abs(row.effect || 0) / maxEffect, 0, 1);
+            const significanceIntensity = clamp(((row.logp || 0) - SIGNIFICANCE_LOGP) / logpSpan, 0, 1);
+            const emphasis = ((effectIntensity * 0.34) + (significanceIntensity * 0.66)) ** 0.92;
+
+            if (row.isSignificant) {
+                const bucketKey = `${directionKey}_${emphasis > 0.55 ? 'strong' : 'soft'}`;
+                const bucket = grouped[bucketKey];
+                bucket.x.push(row.effect);
+                bucket.y.push(row.logp);
+                bucket.text.push(row.gene || row.ensg || row.rowKey);
+                bucket.customdata.push([
+                    row.rowKey,
+                    row.gene || 'NA',
+                    row.ensg || 'NA',
+                    row.effect,
+                    row.p,
+                    row.fdr,
+                    row.primaryProgram || 'others',
+                    row.primaryGeneset || 'others',
+                    row.posteriorSd,
+                    row.lower95,
+                    row.upper95,
+                ]);
+                bucket.colors.push(emphasis > 0.55 ? VOLCANO_STYLE[directionKey].strong : VOLCANO_STYLE[directionKey].color);
+                bucket.opacities.push(emphasis > 0.55 ? VOLCANO_STYLE[directionKey].strongOpacity : VOLCANO_STYLE[directionKey].opacity);
+                bucket.sizes.push((pointSize * 0.84) + (emphasis * 1.8));
+                return;
+            }
+
+            const bucket = grouped.background;
+            bucket.x.push(row.effect);
+            bucket.y.push(row.logp);
+            bucket.text.push(row.gene || row.ensg || row.rowKey);
+            bucket.customdata.push([
                 row.rowKey,
                 row.gene || 'NA',
                 row.ensg || 'NA',
@@ -309,6 +368,9 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 row.lower95,
                 row.upper95,
             ]);
+            bucket.colors.push(VOLCANO_STYLE.background.color);
+            bucket.opacities.push(VOLCANO_STYLE.background.opacity + (significanceIntensity * 0.08));
+            bucket.sizes.push(Math.max(4.6, (pointSize * 0.62) + (effectIntensity * 0.9)));
         });
 
         const posteriorHover = includePosteriorColumns ? [
@@ -316,18 +378,22 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             '95% CI [%{customdata[9]:.4f}, %{customdata[10]:.4f}]',
         ] : [];
 
-        return ['negative', 'positive'].map((key) => ({
-            x: grouped[key].x,
-            y: grouped[key].y,
-            text: grouped[key].text,
-            customdata: grouped[key].customdata,
+        const makeTrace = (key, bucket, showLegend) => ({
+            x: bucket.x,
+            y: bucket.y,
+            text: bucket.text,
+            customdata: bucket.customdata,
             mode: 'markers',
             type: 'scattergl',
-            name: key === 'positive' ? 'Positive effect' : 'Negative effect',
+            name: key === 'background'
+                ? VOLCANO_STYLE.background.label
+                : key.startsWith('positive')
+                    ? VOLCANO_STYLE.positive.label
+                    : VOLCANO_STYLE.negative.label,
             marker: {
-                size: pointSize,
-                color: COLORS[key],
-                opacity: 0.84,
+                size: bucket.sizes,
+                color: bucket.colors,
+                opacity: bucket.opacities,
                 line: { width: 0, color: 'rgba(255,255,255,0)' },
             },
             hovertemplate: [
@@ -341,12 +407,28 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 'Geneset: %{customdata[7]}',
                 '<extra></extra>',
             ].join('<br>'),
-            hoverlabel: buildPlotHoverTone(theme, COLORS[key], {
-                bgAlpha: 0.18,
-                borderAlpha: 0.4,
-            }),
-            showlegend: true,
-        })).filter((trace) => trace.x.length > 0);
+            hoverlabel: key === 'background'
+                ? buildPlotHoverToneNeutral(theme, '#7a8798', {
+                    fontSize: 12,
+                    align: 'left',
+                })
+                : buildPlotHoverTone(theme, key.startsWith('positive')
+                    ? (key.endsWith('strong') ? VOLCANO_STYLE.positive.strong : VOLCANO_STYLE.positive.color)
+                    : (key.endsWith('strong') ? VOLCANO_STYLE.negative.strong : VOLCANO_STYLE.negative.color), {
+                    bgAlpha: 0.16,
+                    borderAlpha: 0.34,
+                }),
+            legendgroup: key.startsWith('positive') ? 'positive' : key.startsWith('negative') ? 'negative' : 'background',
+            showlegend: showLegend,
+        });
+
+        return [
+            makeTrace('background', grouped.background, grouped.background.x.length > 0),
+            makeTrace('negative_soft', grouped.negative_soft, grouped.negative_soft.x.length > 0),
+            makeTrace('negative_strong', grouped.negative_strong, false),
+            makeTrace('positive_soft', grouped.positive_soft, grouped.positive_soft.x.length > 0),
+            makeTrace('positive_strong', grouped.positive_strong, false),
+        ].filter((trace) => trace.x.length > 0);
     }, [effectLabel, filteredRows, includePosteriorColumns, pointSize, theme]);
 
     const highlightedPoint = useMemo(() => {
@@ -402,12 +484,10 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             tickfont: { size: 13, color: theme.palette.text.secondary },
         },
         hovermode: 'closest',
-        hoverlabel: {
-            bgcolor: chartTokens.hoverBg,
-            bordercolor: chartTokens.hoverBorder,
-            font: { size: 12, color: theme.palette.text.primary },
+        hoverlabel: buildPlotHoverToneNeutral(theme, volcanoType === 'posterior' ? '#6b7280' : VOLCANO_STYLE.positive.strong, {
+            fontSize: 12,
             align: 'left',
-        },
+        }),
         margin: { l: 80, r: 40, t: 60, b: 60 },
         plot_bgcolor: chartTokens.plotBg,
         paper_bgcolor: chartTokens.paperBg,
@@ -437,7 +517,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 font: { size: 11, color: chartTokens.threshold, family: 'system-ui, -apple-system, sans-serif' },
             },
         ],
-    }), [chartTokens, effectAxisLabel, fileId, theme.palette.text.primary, theme.palette.text.secondary, title, traitLabel]);
+    }), [chartTokens, effectAxisLabel, fileId, theme, title, traitLabel, volcanoType]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -625,8 +705,8 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
 
                 <Chip icon={<Timeline />} label={`${filteredRows.length.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
                 <Chip icon={<Insights />} label={`${counts.significant.toLocaleString()} highlighted`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
-                <Chip icon={<Science />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(theme.palette.warning.main, 0.1), color: COLORS.positive, border: `1px solid ${alpha(COLORS.positive, 0.22)}` })} />
-                <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(theme.palette.primary.main, 0.08), color: COLORS.negative, border: `1px solid ${alpha(COLORS.negative, 0.2)}` })} />
+                <Chip icon={<Science />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.positive.color, 0.1), color: VOLCANO_STYLE.positive.strong, border: `1px solid ${alpha(VOLCANO_STYLE.positive.strong, 0.2)}` })} />
+                <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.negative.color, 0.1), color: VOLCANO_STYLE.negative.strong, border: `1px solid ${alpha(VOLCANO_STYLE.negative.strong, 0.2)}` })} />
             </Box>
 
             <Box sx={toolbarSx(theme)}>
@@ -722,11 +802,12 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                                 collapsed={legendCollapsed}
                                 onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
                                 title="Effects"
-                                width={{ expanded: 184, collapsed: 116 }}
+                                width={{ expanded: 222, collapsed: 116 }}
                                 defaultPlacement="right"
                                 defaultTop={108}
                                 defaultSideOffset={10}
                                 anchorPlotRef={plotRef}
+                                showScale={false}
                             />
                         </>
                     )}

@@ -146,3 +146,29 @@ export async function getProgramTraits(programId) {
     const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/traits`);
     return res.data;
 }
+
+export async function getCrossTraitStatus(fileId) {
+    const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/status`);
+    return res.data;
+}
+
+export async function getCrossTraitTargets(fileId) {
+    const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/targets`);
+    return res.data;
+}
+
+export async function searchCrossTraits(query, { limit = 12, excludeId = [] } = {}) {
+    const res = await axios.get(`${API_BASE}/cross-trait/search`, {
+        params: { q: query, limit, excludeId },
+        paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),
+    });
+    return res.data;
+}
+
+export async function getCrossTraitMatrix(fileId, { targetIds = [], topGenes = 50 } = {}) {
+    const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/matrix`, {
+        params: { targetIds, topGenes },
+        paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),
+    });
+    return res.data;
+}

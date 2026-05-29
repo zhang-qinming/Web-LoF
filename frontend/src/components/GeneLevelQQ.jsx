@@ -3,6 +3,7 @@ import Plot from 'react-plotly.js';
 import Plotly from 'plotly.js-basic-dist';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Card,
@@ -30,10 +31,11 @@ import {
     RestartAlt,
     Timeline,
 } from '@mui/icons-material';
-import { getDataFileText } from '../api/gwas';
+import { getCrossTraitTargets, getDataFileText, searchCrossTraits } from '../api/gwas';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
+    buildPlotHoverTone,
     chartLayoutTokens,
     controlFieldSx,
     metricChipTone,
@@ -49,19 +51,22 @@ import GeneLevelQQTable from './GeneLevelQQTable';
 const DATA_DIR = 'gene_level_qq/tables';
 const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 820;
-const DEFAULT_POINT_SIZE = 6;
-const DEFAULT_LABEL_LIMIT = 10;
+const DEFAULT_POINT_SIZE = 5;
+const DEFAULT_LABEL_LIMIT = 4;
+const MAX_COMPARE_TRAITS = 6;
 const NOMINAL_LOGP = -Math.log10(0.05);
+const BASE_POINT_COLOR = '#c8d0dc';
+const TRAIT_PALETTE = ['#356fbb', '#d96a3a', '#1f8a70', '#8d5fd3', '#b7791f', '#c44569'];
 
 const TAIL_META = {
     negative: {
         label: 'Negative tail',
-        color: '#4f7da8',
-        symbol: 'circle',
+        color: '#356fbb',
+        symbol: 'diamond',
     },
     positive: {
         label: 'Positive tail',
-        color: '#c55f39',
+        color: '#d96a3a',
         symbol: 'circle',
     },
 };
@@ -73,6 +78,43 @@ const TAIL_MODES = {
     POSITIVE: 'positive',
     NEGATIVE: 'negative',
 };
+
+function normalizeTraitOption(option) {
+    if (!option) return null;
+    const fileId = String(option.file_id || option.fileId || '').trim();
+    const gwasId = String(option.gwas_id || option.gwasId || '').trim();
+    const traitName = String(option.trait_name || option.traitName || '').trim();
+    const id = fileId || gwasId;
+    if (!id) return null;
+    return {
+        file_id: fileId || id,
+        gwas_id: gwasId || id,
+        trait_name: traitName || gwasId || fileId || id,
+    };
+}
+
+function uniqueTraitOptions(items = []) {
+    const seen = new Set();
+    const list = [];
+    items.forEach((item) => {
+        const normalized = normalizeTraitOption(item);
+        if (!normalized) return;
+        if (seen.has(normalized.file_id)) return;
+        seen.add(normalized.file_id);
+        list.push(normalized);
+    });
+    return list;
+}
+
+function buildTraitStamp(selectedTraits = [], fallback = '') {
+    const labels = selectedTraits
+        .map((trait) => String(trait?.trait_name || trait?.gwas_id || trait?.file_id || '').trim())
+        .filter(Boolean);
+    if (!labels.length) return fallback;
+    if (labels.length === 1) return labels[0];
+    if (labels.length === 2) return `${labels[0]} + ${labels[1]}`;
+    return `${labels[0]} + ${labels.length - 1} more`;
+}
 
 function toFiniteNumber(value) {
     const num = Number(value);
@@ -183,6 +225,7 @@ function buildHoverText(row) {
     return [
         `<b>${row.gene || row.ensg}</b>`,
         row.ensg ? `<span style="color:#64748b">${row.ensg}</span>` : '',
+        row.sourceTraitName ? `<span style="color:#475569;font-weight:600">${row.sourceTraitName}</span>` : '',
         `<span style="color:${TAIL_META[row.tailSide].color};font-weight:600">${TAIL_META[row.tailSide].label}</span>`,
         '',
         `Expected: ${formatNumber(row.expected, 3)}`,
@@ -194,6 +237,47 @@ function buildHoverText(row) {
         `FDR: ${formatPValue(row.fdr)}`,
         `beta_withShet: ${formatNumber(row.beta, 4)}`,
     ].filter(Boolean).join('<br>');
+}
+
+function pickSparseLabelRows(rows, limit, axisRange) {
+    if (!Array.isArray(rows) || !rows.length || limit <= 0) return [];
+    const xSpan = Math.max((axisRange?.[1] ?? 1) - (axisRange?.[0] ?? 0), 1);
+    const ySpan = xSpan;
+    const minDx = xSpan * 0.09;
+    const minDy = ySpan * 0.075;
+    const chosen = [];
+
+    for (const row of rows) {
+        const tooClose = chosen.some((picked) => (
+            Math.abs((picked.expected ?? 0) - (row.expected ?? 0)) < minDx
+            && Math.abs((picked.observed ?? 0) - (row.observed ?? 0)) < minDy
+        ));
+        if (tooClose) continue;
+        chosen.push(row);
+        if (chosen.length >= limit) break;
+    }
+
+    return chosen;
+}
+
+function hexToRgb(hex) {
+    const normalized = String(hex || '').replace('#', '');
+    if (normalized.length !== 6) return { r: 183, g: 192, b: 205 };
+    return {
+        r: Number.parseInt(normalized.slice(0, 2), 16),
+        g: Number.parseInt(normalized.slice(2, 4), 16),
+        b: Number.parseInt(normalized.slice(4, 6), 16),
+    };
+}
+
+function mixColors(baseHex, accentHex, ratio, alphaValue) {
+    const base = hexToRgb(baseHex);
+    const accent = hexToRgb(accentHex);
+    const t = clamp(ratio, 0, 1);
+    const r = Math.round(base.r + ((accent.r - base.r) * t));
+    const g = Math.round(base.g + ((accent.g - base.g) * t));
+    const b = Math.round(base.b + ((accent.b - base.b) * t));
+    return `rgba(${r}, ${g}, ${b}, ${clamp(alphaValue, 0, 1)})`;
 }
 
 function normalQuantile(p) {
@@ -292,7 +376,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
 
-    const [payload, setPayload] = useState({ rows: [], fileId: '', path: '' });
+    const [payload, setPayload] = useState({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits: [] });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [tailMode, setTailMode] = useState(TAIL_MODES.BOTH);
@@ -315,14 +399,89 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
+    const [showTraitStamp, setShowTraitStamp] = useState(true);
+    const [traitStampText, setTraitStampText] = useState('');
+    const [availableTraits, setAvailableTraits] = useState([]);
+    const [selectedTraits, setSelectedTraits] = useState([]);
+    const [searchInput, setSearchInput] = useState('');
+    const [searchOptions, setSearchOptions] = useState([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+
+    const primaryTrait = useMemo(() => normalizeTraitOption({
+        file_id: fileId,
+        gwas_id: gwasId,
+        trait_name: traitLabel || gwasId || fileId,
+    }), [fileId, gwasId, traitLabel]);
+
+    useEffect(() => {
+        if (!primaryTrait) return;
+        setSelectedTraits((prev) => {
+            const preserved = uniqueTraitOptions([primaryTrait, ...prev.filter((item) => item.file_id !== primaryTrait.file_id)]);
+            return preserved.slice(0, MAX_COMPARE_TRAITS);
+        });
+    }, [primaryTrait]);
+
+    useEffect(() => {
+        setTraitStampText(buildTraitStamp(selectedTraits, String(traitLabel || gwasId || fileId || '').trim()));
+    }, [fileId, gwasId, selectedTraits, traitLabel]);
 
     const candidateIds = useMemo(() => (
         [...new Set([...(lookupIds || []), fileId, gwasId].filter(Boolean))]
     ), [fileId, gwasId, lookupIds]);
 
     useEffect(() => {
-        if (!candidateIds.length) {
-            setPayload({ rows: [], fileId: '', path: '' });
+        if (!primaryTrait?.file_id) {
+            setAvailableTraits([]);
+            return undefined;
+        }
+        let cancelled = false;
+        getCrossTraitTargets(primaryTrait.file_id)
+            .then((res) => {
+                if (cancelled) return;
+                const next = uniqueTraitOptions([primaryTrait, ...(res?.targets || [])]);
+                setAvailableTraits(next);
+            })
+            .catch(() => {
+                if (!cancelled) setAvailableTraits(primaryTrait ? [primaryTrait] : []);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [primaryTrait]);
+
+    useEffect(() => {
+        const trimmed = searchInput.trim();
+        if (trimmed.length < 2) {
+            setSearchOptions([]);
+            return undefined;
+        }
+        let cancelled = false;
+        setSearchLoading(true);
+        const timeoutId = window.setTimeout(() => {
+            searchCrossTraits(trimmed, {
+                limit: 12,
+                excludeId: [
+                    ...selectedTraits.map((item) => item.file_id),
+                    ...candidateIds,
+                ],
+            }).then((res) => {
+                if (!cancelled) setSearchOptions(uniqueTraitOptions(res?.traits || []));
+            }).catch(() => {
+                if (!cancelled) setSearchOptions([]);
+            }).finally(() => {
+                if (!cancelled) setSearchLoading(false);
+            });
+        }, 220);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [candidateIds, searchInput, selectedTraits]);
+
+    useEffect(() => {
+        if (!selectedTraits.length && !candidateIds.length) {
+            setPayload({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits });
             return undefined;
         }
 
@@ -331,25 +490,64 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setError(null);
 
         (async () => {
+            const chosenTraits = uniqueTraitOptions([
+                ...selectedTraits,
+                ...(selectedTraits.length ? [] : (primaryTrait ? [primaryTrait] : [])),
+            ]).slice(0, MAX_COMPARE_TRAITS);
+            const loadedTraits = [];
             let lastError = null;
-            for (const candidate of candidateIds) {
-                const path = getDataPath(candidate);
-                try {
-                    const text = await getDataFileText(path);
-                    const rows = addFdr(parseTsv(text));
-                    if (!cancelled) {
-                        setPayload({ rows, fileId: candidate, path });
-                        setHighlight({ rowKey: '', key: 0 });
-                        setTablePage(0);
+
+            for (let traitIndex = 0; traitIndex < chosenTraits.length; traitIndex += 1) {
+                const trait = chosenTraits[traitIndex];
+                const loadCandidates = [...new Set([
+                    trait.file_id,
+                    trait.gwas_id,
+                    ...(trait.file_id === primaryTrait?.file_id ? candidateIds : []),
+                ].filter(Boolean))];
+
+                for (const candidate of loadCandidates) {
+                    const path = getDataPath(candidate);
+                    try {
+                        const text = await getDataFileText(path);
+                        const parsedRows = addFdr(parseTsv(text)).map((row) => ({
+                            ...row,
+                            rowKey: `${trait.file_id}::${row.rowKey}`,
+                            sourceFileId: trait.file_id,
+                            sourceGwasId: trait.gwas_id,
+                            sourceTraitName: trait.trait_name,
+                            traitIndex,
+                        }));
+                        loadedTraits.push({
+                            ...trait,
+                            resolved_file_id: candidate,
+                            path,
+                            rows: parsedRows,
+                        });
+                        break;
+                    } catch (err) {
+                        lastError = err;
                     }
-                    return;
-                } catch (err) {
-                    lastError = err;
                 }
             }
+
+            const mergedRows = loadedTraits.flatMap((item) => item.rows);
             if (!cancelled) {
-                setPayload({ rows: [], fileId: candidateIds[0], path: getDataPath(candidateIds[0]) });
-                setError(lastError || new Error('Gene-level QQ TSV not found'));
+                setPayload({
+                    rows: mergedRows,
+                    fileId: loadedTraits[0]?.resolved_file_id || chosenTraits[0]?.file_id || candidateIds[0] || '',
+                    path: loadedTraits[0]?.path || '',
+                    selectedTraits: loadedTraits.map((item) => {
+                        const { rows, ...rest } = item;
+                        void rows;
+                        return rest;
+                    }),
+                    availableTraits,
+                });
+                setHighlight({ rowKey: '', key: 0 });
+                setTablePage(0);
+                if (!mergedRows.length && lastError) {
+                    setError(lastError);
+                }
             }
         })().finally(() => {
             if (!cancelled) setIsLoading(false);
@@ -358,7 +556,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         return () => {
             cancelled = true;
         };
-    }, [candidateIds]);
+    }, [availableTraits, candidateIds, primaryTrait, selectedTraits]);
 
     const rows = payload.rows;
 
@@ -392,18 +590,42 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         return base;
     }, [filteredRows, rows]);
 
+    const activeTraits = useMemo(() => (
+        payload.selectedTraits?.length ? payload.selectedTraits : selectedTraits
+    ), [payload.selectedTraits, selectedTraits]);
+
+    const traitColorMap = useMemo(() => {
+        const map = new Map();
+        activeTraits.forEach((trait, index) => {
+            map.set(trait.file_id, TRAIT_PALETTE[index % TRAIT_PALETTE.length]);
+        });
+        return map;
+    }, [activeTraits]);
+
+    const groupedTraitOptions = useMemo(() => {
+        const availableIds = new Set(availableTraits.map((item) => item.file_id));
+        return uniqueTraitOptions([
+            ...availableTraits.map((item) => ({ ...item, group: item.file_id === primaryTrait?.file_id ? 'Current' : 'Related' })),
+            ...searchOptions
+                .filter((item) => !availableIds.has(item.file_id))
+                .map((item) => ({ ...item, group: 'Search' })),
+        ]);
+    }, [availableTraits, primaryTrait, searchOptions]);
+
     const fdrGuide = useMemo(() => {
         const sig = filteredRows.filter((row) => Number.isFinite(row.fdr) && row.fdr <= 0.05 && Number.isFinite(row.p) && row.p > 0);
         if (!sig.length) return null;
         return -Math.log10(Math.max(...sig.map((row) => row.p)));
     }, [filteredRows]);
 
+    const axisRange = useMemo(() => computeAxisRange(filteredRows), [filteredRows]);
+
     const labelRows = useMemo(() => {
         if (!showTopLabels || labelLimit <= 0) return [];
-        return [...filteredRows]
-            .sort((a, b) => (b.absDeviation || -Infinity) - (a.absDeviation || -Infinity))
-            .slice(0, labelLimit);
-    }, [filteredRows, labelLimit, showTopLabels]);
+        const ranked = [...filteredRows]
+            .sort((a, b) => (b.absDeviation || -Infinity) - (a.absDeviation || -Infinity));
+        return pickSparseLabelRows(ranked, labelLimit, axisRange);
+    }, [axisRange, filteredRows, labelLimit, showTopLabels]);
 
     const axisStyle = useMemo(() => ({
         zeroline: false,
@@ -422,52 +644,70 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     ), [filteredRows, showEnvelope]);
 
     const pointTraces = useMemo(() => {
-        const grouped = Object.fromEntries(TAIL_ORDER.map((key) => [key, {
-            x: [],
-            y: [],
-            text: [],
-            customdata: [],
-            sizes: [],
-            colors: [],
-            opacity: [],
-        }]));
+        const grouped = new Map();
+        let deviationCap = 0.8;
 
         filteredRows.forEach((row) => {
-            const group = grouped[row.tailSide] || grouped.positive;
-            const deviationScale = clamp((row.absDeviation || 0) / 1.8, 0, 2.2);
-            const intensity = clamp((row.absDeviation || 0) / 1.25, 0, 1);
+            if (Number.isFinite(row.absDeviation)) {
+                deviationCap = Math.max(deviationCap, row.absDeviation);
+            }
+        });
+
+        filteredRows.forEach((row) => {
+            const groupKey = `${row.sourceFileId || payload.fileId || 'trait'}::${row.tailSide}`;
+            if (!grouped.has(groupKey)) {
+                grouped.set(groupKey, {
+                    traitId: row.sourceFileId || payload.fileId || 'trait',
+                    traitName: row.sourceTraitName || traitLabel || row.sourceFileId || payload.fileId || 'Trait',
+                    tailSide: row.tailSide,
+                    x: [],
+                    y: [],
+                    text: [],
+                    customdata: [],
+                    sizes: [],
+                    colors: [],
+                    opacity: [],
+                });
+            }
+            const group = grouped.get(groupKey);
+            const normalizedDeviation = clamp((row.absDeviation || 0) / deviationCap, 0, 1);
+            const intensity = normalizedDeviation ** 0.72;
+            const deviationScale = intensity * 1.6;
+            const traitColor = traitColorMap.get(row.sourceFileId) || TAIL_META[row.tailSide].color;
             group.x.push(row.expected);
             group.y.push(row.observed);
             group.text.push(buildHoverText(row));
             group.customdata.push([row.rowKey]);
             group.sizes.push(pointSize + deviationScale);
-            group.colors.push(alpha(TAIL_META[row.tailSide].color, 0.42 + intensity * 0.42));
-            group.opacity.push(0.56 + intensity * 0.26);
+            group.colors.push(mixColors(BASE_POINT_COLOR, traitColor, 0.5 + (intensity * 0.5), 0.62 + (intensity * 0.3)));
+            group.opacity.push(1);
         });
 
-        return TAIL_ORDER
-            .filter((key) => grouped[key].x.length > 0)
-            .map((key) => ({
+        return [...grouped.values()].map((group) => ({
                 type: 'scattergl',
                 mode: 'markers',
-                name: TAIL_META[key].label,
-                x: grouped[key].x,
-                y: grouped[key].y,
-                text: grouped[key].text,
-                customdata: grouped[key].customdata,
+                name: `${group.traitName} · ${TAIL_META[group.tailSide].label}`,
+                x: group.x,
+                y: group.y,
+                text: group.text,
+                customdata: group.customdata,
                 hovertemplate: '%{text}<extra></extra>',
+                hoverlabel: buildPlotHoverTone(theme, traitColorMap.get(group.traitId) || TAIL_META[group.tailSide].color, {
+                    bgAlpha: 0.16,
+                    borderAlpha: 0.36,
+                }),
                 marker: {
-                    color: grouped[key].colors,
-                    symbol: TAIL_META[key].symbol,
-                    size: grouped[key].sizes,
-                    opacity: grouped[key].opacity,
+                    color: group.colors,
+                    symbol: TAIL_META[group.tailSide].symbol,
+                    size: group.sizes,
+                    opacity: group.opacity,
                     line: {
-                        color: 'rgba(15,23,42,0.14)',
-                        width: 0.15,
+                        color: 'rgba(255,255,255,0)',
+                        width: 0,
                     },
                 },
             }));
-    }, [filteredRows, pointSize]);
+    }, [filteredRows, payload.fileId, pointSize, theme, traitColorMap, traitLabel]);
 
     const labelTrace = useMemo(() => {
         if (!labelRows.length) return [];
@@ -479,15 +719,18 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             x: labelRows.map((row) => row.expected),
             y: labelRows.map((row) => row.observed),
             text: labelRows.map((row) => row.gene || row.ensg),
-            textposition: labelRows.map((row) => (row.observed >= 0 ? 'top center' : 'bottom center')),
+            textposition: labelRows.map((row, index) => {
+                if (row.observed >= row.expected) return index % 2 === 0 ? 'top left' : 'top right';
+                return index % 2 === 0 ? 'bottom left' : 'bottom right';
+            }),
             textfont: {
-                size: 11,
-                color: labelRows.map((row) => TAIL_META[row.tailSide].color),
+                size: 10,
+                color: labelRows.map((row) => traitColorMap.get(row.sourceFileId) || TAIL_META[row.tailSide].color),
                 family: theme.typography.fontFamily,
             },
             hoverinfo: 'skip',
         }];
-    }, [labelRows, theme.typography.fontFamily]);
+    }, [labelRows, theme.typography.fontFamily, traitColorMap]);
 
     const highlightedPoint = useMemo(() => {
         if (!highlight.rowKey) return [];
@@ -511,31 +754,49 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     }, [highlight.rowKey, pointSize, rows]);
 
     const legendItems = useMemo(() => {
-        const items = TAIL_ORDER
-            .filter((key) => counts[key] > 0)
-            .map((key) => ({
-                key,
-                label: TAIL_META[key].label,
-                color: TAIL_META[key].color,
-                count: counts[key],
+        const traitItems = activeTraits
+            .filter((trait) => filteredRows.some((row) => row.sourceFileId === trait.file_id))
+            .map((trait) => ({
+                key: trait.file_id,
+                label: trait.trait_name,
+                note: trait.gwas_id && trait.gwas_id !== trait.trait_name ? trait.gwas_id : '',
+                color: traitColorMap.get(trait.file_id) || TRAIT_PALETTE[0],
+                count: filteredRows.filter((row) => row.sourceFileId === trait.file_id).length,
             }));
 
         if (showEnvelope) {
-            items.push({
+            traitItems.push({
                 key: 'envelope',
                 label: '95% envelope',
+                note: 'Tail shape uses marker symbol; envelope is computed from visible rows.',
                 color: alpha(theme.palette.text.secondary, 0.68),
                 count: filteredRows.length,
             });
         }
 
-        return items;
-    }, [counts, filteredRows.length, showEnvelope, theme.palette.text.secondary]);
+        return traitItems;
+    }, [activeTraits, filteredRows, showEnvelope, theme.palette.text.secondary, traitColorMap]);
 
     const layout = useMemo(() => {
-        const axisRange = computeAxisRange(filteredRows);
         const shapes = [];
         const annotations = [];
+
+        if (showTraitStamp && traitStampText.trim()) {
+            annotations.push({
+                xref: 'paper',
+                yref: 'paper',
+                x: 0.016,
+                y: 0.985,
+                xanchor: 'left',
+                yanchor: 'top',
+                showarrow: false,
+                text: `<b>${traitStampText.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>`,
+                font: { size: 11, color: theme.palette.text.primary, family: theme.typography.fontFamily },
+                bgcolor: alpha(theme.palette.background.paper, 0.94),
+                bordercolor: theme.custom.border.strong,
+                borderpad: 5,
+            });
+        }
 
         if (showExpectedLine) {
             shapes.push({
@@ -614,7 +875,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
 
         return {
             title: {
-                text: `${traitLabel || payload.fileId || fileId} gene-level regulation QQ`,
+                text: 'Gene-level QQ',
                 font: { size: 18, color: theme.palette.text.primary, family: theme.typography.fontFamily },
                 x: 0.02,
                 xanchor: 'left',
@@ -641,7 +902,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             annotations,
             transition: { duration: 220, easing: 'cubic-in-out' },
         };
-    }, [axisStyle, chartTokens, fdrGuide, fileId, filteredRows, payload.fileId, showExpectedLine, showFdrLine, showNominalLine, theme, traitLabel]);
+    }, [axisRange, axisStyle, chartTokens, fdrGuide, showExpectedLine, showFdrLine, showNominalLine, showTraitStamp, theme, traitStampText]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -714,11 +975,14 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setShowFdrLine(true);
         setShowEnvelope(false);
         setShowTopLabels(true);
+        setShowTraitStamp(true);
+        setSelectedTraits(primaryTrait ? [primaryTrait] : []);
+        setTraitStampText(buildTraitStamp(primaryTrait ? [primaryTrait] : [], String(traitLabel || gwasId || fileId || '').trim()));
         setPointSize(DEFAULT_POINT_SIZE);
         setLabelLimit(DEFAULT_LABEL_LIMIT);
         setHighlight({ rowKey: '', key: 0 });
         setTablePage(0);
-    }, []);
+    }, [fileId, gwasId, primaryTrait, traitLabel]);
 
     const handleExport = useCallback(() => {
         const gd = plotRef.current;
@@ -751,21 +1015,23 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
 
     const plotRevision = useMemo(() => JSON.stringify({
         rows: filteredRows.length,
+        traits: activeTraits.map((trait) => trait.file_id).join('|'),
         tailMode,
         query: geneQuery,
         lines: [showExpectedLine, showNominalLine, showFdrLine, showEnvelope, showTopLabels].join('-'),
         pointSize,
         labelLimit,
         highlight: highlight.key,
-    }), [filteredRows.length, geneQuery, highlight.key, labelLimit, pointSize, showEnvelope, showExpectedLine, showFdrLine, showNominalLine, showTopLabels, tailMode]);
+    }), [activeTraits, filteredRows.length, geneQuery, highlight.key, labelLimit, pointSize, showEnvelope, showExpectedLine, showFdrLine, showNominalLine, showTopLabels, tailMode]);
 
     const plotKey = useMemo(() => [
         payload.fileId || fileId || 'qq',
+        activeTraits.map((trait) => trait.file_id).join('+'),
         tailMode,
         geneQuery.trim().toLowerCase(),
         showEnvelope ? 'envelope' : 'no-envelope',
         showTopLabels ? `labels-${labelLimit}` : 'no-labels',
-    ].join('|'), [fileId, geneQuery, labelLimit, payload.fileId, showEnvelope, showTopLabels, tailMode]);
+    ].join('|'), [activeTraits, fileId, geneQuery, labelLimit, payload.fileId, showEnvelope, showTopLabels, tailMode]);
 
     const hasVisiblePoints = pointTraces.some((trace) => Array.isArray(trace.x) && trace.x.length > 0);
 
@@ -785,10 +1051,10 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                         Gene-level QQ
                     </Typography>
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
-                        Regulation evidence tail inflation
+                        Signed deviation from expectation
                     </Typography>
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        Signed QQ plot of perturb-seq gene-level P values. Warm and cool tails share the same scale, with stronger departures rendered more prominently.
+                        Signed QQ plot of perturb-seq gene-level P values. Add multiple traits to overlay them in one frame; color encodes trait, marker shape still separates positive and negative tails.
                     </Typography>
                 </Box>
 
@@ -816,19 +1082,52 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 />
 
                 <Chip icon={<Timeline />} label={`${counts.filtered.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                <Chip icon={<FilterAlt />} label={`${activeTraits.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
                 <Chip icon={<Insights />} label={`${counts.fdr.toLocaleString()} FDR hits`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(chartTokens.threshold, 0.08), color: chartTokens.threshold, border: `1px solid ${alpha(chartTokens.threshold, 0.22)}` })} />
                 <Chip icon={<FilterAlt />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.positive.color, 0.08), color: TAIL_META.positive.color, border: `1px solid ${alpha(TAIL_META.positive.color, 0.2)}` })} />
                 <Chip icon={<FilterAlt />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.negative.color, 0.08), color: TAIL_META.negative.color, border: `1px solid ${alpha(TAIL_META.negative.color, 0.2)}` })} />
             </Box>
 
             <Box sx={toolbarSx(theme)}>
+                <Autocomplete
+                    multiple
+                    size="small"
+                    options={groupedTraitOptions}
+                    loading={searchLoading}
+                    value={activeTraits}
+                    groupBy={(option) => option.group || 'Traits'}
+                    isOptionEqualToValue={(option, value) => option.file_id === value.file_id}
+                    getOptionLabel={(option) => option.trait_name || option.gwas_id || option.file_id}
+                    onChange={(_, value) => setSelectedTraits(uniqueTraitOptions(value).slice(0, MAX_COMPARE_TRAITS))}
+                    onInputChange={(_, value) => setSearchInput(value)}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            label="Compare traits"
+                            placeholder="Search traits"
+                            helperText="Overlay up to 6 traits in the same QQ frame."
+                        />
+                    )}
+                    sx={{ minWidth: 360, maxWidth: 720, flex: 1 }}
+                />
+
                 <Stack direction="row" spacing={0.4} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
                     <FormControlLabel control={<Checkbox checked={showExpectedLine} onChange={(event) => setShowExpectedLine(event.target.checked)} size="small" />} label="Expected line" />
                     <FormControlLabel control={<Checkbox checked={showFdrLine} onChange={(event) => setShowFdrLine(event.target.checked)} size="small" />} label="FDR guide" />
                     <FormControlLabel control={<Checkbox checked={showNominalLine} onChange={(event) => setShowNominalLine(event.target.checked)} size="small" />} label="P=0.05" />
                     <FormControlLabel control={<Checkbox checked={showEnvelope} onChange={(event) => setShowEnvelope(event.target.checked)} size="small" />} label="Envelope" />
                     <FormControlLabel control={<Checkbox checked={showTopLabels} onChange={(event) => setShowTopLabels(event.target.checked)} size="small" />} label="Top labels" />
+                    <FormControlLabel control={<Checkbox checked={showTraitStamp} onChange={(event) => setShowTraitStamp(event.target.checked)} size="small" />} label="Trait stamp" />
                 </Stack>
+
+                <TextField
+                    size="small"
+                    label="Trait stamp"
+                    value={traitStampText}
+                    onChange={(event) => setTraitStampText(event.target.value)}
+                    disabled={!showTraitStamp}
+                    sx={controlFieldSx(theme, { width: 260 })}
+                />
 
                 <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 240 }}>
                     <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -868,7 +1167,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     CSV
                 </Button>
                 <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    Points above the expected line in either tail indicate stronger perturb-seq regulation evidence than expected under the null; the table ranks genes by absolute QQ deviation.
+                    The trait stamp is written into the plot itself, so exported images can carry your current comparison set. Color encodes trait identity; marker shape still indicates positive vs negative tail.
                 </Typography>
             </Box>
 
@@ -930,12 +1229,13 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                                 items={legendItems}
                                 collapsed={legendCollapsed}
                                 onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
-                                title="Tails"
-                                width={{ expanded: 194, collapsed: 118 }}
+                                title="Traits"
+                                width={{ expanded: 236, collapsed: 118 }}
                                 defaultPlacement="right"
                                 defaultTop={68}
                                 defaultSideOffset={10}
                                 anchorPlotRef={plotElRef}
+                                showScale={false}
                             />
                         </>
                     )}

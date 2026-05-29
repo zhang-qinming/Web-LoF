@@ -54,25 +54,25 @@ const DEFAULT_LABEL_LIMIT = 10;
 
 const EVIDENCE_CLASSES = {
     background: {
-        label: 'Background',
+        label: 'Neutral / low support',
         color: '#b6c0cf',
         symbol: 'circle',
         rank: 0,
     },
     posterior_high: {
-        label: 'High posterior',
+        label: 'Posterior-supported',
         color: '#7a8ca8',
         symbol: 'circle',
         rank: 1,
     },
     regulation_supported: {
-        label: 'Concordant regulation',
+        label: 'Concordant signal',
         color: '#c55f39',
         symbol: 'circle',
         rank: 3,
     },
     direction_discordant: {
-        label: 'Discordant regulation',
+        label: 'Discordant signal',
         color: '#4f7da8',
         symbol: 'diamond',
         rank: 2,
@@ -207,6 +207,43 @@ function buildHoverText(row) {
         '',
         `Combined score: ${formatNumber(row.combinedScore, 2)}`,
     ].filter(Boolean).join('<br>');
+}
+
+function getBackgroundPointColor(row) {
+    const x = Number.isFinite(row.postMean) ? row.postMean : 0;
+    const y = Number.isFinite(row.signedLogP) ? row.signedLogP : 0;
+    const sameDirection = (x >= 0 && y >= 0) || (x <= 0 && y <= 0);
+
+    if (sameDirection) {
+        return x >= 0 ? 'rgba(197, 95, 57, 0.42)' : 'rgba(79, 125, 168, 0.42)';
+    }
+
+    return x >= 0 ? 'rgba(197, 95, 57, 0.26)' : 'rgba(79, 125, 168, 0.26)';
+}
+
+function getBackgroundGroupKey(row) {
+    const x = Number.isFinite(row.postMean) ? row.postMean : 0;
+    const y = Number.isFinite(row.signedLogP) ? row.signedLogP : 0;
+    const sameDirection = (x >= 0 && y >= 0) || (x <= 0 && y <= 0);
+    if (x >= 0 && sameDirection) return 'background_pos_same';
+    if (x < 0 && sameDirection) return 'background_neg_same';
+    if (x >= 0) return 'background_pos_cross';
+    return 'background_neg_cross';
+}
+
+function getBackgroundHoverColor(groupKey) {
+    switch (groupKey) {
+        case 'background_pos_same':
+            return '#c55f39';
+        case 'background_neg_same':
+            return '#4f7da8';
+        case 'background_pos_cross':
+            return '#c55f39';
+        case 'background_neg_cross':
+            return '#4f7da8';
+        default:
+            return EVIDENCE_CLASSES.background.color;
+    }
 }
 
 function getDataPath(fileId) {
@@ -353,17 +390,27 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     }), [chartTokens, theme.typography.fontFamily]);
 
     const plotData = useMemo(() => {
-        const grouped = Object.fromEntries(EVIDENCE_ORDER.map((key) => [key, {
-            x: [],
-            y: [],
-            text: [],
-            customdata: [],
-            sizes: [],
-            opacity: [],
-        }]));
+        const grouped = Object.fromEntries([
+            ...EVIDENCE_ORDER.map((key) => [key, {
+                x: [],
+                y: [],
+                text: [],
+                customdata: [],
+                sizes: [],
+                opacity: [],
+                colors: [],
+            }]),
+            ['background_pos_same', { x: [], y: [], text: [], customdata: [], sizes: [], opacity: [], colors: [] }],
+            ['background_neg_same', { x: [], y: [], text: [], customdata: [], sizes: [], opacity: [], colors: [] }],
+            ['background_pos_cross', { x: [], y: [], text: [], customdata: [], sizes: [], opacity: [], colors: [] }],
+            ['background_neg_cross', { x: [], y: [], text: [], customdata: [], sizes: [], opacity: [], colors: [] }],
+        ]);
 
         filteredRows.forEach((row) => {
-            const group = grouped[row.evidenceClass] || grouped.background;
+            const groupKey = row.evidenceClass === 'background'
+                ? getBackgroundGroupKey(row)
+                : row.evidenceClass;
+            const group = grouped[groupKey] || grouped.background;
             const scoreScale = clamp(Math.sqrt(Math.max(row.combinedScore || 0, 0)) / 4, 0, 1.6);
             group.x.push(row.postMean);
             group.y.push(row.signedLogP);
@@ -371,34 +418,46 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             group.customdata.push([row.rowKey]);
             group.sizes.push(pointSize + scoreScale);
             group.opacity.push(row.evidenceClass === 'background' ? 0.34 : 0.86);
+            group.colors.push(row.evidenceClass === 'background' ? getBackgroundPointColor(row) : EVIDENCE_CLASSES[row.evidenceClass].color);
         });
 
-        return EVIDENCE_ORDER
-            .filter((key) => grouped[key].x.length > 0)
-            .sort((a, b) => EVIDENCE_CLASSES[a].rank - EVIDENCE_CLASSES[b].rank)
+        const renderOrder = [
+            'background_pos_same',
+            'background_neg_same',
+            'background_pos_cross',
+            'background_neg_cross',
+            'posterior_high',
+            'direction_discordant',
+            'regulation_supported',
+        ];
+
+        return renderOrder
+            .filter((key) => grouped[key]?.x.length > 0)
             .map((key) => ({
                 type: 'scattergl',
                 mode: 'markers',
-                name: EVIDENCE_CLASSES[key].label,
+                name: key.startsWith('background') ? EVIDENCE_CLASSES.background.label : EVIDENCE_CLASSES[key].label,
                 x: grouped[key].x,
                 y: grouped[key].y,
                 text: grouped[key].text,
                 customdata: grouped[key].customdata,
                 hovertemplate: '%{text}<extra></extra>',
-                hoverlabel: buildPlotHoverTone(theme, EVIDENCE_CLASSES[key].color, {
-                    bgAlpha: key === 'background' ? 0.14 : 0.18,
-                    borderAlpha: key === 'background' ? 0.26 : 0.4,
+                hoverlabel: buildPlotHoverTone(theme, key.startsWith('background') ? getBackgroundHoverColor(key) : EVIDENCE_CLASSES[key].color, {
+                    bgAlpha: key.startsWith('background') ? 0.14 : 0.18,
+                    borderAlpha: key.startsWith('background') ? 0.26 : 0.4,
                 }),
                 marker: {
-                    color: EVIDENCE_CLASSES[key].color,
-                    symbol: EVIDENCE_CLASSES[key].symbol,
+                    color: grouped[key].colors,
+                    symbol: key.startsWith('background') ? EVIDENCE_CLASSES.background.symbol : EVIDENCE_CLASSES[key].symbol,
                     size: grouped[key].sizes,
                     opacity: grouped[key].opacity,
                     line: {
-                        color: key === 'background' ? 'rgba(255,255,255,0)' : 'rgba(15,23,42,0.18)',
-                        width: key === 'background' ? 0 : 0.2,
+                        color: key.startsWith('background') ? 'rgba(255,255,255,0)' : 'rgba(15,23,42,0.18)',
+                        width: key.startsWith('background') ? 0 : 0.2,
                     },
                 },
+                legendgroup: key.startsWith('background') ? 'background' : key,
+                showlegend: !key.startsWith('background') || key === 'background_pos_same',
             }));
     }, [filteredRows, pointSize, theme]);
 
@@ -457,6 +516,15 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     key,
                     label: EVIDENCE_CLASSES[key].label,
                     color: EVIDENCE_CLASSES[key].color,
+                    colors: key === 'background' ? ['rgba(197, 95, 57, 0.34)', 'rgba(79, 125, 168, 0.34)'] : undefined,
+                    symbol: EVIDENCE_CLASSES[key].symbol,
+                    note: key === 'background'
+                        ? 'Muted background genes; tint follows quadrant direction.'
+                        : key === 'posterior_high'
+                            ? 'Strong posterior support without a matched regulation call.'
+                            : key === 'regulation_supported'
+                                ? 'Posterior and perturb-seq regulation agree.'
+                                : 'Posterior and perturb-seq regulation disagree.',
                     count,
                 } : null;
             })

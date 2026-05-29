@@ -288,6 +288,12 @@ const theme = createTheme({
                     color: '#475569',
                     backgroundColor: '#f8fafc',
                 },
+                stickyHeader: {
+                    backgroundColor: '#f8fafc',
+                    backgroundClip: 'border-box',
+                    zIndex: 4,
+                    boxShadow: '0 2px 0 #ffffff, inset 0 -1px 0 rgba(148, 163, 184, 0.26)',
+                },
             },
         },
         MuiAlert: {

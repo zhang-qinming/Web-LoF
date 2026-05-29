@@ -1,9 +1,9 @@
 import { Box, Card, CardContent, Chip, Link, Skeleton, Divider, Avatar, Tooltip, Typography } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
     OpenInNew, Person, Article, People,
     Public, Numbers, Dns, Link as LinkIcon,
-    BarChart,
+    BarChart, CalendarMonth, Category, DatasetLinked, Inventory2,
 } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
@@ -70,6 +70,49 @@ function Field({ icon: Icon, label, value, mono, href, theme }) {
             </Box>
         </Box>
     );
+}
+
+function InfoSection({ title, children, theme }) {
+    return (
+        <Box
+            sx={{
+                minWidth: 0,
+                p: 2,
+                borderRadius: 2,
+                border: `1px solid ${theme.custom.border.soft}`,
+                backgroundColor: alpha(theme.palette.background.paper, 0.9),
+            }}
+        >
+            <Typography
+                variant="caption"
+                sx={{
+                    display: 'block',
+                    mb: 1.5,
+                    color: theme.palette.text.secondary,
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                }}
+            >
+                {title}
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', rowGap: 2, columnGap: 4 }}>
+                {children}
+            </Box>
+        </Box>
+    );
+}
+
+function formatCount(value) {
+    return value != null && value !== '' ? Number(value).toLocaleString() : '—';
+}
+
+function formatCases(info) {
+    if (info.n_case == null && info.n_control == null) return null;
+    const cases = info.n_case != null ? `${Number(info.n_case).toLocaleString()} cases` : null;
+    const controls = info.n_control != null ? `${Number(info.n_control).toLocaleString()} controls` : null;
+    return [cases, controls].filter(Boolean).join(' / ');
 }
 
 export default function TraitMetaCard({ fileId, listData }) {
@@ -142,33 +185,35 @@ export default function TraitMetaCard({ fileId, listData }) {
 
                         <Divider sx={{ my: 2.5 }} />
 
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', rowGap: 2.5, columnGap: 5 }}>
-                            {info.first_author && (
-                                <Field icon={Person} label="GWAS Author" value={`${info.first_author}${info.year ? ` (${info.year})` : ''}`} theme={theme} />
-                            )}
-                            {info.pmid && (
-                                <Field icon={Article} label="PubMed" value={info.pmid} href={`https://pubmed.ncbi.nlm.nih.gov/${info.pmid}`} theme={theme} />
-                            )}
-                            {(info.sample_size || info.n_case != null) && (
+                        <Box
+                            sx={{
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.2fr) minmax(0, 1fr)' },
+                                gap: 2,
+                            }}
+                        >
+                            <InfoSection title="Study summary" theme={theme}>
                                 <Field
-                                    icon={People}
-                                    label="Sample"
-                                    value={[
-                                        info.sample_size && Number(info.sample_size).toLocaleString(),
-                                        info.n_case != null && `${Number(info.n_case).toLocaleString()} cases / ${Number(info.n_control).toLocaleString()} controls`,
-                                    ].filter(Boolean).join('  ·  ')}
+                                    icon={Person}
+                                    label="GWAS Author"
+                                    value={info.first_author ? `${info.first_author}${info.year ? ` (${info.year})` : ''}` : '—'}
                                     theme={theme}
                                 />
-                            )}
-                            {info.population && (
-                                <Field icon={Public} label="Population" value={info.population} theme={theme} />
-                            )}
-                            {info.n_variants && (
-                                <Field icon={Numbers} label="Variants" value={Number(info.n_variants).toLocaleString()} theme={theme} />
-                            )}
-                            {info.url && (
-                                <Field icon={LinkIcon} label="Source" value="Open" href={info.url} theme={theme} />
-                            )}
+                                <Field icon={CalendarMonth} label="Year" value={info.year || '—'} theme={theme} />
+                                <Field icon={Public} label="Population" value={info.population || '—'} theme={theme} />
+                                <Field icon={Category} label="MeSH term" value={info.mesh_term || '—'} theme={theme} />
+                                <Field icon={DatasetLinked} label="Source batch" value={info.gwas_source_batch || '—'} theme={theme} />
+                                <Field icon={Article} label="PubMed" value={info.pmid || '—'} href={info.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${info.pmid}` : undefined} theme={theme} />
+                            </InfoSection>
+
+                            <InfoSection title="Data summary" theme={theme}>
+                                <Field icon={People} label="Sample size" value={formatCount(info.sample_size)} theme={theme} />
+                                <Field icon={People} label="Case / control" value={formatCases(info) || '—'} theme={theme} />
+                                <Field icon={Numbers} label="Variants" value={formatCount(info.n_variants)} theme={theme} />
+                                <Field icon={Inventory2} label="Significant loci" value={formatCount(info.n_sig)} theme={theme} />
+                                <Field icon={Dns} label="LoF ID" value={info.lof_id || info.file_id || '—'} mono theme={theme} />
+                                <Field icon={LinkIcon} label="Source link" value={info.url ? 'Open source' : '—'} href={info.url || undefined} theme={theme} />
+                            </InfoSection>
                         </Box>
                     </>
                 )}
