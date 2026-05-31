@@ -13,6 +13,7 @@ import {
     Stack,
     TextField,
     Typography,
+    Slider,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { RestartAlt, Hub, Search, Timeline } from '@mui/icons-material';
@@ -34,7 +35,9 @@ import {
 } from '../themeUtils';
 import { StatePanel } from './PageScaffold';
 
-const DEFAULT_TOP_GENES = 50;
+const DEFAULT_TOP_GENES = 30;
+const MIN_TOP_GENES = 10;
+const MAX_TOP_GENES = 100;
 const DEFAULT_TARGET_LIMIT = 24;
 const RECENT_STORAGE_KEY = 'cross-trait-heatmap-recent';
 const MAX_RECENT = 12;
@@ -107,6 +110,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const [statusLoading, setStatusLoading] = useState(true);
     const [recommended, setRecommended] = useState([]);
     const [selectedTargets, setSelectedTargets] = useState([]);
+    const [topGeneCount, setTopGeneCount] = useState(DEFAULT_TOP_GENES);
     const [recentTargets, setRecentTargets] = useState(() => readRecentTraits());
     const [searchOptions, setSearchOptions] = useState([]);
     const [searchInput, setSearchInput] = useState('');
@@ -123,6 +127,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         let cancelled = false;
         setStatusLoading(true);
         setStatus(null);
+        setTopGeneCount(DEFAULT_TOP_GENES);
         getCrossTraitStatus(fileId)
             .then((res) => {
                 if (!cancelled) setStatus(res);
@@ -190,7 +195,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         setMatrixError(null);
         getCrossTraitMatrix(fileId, {
             targetIds: selectedTargetIds,
-            topGenes: DEFAULT_TOP_GENES,
+            topGenes: topGeneCount,
         }).then((res) => {
             if (!cancelled) {
                 setMatrixPayload(res);
@@ -209,7 +214,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             if (!cancelled) setMatrixLoading(false);
         });
         return () => { cancelled = true; };
-    }, [fileId, selectedTargetIds, selectedTargets, status?.available]);
+    }, [fileId, selectedTargetIds, selectedTargets, status?.available, topGeneCount]);
 
     const groupedOptions = useMemo(() => {
         const recommendIds = new Set(recommended.map((item) => item.file_id));
@@ -277,13 +282,22 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             tickfont: { size: 11, color: theme.palette.text.secondary },
             side: 'bottom',
             automargin: true,
+            showgrid: false,
+            zeroline: false,
         },
         yaxis: {
             tickfont: { size: 11, color: theme.palette.text.secondary },
             automargin: true,
+            showgrid: false,
+            zeroline: false,
         },
         hovermode: 'closest',
     }), [chartTokens.paperBg, chartTokens.plotBg, fileId, theme.palette.text.primary, theme.palette.text.secondary, traitLabel]);
+
+    const plotHeight = useMemo(() => {
+        const geneRows = matrixPayload?.genes?.length || topGeneCount;
+        return Math.min(1120, Math.max(680, 180 + (geneRows * 18)));
+    }, [matrixPayload?.genes?.length, topGeneCount]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -331,7 +345,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     </Typography>
                 </Box>
 
-                <Chip icon={<Timeline />} label={`${DEFAULT_TOP_GENES} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                <Chip icon={<Timeline />} label={`${matrixPayload?.summary?.topGenes || topGeneCount} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
                 <Chip icon={<Hub />} label={`${selectedTargets.length.toLocaleString()} targets`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
                 <Chip icon={<Search />} label={`${matrixPayload?.summary?.missingCells?.toLocaleString?.() || 0} missing`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
             </Box>
@@ -370,10 +384,72 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     }}
                 />
 
+                <Box
+                    sx={{
+                        width: 220,
+                        minWidth: 220,
+                        px: 1.2,
+                        py: 0.85,
+                        borderRadius: 2,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                    }}
+                >
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.7 }}>
+                        Gene rows
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                        <Slider
+                            size="small"
+                            value={topGeneCount}
+                            min={MIN_TOP_GENES}
+                            max={MAX_TOP_GENES}
+                            step={5}
+                            marks={[
+                                { value: MIN_TOP_GENES, label: String(MIN_TOP_GENES) },
+                                { value: 50, label: '50' },
+                                { value: MAX_TOP_GENES, label: String(MAX_TOP_GENES) },
+                            ]}
+                            onChange={(_, value) => setTopGeneCount(Array.isArray(value) ? value[0] : value)}
+                            sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                        />
+                        <TextField
+                            size="small"
+                            value={topGeneCount}
+                            onChange={(event) => {
+                                const raw = Number.parseInt(event.target.value, 10);
+                                if (Number.isNaN(raw)) {
+                                    setTopGeneCount(MIN_TOP_GENES);
+                                    return;
+                                }
+                                setTopGeneCount(Math.min(MAX_TOP_GENES, Math.max(MIN_TOP_GENES, raw)));
+                            }}
+                            slotProps={{
+                                htmlInput: {
+                                    min: MIN_TOP_GENES,
+                                    max: MAX_TOP_GENES,
+                                    step: 5,
+                                    inputMode: 'numeric',
+                                },
+                            }}
+                            sx={{
+                                width: 72,
+                                '& .MuiInputBase-input': {
+                                    textAlign: 'center',
+                                    fontWeight: 700,
+                                },
+                            }}
+                        />
+                    </Box>
+                </Box>
+
                 <Button
                     variant="text"
                     startIcon={<RestartAlt />}
-                    onClick={() => setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT))}
+                    onClick={() => {
+                        setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT));
+                        setTopGeneCount(DEFAULT_TOP_GENES);
+                    }}
                     sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}
                 >
                     Reset
@@ -424,7 +500,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                                 if (target?.file_id) navigate(`/trait/${encodeURIComponent(target.file_id)}`);
                             }}
                             useResizeHandler
-                            style={{ width: '100%', height: '680px' }}
+                            style={{ width: '100%', height: `${plotHeight}px` }}
                         />
                     )}
                 </CardContent>

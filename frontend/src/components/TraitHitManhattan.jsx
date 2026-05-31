@@ -54,6 +54,7 @@ const UNASSIGNED_COLOR = '#6f7d90';
 const FULL_BACKGROUND_CHROM_COLORS = ['#e58d2a', '#3b7fc4'];
 const DEFAULT_EXPORT_WIDTH = 1400;
 const DEFAULT_EXPORT_HEIGHT = 760;
+const MIN_DEFAULT_HIT_ROWS = 30;
 const PROGRAM_COLORS = [
     '#5194D6', '#D66351', '#51D6AA', '#D69451', '#9851D6', '#D65187', '#51BCD6', '#63D651',
     '#6351D6', '#D67E51', '#51D689', '#D651D6', '#51D6CD', '#D6C551', '#5175D6', '#D65168',
@@ -196,6 +197,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const tableRowRefs = useRef({});
     const plotRef = useRef(null);
     const tableSectionRef = useRef(null);
+    const hasAutoSelectedDefaultVariant = useRef(false);
 
     const [loading, setLoading] = useState(true);
     const [payload, setPayload] = useState(null);
@@ -252,12 +254,14 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         !loading
         && variant === 'hits'
         && Boolean(payload?.availableVariants?.full)
-        && rows.length === 0
+        && !hasAutoSelectedDefaultVariant.current
+        && rows.length < MIN_DEFAULT_HIT_ROWS
     );
 
     useEffect(() => {
         if (!shouldAutoSwitchToFull) return;
 
+        hasAutoSelectedDefaultVariant.current = true;
         setVariant('full');
         setProgramOnly(false);
         setSelectedGenesets([]);
@@ -268,6 +272,10 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         setHighlight({ rowKey: '', key: 0 });
         setTablePage(0);
     }, [shouldAutoSwitchToFull]);
+
+    useEffect(() => {
+        hasAutoSelectedDefaultVariant.current = false;
+    }, [fileId, gwasId]);
 
     const summary = payload?.summary || {
         totalRows: 0,
@@ -709,6 +717,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
 
     const handleVariantChange = (_, value) => {
         if (!value || value === variant) return;
+        hasAutoSelectedDefaultVariant.current = true;
         setVariant(value);
         setProgramOnly(false);
         setSelectedGenesets([]);
@@ -997,7 +1006,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    {shouldAutoSwitchToFull ? 'Hits TSV is empty; loading Full TSV...' : 'Loading Manhattan data from GWAS TSV...'}
+                                    {shouldAutoSwitchToFull ? `Hits TSV has fewer than ${MIN_DEFAULT_HIT_ROWS} rows; loading Full TSV...` : 'Loading Manhattan data from GWAS TSV...'}
                                 </Typography>
                             </Box>
                         </Box>

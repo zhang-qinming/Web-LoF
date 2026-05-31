@@ -17,6 +17,8 @@ import {
     panelSx,
     sectionPanelHeaderSx,
     sectionTitleSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
@@ -276,8 +278,8 @@ export default function Programs() {
             <Paper elevation={0} sx={panelSx(theme, {
                 overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column',
             })}>
-                <TableContainer sx={{ flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
-                    <Table stickyHeader size="small">
+                <TableContainer sx={stickyTableContainerSx(theme, { flex: 1, overflowX: 'auto', overflowY: 'auto' })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme)}>
                         <TableHead>
                             <TableRow>
                                 <TableCell sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', { ...programHeaderSx, width: 80 })}>

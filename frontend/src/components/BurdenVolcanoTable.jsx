@@ -23,6 +23,8 @@ import {
     metricChipTone,
     plotFrameSx,
     sectionPanelHeaderSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     summaryChipSx,
     tableRowRevealSx,
     tableTone,
@@ -218,8 +220,8 @@ export default function BurdenVolcanoTable({
             </Box>
 
             <Collapse in={tableOpen}>
-                <TableContainer sx={{ maxHeight: 520, overflowX: 'auto', overflowY: 'auto' }}>
-                    <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: tableMinWidth }}>
+                <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 520, overflowX: 'auto', overflowY: 'auto' })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: tableMinWidth })}>
                         <colgroup>
                             {columnSpecs.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />
@@ -277,7 +279,7 @@ export default function BurdenVolcanoTable({
                                             const sx = {
                                                 ...bodyCellSx({
                                                     align: column.align,
-                                                    tone: column.tone,
+                                                    tone: TONES[column.tone],
                                                     fontFamily: ['ensg', 'effect', 'posteriorSd', 'lower95', 'upper95', 'logp', 'p', 'fdr', 'primaryProgram'].includes(column.key) ? 'monospace' : undefined,
                                                     fontWeight: ['gene', 'logp', 'primaryProgram'].includes(column.key) ? 600 : 400,
                                                     whiteSpace: ['primaryGeneset'].includes(column.key) ? 'normal' : 'nowrap',

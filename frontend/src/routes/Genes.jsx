@@ -39,6 +39,8 @@ import {
     panelSx,
     sectionPanelHeaderSx,
     sectionTitleSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
@@ -132,8 +134,8 @@ function GeneSuggestionList({ suggestions, onSelect }) {
                     sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
                 />
             </Box>
-            <TableContainer>
-                <Table size="small">
+            <TableContainer sx={stickyTableContainerSx(theme)}>
+                <Table size="small" sx={stickyTableSx(theme)}>
                     <TableHead>
                         <TableRow>
                             {['Gene', 'ENSG', 'Programs', 'Traits', 'Roles'].map((label) => (
@@ -369,8 +371,8 @@ function GeneRecordsTable({ records }) {
                 </Box>
                 <Chip label={`${records.length.toLocaleString()} total`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
             </Box>
-            <TableContainer sx={{ maxHeight: 620, overflowX: 'auto', overflowY: 'auto' }}>
-                <Table stickyHeader size="small">
+            <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 620, overflowX: 'auto', overflowY: 'auto' })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme)}>
                     <TableHead>
                         <TableRow>
                             {['Trait', 'Program', 'Role', 'Direction', 'post_mean', 'abs_gamma', 'membership', 'Concordance'].map((label) => (

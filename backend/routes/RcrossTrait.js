@@ -12,7 +12,7 @@ const crossTraitStore = createFileStore(config.paths.crossTraitHeatmapDir);
 const metaTraitsStore = createFileStore(`${config.paths.crossTraitHeatmapDir}/meta/traits`);
 const effectsStore = createFileStore(`${config.paths.crossTraitHeatmapDir}/tables/effects`);
 
-const DEFAULT_TOP_GENES = 50;
+const DEFAULT_TOP_GENES = 30;
 const MAX_TOP_GENES = 100;
 const MAX_TARGET_IDS = 24;
 const DEFAULT_SEARCH_LIMIT = 12;

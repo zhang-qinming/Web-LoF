@@ -25,6 +25,8 @@ import {
     metricChipTone,
     plotFrameSx,
     sectionPanelHeaderSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     summaryChipSx,
     tableRowRevealSx,
     tableTone,
@@ -303,13 +305,13 @@ export default function TraitHitManhattanTable({
 
             <Collapse in={tableOpen}>
                 <TableContainer
-                    sx={{
+                    sx={stickyTableContainerSx(theme, {
                         maxHeight: 520,
                         overflowX: 'auto',
                         overflowY: 'auto',
-                    }}
+                    })}
                 >
-                    <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: 930 }}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: 930 })}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />

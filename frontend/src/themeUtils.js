@@ -309,11 +309,83 @@ export const groupedTableHeaderMetrics = {
     columnHeight: 36,
 };
 
+export function stickyTableContainerSx(theme, overrides = {}) {
+    return {
+        position: 'relative',
+        isolation: 'isolate',
+        backgroundColor: theme.palette.background.paper,
+        ...overrides,
+        '& .MuiTable-root.MuiTable-stickyHeader': {
+            borderCollapse: 'separate',
+            borderSpacing: 0,
+        },
+        '& .MuiTableHead-root': {
+            position: 'relative',
+            zIndex: 40,
+        },
+        '& .MuiTableCell-head': {
+            position: 'sticky',
+            zIndex: 41,
+            background: theme.custom.surface.subtle,
+            backgroundColor: theme.custom.surface.subtle,
+            backgroundClip: 'border-box',
+            backgroundRepeat: 'no-repeat',
+            backgroundImage: 'none',
+        },
+        '& .MuiTableCell-stickyHeader': {
+            background: theme.custom.surface.subtle,
+            backgroundColor: theme.custom.surface.subtle,
+            backgroundImage: 'none',
+            zIndex: 41,
+        },
+        '& .MuiTableBody-root': {
+            position: 'relative',
+            zIndex: 0,
+        },
+        '& .MuiTableBody-root .MuiTableRow-root, & .MuiTableBody-root .MuiTableCell-root': {
+            position: 'relative',
+            zIndex: 0,
+        },
+    };
+}
+
+export function stickyTableSx(theme, overrides = {}) {
+    return {
+        borderCollapse: 'separate',
+        borderSpacing: 0,
+        backgroundColor: theme.palette.background.paper,
+        '& thead': {
+            position: 'relative',
+            zIndex: 40,
+        },
+        '& thead tr': {
+            position: 'relative',
+        },
+        '& thead th': {
+            background: theme.custom.surface.subtle,
+            backgroundColor: theme.custom.surface.subtle,
+            backgroundClip: 'border-box',
+            backgroundRepeat: 'no-repeat',
+            backgroundImage: 'none',
+            zIndex: 41,
+        },
+        '& tbody': {
+            position: 'relative',
+            zIndex: 0,
+        },
+        '& tbody tr, & tbody td': {
+            position: 'relative',
+            zIndex: 0,
+        },
+        ...overrides,
+    };
+}
+
 export function groupedTableHeaderCellSx(theme, tone, overrides = {}) {
     return {
         position: 'sticky',
         top: 0,
-        zIndex: 5,
+        zIndex: '42 !important',
         height: groupedTableHeaderMetrics.groupHeight,
         minHeight: groupedTableHeaderMetrics.groupHeight,
         maxHeight: groupedTableHeaderMetrics.groupHeight,
@@ -323,7 +395,9 @@ export function groupedTableHeaderCellSx(theme, tone, overrides = {}) {
         textAlign: 'center',
         whiteSpace: 'nowrap',
         bgcolor: tone.headerBg,
-        backgroundColor: tone.headerBg,
+        backgroundColor: `${tone.headerBg} !important`,
+        background: `${tone.headerBg} !important`,
+        backgroundImage: 'none !important',
         borderBottom: `1px solid ${tone.headerBorder}`,
         color: tone.headerColor,
         fontWeight: 750,
@@ -343,7 +417,7 @@ export function groupedTableColumnHeaderCellSx(theme, tone, align = 'left', over
     return {
         position: 'sticky',
         top: groupedTableHeaderMetrics.groupHeight,
-        zIndex: 4,
+        zIndex: '41 !important',
         height: groupedTableHeaderMetrics.columnHeight,
         minHeight: groupedTableHeaderMetrics.columnHeight,
         py: 0,
@@ -352,7 +426,9 @@ export function groupedTableColumnHeaderCellSx(theme, tone, align = 'left', over
         textAlign: align,
         whiteSpace: 'nowrap',
         bgcolor: tone.headerBg,
-        backgroundColor: tone.headerBg,
+        backgroundColor: `${tone.headerBg} !important`,
+        background: `${tone.headerBg} !important`,
+        backgroundImage: 'none !important',
         borderBottom: `2px solid ${tone.headerBorder}`,
         color: tone.headerColor,
         fontWeight: 650,
@@ -370,9 +446,11 @@ export function stickyTableHeaderCellSx(theme, tone, align = 'left', overrides =
     return {
         position: 'sticky',
         top: 0,
-        zIndex: 4,
+        zIndex: '41 !important',
         bgcolor: tone.headerBg,
-        backgroundColor: tone.headerBg,
+        backgroundColor: `${tone.headerBg} !important`,
+        background: `${tone.headerBg} !important`,
+        backgroundImage: 'none !important',
         color: tone.headerColor,
         borderBottom: `2px solid ${tone.headerBorder}`,
         textAlign: align,

@@ -11,10 +11,11 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { stickyTableHeaderCellSx, tableRowRevealSx, tableTone } from '../themeUtils';
+import { stickyTableContainerSx, stickyTableHeaderCellSx, stickyTableSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
 export default function TraitProgramGraphSummary({
     title,
@@ -31,6 +32,8 @@ export default function TraitProgramGraphSummary({
     effectSignFromGene,
     edgeColorFromScore,
     formatNumber,
+    onOpenProgram,
+    onOpenGene,
 }) {
     const theme = useTheme();
     const headerTone = tableTone(theme, 'neutral');
@@ -84,8 +87,8 @@ export default function TraitProgramGraphSummary({
                 </Stack>
             </Box>
 
-            <TableContainer sx={{ maxHeight: 430, overflowX: 'auto', overflowY: 'auto' }}>
-                <Table size="small" stickyHeader>
+            <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 430, overflowX: 'auto', overflowY: 'auto' })}>
+                <Table size="small" stickyHeader sx={stickyTableSx(theme)}>
                     <TableHead>
                         <TableRow>
                             <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, width: 112 })}>Side</TableCell>
@@ -94,6 +97,7 @@ export default function TraitProgramGraphSummary({
                             <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Score</TableCell>
                             <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Genes</TableCell>
                             <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>+ / -</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, minWidth: 260 })}>Visible genes</TableCell>
                             <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Shown</TableCell>
                         </TableRow>
                     </TableHead>
@@ -108,6 +112,14 @@ export default function TraitProgramGraphSummary({
                             const selectionLabel = programSelectionLabel(module);
                             const positiveCount = module.visibleGenes?.filter((gene) => effectSignFromGene(gene) === 'positive').length || 0;
                             const negativeCount = module.visibleGenes?.filter((gene) => effectSignFromGene(gene) === 'negative').length || 0;
+                            const uniqueGenes = [];
+                            const seenGenes = new Set();
+                            (module.visibleGenes || []).forEach((gene) => {
+                                const key = gene.highlightKey || gene.ensg || gene.gene;
+                                if (!key || seenGenes.has(key)) return;
+                                seenGenes.add(key);
+                                uniqueGenes.push(gene);
+                            });
 
                             return (
                                 <TableRow
@@ -138,9 +150,27 @@ export default function TraitProgramGraphSummary({
                                     </TableCell>
                                     <TableCell>
                                         <Stack spacing={0.35}>
-                                            <Typography sx={{ fontWeight: 900, color: '#111827', lineHeight: 1 }}>
-                                                {module.program}
-                                            </Typography>
+                                            <Tooltip title={`Open ${module.program}`}>
+                                                <Button
+                                                    size="small"
+                                                    variant="text"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onOpenProgram?.(module.program);
+                                                    }}
+                                                    sx={{
+                                                        justifyContent: 'flex-start',
+                                                        minWidth: 0,
+                                                        p: 0,
+                                                        color: '#245089',
+                                                        fontWeight: 900,
+                                                        lineHeight: 1,
+                                                        textTransform: 'none',
+                                                    }}
+                                                >
+                                                    {module.program}
+                                                </Button>
+                                            </Tooltip>
                                             <Typography sx={{ fontSize: 11.5, color: '#667085', lineHeight: 1.2 }}>
                                                 {rowSide === 'program' ? 'program burden' : 'regulator-program'}
                                             </Typography>
@@ -203,6 +233,40 @@ export default function TraitProgramGraphSummary({
                                         {' / '}
                                         <Box component="span" sx={{ color: effectColors.negative, fontWeight: 800 }}>{negativeCount}</Box>
                                     </TableCell>
+                                    <TableCell>
+                                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                                            {uniqueGenes.length ? uniqueGenes.slice(0, 10).map((gene) => {
+                                                const geneLabel = gene.geneLabel || gene.gene || gene.ensg || 'gene';
+                                                const sign = effectSignFromGene(gene);
+                                                return (
+                                                    <Chip
+                                                        key={gene.highlightKey || `${module.program}:${geneLabel}`}
+                                                        label={geneLabel}
+                                                        size="small"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            onOpenGene?.(gene);
+                                                        }}
+                                                        sx={{
+                                                            height: 22,
+                                                            borderRadius: 1,
+                                                            fontSize: 11,
+                                                            fontWeight: 800,
+                                                            color: effectColors[sign] || '#475467',
+                                                            bgcolor: sign === 'negative' ? 'rgba(52,125,204,0.10)' : sign === 'positive' ? 'rgba(239,78,47,0.10)' : 'rgba(15,23,42,0.06)',
+                                                            border: `1px solid ${sign === 'negative' ? 'rgba(52,125,204,0.24)' : sign === 'positive' ? 'rgba(239,78,47,0.24)' : 'rgba(15,23,42,0.10)'}`,
+                                                            cursor: 'pointer',
+                                                        }}
+                                                    />
+                                                );
+                                            }) : (
+                                                <Typography sx={{ fontSize: 12, color: '#667085' }}>none</Typography>
+                                            )}
+                                            {uniqueGenes.length > 10 && (
+                                                <Chip label={`+${uniqueGenes.length - 10}`} size="small" sx={{ height: 22, borderRadius: 1, fontSize: 11, fontWeight: 800 }} />
+                                            )}
+                                        </Stack>
+                                    </TableCell>
                                     <TableCell align="right">
                                         {module.collapsed ? (
                                             <Typography sx={{ fontSize: 12, color: '#667085' }}>none</Typography>
@@ -225,7 +289,7 @@ export default function TraitProgramGraphSummary({
                         })}
                         {!modules.length && (
                             <TableRow>
-                                <TableCell colSpan={7}>
+                                <TableCell colSpan={8}>
                                     <Typography sx={{ py: 2, textAlign: 'center', color: '#667085', fontSize: 13 }}>
                                         No modules after current filters
                                     </Typography>

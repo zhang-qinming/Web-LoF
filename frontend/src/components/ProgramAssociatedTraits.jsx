@@ -30,6 +30,8 @@ import {
     panelSx,
     sectionPanelHeaderSx,
     sectionTitleSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
@@ -160,8 +162,8 @@ export default function ProgramAssociatedTraits({ programId }) {
                 </Stack>
             </Box>
 
-            <TableContainer sx={{ maxHeight: 520, overflowX: 'auto', overflowY: 'auto' }}>
-                <Table stickyHeader size="small">
+            <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 520, overflowX: 'auto', overflowY: 'auto' })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme)}>
                     <TableHead>
                         <TableRow>
                             {['Trait', 'Selection', 'Scores', 'Genes', 'Top genes'].map((label) => (

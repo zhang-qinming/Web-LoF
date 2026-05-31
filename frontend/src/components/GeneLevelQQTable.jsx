@@ -23,6 +23,8 @@ import {
     metricChipTone,
     plotFrameSx,
     sectionPanelHeaderSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     summaryChipSx,
     tableRowRevealSx,
     tableTone,
@@ -176,8 +178,8 @@ export default function GeneLevelQQTable({
             </Box>
 
             <Collapse in={tableOpen}>
-                <TableContainer sx={{ maxHeight: 560, overflowX: 'auto', overflowY: 'auto' }}>
-                    <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: 1256 }}>
+                <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 560, overflowX: 'auto', overflowY: 'auto' })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: 1256 })}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />

@@ -22,6 +22,8 @@ import {
     metricChipTone,
     plotFrameSx,
     sectionPanelHeaderSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     summaryChipSx,
     tableRowRevealSx,
     tableTone,
@@ -164,8 +166,8 @@ export default function ProgramScatterTable({
                 </Button>
             </Box>
             <Collapse in={tableOpen}>
-                <TableContainer sx={{ maxHeight: 460, overflowX: 'auto', overflowY: 'auto' }}>
-                    <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', minWidth: 980 }}>
+                <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 460, overflowX: 'auto', overflowY: 'auto' })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 980 })}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />

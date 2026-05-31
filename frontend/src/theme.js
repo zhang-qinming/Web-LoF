@@ -278,6 +278,33 @@ const theme = createTheme({
                 },
             },
         },
+        MuiTable: {
+            styleOverrides: {
+                root: {
+                    '&.MuiTable-stickyHeader': {
+                        borderCollapse: 'separate',
+                        borderSpacing: 0,
+                        backgroundColor: '#ffffff',
+                        '& thead': {
+                            position: 'relative',
+                            zIndex: 40,
+                        },
+                        '& thead th': {
+                            position: 'sticky',
+                            background: '#f8fafc',
+                            backgroundColor: '#f8fafc',
+                            backgroundClip: 'border-box',
+                            backgroundImage: 'none',
+                            zIndex: 41,
+                        },
+                        '& tbody, & tbody tr, & tbody td': {
+                            position: 'relative',
+                            zIndex: 0,
+                        },
+                    },
+                },
+            },
+        },
         MuiTableCell: {
             styleOverrides: {
                 root: {
@@ -289,9 +316,12 @@ const theme = createTheme({
                     backgroundColor: '#f8fafc',
                 },
                 stickyHeader: {
+                    position: 'sticky',
                     backgroundColor: '#f8fafc',
+                    background: '#f8fafc',
                     backgroundClip: 'border-box',
-                    zIndex: 4,
+                    backgroundImage: 'none',
+                    zIndex: 41,
                     boxShadow: '0 2px 0 #ffffff, inset 0 -1px 0 rgba(148, 163, 184, 0.26)',
                 },
             },

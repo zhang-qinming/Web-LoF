@@ -25,6 +25,8 @@ import {
     metricChipTone,
     plotFrameSx,
     sectionPanelHeaderSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
@@ -141,8 +143,8 @@ export default function GeneRegulationTable({
                 )}
             </Box>
             <Collapse in={tableOpen}>
-                <TableContainer sx={{ maxHeight: 540, overflowX: 'auto', overflowY: 'auto' }}>
-                    <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', minWidth: 620 }}>
+                <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 540, overflowX: 'auto', overflowY: 'auto' })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 620 })}>
                         <colgroup>
                             {COLUMNS.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />

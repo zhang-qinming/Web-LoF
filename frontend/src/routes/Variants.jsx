@@ -21,6 +21,8 @@ import {
     plotFrameSx,
     sectionPanelHeaderSx,
     sectionTitleSx,
+    stickyTableContainerSx,
+    stickyTableSx,
     stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
@@ -435,8 +437,8 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             )}
 
             {/* table */}
-            <TableContainer sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }} onMouseLeave={() => setHov(null)}>
-                <Table stickyHeader size="small" sx={{ tableLayout: 'fixed' }}>
+            <TableContainer sx={stickyTableContainerSx(theme, { flex: 1, overflowY: 'auto', overflowX: 'hidden' })} onMouseLeave={() => setHov(null)}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed' })}>
                     <TableHead>
                         <TableRow>
                             <TableCell sx={{ ...thSx, width: 38, textAlign: 'center', px: 0.3 }}>
@@ -891,8 +893,8 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                 </Typography>
                             </Box>
                         )}
-                        <TableContainer sx={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }} onMouseLeave={() => setHovered(null)}>
-                            <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', minWidth: { xs: 720, sm: 780 } }}>
+                        <TableContainer sx={stickyTableContainerSx(theme, { flex: 1, overflowY: 'auto', overflowX: 'auto' })} onMouseLeave={() => setHovered(null)}>
+                            <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: { xs: 720, sm: 780 } })}>
                                 <TableHead>
                                     <TableRow>
                                         <TableCell sx={{ ...thSx, width: 38, textAlign: 'center', px: 0.3 }}>

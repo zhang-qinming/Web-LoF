@@ -32,7 +32,9 @@ import { Clear, Search } from '@mui/icons-material';
 import {
     panelSx,
     sectionTitleSx,
+    stickyTableContainerSx,
     stickyTableHeaderCellSx,
+    stickyTableSx,
     summaryChipSx,
     tableRowRevealSx,
     tableSkeletonCellSx,
@@ -403,8 +405,8 @@ export default function GwasDataList({
 
                 <CardContent sx={{ p: 0 }}>
                     <Box sx={{ position: 'relative' }}>
-                        <TableContainer component={Paper} elevation={0} sx={{ border: 0, borderRadius: 0, maxHeight: 600, overflow: 'auto', boxShadow: 'none', backgroundColor: 'transparent' }}>
-                            <Table stickyHeader>
+                        <TableContainer component={Paper} elevation={0} sx={stickyTableContainerSx(theme, { border: 0, borderRadius: 0, maxHeight: 600, overflow: 'auto', boxShadow: 'none' })}>
+                            <Table stickyHeader sx={stickyTableSx(theme)}>
                                 <TableHead>
                                     <TableRow>
                                         {columns.map(({ id, label, numeric }) => (
