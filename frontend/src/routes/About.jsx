@@ -40,7 +40,7 @@ const COPY = {
             {
                 icon: InsightsOutlined,
                 title: 'What This Browser Does',
-                body: 'GWAS Data Browser is a project-facing workspace for browsing trait-linked results, inspecting program and regulator signals, and reviewing gene-level summaries through interactive plots and tables.',
+                body: 'LoF Gene-Program-Trait Browser is a scientific data browser organized around a LoF -> gene -> regulator/program -> trait workflow.',
                 bullets: [
                     'It combines metadata lookup, chart-based interpretation, and raw file access in one place.',
                     'The interface is designed for fast movement between trait discovery, figure inspection, and downstream download.',
@@ -79,7 +79,7 @@ const COPY = {
             },
         ],
         footerTitle: 'Scope',
-        footerBody: 'This browser is intended for exploration, interpretation, and export of project outputs. It is not positioned as a public documentation site or a general-purpose genomics portal.',
+        footerBody: 'This browser is intended for exploration, interpretation, and export of project outputs. It is not positioned as a public documentation site or a general-purpose genomics database browser.',
         footerChip: 'Project-facing workspace',
     },
     zh: {
@@ -98,7 +98,7 @@ const COPY = {
             {
                 icon: InsightsOutlined,
                 title: '这个浏览器做什么',
-                body: 'GWAS Data Browser 是一个面向项目内部结果浏览的工作界面，用于浏览 trait 相关结果、检查 program 与 regulator 信号，并通过交互式图表和表格查看 gene-level 汇总。',
+                body: 'LoF Gene-Program-Trait Browser 是一个科研数据浏览器，围绕 LoF 优先的 gene-program-trait 主链路组织结果浏览，并连接 perturb-seq regulator 与 trait 关联。',
                 bullets: [
                     '它把元信息检索、图表解释和原始文件访问整合在同一个界面里。',
                     '页面流程强调 trait 发现、图形检查和后续下载之间的快速切换。',

@@ -172,10 +172,10 @@ export default function MobileNavDrawer({ links }) {
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1, py: 0.6 }}>
                     <Box>
                         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                            GWAS Browser
+                            LoF Gene-Program-Trait Browser
                         </Typography>
                         <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                            Navigation
+                            Scientific data browser
                         </Typography>
                     </Box>
                     <IconButton onClick={toggle(false)} aria-label="Close navigation" size="small">
