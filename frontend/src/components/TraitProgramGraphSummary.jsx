@@ -22,6 +22,7 @@ export default function TraitProgramGraphSummary({
     modules,
     side,
     selectedProgram,
+    selectedGeneKey,
     onSelectProgram,
     onToggleExpanded,
     sideMeta,
@@ -36,9 +37,55 @@ export default function TraitProgramGraphSummary({
     onOpenGene,
 }) {
     const theme = useTheme();
+    const [filter, setFilter] = React.useState('all');
+    const rowRefs = React.useRef(new Map());
     const headerTone = tableTone(theme, 'neutral');
     const programCount = modules.filter((module) => (module.side || side) === 'program').length;
     const regulatorCount = modules.filter((module) => (module.side || side) === 'regulator').length;
+    const filteredModules = React.useMemo(() => modules.filter((module) => {
+        const rowSide = module.side || side;
+        if (filter === 'program') return rowSide === 'program';
+        if (filter === 'regulator') return rowSide === 'regulator';
+        if (filter === 'selected') return selectedProgram && module.program === selectedProgram;
+        if (filter === 'gene') return selectedGeneKey && module.filteredGeneKeys?.includes(selectedGeneKey);
+        return true;
+    }), [filter, modules, selectedGeneKey, selectedProgram, side]);
+
+    React.useEffect(() => {
+        if (selectedGeneKey) {
+            setFilter('gene');
+            return;
+        }
+        if (selectedProgram) {
+            setFilter('selected');
+            return;
+        }
+        if (filter === 'gene' || filter === 'selected') {
+            setFilter('all');
+        }
+    }, [filter, selectedGeneKey, selectedProgram]);
+
+    React.useEffect(() => {
+        if (!selectedProgram) return;
+        const row = rowRefs.current.get(`${selectedProgram}:program`) || rowRefs.current.get(`${selectedProgram}:regulator`);
+        row?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    }, [selectedProgram, filteredModules]);
+
+    React.useEffect(() => {
+        if (!selectedGeneKey) return;
+        const module = filteredModules.find((item) => item.filteredGeneKeys?.includes(selectedGeneKey));
+        if (!module) return;
+        const row = rowRefs.current.get(`${module.program}:${module.side || side}`);
+        row?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    }, [filteredModules, selectedGeneKey, side]);
+
+    const filterOptions = [
+        { key: 'all', label: 'All', disabled: false },
+        { key: 'program', label: 'Program side', disabled: programCount === 0 },
+        { key: 'regulator', label: 'Regulator side', disabled: regulatorCount === 0 },
+        { key: 'selected', label: 'Selected only', disabled: !selectedProgram },
+        { key: 'gene', label: 'Gene focused', disabled: !selectedGeneKey },
+    ];
 
     return (
         <Paper variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'rgba(15,23,42,0.10)', overflow: 'hidden' }}>
@@ -85,6 +132,20 @@ export default function TraitProgramGraphSummary({
                         />
                     )}
                 </Stack>
+                <Stack direction="row" spacing={0.6} flexWrap="wrap" useFlexGap sx={{ width: '100%' }}>
+                    {filterOptions.map((option) => (
+                        <Button
+                            key={option.key}
+                            size="small"
+                            variant={filter === option.key ? 'contained' : 'outlined'}
+                            disabled={option.disabled}
+                            onClick={() => setFilter(option.key)}
+                            sx={{ minHeight: 26, py: 0.15, px: 1, fontSize: 11.5, textTransform: 'none' }}
+                        >
+                            {option.label}
+                        </Button>
+                    ))}
+                </Stack>
             </Box>
 
             <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 430, overflowX: 'auto', overflowY: 'auto' })}>
@@ -102,7 +163,7 @@ export default function TraitProgramGraphSummary({
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {modules.map((module, index) => {
+                        {filteredModules.map((module, index) => {
                             const rowSide = module.side || side;
                             const rowMeta = sideMetaMap?.[rowSide] || sideMeta;
                             const scoreField = rowSide === 'program' ? 'programScore' : 'regulatorScore';
@@ -124,6 +185,9 @@ export default function TraitProgramGraphSummary({
                             return (
                                 <TableRow
                                     key={`${module.program}:${rowSide}`}
+                                    ref={(el) => {
+                                        if (el) rowRefs.current.set(`${module.program}:${rowSide}`, el);
+                                    }}
                                     hover
                                     selected={selected}
                                     onClick={() => onSelectProgram(module.program)}
@@ -287,7 +351,7 @@ export default function TraitProgramGraphSummary({
                                 </TableRow>
                             );
                         })}
-                        {!modules.length && (
+                        {!filteredModules.length && (
                             <TableRow>
                                 <TableCell colSpan={8}>
                                     <Typography sx={{ py: 2, textAlign: 'center', color: '#667085', fontSize: 13 }}>

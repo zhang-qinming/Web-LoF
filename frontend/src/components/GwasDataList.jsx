@@ -146,6 +146,27 @@ function formatCellValue(row, columnId) {
     return row[columnId] || '-';
 }
 
+function columnLayoutSx(column = {}) {
+    const sx = {};
+    if (column.width !== undefined) sx.width = column.width;
+    if (column.minWidth !== undefined) sx.minWidth = column.minWidth;
+    if (column.maxWidth !== undefined) sx.maxWidth = column.maxWidth;
+    if (column.whiteSpace !== undefined) sx.whiteSpace = column.whiteSpace;
+    return sx;
+}
+
+function headerLayoutSx(column = {}) {
+    if (!column.headerWrap) return {};
+    return {
+        whiteSpace: 'normal',
+        overflow: 'visible',
+        textOverflow: 'clip',
+        lineHeight: 1.1,
+        wordBreak: 'break-word',
+        py: 0.9,
+    };
+}
+
 function TraitRow({ row, index, columns, theme }) {
     return (
         <TableRow
@@ -166,7 +187,11 @@ function TraitRow({ row, index, columns, theme }) {
             }}
         >
             {columns.map((col) => (
-                <TableCell key={col.id} align={col.numeric ? 'right' : 'left'}>
+                <TableCell
+                    key={col.id}
+                    align={col.numeric ? 'right' : 'left'}
+                    sx={columnLayoutSx(col)}
+                >
                     {col.id === 'trait_name' ? (
                         <Link
                             component={RouterLink}
@@ -406,37 +431,65 @@ export default function GwasDataList({
                 <CardContent sx={{ p: 0 }}>
                     <Box sx={{ position: 'relative' }}>
                         <TableContainer component={Paper} elevation={0} sx={stickyTableContainerSx(theme, { border: 0, borderRadius: 0, maxHeight: 600, overflow: 'auto', boxShadow: 'none' })}>
-                            <Table stickyHeader sx={stickyTableSx(theme)}>
+                            <Table
+                                stickyHeader
+                                sx={stickyTableSx(theme, {
+                                    tableLayout: columns.some((column) => column.width || column.minWidth || column.maxWidth) ? 'fixed' : 'auto',
+                                })}
+                            >
+                                <colgroup>
+                                    {columns.map((column) => (
+                                        <col
+                                            key={column.id}
+                                            style={{
+                                                width: column.width,
+                                                minWidth: column.minWidth,
+                                                maxWidth: column.maxWidth,
+                                            }}
+                                        />
+                                    ))}
+                                </colgroup>
                                 <TableHead>
                                     <TableRow>
-                                        {columns.map(({ id, label, numeric }) => (
+                                        {columns.map((column) => (
                                             <TableCell
-                                                key={id}
-                                                align={numeric ? 'right' : 'left'}
+                                                key={column.id}
+                                                align={column.numeric ? 'right' : 'left'}
                                                 sx={stickyTableHeaderCellSx(theme, {
                                                     headerBg: theme.custom.surface.subtle,
                                                     headerBorder: theme.custom.border.strong,
                                                     headerColor: '#475569',
-                                                }, numeric ? 'right' : 'left', {
+                                                }, column.numeric ? 'right' : 'left', {
                                                     fontSize: '0.8rem',
                                                     fontWeight: 700,
                                                     letterSpacing: '0.03em',
                                                     textTransform: 'uppercase',
                                                     py: 1.2,
+                                                    ...columnLayoutSx(column),
+                                                    ...headerLayoutSx(column),
                                                 })}
                                             >
                                                 <TableSortLabel
-                                                    active={sortBy === id}
-                                                    direction={sortBy === id ? order.toLowerCase() : 'asc'}
-                                                    onClick={() => handleSort(id)}
+                                                    active={sortBy === column.id}
+                                                    direction={sortBy === column.id ? order.toLowerCase() : 'asc'}
+                                                    onClick={() => handleSort(column.id)}
                                                     sx={{
                                                         color: 'inherit',
+                                                        display: 'flex',
+                                                        width: '100%',
+                                                        whiteSpace: column.headerWrap ? 'normal' : 'nowrap',
+                                                        lineHeight: column.headerWrap ? 1.1 : 1.2,
+                                                        alignItems: 'center',
                                                         '&:hover': { color: theme.palette.primary.main },
                                                         '&.Mui-active': { color: theme.palette.primary.main, fontWeight: 700 },
-                                                        '& .MuiTableSortLabel-icon': { color: `${theme.palette.primary.main} !important` },
+                                                        '& .MuiTableSortLabel-icon': {
+                                                            color: `${theme.palette.primary.main} !important`,
+                                                            flexShrink: 0,
+                                                            marginLeft: 0.35,
+                                                        },
                                                     }}
                                                 >
-                                                    {label}
+                                                    {column.label}
                                                 </TableSortLabel>
                                             </TableCell>
                                         ))}

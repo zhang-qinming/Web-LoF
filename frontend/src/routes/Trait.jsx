@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Box, Typography, Tabs, Tab } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Timeline } from '@mui/icons-material';
@@ -22,11 +22,24 @@ function findAvailableId(files, candidates) {
     return candidates.find((candidate) => candidate && files.includes(candidate)) || '';
 }
 
+const TAB_KEY_TO_INDEX = {
+    'program-scatter': 0,
+    'trait-program-graph': 1,
+    manhattan: 2,
+    'burden-volcano': 3,
+    'posterior-volcano': 4,
+    'gene-evidence': 5,
+    'gene-qq': 6,
+    'cross-trait-heatmap': 7,
+};
+
 export default function Trait() {
     const theme = useTheme();
     const { traitName } = useParams();
+    const [searchParams] = useSearchParams();
     const fileId = traitName;
-    const [tab, setTab] = React.useState(2);
+    const requestedTab = TAB_KEY_TO_INDEX[searchParams.get('tab')] ?? 2;
+    const [tab, setTab] = React.useState(requestedTab);
     const userSelectedTabRef = React.useRef(false);
     const { data: scatterListData } = useSWR('/api/programs/list', fetcher);
     const { data: graphListData } = useSWR('/api/programs/graph-list', fetcher);
@@ -45,8 +58,8 @@ export default function Trait() {
 
     React.useEffect(() => {
         userSelectedTabRef.current = false;
-        setTab(2);
-    }, [fileId]);
+        setTab(requestedTab);
+    }, [fileId, requestedTab]);
 
     React.useEffect(() => {
         if (!availabilityReady) return;
@@ -70,15 +83,15 @@ export default function Trait() {
                 <GwasDataList
                     title=""
                     columns={[
-                        { id: 'file_id', label: 'LoF ID' },
-                        { id: 'trait_name', label: 'Trait' },
-                        { id: 'sample_size', label: 'Sample Size', numeric: true },
-                        { id: 'population', label: 'Population' },
-                        { id: 'mesh_term', label: 'MeSH term' },
-                        { id: 'n_sig', label: 'Significant Loci', numeric: true },
-                        { id: 'qc_score', label: 'QC', numeric: true },
-                        { id: 'year', label: 'Year', numeric: true },
-                        { id: 'n_variants', label: 'Variants', numeric: true },
+                        { id: 'file_id', label: 'LoF ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
+                        { id: 'trait_name', label: 'Trait', width: '34%', minWidth: 360 },
+                        { id: 'sample_size', label: 'Sample Size', numeric: true, width: 132, minWidth: 132, whiteSpace: 'nowrap', headerWrap: true },
+                        { id: 'population', label: 'Population', width: 96, minWidth: 96, whiteSpace: 'nowrap' },
+                        { id: 'mesh_term', label: 'MeSH term', width: 170, minWidth: 170, headerWrap: true },
+                        { id: 'n_sig', label: 'Significant Loci', numeric: true, width: 126, minWidth: 126, whiteSpace: 'nowrap', headerWrap: true },
+                        { id: 'qc_score', label: 'QC', numeric: true, width: 78, minWidth: 78, whiteSpace: 'nowrap' },
+                        { id: 'year', label: 'Year', numeric: true, width: 84, minWidth: 84, whiteSpace: 'nowrap' },
+                        { id: 'n_variants', label: 'Variants', numeric: true, width: 138, minWidth: 138, whiteSpace: 'nowrap' },
                     ]}
                     defaultSortBy="trait_name"
                     defaultOrder="ASC"

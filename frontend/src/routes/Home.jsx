@@ -31,6 +31,7 @@ import {
     Dns,
     FileDownload,
     Folder,
+    Hub,
     InsertDriveFile,
     Science,
     Search,
@@ -38,13 +39,21 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { downloadDataPaths } from '../utils/download';
-import { captionSx, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
+import { captionSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
+import homeThumbProgramScatter from '../assets/home-thumb-program-scatter.png';
+import homeThumbTraitGraph from '../assets/home-thumb-trait-graph.png';
+import homeThumbCrossHeatmap from '../assets/home-thumb-cross-heatmap.png';
+import homeThumbGeneEvidence from '../assets/home-thumb-gene-evidence.png';
+import homeThumbDataBrowser from '../assets/home-thumb-data-browser.png';
 
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const HOME_API = axios.create({ baseURL: '/api' });
 const SEARCH_CACHE = new Map();
 const SEARCH_DEBOUNCE_MS = 220;
 const SEARCH_CACHE_TTL_MS = 90 * 1000;
+const HOME_ACCENT = '#d57d5a';
+const HOME_DEEP = '#1f2b3d';
+const HOME_DISPLAY_FONT = '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif';
 
 const loadingBarSx = {
     height: 3,
@@ -70,44 +79,101 @@ const shimmerSx = {
     },
 };
 
-const statsConfig = [
+const heroStatsConfig = [
     {
         key: 'traits',
-        label: 'Trait Browser',
-        icon: <Dns sx={{ fontSize: 28 }} />,
-        to: '/trait',
+        label: 'Traits indexed',
         color: '#2563eb',
-        description: 'Browse study-level traits and linked figures.',
     },
     {
         key: 'programs',
-        label: 'Programs',
-        icon: <Science sx={{ fontSize: 28 }} />,
-        to: '/programs',
+        label: 'Programs linked',
         color: '#1f9d62',
-        description: 'Inspect regulator and pathway-level program outputs.',
     },
     {
         key: 'dataOutputs',
-        label: 'Data Outputs',
-        icon: <Storage sx={{ fontSize: 28 }} />,
-        to: '/data',
+        label: 'Indexed outputs',
         color: '#b7791f',
-        description: 'Open indexed folders and download result files directly.',
     },
 ];
+
+const entryCards = [
+    {
+        key: 'traits',
+        label: 'Trait browser',
+        eyebrow: 'Trait-first navigation',
+        description: 'Open phenotype pages with linked summary statistics and rendered evidence views.',
+        statKey: 'traits',
+        metricLabel: 'traits indexed',
+        icon: <Dns sx={{ fontSize: 26 }} />,
+        to: '/trait',
+        color: '#2563eb',
+        image: homeThumbProgramScatter,
+    },
+    {
+        key: 'genes',
+        label: 'Gene evidence',
+        eyebrow: 'Gene-level readouts',
+        description: 'Trace QQ, regulation, scatter, and burden signals around candidate genes.',
+        metricFallback: 'gene-centric views',
+        icon: <Hub sx={{ fontSize: 26 }} />,
+        to: '/genes',
+        color: '#7c3aed',
+        image: homeThumbGeneEvidence,
+    },
+    {
+        key: 'programs',
+        label: 'Program networks',
+        eyebrow: 'Program context',
+        description: 'Inspect regulator-program structure and the traits enriched in each module.',
+        statKey: 'programs',
+        metricLabel: 'programs linked',
+        icon: <Science sx={{ fontSize: 26 }} />,
+        to: '/programs',
+        color: '#0f766e',
+        image: homeThumbTraitGraph,
+    },
+    {
+        key: 'dataOutputs',
+        label: 'Data browser',
+        eyebrow: 'Download and reuse',
+        description: 'Search files, folders, and downloadable outputs without leaving the atlas.',
+        statKey: 'dataOutputs',
+        metricLabel: 'outputs indexed',
+        icon: <Storage sx={{ fontSize: 26 }} />,
+        to: '/data',
+        color: '#b7791f',
+        image: homeThumbDataBrowser,
+    },
+];
+
+const FIGURE_PREVIEW_MAP = {
+    'program-scatter': {
+        image: homeThumbProgramScatter,
+        label: 'Program scatter',
+    },
+    'trait-program-graph': {
+        image: homeThumbTraitGraph,
+        label: 'Trait-program graph',
+    },
+    'cross-trait-heatmap': {
+        image: homeThumbCrossHeatmap,
+        label: 'Cross-trait heatmap',
+    },
+};
 
 const featuredTraits = [
     {
         fileId: 'GCST90083707',
         gwasId: 'MR08330',
         traitName: 'Diagnoses - secondary ICD10: E03.9 Hypothyroidism, unspecified',
-        meshTerm: 'Diagnosis',
         nSig: 8931,
         qqDeviation: '2.552',
-        volcanoHits: '3 burden / 155 posterior',
-        evidence: ['Program scatter', 'Trait-program graph', 'Cross-trait heatmap'],
-        note: 'Most balanced showcase across Manhattan, QQ, volcano, scatter, and cross-trait views.',
+        evidence: [
+            { label: 'Program scatter', tab: 'program-scatter' },
+            { label: 'Trait-program graph', tab: 'trait-program-graph' },
+            { label: 'Cross-trait heatmap', tab: 'cross-trait-heatmap' },
+        ],
         tone: {
             glow: 'rgba(37, 99, 235, 0.16)',
             line: '#2563eb',
@@ -118,12 +184,13 @@ const featuredTraits = [
         fileId: 'GCST90083648',
         gwasId: 'PE04609',
         traitName: 'D12 Benign neoplasm of colon, rectum, anus and anal canal',
-        meshTerm: 'Colorectal Neoplasms',
         nSig: 1617,
         qqDeviation: '1.586',
-        volcanoHits: '4 burden / 82 posterior',
-        evidence: ['Program scatter', 'Trait-program graph', 'Cross-trait heatmap'],
-        note: 'Good visual balance and cleaner patterning for demos when the primary trait feels too dense.',
+        evidence: [
+            { label: 'Program scatter', tab: 'program-scatter' },
+            { label: 'Trait-program graph', tab: 'trait-program-graph' },
+            { label: 'Cross-trait heatmap', tab: 'cross-trait-heatmap' },
+        ],
         tone: {
             glow: 'rgba(217, 119, 6, 0.18)',
             line: '#d97706',
@@ -134,12 +201,13 @@ const featuredTraits = [
         fileId: 'GCST90083948',
         gwasId: 'AT599',
         traitName: 'I10 Essential (primary) hypertension',
-        meshTerm: 'Hypertension',
         nSig: 8374,
         qqDeviation: '3.746',
-        volcanoHits: '4 burden / 111 posterior',
-        evidence: ['Program scatter', 'Trait-program graph', 'Cross-trait heatmap'],
-        note: 'Very strong QQ separation and broad cross-panel signal, useful as a second high-signal disease trait.',
+        evidence: [
+            { label: 'Program scatter', tab: 'program-scatter' },
+            { label: 'Trait-program graph', tab: 'trait-program-graph' },
+            { label: 'Cross-trait heatmap', tab: 'cross-trait-heatmap' },
+        ],
         tone: {
             glow: 'rgba(14, 116, 144, 0.16)',
             line: '#0f766e',
@@ -172,6 +240,27 @@ function getRequestErrorMessage(err, fallback) {
 
 function cleanTraitName(value) {
     return String(value || '').replace(/^"|"$/g, '');
+}
+
+function getFeaturedTraitRoute(trait, tabKey = '') {
+    const target = cleanTraitName(trait?.fileId || trait?.gwasId || trait?.traitName);
+    if (!target) return '/trait';
+    const params = new URLSearchParams();
+    if (tabKey) params.set('tab', tabKey);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return `/trait/${encodeURIComponent(target)}${suffix}`;
+}
+
+function getTraitPreview(tabKey) {
+    return FIGURE_PREVIEW_MAP[tabKey] || null;
+}
+
+function getFeaturedTraitCoverImage(trait) {
+    const preferredTabs = ['cross-trait-heatmap', 'trait-program-graph', 'program-scatter'];
+    const match = preferredTabs
+        .map((tabKey) => trait?.evidence?.find((item) => item.tab === tabKey))
+        .find(Boolean);
+    return getTraitPreview(match?.tab || trait?.evidence?.[0]?.tab)?.image || homeThumbCrossHeatmap;
 }
 
 function SearchResultsPanel({
@@ -521,55 +610,462 @@ function SearchResultsPanel({
     );
 }
 
-function MetricTile({ description, icon, label, theme, to, value, navigate, color, loading }) {
+function SectionIntro({ eyebrow, title, description, align = 'left' }) {
+    const centered = align === 'center';
+
+    return (
+        <Stack
+            spacing={0.45}
+            alignItems={centered ? 'center' : 'flex-start'}
+            sx={{
+                textAlign: centered ? 'center' : 'left',
+                maxWidth: centered ? 680 : 520,
+                mx: centered ? 'auto' : 0,
+            }}
+        >
+            <Typography
+                sx={{
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: HOME_ACCENT,
+                }}
+            >
+                {eyebrow}
+            </Typography>
+            <Typography
+                sx={{
+                    fontFamily: HOME_DISPLAY_FONT,
+                    fontSize: { xs: '2rem', md: '2.5rem' },
+                    lineHeight: 0.98,
+                    color: HOME_DEEP,
+                }}
+            >
+                {title}
+            </Typography>
+            {centered && (
+                <Box
+                    sx={{
+                        width: 76,
+                        height: 3,
+                        borderRadius: 999,
+                        background: `linear-gradient(90deg, ${alpha(HOME_ACCENT, 0.16)} 0%, ${HOME_ACCENT} 52%, ${alpha(HOME_ACCENT, 0.16)} 100%)`,
+                        mt: 0.2,
+                        mb: 0.3,
+                    }}
+                />
+            )}
+            {description && (
+                <Typography
+                    sx={{
+                        maxWidth: centered ? 620 : 480,
+                        fontSize: '0.9rem',
+                        lineHeight: 1.7,
+                        color: '#5b6472',
+                    }}
+                >
+                    {description}
+                </Typography>
+            )}
+        </Stack>
+    );
+}
+
+function HeroStat({ label, loading, value }) {
     return (
         <Box
             sx={{
-                border: `1px solid ${theme.custom.border.soft}`,
-                borderRadius: 2,
-                backgroundColor: theme.palette.background.paper,
+                minWidth: 0,
+                px: 1.25,
+                py: 1,
+                borderRadius: 2.2,
+                bgcolor: 'rgba(255,255,255,0.74)',
+                border: '1px solid rgba(213,125,90,0.12)',
+                boxShadow: '0 10px 22px rgba(31,43,61,0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 0.45,
+            }}
+        >
+            <Typography
+                sx={{
+                    fontSize: '0.67rem',
+                    fontWeight: 800,
+                    color: '#8a624e',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.12em',
+                    lineHeight: 1,
+                }}
+            >
+                {label}
+            </Typography>
+            <Typography
+                sx={{
+                    fontFamily: HOME_DISPLAY_FONT,
+                    fontSize: { xs: '1.25rem', md: '1.5rem' },
+                    fontWeight: 700,
+                    color: HOME_DEEP,
+                    lineHeight: 1,
+                }}
+            >
+                {loading ? (
+                    <Skeleton
+                        variant="text"
+                        width={56}
+                        height={28}
+                        sx={{ transform: 'none', bgcolor: 'rgba(31,43,61,0.08)' }}
+                    />
+                ) : (
+                    value.toLocaleString()
+                )}
+            </Typography>
+        </Box>
+    );
+}
+
+function TraitFigurePreviewGrid({ toneColor, trait, onOpenFeaturedTrait, dense = false }) {
+    const theme = useTheme();
+
+    return (
+        <Box
+            sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: dense ? 0.55 : 0.7,
+            }}
+        >
+            {trait.evidence.map((item) => {
+                const preview = FIGURE_PREVIEW_MAP[item.tab];
+                return (
+                    <Box
+                        key={`${trait.fileId}-${item.tab}`}
+                        onClick={() => onOpenFeaturedTrait(trait, item.tab)}
+                        sx={{
+                            position: 'relative',
+                            borderRadius: 1.5,
+                            overflow: 'hidden',
+                            border: `1px solid ${alpha(toneColor, 0.14)}`,
+                            cursor: 'pointer',
+                            backgroundColor: '#fff',
+                            transition: `transform ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}`,
+                            '&:hover': {
+                                transform: 'translateY(-1px)',
+                                boxShadow: `0 10px 18px ${alpha(toneColor, 0.12)}`,
+                            },
+                        }}
+                    >
+                        <Box
+                            component="img"
+                            src={preview.image}
+                            alt={item.label}
+                            sx={{
+                                display: 'block',
+                                width: '100%',
+                                aspectRatio: dense ? '1 / 0.66' : '1 / 0.8',
+                                objectFit: 'cover',
+                            }}
+                        />
+                        <Box
+                            sx={{
+                                position: 'absolute',
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                px: 0.55,
+                                py: 0.45,
+                                background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(15,23,42,0.72) 100%)',
+                            }}
+                        >
+                            <Typography sx={{ fontSize: dense ? '0.62rem' : '0.66rem', fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
+                                {preview.label}
+                            </Typography>
+                        </Box>
+                    </Box>
+                );
+            })}
+        </Box>
+    );
+}
+
+function FeaturedTraitTile({ trait, onOpenFeaturedTrait, onOpenTrait, compact = false }) {
+    const theme = useTheme();
+    const coverImage = getFeaturedTraitCoverImage(trait);
+
+    return (
+        <Box
+            sx={{
                 minWidth: 0,
                 height: '100%',
+                borderRadius: 2.8,
+                overflow: 'hidden',
+                backgroundColor: 'rgba(255,255,255,0.86)',
+                border: `1px solid ${alpha(trait.tone.line, 0.12)}`,
+                boxShadow: `0 18px 32px ${alpha(trait.tone.line, 0.1)}`,
+            }}
+        >
+            <Box
+                onClick={() => onOpenTrait(trait)}
+                sx={{
+                    position: 'relative',
+                    aspectRatio: compact ? '1 / 0.58' : '1 / 0.64',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                }}
+            >
+                <Box
+                    component="img"
+                    src={coverImage}
+                    alt={trait.traitName}
+                    sx={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'block',
+                        objectFit: 'cover',
+                        transition: `transform ${theme.custom.motion.smooth}`,
+                    }}
+                />
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: `linear-gradient(180deg, ${alpha(trait.tone.line, 0.1)} 0%, rgba(15,23,42,0.78) 82%)`,
+                    }}
+                />
+                <Stack
+                    direction="row"
+                    spacing={0.7}
+                    alignItems="flex-start"
+                    justifyContent="space-between"
+                    sx={{ position: 'absolute', top: 12, left: 12, right: 12 }}
+                >
+                    <Chip
+                        label={trait.gwasId}
+                        size="small"
+                        sx={summaryChipSx(theme, {
+                            color: '#fff',
+                            backgroundColor: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.16)',
+                            backdropFilter: 'blur(10px)',
+                        })}
+                    />
+                    <Typography
+                        sx={{
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            color: 'rgba(255,255,255,0.88)',
+                            textAlign: 'right',
+                            lineHeight: 1.3,
+                            fontVariantNumeric: 'tabular-nums',
+                        }}
+                    >
+                        {trait.nSig.toLocaleString()} loci
+                    </Typography>
+                </Stack>
+                <Box sx={{ position: 'absolute', left: 14, right: 14, bottom: 14 }}>
+                    <Typography
+                        sx={{
+                            fontFamily: HOME_DISPLAY_FONT,
+                            fontSize: compact ? '1.12rem' : '1.24rem',
+                            fontWeight: 700,
+                            color: '#fff',
+                            lineHeight: 1.08,
+                            textShadow: '0 4px 18px rgba(15,23,42,0.28)',
+                            mb: 0.35,
+                        }}
+                    >
+                        {trait.traitName}
+                    </Typography>
+                    <Typography
+                        sx={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            color: 'rgba(255,255,255,0.84)',
+                            letterSpacing: '0.04em',
+                        }}
+                    >
+                        QQ {trait.qqDeviation}
+                    </Typography>
+                </Box>
+            </Box>
+            <Stack
+                direction="row"
+                spacing={0.7}
+                useFlexGap
+                flexWrap="wrap"
+                sx={{
+                    p: compact ? 0.9 : 1.05,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.82), rgba(250,244,239,0.94))',
+                }}
+            >
+                {trait.evidence.map((item) => (
+                    <Chip
+                        key={`${trait.fileId}-${item.tab}`}
+                        label={item.label}
+                        onClick={() => onOpenFeaturedTrait(trait, item.tab)}
+                        sx={summaryChipSx(theme, {
+                            cursor: 'pointer',
+                            color: alpha(trait.tone.line, 0.92),
+                            backgroundColor: alpha(trait.tone.line, 0.08),
+                            border: `1px solid ${alpha(trait.tone.line, 0.12)}`,
+                            '&:hover': {
+                                backgroundColor: alpha(trait.tone.line, 0.14),
+                            },
+                        })}
+                    />
+                ))}
+            </Stack>
+        </Box>
+    );
+}
+
+function ExploreCard({
+    color,
+    figureRatio = '1 / 0.63',
+    eyebrow,
+    image,
+    icon,
+    label,
+    description,
+    metricText,
+    navigate,
+    to,
+}) {
+    const theme = useTheme();
+
+    return (
+        <Box
+            sx={{
+                borderRadius: 3,
+                backgroundColor: 'rgba(255,255,255,0.84)',
+                minWidth: 0,
+                height: '100%',
+                border: `1px solid ${alpha(color, 0.12)}`,
+                boxShadow: `0 16px 34px ${alpha(color, 0.1)}`,
+                overflow: 'hidden',
             }}
         >
             <CardActionArea
                 onClick={() => navigate(to)}
                 sx={{
                     height: '100%',
-                    transition: `background-color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
-                    '&:hover .home-stat-icon': {
-                        transform: 'translateY(-1px) scale(1.04)',
+                    borderRadius: 3,
+                    p: 1.05,
+                    transition: `background-color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}`,
+                    '&:hover': {
+                        bgcolor: alpha(color, 0.04),
+                        transform: 'translateY(-2px)',
+                    },
+                    '&:hover .home-entry-figure': {
+                        transform: 'scale(1.04)',
                     },
                 }}
             >
-                <CardContent sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, py: 1.8 }}>
-                    <Box
-                        sx={{
-                            width: 42,
-                            height: 42,
-                            borderRadius: 2,
-                            display: 'grid',
-                            placeItems: 'center',
-                            bgcolor: alpha(color, 0.10),
-                            color,
-                            flexShrink: 0,
-                            transition: `transform ${theme.custom.motion.swift}`,
-                        }}
-                        className="home-stat-icon"
-                    >
-                        {icon}
-                    </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.05 }}>
-                            {loading ? <Skeleton variant="text" width={52} height={34} sx={{ transform: 'none' }} /> : value.toLocaleString()}
+                <CardContent sx={{ p: 0, height: '100%' }}>
+                    <Stack spacing={1.05} sx={{ height: '100%' }}>
+                        <Box
+                            sx={{
+                                position: 'relative',
+                                aspectRatio: figureRatio,
+                                overflow: 'hidden',
+                                borderRadius: 2.3,
+                                bgcolor: alpha(color, 0.08),
+                            }}
+                        >
+                            <Box
+                                component="img"
+                                src={image}
+                                alt={label}
+                                sx={{
+                                    width: '100%',
+                                    height: '100%',
+                                    display: 'block',
+                                    objectFit: 'cover',
+                                    transition: `transform ${theme.custom.motion.smooth}`,
+                                }}
+                                className="home-entry-figure"
+                            />
+                            <Box
+                                sx={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(15,23,42,0.24) 100%)',
+                                }}
+                            />
+                            <Stack
+                                direction="row"
+                                alignItems="flex-start"
+                                justifyContent="space-between"
+                                spacing={1}
+                                sx={{ position: 'absolute', top: 12, left: 12, right: 12 }}
+                            >
+                                <Box
+                                    sx={{
+                                        width: 42,
+                                        height: 42,
+                                        borderRadius: 1.8,
+                                        display: 'grid',
+                                        placeItems: 'center',
+                                        bgcolor: 'rgba(255,255,255,0.92)',
+                                        color,
+                                        boxShadow: `0 10px 18px ${alpha(color, 0.16)}`,
+                                    }}
+                                >
+                                    {icon}
+                                </Box>
+                                <Chip
+                                    label={metricText}
+                                    size="small"
+                                    sx={summaryChipSx(theme, {
+                                        color: '#fff',
+                                        backgroundColor: 'rgba(15,23,42,0.3)',
+                                        border: '1px solid rgba(255,255,255,0.18)',
+                                        backdropFilter: 'blur(10px)',
+                                    })}
+                                />
+                            </Stack>
+                        </Box>
+                        <Stack spacing={0.7} sx={{ px: 0.3, pb: 0.35, minHeight: 0, flex: 1 }}>
+                        <Typography
+                            sx={{
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                letterSpacing: '0.16em',
+                                textTransform: 'uppercase',
+                                color,
+                            }}
+                        >
+                            {eyebrow}
                         </Typography>
-                        <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontWeight: 600, mt: 0.35 }}>
+                        <Typography
+                            sx={{
+                                fontFamily: HOME_DISPLAY_FONT,
+                                fontSize: { xs: '1.38rem', md: '1.56rem' },
+                                lineHeight: 1,
+                                color: HOME_DEEP,
+                            }}
+                        >
                             {label}
                         </Typography>
-                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mt: 0.45, lineHeight: 1.55 }}>
+                        <Typography
+                            sx={{
+                                fontSize: '0.84rem',
+                                lineHeight: 1.68,
+                                color: '#5b6472',
+                                flex: 1,
+                            }}
+                        >
                             {description}
                         </Typography>
-                    </Box>
+                        <Stack direction="row" spacing={0.55} alignItems="center" sx={{ pt: 0.15 }}>
+                            <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: HOME_DEEP }}>
+                                Open module
+                            </Typography>
+                            <ArrowForward sx={{ fontSize: 16, color: HOME_DEEP }} />
+                        </Stack>
+                        </Stack>
+                    </Stack>
                 </CardContent>
             </CardActionArea>
         </Box>
@@ -603,6 +1099,8 @@ export default function Home() {
         () => results.filter((item) => item.type === 'dir'),
         [results],
     );
+    const primaryFeaturedTrait = featuredTraits[0];
+    const secondaryFeaturedTraits = featuredTraits.slice(1);
     const checkedFiles = useMemo(
         () => fileResults.filter((item) => checked.has(item.path)),
         [checked, fileResults],
@@ -751,6 +1249,10 @@ export default function Home() {
         setOpen(false);
     };
 
+    const openFeaturedTrait = (trait, tabKey = '') => {
+        navigate(getFeaturedTraitRoute(trait, tabKey));
+    };
+
     const handleDownloadSelection = async () => {
         setDownloading(true);
         setError('');
@@ -766,170 +1268,345 @@ export default function Home() {
         }
     };
 
-    const helperText = !trimmedQ
-        ? 'Search file names, folder names, GCST accessions, and program outputs.'
-        : canSearch
-            ? 'Press Enter to open all matches in Data Browser.'
-            : 'Type at least 2 characters.';
-
     return (
-        <Box sx={{ maxWidth: 1220, mx: 'auto', py: { xs: 2, md: 3 }, px: { xs: 1.25, md: 2 } }}>
-            <Box
-                sx={{
-                    ...panelSx(theme, {
-                        p: { xs: 1.2, md: 1.6 },
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                    }),
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,255,0.94))',
-                }}
-            >
+        <Box sx={{ maxWidth: 1240, mx: 'auto', py: { xs: 2.2, md: 4 }, px: { xs: 1.25, md: 2 } }}>
+            <Stack spacing={{ xs: 3.5, md: 5 }}>
                 <Box
+                    component="section"
                     sx={{
-                        minWidth: 0,
-                        p: { xs: 0.85, md: 1.15 },
-                        borderRadius: 2,
-                        background: 'linear-gradient(135deg, rgba(238,245,255,0.92), rgba(248,250,255,0.76))',
-                        border: `1px solid ${theme.custom.border.soft}`,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        borderRadius: 4,
+                        border: '1px solid rgba(213,125,90,0.12)',
+                        background: 'linear-gradient(135deg, rgba(249,239,230,0.96) 0%, rgba(250,246,240,0.94) 46%, rgba(234,241,251,0.94) 100%)',
+                        boxShadow: '0 32px 68px rgba(31,43,61,0.12)',
+                        px: { xs: 1.4, md: 2.4 },
+                        py: { xs: 1.5, md: 2.4 },
+                        '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            width: 360,
+                            height: 360,
+                            right: -140,
+                            top: -150,
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle, rgba(213,125,90,0.18) 0%, rgba(213,125,90,0) 72%)',
+                        },
+                        '&::after': {
+                            content: '""',
+                            position: 'absolute',
+                            inset: 0,
+                            backgroundImage: 'linear-gradient(rgba(255,255,255,0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.22) 1px, transparent 1px)',
+                            backgroundSize: '28px 28px',
+                            opacity: 0.3,
+                            pointerEvents: 'none',
+                        },
                     }}
                 >
-                    <Typography variant="h4" sx={sectionTitleSx(theme, { fontSize: { xs: '1.85rem', md: '2.35rem' }, lineHeight: 1.08, mb: 0.8, maxWidth: 860 })}>
-                        GWAS browser for trait review, program context, and direct data access
-                    </Typography>
-                    <Typography variant="body1" sx={captionSx(theme, { maxWidth: 760, lineHeight: 1.68, mb: 1.2 })}>
-                        Start from a high-signal trait, open the full figure stack, or jump straight to indexed outputs.
-                    </Typography>
-                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1.25 }}>
-                        <Button variant="contained" endIcon={<ArrowForward />} onClick={() => navigate('/trait')} sx={{ textTransform: 'none', boxShadow: 'none' }}>
-                            Open Trait Browser
-                        </Button>
-                        <Button variant="outlined" startIcon={<Storage />} onClick={() => navigate('/data')} sx={{ textTransform: 'none' }}>
-                            Data Browser
-                        </Button>
-                        <Button variant="outlined" startIcon={<Science />} onClick={() => navigate('/programs')} sx={{ textTransform: 'none' }}>
-                            Programs
-                        </Button>
-                    </Stack>
                     <Box
                         sx={{
+                            position: 'relative',
+                            zIndex: 1,
                             display: 'grid',
-                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
-                            gap: 1,
+                            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.08fr) 410px' },
+                            gap: { xs: 2.2, lg: 2.1 },
+                            alignItems: 'stretch',
                         }}
                     >
-                        {statsConfig.map((item) => (
-                            <MetricTile
+                        <Stack spacing={{ xs: 1.5, md: 2.1 }} sx={{ justifyContent: 'space-between', minWidth: 0 }}>
+                            <Stack spacing={1.15} sx={{ maxWidth: 640 }}>
+                                <Typography
+                                    sx={{
+                                        fontSize: '0.76rem',
+                                        fontWeight: 800,
+                                        letterSpacing: '0.2em',
+                                        textTransform: 'uppercase',
+                                        color: HOME_ACCENT,
+                                    }}
+                                >
+                                    GWAS browser
+                                </Typography>
+                                <Typography
+                                    variant="h1"
+                                    sx={sectionTitleSx(theme, {
+                                        fontFamily: HOME_DISPLAY_FONT,
+                                        fontSize: { xs: '2.45rem', md: '4.1rem' },
+                                        lineHeight: 0.92,
+                                        maxWidth: 720,
+                                        color: HOME_DEEP,
+                                    })}
+                                >
+                                    Map traits to genes, programs, and downloadable evidence.
+                                </Typography>
+                                <Typography
+                                    variant="body1"
+                                    sx={captionSx(theme, {
+                                        maxWidth: 520,
+                                        fontSize: { xs: '0.94rem', md: '1rem' },
+                                        lineHeight: 1.72,
+                                        color: '#556171',
+                                    })}
+                                >
+                                    A cleaner entry point into trait pages, gene-level signals, program structure,
+                                    and reusable result files.
+                                </Typography>
+                            </Stack>
+
+                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                                <Button variant="contained" endIcon={<ArrowForward />} onClick={() => navigate('/trait')}>
+                                    Browse traits
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => navigate('/data')}
+                                    sx={{
+                                        borderColor: 'rgba(31,43,61,0.14)',
+                                        color: HOME_DEEP,
+                                        backgroundColor: 'rgba(255,255,255,0.64)',
+                                    }}
+                                >
+                                    Open data browser
+                                </Button>
+                            </Stack>
+
+                            <Box
+                                sx={{
+                                    display: 'grid',
+                                    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' },
+                                    gap: 0.85,
+                                    maxWidth: 620,
+                                }}
+                            >
+                                {heroStatsConfig.map((item) => (
+                                    <HeroStat
+                                        key={item.key}
+                                        label={item.label}
+                                        loading={statsLoading}
+                                        value={homeStats[item.key] || 0}
+                                    />
+                                ))}
+                            </Box>
+                        </Stack>
+
+                        <Box
+                            sx={{
+                                position: 'relative',
+                                minWidth: 0,
+                                overflow: 'hidden',
+                                borderRadius: 3.1,
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                boxShadow: '0 24px 44px rgba(15,23,42,0.18)',
+                                p: 1.05,
+                                backgroundColor: '#182232',
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    backgroundImage: `linear-gradient(180deg, rgba(24,34,50,0.1) 0%, rgba(24,34,50,0.84) 100%), url(${getFeaturedTraitCoverImage(primaryFeaturedTrait)})`,
+                                    backgroundSize: 'cover',
+                                    backgroundPosition: 'center',
+                                }}
+                            />
+                            <Stack spacing={0.75} sx={{ position: 'relative', zIndex: 1 }}>
+                                <Stack direction="row" spacing={0.7} alignItems="center" justifyContent="space-between">
+                                    <Typography
+                                        sx={{
+                                            fontSize: '0.72rem',
+                                            fontWeight: 800,
+                                            letterSpacing: '0.18em',
+                                            textTransform: 'uppercase',
+                                            color: 'rgba(255,255,255,0.72)',
+                                        }}
+                                    >
+                                        Featured view
+                                    </Typography>
+                                    <Chip
+                                        label={primaryFeaturedTrait.gwasId}
+                                        size="small"
+                                        sx={summaryChipSx(theme, {
+                                            color: '#fff',
+                                            backgroundColor: 'rgba(15,23,42,0.28)',
+                                            border: '1px solid rgba(255,255,255,0.16)',
+                                        })}
+                                    />
+                                </Stack>
+                                <Button
+                                    variant="text"
+                                    onClick={() => openFeaturedTrait(primaryFeaturedTrait)}
+                                    sx={{
+                                        justifyContent: 'flex-start',
+                                        p: 0,
+                                        minWidth: 0,
+                                        textAlign: 'left',
+                                        textTransform: 'none',
+                                        color: '#fff',
+                                        fontFamily: HOME_DISPLAY_FONT,
+                                        fontSize: { xs: '1.42rem', md: '1.62rem' },
+                                        lineHeight: 1.02,
+                                        '&:hover': {
+                                            backgroundColor: 'transparent',
+                                        },
+                                    }}
+                                >
+                                    {primaryFeaturedTrait.traitName}
+                                </Button>
+                                <Typography
+                                    sx={{
+                                        fontSize: '0.77rem',
+                                        fontWeight: 700,
+                                        color: 'rgba(255,255,255,0.8)',
+                                        fontVariantNumeric: 'tabular-nums',
+                                    }}
+                                >
+                                    {primaryFeaturedTrait.nSig.toLocaleString()} loci · QQ {primaryFeaturedTrait.qqDeviation}
+                                </Typography>
+                                <TraitFigurePreviewGrid
+                                    toneColor={primaryFeaturedTrait.tone.line}
+                                    trait={primaryFeaturedTrait}
+                                    onOpenFeaturedTrait={openFeaturedTrait}
+                                    dense
+                                />
+                            </Stack>
+                        </Box>
+                    </Box>
+                </Box>
+
+                <Box component="section">
+                    <SectionIntro
+                        align="center"
+                        eyebrow="Modules"
+                        title="Explore the atlas"
+                        description="Four direct entry points keep the homepage visual-first: browse, inspect evidence, follow programs, or pull files."
+                    />
+                    <Box
+                        sx={{
+                            mt: { xs: 1.7, md: 2.2 },
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+                            gap: 1.2,
+                        }}
+                    >
+                        {entryCards.map((item) => (
+                            <ExploreCard
                                 key={item.key}
-                                description={item.description}
+                                color={item.color}
+                                eyebrow={item.eyebrow}
+                                figureRatio={item.key === 'traits' ? '1 / 0.62' : '1 / 0.54'}
+                                image={item.image}
                                 icon={item.icon}
                                 label={item.label}
-                                theme={theme}
-                                to={item.to}
-                                value={homeStats[item.key] || 0}
+                                description={item.description}
+                                metricText={item.statKey
+                                    ? `${statsLoading ? '...' : (homeStats[item.statKey] || 0).toLocaleString()} ${item.metricLabel}`
+                                    : item.metricFallback}
                                 navigate={navigate}
-                                color={item.color}
-                                loading={statsLoading}
+                                to={item.to}
                             />
                         ))}
                     </Box>
                 </Box>
 
-                <Box sx={{ mt: 1.45 }}>
-                    <Box sx={{ mb: 0.9 }}>
-                        <Typography variant="h5" sx={sectionTitleSx(theme, { fontSize: '1.08rem', mb: 0.25 })}>
-                            Featured significant traits
-                        </Typography>
-                        <Typography variant="body2" sx={captionSx(theme)}>
-                            Three practical entry traits with strong current figure coverage.
-                        </Typography>
-                    </Box>
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, minmax(0, 1fr))' },
-                            gap: 1,
-                        }}
-                    >
-                        {featuredTraits.map((trait, index) => (
-                            <Box
-                                key={trait.fileId}
-                                sx={{
-                                    position: 'relative',
-                                    minWidth: 0,
-                                    borderRadius: 2,
-                                    border: `1px solid ${theme.custom.border.soft}`,
-                                    background: trait.tone.bg,
-                                    boxShadow: `0 14px 28px ${trait.tone.glow}`,
-                                    overflow: 'hidden',
-                                }}
-                            >
-                                <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: trait.tone.line }} />
-                                <Box sx={{ p: 1.15 }}>
-                                    <Stack direction="row" spacing={0.55} useFlexGap flexWrap="wrap" sx={{ mb: 0.75 }}>
-                                        <Chip label={index === 0 ? 'Primary' : 'Featured'} size="small" sx={summaryChipSx(theme, { color: trait.tone.line, backgroundColor: alpha(trait.tone.line, 0.08), border: `1px solid ${alpha(trait.tone.line, 0.18)}` })} />
-                                        <Chip label={trait.gwasId} size="small" sx={summaryChipSx(theme)} />
-                                    </Stack>
-                                    <Typography variant="h6" sx={sectionTitleSx(theme, { fontSize: '0.98rem', lineHeight: 1.3, mb: 0.45 })}>
-                                        {trait.traitName}
-                                    </Typography>
-                                    <Box
-                                        sx={{
-                                            display: 'grid',
-                                            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                                            gap: 0.7,
-                                            mb: 0.9,
-                                        }}
-                                    >
-                                        <Box sx={{ borderRadius: 1.25, border: `1px solid ${theme.custom.border.soft}`, p: 0.75, backgroundColor: 'rgba(255,255,255,0.76)' }}>
-                                            <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#5b6b82', textTransform: 'uppercase' }}>Sig loci</Typography>
-                                            <Typography sx={{ fontSize: '0.98rem', fontWeight: 700, color: theme.palette.text.primary, mt: 0.15 }}>{trait.nSig.toLocaleString()}</Typography>
-                                        </Box>
-                                        <Box sx={{ borderRadius: 1.25, border: `1px solid ${theme.custom.border.soft}`, p: 0.75, backgroundColor: 'rgba(255,255,255,0.76)' }}>
-                                            <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#5b6b82', textTransform: 'uppercase' }}>QQ dev</Typography>
-                                            <Typography sx={{ fontSize: '0.98rem', fontWeight: 700, color: theme.palette.text.primary, mt: 0.15 }}>{trait.qqDeviation}</Typography>
-                                        </Box>
-                                        <Box sx={{ borderRadius: 1.25, border: `1px solid ${theme.custom.border.soft}`, p: 0.75, backgroundColor: 'rgba(255,255,255,0.76)' }}>
-                                            <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#5b6b82', textTransform: 'uppercase' }}>Volcano</Typography>
-                                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: theme.palette.text.primary, mt: 0.15, lineHeight: 1.3 }}>{trait.volcanoHits}</Typography>
-                                        </Box>
-                                    </Box>
-                                    <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
-                                        <Button variant="contained" endIcon={<ArrowForward />} onClick={() => navigate(`/trait/${trait.fileId}`)} sx={{ textTransform: 'none', boxShadow: 'none' }}>
-                                            Open trait
-                                        </Button>
-                                        <Button variant="outlined" onClick={() => setQ(cleanTraitName(trait.fileId))} sx={{ textTransform: 'none' }}>
-                                            Search files
-                                        </Button>
-                                    </Stack>
-                                </Box>
-                            </Box>
-                        ))}
-                    </Box>
-                </Box>
-
                 <Box
+                    component="section"
                     sx={{
-                        mt: 1.35,
-                        ...panelSx(theme, {
-                            borderRadius: 2,
-                            p: 0,
-                            overflow: 'visible',
-                        }),
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.12fr) 360px' },
+                        gap: { xs: 1.4, lg: 1.35 },
+                        alignItems: 'start',
                     }}
                 >
-                        <Box sx={{ px: { xs: 1.3, md: 1.55 }, py: { xs: 1.2, md: 1.4 }, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
-                            <Typography variant="subtitle1" sx={sectionTitleSx(theme, { fontSize: '1rem', mb: 0.35 })}>
-                                File search
-                            </Typography>
-                            <Typography variant="body2" sx={captionSx(theme, { mb: 0.9 })}>
-                                Search file names, GCST accessions, program labels, and folders.
-                            </Typography>
+                    <Box>
+                        <SectionIntro
+                            eyebrow="Curated traits"
+                            title="Representative signals"
+                            description="A small set of examples keeps the homepage visual without turning it into a wall of panels."
+                        />
+                        <Box
+                            sx={{
+                                mt: 1.45,
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                                gap: 1.1,
+                            }}
+                        >
+                            {secondaryFeaturedTraits.map((trait) => (
+                                <FeaturedTraitTile
+                                    key={trait.fileId}
+                                    trait={trait}
+                                    onOpenFeaturedTrait={openFeaturedTrait}
+                                    onOpenTrait={openFeaturedTrait}
+                                    compact
+                                />
+                            ))}
+                        </Box>
+                    </Box>
+
+                    <Box
+                        sx={{
+                            position: 'relative',
+                            borderRadius: 3,
+                            overflow: 'visible',
+                            p: 1.2,
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.92), rgba(249,240,231,0.86))',
+                            border: '1px solid rgba(213,125,90,0.14)',
+                            boxShadow: '0 18px 38px rgba(31,43,61,0.08)',
+                        }}
+                    >
+                        <Stack spacing={1.1}>
+                            <Box>
+                                <Typography
+                                    sx={{
+                                        fontSize: '0.72rem',
+                                        fontWeight: 800,
+                                        letterSpacing: '0.18em',
+                                        textTransform: 'uppercase',
+                                        color: HOME_ACCENT,
+                                        mb: 0.35,
+                                    }}
+                                >
+                                    Quick search
+                                </Typography>
+                                <Typography
+                                    sx={{
+                                        fontFamily: HOME_DISPLAY_FONT,
+                                        fontSize: { xs: '1.5rem', md: '1.7rem' },
+                                        lineHeight: 1,
+                                        color: HOME_DEEP,
+                                        mb: 0.45,
+                                    }}
+                                >
+                                    Jump straight into files
+                                </Typography>
+                                <Typography sx={{ fontSize: '0.85rem', lineHeight: 1.65, color: '#5b6472' }}>
+                                    Search file fragments, folders, or accessions and continue in the full data browser.
+                                </Typography>
+                            </Box>
+
+                            <Stack direction="row" spacing={0.7} useFlexGap flexWrap="wrap">
+                                {[primaryFeaturedTrait.gwasId, ...secondaryFeaturedTraits.map((trait) => trait.gwasId)].map((label) => (
+                                    <Chip
+                                        key={label}
+                                        label={label}
+                                        onClick={() => {
+                                            setQ(label);
+                                            setOpen(true);
+                                        }}
+                                        sx={summaryChipSx(theme, {
+                                            cursor: 'pointer',
+                                            backgroundColor: 'rgba(255,255,255,0.72)',
+                                            border: '1px solid rgba(213,125,90,0.14)',
+                                        })}
+                                    />
+                                ))}
+                            </Stack>
 
                             <ClickAwayListener onClickAway={() => setOpen(false)}>
                                 <Box sx={{ position: 'relative' }}>
                                     <TextField
                                         fullWidth
-                                        placeholder="Search by filename, GCST ID, program, or folder"
+                                        placeholder="Search files or folders"
                                         aria-label="Search files and folders"
                                         value={q}
                                         onChange={(event) => setQ(event.target.value)}
@@ -959,12 +1636,11 @@ export default function Home() {
                                                     </IconButton>
                                                 )),
                                             sx: {
-                                                bgcolor: theme.palette.background.paper,
-                                                '& fieldset': { borderColor: theme.custom.border.strong },
+                                                bgcolor: 'rgba(255,255,255,0.9)',
+                                                '& fieldset': { borderColor: 'rgba(148,163,184,0.22)' },
                                                 '&:hover fieldset': { borderColor: 'rgba(100, 116, 139, 0.34)' },
                                             },
                                         }}
-                                        helperText={helperText}
                                     />
 
                                     <SearchResultsPanel
@@ -992,9 +1668,22 @@ export default function Home() {
                                     />
                                 </Box>
                             </ClickAwayListener>
-                        </Box>
+
+                            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+                                <Button variant="text" endIcon={<ArrowForward />} onClick={() => navigate('/data')}>
+                                    All data
+                                </Button>
+                                <Button variant="text" onClick={() => navigate('/programs')}>
+                                    Programs
+                                </Button>
+                                <Button variant="text" onClick={() => navigate('/genes')}>
+                                    Genes
+                                </Button>
+                            </Stack>
+                        </Stack>
                     </Box>
-            </Box>
+                </Box>
+            </Stack>
         </Box>
     );
 }
