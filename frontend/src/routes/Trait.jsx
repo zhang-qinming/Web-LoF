@@ -86,10 +86,7 @@ export default function Trait() {
                         { id: 'file_id', label: 'LoF ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
                         { id: 'trait_name', label: 'Trait', width: '34%', minWidth: 360 },
                         { id: 'sample_size', label: 'Sample Size', numeric: true, width: 132, minWidth: 132, whiteSpace: 'nowrap', headerWrap: true },
-                        { id: 'population', label: 'Population', width: 96, minWidth: 96, whiteSpace: 'nowrap' },
                         { id: 'mesh_term', label: 'MeSH term', width: 170, minWidth: 170, headerWrap: true },
-                        { id: 'n_sig', label: 'Significant Loci', numeric: true, width: 126, minWidth: 126, whiteSpace: 'nowrap', headerWrap: true },
-                        { id: 'qc_score', label: 'QC', numeric: true, width: 78, minWidth: 78, whiteSpace: 'nowrap' },
                         { id: 'year', label: 'Year', numeric: true, width: 84, minWidth: 84, whiteSpace: 'nowrap' },
                         { id: 'n_variants', label: 'Variants', numeric: true, width: 138, minWidth: 138, whiteSpace: 'nowrap' },
                     ]}

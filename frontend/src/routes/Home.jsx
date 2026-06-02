@@ -47,6 +47,9 @@ import homeFigureGwasManhattan from '../assets/home-figure-gwas-manhattan.svg';
 import homeFigureLofGene from '../assets/home-figure-lof-gene.svg';
 import homeFigureProgramScatter from '../assets/home-figure-program-scatter.svg';
 import homeFigureTraitProgramNetwork from '../assets/home-figure-trait-program-network.svg';
+import tempHomeFigureGeneEnrichment from '../assets/temp/home-figure-gene-enrichment.svg';
+import tempHomeFigureRegionalAssociation from '../assets/temp/home-figure-regional-association.svg';
+import tempHomeFigureVariantDetail from '../assets/temp/home-figure-variant-detail.svg';
 
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const HOME_API = axios.create({ baseURL: '/api' });
@@ -153,27 +156,27 @@ const researchFlowPanels = [
     {
         key: 'lof',
         step: '01',
-        eyebrow: 'LoF genes',
-        title: 'LoF gene evidence',
-        description: 'Loss-of-function genes define the entry set before any program-level aggregation.',
-        accent: '#7c3aed',
-        to: '/genes',
+        eyebrow: 'GWAS loci',
+        title: 'Regional association',
+        description: 'Start at the GWAS locus level before linking signals to LoF-supported genes.',
+        accent: '#2563eb',
+        to: '/trait',
     },
     {
         key: 'regulator',
         step: '02',
-        eyebrow: 'Regulators',
-        title: 'Perturb-seq regulator screen',
-        description: 'Regulator hits connect causal genes to shared expression responses.',
-        accent: '#d97706',
-        to: '/programs',
+        eyebrow: 'LoF genes',
+        title: 'GeneBayes posterior',
+        description: 'LoF-supported genes are rescored into posterior evidence before program matching.',
+        accent: '#7c3aed',
+        to: '/genes',
     },
     {
         key: 'program',
         step: '03',
         eyebrow: 'Programs',
-        title: 'Program aggregation',
-        description: 'Program-level structure consolidates regulator effects into interpretable modules.',
+        title: 'cNMF program layer',
+        description: 'Perturb-seq decomposition produces program structure and pathway-level summaries.',
         accent: '#0f766e',
         to: '/programs',
     },
@@ -181,8 +184,8 @@ const researchFlowPanels = [
         key: 'trait',
         step: '04',
         eyebrow: 'Traits',
-        title: 'Trait association',
-        description: 'Trait views expose which programs align with phenotype-level association signals.',
+        title: 'Posterior-program association',
+        description: 'Trait-level association is interpreted after posterior and program layers are aligned.',
         accent: '#2563eb',
         to: '/trait',
     },
@@ -199,15 +202,15 @@ const outputPreviewTiles = [
     },
     {
         key: 'gene-view',
-        label: 'Gene evidence',
-        image: homeFigureLofGene,
+        label: 'Variant detail',
+        image: tempHomeFigureVariantDetail,
         ratio: '1 / 0.7',
-        accent: '#7c3aed',
+        accent: '#b45309',
     },
     {
         key: 'program-view',
-        label: 'Program network',
-        image: homeFigureTraitProgramNetwork,
+        label: 'Gene enrichment',
+        image: tempHomeFigureGeneEnrichment,
         ratio: '1 / 0.7',
         accent: '#0f766e',
     },
@@ -224,23 +227,23 @@ const outputPreviewTiles = [
 const workflowHighlights = [
     {
         icon: <Dns sx={{ fontSize: 18 }} />,
-        title: 'Trait record',
-        description: 'Anchor the query in phenotype metadata and GWAS context.',
+        title: 'GWAS locus',
+        description: 'Start from the association locus and inspect the regional peak before gene mapping.',
     },
     {
         icon: <Polyline sx={{ fontSize: 18 }} />,
-        title: 'Signal filter',
-        description: 'Constrain loci before expanding into gene and program evidence.',
+        title: 'LoF posterior',
+        description: 'Use LoF evidence and GeneBayes posterior to prioritize candidate genes.',
     },
     {
         icon: <Hub sx={{ fontSize: 18 }} />,
         title: 'Program context',
-        description: 'Follow regulator-to-program structure instead of isolated hits.',
+        description: 'Bring in perturb-seq cNMF programs to aggregate regulator-driven responses.',
     },
     {
         icon: <Storage sx={{ fontSize: 18 }} />,
-        title: 'Export package',
-        description: 'Keep derived figures and tables aligned with the same route.',
+        title: 'Association output',
+        description: 'Read out trait-facing association layers once posterior and program evidence converge.',
     },
 ];
 
@@ -831,9 +834,9 @@ function SummaryBoardFigure() {
 }
 
 function researchFigureFor(key) {
-    if (key === 'lof') return <ImageFigure alt="LoF gene evidence" image={homeFigureLofGene} ratio="1 / 0.58" />;
-    if (key === 'regulator') return <ImageFigure alt="Program scatter" image={homeFigureProgramScatter} ratio="1 / 0.58" />;
-    if (key === 'program') return <ImageFigure alt="Trait-program network" image={homeFigureTraitProgramNetwork} ratio="1 / 0.58" />;
+    if (key === 'lof') return <ImageFigure alt="Regional association" image={tempHomeFigureRegionalAssociation} ratio="1 / 0.58" />;
+    if (key === 'regulator') return <ImageFigure alt="LoF gene evidence" image={homeFigureLofGene} ratio="1 / 0.58" />;
+    if (key === 'program') return <ImageFigure alt="Gene enrichment" image={tempHomeFigureGeneEnrichment} ratio="1 / 0.58" />;
     return <ImageFigure alt="Cross-trait heatmap" image={homeFigureCrossTraitHeatmap} ratio="1 / 0.58" />;
 }
 
@@ -1655,7 +1658,7 @@ export default function Home() {
                 <Box component="section">
                     <SectionHeading
                         eyebrow="Scientific route"
-                        title="LoF -> regulator -> program -> trait"
+                        title="GWAS -> LoF posterior -> cNMF program -> trait association"
                     />
                     <Typography
                         sx={captionSx(theme, {
@@ -1664,7 +1667,7 @@ export default function Home() {
                             fontSize: '0.87rem',
                         })}
                     >
-                        The homepage now follows the biological analysis order instead of separating unrelated screenshots.
+                        The homepage now follows the article’s analysis route: start from GWAS loci, prioritize LoF genes with GeneBayes, derive perturb-seq programs with cNMF, then inspect trait-facing associations.
                     </Typography>
                     <Box
                         sx={{
@@ -1692,7 +1695,7 @@ export default function Home() {
                 <Box component="section">
                     <SectionHeading
                         eyebrow="Linked outputs"
-                        title="One route, two coupled result layers"
+                        title="From locus evidence to interpretable outputs"
                     />
                     <Box
                         sx={{
@@ -1704,15 +1707,15 @@ export default function Home() {
                     >
                         <FigureCard
                             title="Dependency structure"
-                            description="LoF genes, regulators, programs, and traits stay in one dependency graph rather than being shown as isolated picture tiles."
+                            description="The front page now keeps GWAS, LoF evidence, programs, and trait-level views on one scientific route instead of unrelated figure blocks."
                             figure={<ImageFigure alt="Trait-program network overview" image={homeFigureTraitProgramNetwork} ratio="1 / 0.58" />}
                             chips={['LoF genes', 'regulators', 'programs', 'traits']}
                         />
                         <FigureCard
                             title="Resolved browser outputs"
-                            description="The same path opens concrete outputs: gene evidence, program networks, trait views, and archived result files."
+                            description="The same route now resolves into concrete outputs: locus detail, posterior evidence, enrichment summaries, trait-level heatmaps, and archived files."
                             figure={<SummaryBoardFigure />}
-                            chips={['gene evidence', 'program graph', 'trait heatmap', 'data archive']}
+                            chips={['variant detail', 'posterior evidence', 'enrichment', 'trait heatmap']}
                         />
                     </Box>
                 </Box>
@@ -1737,7 +1740,7 @@ export default function Home() {
                         <Stack spacing={1.2}>
                             <SectionHeading
                                 eyebrow="Browser workflow"
-                                title="Inspect the route, then open the correct layer"
+                                title="Inspect the scientific route, then open the right layer"
                             />
                             <Box
                                 sx={{

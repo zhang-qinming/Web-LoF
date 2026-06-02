@@ -207,9 +207,14 @@ export default function TraitMetaCard({ fileId, listData }) {
                                 />
                                 <Field icon={CalendarMonth} label="Year" value={info.year || '—'} theme={theme} />
                                 <Field icon={Public} label="Population" value={info.population || '—'} theme={theme} />
+                                <Field icon={Dns} label="GWAS ID" value={info.gwas_id || '—'} mono theme={theme} />
+                                <Field icon={Dns} label="LoF ID" value={info.lof_id || info.file_id || '—'} mono theme={theme} />
                                 <Field icon={Category} label="MeSH term" value={info.mesh_term || '—'} theme={theme} />
+                                <Field icon={Category} label="MeSH ID" value={info.mesh_id || '—'} mono theme={theme} />
                                 <Field icon={DatasetLinked} label="Source batch" value={info.gwas_source_batch || '—'} theme={theme} />
+                                <Field icon={CalendarMonth} label="Collect date" value={info.collect_date || '—'} theme={theme} />
                                 <Field icon={Article} label="PubMed" value={info.pmid || '—'} href={info.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${info.pmid}` : undefined} theme={theme} />
+                                <Field icon={LinkIcon} label="Source link" value={info.url ? 'Open source' : '—'} href={info.url || undefined} theme={theme} />
                             </InfoSection>
 
                             <InfoSection title="Data summary" theme={theme}>
@@ -218,7 +223,6 @@ export default function TraitMetaCard({ fileId, listData }) {
                                 <Field icon={Numbers} label="Variants" value={formatCount(info.n_variants)} theme={theme} />
                                 <Field icon={Inventory2} label="Significant loci" value={formatCount(info.n_sig)} theme={theme} />
                                 <Field icon={Dns} label="LoF ID" value={info.lof_id || info.file_id || '—'} mono theme={theme} />
-                                <Field icon={LinkIcon} label="Source link" value={info.url ? 'Open source' : '—'} href={info.url || undefined} theme={theme} />
                             </InfoSection>
                         </Box>
 

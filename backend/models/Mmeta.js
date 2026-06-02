@@ -1,7 +1,7 @@
 const pool = require('./db');
 const { config } = require('../lib/config');
 
-let hasTraitHeritabilityTablePromise = null;
+let hasTraitLdscTablePromise = null;
 const SORT_COLUMN_MAP = {
     file_id: 'fm.file_id',
     trait_name: 'fm.trait_name',
@@ -30,20 +30,20 @@ function buildMetaOrderBy(sortBy, order) {
     return `ORDER BY ${column} ${direction}`;
 }
 
-async function hasTraitHeritabilityTable() {
-    if (!hasTraitHeritabilityTablePromise) {
-        hasTraitHeritabilityTablePromise = pool.query(
+async function hasTraitLdscTable() {
+    if (!hasTraitLdscTablePromise) {
+        hasTraitLdscTablePromise = pool.query(
             `SELECT 1
              FROM information_schema.TABLES
              WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'trait_heritability'
+               AND TABLE_NAME = 'trait_ldsc'
              LIMIT 1`
         )
             .then(([rows]) => rows.length > 0)
             .catch(() => false);
     }
 
-    return hasTraitHeritabilityTablePromise;
+    return hasTraitLdscTablePromise;
 }
 
 async function getTraits({ page = 1, limit = 20, sortBy = 'trait_name', order = 'ASC', search = '' } = {}) {
@@ -113,13 +113,15 @@ async function getTraitMeta(fileId) {
     const safeFileId = String(fileId || '').trim();
     if (!safeFileId || safeFileId.length > 255) return null;
 
-    const includeHeritability = await hasTraitHeritabilityTable();
+    const includeHeritability = await hasTraitLdscTable();
     const heritabilitySelect = includeHeritability ? `,
-                th.source_file AS heritability_source_file,
-                th.enrichment, th.coefficient_z_score,
-                th.notes AS heritability_notes` : '';
+                tl.source_file AS heritability_source_file,
+                tl.enrichment, tl.coefficient_z_score` : '';
     const heritabilityJoin = includeHeritability
-        ? '\n         LEFT JOIN trait_heritability th ON th.file_id = fm.file_id OR th.gwas_id = fm.gwas_id'
+        ? `\n         LEFT JOIN trait_ldsc tl
+             ON tl.file_id COLLATE utf8mb4_unicode_ci = fm.file_id COLLATE utf8mb4_unicode_ci
+             OR tl.gwas_id COLLATE utf8mb4_unicode_ci = fm.gwas_id COLLATE utf8mb4_unicode_ci
+             OR tl.lof_id COLLATE utf8mb4_unicode_ci = lm.lof_id COLLATE utf8mb4_unicode_ci`
         : '';
 
     const [rows] = await pool.query(
