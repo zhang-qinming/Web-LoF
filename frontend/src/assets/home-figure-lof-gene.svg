@@ -1,0 +1,36 @@
+<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
+  <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
+  <text x="62" y="82" fill="#7C3AED" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Gene evidence scatter</text>
+  <text x="62" y="108" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="14">LoF-supported genes with effect size, significance, and confidence tiers</text>
+  <line x1="104" y1="326" x2="614" y2="326" stroke="#CBD5E1" stroke-width="2"/>
+  <line x1="104" y1="326" x2="104" y2="138" stroke="#CBD5E1" stroke-width="2"/>
+  <line x1="359" y1="132" x2="359" y2="326" stroke="#E9D5FF" stroke-width="2" stroke-dasharray="8 8"/>
+  <text x="536" y="350" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="14">effect size</text>
+  <text transform="rotate(-90 72 248)" x="72" y="248" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="14">-log10(P)</text>
+  <circle cx="160" cy="272" r="8" fill="#C4B5FD"/>
+  <circle cx="204" cy="236" r="11" fill="#A78BFA"/>
+  <circle cx="248" cy="216" r="13" fill="#8B5CF6"/>
+  <circle cx="300" cy="188" r="15" fill="#7C3AED"/>
+  <circle cx="334" cy="174" r="12" fill="#6D28D9"/>
+  <circle cx="388" cy="206" r="10" fill="#A78BFA"/>
+  <circle cx="430" cy="182" r="16" fill="#8B5CF6"/>
+  <circle cx="480" cy="152" r="20" fill="#7C3AED"/>
+  <circle cx="548" cy="170" r="16" fill="#6D28D9"/>
+  <circle cx="586" cy="210" r="12" fill="#A78BFA"/>
+  <circle cx="260" cy="258" r="4.5" fill="#F97316"/>
+  <circle cx="352" cy="246" r="4.5" fill="#2563EB"/>
+  <circle cx="470" cy="130" r="4.5" fill="#F97316"/>
+  <circle cx="570" cy="188" r="4.5" fill="#2563EB"/>
+  <rect x="474" y="70" width="164" height="74" rx="16" fill="#FAF5FF" stroke="#E9D5FF"/>
+  <text x="492" y="96" fill="#6D28D9" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">What matters here</text>
+  <text x="492" y="117" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">• points are genes</text>
+  <text x="492" y="135" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">• x = signed effect</text>
+  <text x="492" y="153" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">• y = significance / strength</text>
+  <rect x="126" y="354" width="16" height="16" rx="8" fill="#7C3AED"/>
+  <text x="150" y="367" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="13">LoF-supported genes</text>
+  <circle cx="312" cy="362" r="5" fill="#F97316"/>
+  <text x="326" y="367" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="13">positive signal</text>
+  <circle cx="454" cy="362" r="5" fill="#2563EB"/>
+  <text x="468" y="367" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="13">negative signal</text>
+</svg>

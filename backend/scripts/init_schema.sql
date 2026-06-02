@@ -46,6 +46,22 @@ CREATE TABLE IF NOT EXISTS file_metadata (
     INDEX idx_file_id (file_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS trait_ldsc (
+    id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    gwas_id             VARCHAR(100) NOT NULL,
+    file_id             VARCHAR(100) DEFAULT NULL,
+    lof_id              VARCHAR(200) DEFAULT NULL,
+    source_file         VARCHAR(255) DEFAULT NULL,
+    enrichment          DOUBLE       DEFAULT NULL,
+    coefficient_z_score DOUBLE       DEFAULT NULL,
+    imported_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_trait_ldsc_gwas (gwas_id),
+    INDEX idx_trait_ldsc_file (file_id),
+    INDEX idx_trait_ldsc_lof (lof_id),
+    CONSTRAINT fk_trait_ldsc_file
+        FOREIGN KEY (file_id) REFERENCES file_metadata(file_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS gene_annotation (
     ensg_id         VARCHAR(15)  NOT NULL PRIMARY KEY,
     gene_symbol     VARCHAR(50)  NOT NULL,

@@ -372,18 +372,28 @@ function GeneRecordsTable({ records }) {
                 <Chip label={`${records.length.toLocaleString()} total`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
             </Box>
             <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 620, overflowX: 'auto', overflowY: 'auto' })}>
-                <Table stickyHeader size="small" sx={stickyTableSx(theme)}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1280 })}>
                     <TableHead>
                         <TableRow>
-                            {['Trait', 'Program', 'Role', 'Direction', 'post_mean', 'abs_gamma', 'membership', 'Concordance'].map((label) => (
+                            {[
+                                { label: 'Trait', width: '30%' },
+                                { label: 'Program', width: '20%' },
+                                { label: 'Role', width: 110 },
+                                { label: 'Direction', width: '16%' },
+                                { label: 'post_mean', width: 96 },
+                                { label: 'abs_gamma', width: 96 },
+                                { label: 'membership', width: 104 },
+                                { label: 'Concordance', width: 160 },
+                            ].map((column) => (
                                 <TableCell
-                                    key={label}
+                                    key={column.label}
                                     sx={stickyTableHeaderCellSx(theme, tone, 'left', {
                                         fontSize: '0.72rem',
                                         fontWeight: 800,
+                                        width: column.width,
                                     })}
                                 >
-                                    {label}
+                                    {column.label}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -398,37 +408,93 @@ function GeneRecordsTable({ records }) {
                                     '&:hover td': { bgcolor: alpha(theme.palette.primary.main, 0.035) },
                                 }}
                             >
-                                <TableCell sx={{ minWidth: 260 }}>
+                                <TableCell sx={{ width: '30%', minWidth: 360, verticalAlign: 'top' }}>
                                     <Button
                                         component={RouterLink}
                                         to={`/trait/${encodeURIComponent(row.fileId || row.traitId)}`}
                                         endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-                                        sx={{ textTransform: 'none', fontWeight: 750, justifyContent: 'flex-start', px: 0, color: theme.palette.text.primary }}
+                                        sx={{
+                                            textTransform: 'none',
+                                            fontWeight: 750,
+                                            justifyContent: 'flex-start',
+                                            alignItems: 'flex-start',
+                                            px: 0,
+                                            py: 0,
+                                            color: theme.palette.text.primary,
+                                            width: '100%',
+                                            maxWidth: '100%',
+                                            minHeight: 0,
+                                        }}
                                     >
-                                        {row.traitName || row.traitId}
+                                        <Box
+                                            component="span"
+                                            sx={{
+                                                textAlign: 'left',
+                                                width: '100%',
+                                                whiteSpace: 'normal',
+                                                wordBreak: 'break-word',
+                                                lineHeight: 1.28,
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 2,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                            }}
+                                        >
+                                            {row.traitName || row.traitId}
+                                        </Box>
                                     </Button>
-                                    <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary, fontFamily: 'monospace' }}>
+                                    <Typography
+                                        sx={{
+                                            fontSize: '0.7rem',
+                                            color: theme.palette.text.secondary,
+                                            fontFamily: 'monospace',
+                                            mt: 0.25,
+                                            whiteSpace: 'normal',
+                                            wordBreak: 'break-all',
+                                            lineHeight: 1.2,
+                                        }}
+                                    >
                                         {row.traitId}
                                     </Typography>
                                 </TableCell>
-                                <TableCell sx={{ minWidth: 150 }}>
+                                <TableCell sx={{ width: '20%', minWidth: 220, verticalAlign: 'top' }}>
                                     <Button
                                         component={RouterLink}
                                         to={`/programs/${encodeURIComponent(row.program)}`}
-                                        sx={{ textTransform: 'none', fontWeight: 800, px: 0, color: theme.palette.primary.dark }}
+                                        sx={{
+                                            textTransform: 'none',
+                                            fontWeight: 800,
+                                            px: 0,
+                                            py: 0,
+                                            color: theme.palette.primary.dark,
+                                            width: '100%',
+                                            justifyContent: 'flex-start',
+                                            minHeight: 0,
+                                        }}
                                     >
                                         {row.program}
                                     </Button>
                                     {row.programAnnotation && (
-                                        <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary, maxWidth: 260 }} noWrap>
+                                        <Typography
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                color: theme.palette.text.secondary,
+                                                mt: 0.25,
+                                                lineHeight: 1.2,
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 2,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                            }}
+                                        >
                                             {row.programAnnotation}
                                         </Typography>
                                     )}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell sx={{ width: 110 }}>
                                     <Chip label={row.role} size="small" sx={summaryChipSx(theme, roleTone(theme, row.role))} />
                                 </TableCell>
-                                <TableCell sx={{ minWidth: 140 }}>
+                                <TableCell sx={{ width: '16%', minWidth: 180 }}>
                                     <Typography sx={{ fontSize: '0.76rem', fontWeight: 700 }}>
                                         {row.predictedSign || row.gammaSign || '-'}
                                     </Typography>
@@ -436,10 +502,10 @@ function GeneRecordsTable({ records }) {
                                         gamma {row.gammaSign || '-'} / post {row.postMeanSign || '-'}
                                     </Typography>
                                 </TableCell>
-                                <TableCell sx={{ fontFamily: 'monospace' }}>{formatSigned(row.postMean, 4)}</TableCell>
-                                <TableCell sx={{ fontFamily: 'monospace' }}>{formatNumber(row.absGamma, 4)}</TableCell>
-                                <TableCell sx={{ fontFamily: 'monospace' }}>{formatNumber(row.membershipScore, 4)}</TableCell>
-                                <TableCell>
+                                <TableCell sx={{ width: 96, fontFamily: 'monospace' }}>{formatSigned(row.postMean, 4)}</TableCell>
+                                <TableCell sx={{ width: 96, fontFamily: 'monospace' }}>{formatNumber(row.absGamma, 4)}</TableCell>
+                                <TableCell sx={{ width: 104, fontFamily: 'monospace' }}>{formatNumber(row.membershipScore, 4)}</TableCell>
+                                <TableCell sx={{ width: 160 }}>
                                     <Stack direction="row" spacing={0.6}>
                                         {row.isConcordant && <Chip label="concordant" size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'success'))} />}
                                         {row.isDiscordant && <Chip label="discordant" size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />}

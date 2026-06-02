@@ -40,11 +40,13 @@ import {
 import axios from 'axios';
 import { downloadDataPaths } from '../utils/download';
 import { captionSx, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
-import homeThumbCrossHeatmap from '../assets/home-thumb-cross-heatmap.png';
-import homeThumbDataBrowser from '../assets/home-thumb-data-browser.png';
-import homeThumbGeneEvidence from '../assets/home-thumb-gene-evidence.png';
-import homeThumbProgramScatter from '../assets/home-thumb-program-scatter.png';
-import homeThumbTraitGraph from '../assets/home-thumb-trait-graph.png';
+import homeFigureCrossTraitHeatmap from '../assets/home-figure-cross-trait-heatmap.svg';
+import homeFigureDataBrowser from '../assets/home-figure-data-browser.svg';
+import homeFigureBrowserWorkflow from '../assets/home-figure-browser-workflow.svg';
+import homeFigureGwasManhattan from '../assets/home-figure-gwas-manhattan.svg';
+import homeFigureLofGene from '../assets/home-figure-lof-gene.svg';
+import homeFigureProgramScatter from '../assets/home-figure-program-scatter.svg';
+import homeFigureTraitProgramNetwork from '../assets/home-figure-trait-program-network.svg';
 
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const HOME_API = axios.create({ baseURL: '/api' });
@@ -103,7 +105,7 @@ const moduleCards = [
         step: '01',
         title: 'Gene evidence',
         description: 'Start from LoF-supported genes and inspect the primary evidence layer.',
-        image: homeThumbGeneEvidence,
+        image: homeFigureLofGene,
         to: '/genes',
         icon: Biotech,
         color: '#7c3aed',
@@ -114,7 +116,7 @@ const moduleCards = [
         step: '02',
         title: 'Program browser',
         description: 'Track regulator hits into aggregated gene programs and network views.',
-        image: homeThumbTraitGraph,
+        image: homeFigureTraitProgramNetwork,
         to: '/programs',
         icon: Hub,
         color: '#0f766e',
@@ -126,7 +128,7 @@ const moduleCards = [
         step: '03',
         title: 'Trait browser',
         description: 'Move from program structure into trait-level association patterns.',
-        image: homeThumbCrossHeatmap,
+        image: homeFigureCrossTraitHeatmap,
         to: '/trait',
         icon: QueryStats,
         color: '#2563eb',
@@ -138,7 +140,7 @@ const moduleCards = [
         step: '04',
         title: 'Data browser',
         description: 'Retrieve result files after deciding which biological layer to export.',
-        image: homeThumbDataBrowser,
+        image: homeFigureDataBrowser,
         to: '/data',
         icon: Storage,
         color: '#b45309',
@@ -190,7 +192,7 @@ const outputPreviewTiles = [
     {
         key: 'trait-view',
         label: 'Trait association',
-        image: homeThumbCrossHeatmap,
+        image: homeFigureCrossTraitHeatmap,
         ratio: '1 / 0.48',
         accent: '#2563eb',
         wide: true,
@@ -198,21 +200,21 @@ const outputPreviewTiles = [
     {
         key: 'gene-view',
         label: 'Gene evidence',
-        image: homeThumbGeneEvidence,
+        image: homeFigureLofGene,
         ratio: '1 / 0.7',
         accent: '#7c3aed',
     },
     {
         key: 'program-view',
         label: 'Program network',
-        image: homeThumbTraitGraph,
+        image: homeFigureTraitProgramNetwork,
         ratio: '1 / 0.7',
         accent: '#0f766e',
     },
     {
         key: 'file-view',
         label: 'Data archive',
-        image: homeThumbDataBrowser,
+        image: homeFigureDataBrowser,
         ratio: '1 / 0.44',
         accent: '#b45309',
         wide: true,
@@ -244,15 +246,15 @@ const workflowHighlights = [
 
 const FIGURE_PREVIEW_MAP = {
     'program-scatter': {
-        image: homeThumbProgramScatter,
+        image: homeFigureProgramScatter,
         label: 'Program scatter',
     },
     'trait-program-graph': {
-        image: homeThumbTraitGraph,
+        image: homeFigureTraitProgramNetwork,
         label: 'Trait-program graph',
     },
     'cross-trait-heatmap': {
-        image: homeThumbCrossHeatmap,
+        image: homeFigureCrossTraitHeatmap,
         label: 'Cross-trait heatmap',
     },
 };
@@ -318,7 +320,7 @@ function getFeaturedTraitCoverImage(trait) {
     const match = preferredTabs
         .map((tabKey) => trait?.evidence?.find((item) => item.tab === tabKey))
         .find(Boolean);
-    return getTraitPreview(match?.tab || trait?.evidence?.[0]?.tab)?.image || homeThumbCrossHeatmap;
+    return getTraitPreview(match?.tab || trait?.evidence?.[0]?.tab)?.image || homeFigureCrossTraitHeatmap;
 }
 
 function SearchResultsPanel({
@@ -763,77 +765,6 @@ function HeroMetricCard({ hint, label, loading, tone, value }) {
     );
 }
 
-function SignalLandscapeFigure({ compact = false }) {
-    const theme = useTheme();
-    const width = 560;
-    const height = compact ? 210 : 238;
-    const baseY = compact ? 168 : 188;
-    const barHeights = Array.from({ length: 44 }, (_, index) => (
-        24 + Math.abs(Math.sin(index * 0.39)) * 74 + (index % 9 === 0 ? 20 : 0)
-    ));
-    const colors = [
-        theme.palette.primary.main,
-        theme.custom.chart.regulator,
-        theme.palette.warning.main,
-    ];
-    const linePoints = Array.from({ length: 33 }, (_, index) => {
-        const x = 48 + index * 14.6;
-        const y = baseY - (Math.sin(index * 0.38) * 34 + Math.cos(index * 0.17) * 18);
-        return `${x},${y.toFixed(2)}`;
-    }).join(' ');
-
-    return (
-        <Box component="svg" viewBox={`0 0 ${width} ${height}`} sx={{ width: '100%', display: 'block' }}>
-            <rect x="0" y="0" width={width} height={height} fill="transparent" />
-            <line x1="32" y1="20" x2="32" y2={baseY + 14} stroke={alpha(theme.palette.text.secondary, 0.24)} strokeWidth="2" />
-            <line x1="32" y1={baseY + 14} x2={width - 18} y2={baseY + 14} stroke={alpha(theme.palette.text.secondary, 0.24)} strokeWidth="2" />
-            <line
-                x1="32"
-                y1={compact ? 96 : 108}
-                x2={width - 18}
-                y2={compact ? 96 : 108}
-                stroke={alpha(theme.palette.warning.main, 0.18)}
-                strokeDasharray="6 6"
-            />
-            {barHeights.map((barHeight, index) => {
-                const x = 48 + index * 10.8;
-                const color = colors[index % colors.length];
-                return (
-                    <rect
-                        key={x}
-                        x={x}
-                        y={baseY - barHeight}
-                        width="4.8"
-                        height={barHeight}
-                        rx="1.5"
-                        fill={alpha(color, 0.82)}
-                    />
-                );
-            })}
-            <polyline
-                points={linePoints}
-                fill="none"
-                stroke={alpha(theme.palette.warning.main, 0.36)}
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            {['chr1', 'chr6', 'chr12', 'chr18', 'chrX'].map((label, index) => (
-                <text
-                    key={label}
-                    x={64 + index * 110}
-                    y={height - 10}
-                    fill={theme.palette.text.secondary}
-                    fontSize="11"
-                    fontWeight="700"
-                >
-                    {label}
-                </text>
-            ))}
-        </Box>
-    );
-}
-
 function ImageFigure({ alt, image, ratio = '1 / 0.58' }) {
     const theme = useTheme();
 
@@ -853,303 +784,6 @@ function ImageFigure({ alt, image, ratio = '1 / 0.58' }) {
                 boxShadow: '0 10px 20px rgba(15, 23, 42, 0.05)',
             }}
         />
-    );
-}
-
-function StageFigureFrame({ children }) {
-    const theme = useTheme();
-
-    return (
-        <Box
-            sx={{
-                borderRadius: 1.5,
-                overflow: 'hidden',
-                border: `1px solid ${theme.custom.border.soft}`,
-                background: 'linear-gradient(180deg, rgba(248,250,252,0.96), rgba(255,255,255,0.98))',
-                boxShadow: '0 10px 20px rgba(15, 23, 42, 0.05)',
-                p: 0.9,
-            }}
-        >
-            {children}
-        </Box>
-    );
-}
-
-function GeneSignalBoardFigure() {
-    return (
-        <StageFigureFrame>
-            <Box component="svg" viewBox="0 0 340 182" sx={{ width: '100%', display: 'block' }}>
-                {Array.from({ length: 6 }).map((_, index) => {
-                    const y = 18 + (index * 20);
-                    const width = 78 + (index * 30);
-                    const dotX = 208 + ((index % 2) * 34);
-                    return (
-                        <g key={y}>
-                            <rect x="18" y={y} width="250" height="12" rx="6" fill="#e7edf6" />
-                            <rect x="18" y={y} width={width} height="12" rx="6" fill="#7c3aed" />
-                            <circle cx={dotX} cy={y + 6} r="4.5" fill={index % 2 === 0 ? '#ef4e2f' : '#347dcc'} />
-                        </g>
-                    );
-                })}
-                <text x="18" y="160" fill="#7c3aed" fontSize="11" fontWeight="800">LoF overlap</text>
-                <text x="110" y="160" fill="#475569" fontSize="11" fontWeight="700">post_mean sign</text>
-                <circle cx="214" cy="156" r="4.5" fill="#ef4e2f" />
-                <circle cx="248" cy="156" r="4.5" fill="#347dcc" />
-            </Box>
-        </StageFigureFrame>
-    );
-}
-
-function RegulatorScreenFigure() {
-    const theme = useTheme();
-    const points = [
-        [44, 132], [62, 102], [80, 84], [98, 70], [116, 62], [134, 76], [152, 92], [170, 120],
-        [198, 136], [216, 104], [234, 82], [252, 72], [270, 86], [288, 114],
-    ];
-
-    return (
-        <StageFigureFrame>
-            <Box component="svg" viewBox="0 0 340 170" sx={{ width: '100%', display: 'block' }}>
-                <line x1="28" y1="18" x2="28" y2="148" stroke="#cbd5e1" strokeWidth="2" />
-                <line x1="28" y1="148" x2="312" y2="148" stroke="#cbd5e1" strokeWidth="2" />
-                {points.map(([x, y], index) => (
-                    <circle
-                        key={`${x}-${y}`}
-                        cx={x}
-                        cy={y}
-                        r={index % 5 === 0 ? 5.5 : 4}
-                        fill={index % 5 === 0 ? theme.palette.warning.main : theme.palette.primary.main}
-                        opacity={index % 5 === 0 ? 0.96 : 0.78}
-                    />
-                ))}
-                <path d="M44 132 C 92 46, 144 48, 188 132" fill="none" stroke="#0f766e" strokeWidth="3" strokeDasharray="4 4" />
-                <path d="M198 136 C 230 56, 270 58, 300 130" fill="none" stroke="#d97706" strokeWidth="3" strokeDasharray="4 4" />
-                <text x="208" y="36" fill="#d97706" fontSize="11" fontWeight="800">regulator hit</text>
-            </Box>
-        </StageFigureFrame>
-    );
-}
-
-function ProgramAssemblyFigure() {
-    return (
-        <StageFigureFrame>
-            <Box component="svg" viewBox="0 0 340 170" sx={{ width: '100%', display: 'block' }}>
-                {Array.from({ length: 4 }).map((_, index) => (
-                    <rect key={`left-${index}`} x="18" y={26 + (index * 28)} width="56" height="16" rx="8" fill="#f4d2aa" />
-                ))}
-                {Array.from({ length: 4 }).map((_, index) => (
-                    <rect key={`right-${index}`} x="266" y={26 + (index * 28)} width="56" height="16" rx="8" fill="#c9e1f4" />
-                ))}
-                <rect x="132" y="50" width="76" height="70" rx="14" fill="#7b8798" />
-                {Array.from({ length: 4 }).map((_, index) => (
-                    <path
-                        key={`link-l-${index}`}
-                        d={`M 74 ${34 + (index * 28)} C 98 ${34 + (index * 28)}, 114 ${58 + (index * 10)}, 132 ${76 + (index * 3)}`}
-                        fill="none"
-                        stroke="#d28b35"
-                        strokeWidth="3"
-                    />
-                ))}
-                {Array.from({ length: 4 }).map((_, index) => (
-                    <path
-                        key={`link-r-${index}`}
-                        d={`M 208 ${76 + (index * 3)} C 228 ${62 + (index * 10)}, 244 ${34 + (index * 28)}, 266 ${34 + (index * 28)}`}
-                        fill="none"
-                        stroke="#3f7fc0"
-                        strokeWidth="3"
-                    />
-                ))}
-            </Box>
-        </StageFigureFrame>
-    );
-}
-
-function TraitAssociationFigure() {
-    const rows = 7;
-    const cols = 10;
-    const cell = 18;
-    const gap = 5;
-
-    return (
-        <StageFigureFrame>
-            <Box component="svg" viewBox="0 0 340 170" sx={{ width: '100%', display: 'block' }}>
-                {Array.from({ length: rows }).map((_, row) => (
-                    Array.from({ length: cols }).map((__, col) => {
-                        const x = 20 + col * (cell + gap);
-                        const y = 22 + row * (cell + gap);
-                        const fill = row === 2 || (row + col) % 6 === 0
-                            ? '#347dcc'
-                            : (row === 4 && col % 3 === 0) || (row + col) % 7 === 0
-                                ? '#ef4e2f'
-                                : '#dbe4f0';
-                        return <rect key={`${row}-${col}`} x={x} y={y} width={cell} height={cell} rx="4" fill={fill} />;
-                    })
-                ))}
-                {['thyroid', 'immune', 'lipid'].map((label, index) => (
-                    <text key={label} x="262" y={44 + (index * 36)} fill="#475569" fontSize="11" fontWeight="700">{label}</text>
-                ))}
-            </Box>
-        </StageFigureFrame>
-    );
-}
-
-function WorkflowFigure() {
-    const theme = useTheme();
-    const steps = [
-        { x: 62, y: 96, color: theme.palette.primary.main, title: 'Trait registry', subtitle: 'metadata intake' },
-        { x: 220, y: 56, color: theme.palette.warning.main, title: 'Signal screen', subtitle: 'CHR / BP / P / rsID' },
-        { x: 378, y: 118, color: theme.palette.secondary.main, title: 'Gene and program', subtitle: 'contextual evidence' },
-        { x: 536, y: 70, color: '#334155', title: 'Data reuse', subtitle: 'browse and download' },
-    ];
-
-    return (
-        <Box component="svg" viewBox="0 0 640 240" sx={{ width: '100%', display: 'block' }}>
-            <defs>
-                <marker id="home-flow-arrow" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
-                    <polygon points="0 0, 7 3.5, 0 7" fill={alpha(theme.palette.primary.main, 0.55)} />
-                </marker>
-            </defs>
-            <path
-                d="M110 106 C 150 84, 178 76, 220 68 S 324 84, 378 128 S 484 92, 536 82"
-                fill="none"
-                stroke={alpha(theme.palette.primary.main, 0.22)}
-                strokeWidth="10"
-                strokeLinecap="round"
-            />
-            <path
-                d="M110 106 C 150 84, 178 76, 220 68 S 324 84, 378 128 S 484 92, 536 82"
-                fill="none"
-                stroke={alpha(theme.palette.primary.main, 0.58)}
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                markerEnd="url(#home-flow-arrow)"
-            />
-            {steps.map((step, index) => (
-                <g key={step.title}>
-                    <circle cx={step.x} cy={step.y} r="30" fill={alpha(step.color, 0.12)} stroke={alpha(step.color, 0.28)} strokeWidth="2" />
-                    <circle cx={step.x} cy={step.y} r="10" fill={step.color} />
-                    <rect
-                        x={step.x - 56}
-                        y={step.y + 38}
-                        width="112"
-                        height="56"
-                        rx="12"
-                        fill="#ffffff"
-                        stroke={alpha(step.color, 0.22)}
-                    />
-                    <text x={step.x} y={step.y + 60} textAnchor="middle" fill={theme.palette.text.primary} fontSize="12" fontWeight="800">
-                        {step.title}
-                    </text>
-                    <text x={step.x} y={step.y + 78} textAnchor="middle" fill={theme.palette.text.secondary} fontSize="11" fontWeight="600">
-                        {step.subtitle}
-                    </text>
-                    <text x={step.x - 4} y={step.y + 4} textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="800">
-                        {index + 1}
-                    </text>
-                </g>
-            ))}
-        </Box>
-    );
-}
-
-function AnalysisFlowFigure() {
-    const theme = useTheme();
-    const columns = [
-        {
-            title: 'LoF genes',
-            color: '#7c3aed',
-            nodes: [
-                { label: 'LoF-01', x: 88, y: 74 },
-                { label: 'LoF-07', x: 88, y: 128 },
-                { label: 'LoF-12', x: 88, y: 182 },
-            ],
-        },
-        {
-            title: 'Regulators',
-            color: '#d97706',
-            nodes: [
-                { label: 'TF-03', x: 264, y: 64 },
-                { label: 'TF-08', x: 264, y: 118 },
-                { label: 'TF-17', x: 264, y: 172 },
-            ],
-        },
-        {
-            title: 'Programs',
-            color: '#0f766e',
-            nodes: [
-                { label: 'cNMF-04', x: 456, y: 82 },
-                { label: 'cNMF-11', x: 456, y: 154 },
-            ],
-        },
-        {
-            title: 'Traits',
-            color: '#2563eb',
-            nodes: [
-                { label: 'thyroid', x: 650, y: 62 },
-                { label: 'immune', x: 650, y: 110 },
-                { label: 'cardio', x: 650, y: 158 },
-                { label: 'metabolic', x: 650, y: 206 },
-            ],
-        },
-    ];
-    const links = [
-        { from: [88, 74], to: [264, 64], color: '#7c3aed' },
-        { from: [88, 74], to: [264, 118], color: '#7c3aed' },
-        { from: [88, 128], to: [264, 118], color: '#7c3aed' },
-        { from: [88, 182], to: [264, 172], color: '#7c3aed' },
-        { from: [264, 64], to: [456, 82], color: '#d97706' },
-        { from: [264, 118], to: [456, 82], color: '#d97706' },
-        { from: [264, 118], to: [456, 154], color: '#d97706' },
-        { from: [264, 172], to: [456, 154], color: '#d97706' },
-        { from: [456, 82], to: [650, 62], color: '#0f766e' },
-        { from: [456, 82], to: [650, 110], color: '#0f766e' },
-        { from: [456, 154], to: [650, 158], color: '#0f766e' },
-        { from: [456, 154], to: [650, 206], color: '#0f766e' },
-    ];
-
-    return (
-        <Box component="svg" viewBox="0 0 740 250" sx={{ width: '100%', display: 'block' }}>
-            <rect x="0" y="0" width="740" height="250" rx="24" fill="rgba(248,250,252,0.96)" />
-            {links.map((link, index) => {
-                const [x1, y1] = link.from;
-                const [x2, y2] = link.to;
-                return (
-                    <path
-                        key={`${x1}-${y1}-${x2}-${y2}-${index}`}
-                        d={`M ${x1 + 32} ${y1} C ${x1 + 110} ${y1}, ${x2 - 104} ${y2}, ${x2 - 34} ${y2}`}
-                        fill="none"
-                        stroke={alpha(link.color, 0.24)}
-                        strokeWidth="6"
-                        strokeLinecap="round"
-                    />
-                );
-            })}
-            {columns.map((column) => (
-                <g key={column.title}>
-                    <text x={column.nodes[0].x - 34} y="28" fill={column.color} fontSize="13" fontWeight="800" letterSpacing="1.2">
-                        {column.title}
-                    </text>
-                    {column.nodes.map((node) => (
-                        <g key={node.label}>
-                            <rect
-                                x={node.x - 34}
-                                y={node.y - 18}
-                                width="108"
-                                height="36"
-                                rx="12"
-                                fill="#ffffff"
-                                stroke={alpha(column.color, 0.24)}
-                                strokeWidth="1.5"
-                            />
-                            <circle cx={node.x - 14} cy={node.y} r="5" fill={column.color} />
-                            <text x={node.x + 2} y={node.y + 4} fill={theme.palette.text.primary} fontSize="12" fontWeight="700">
-                                {node.label}
-                            </text>
-                        </g>
-                    ))}
-                </g>
-            ))}
-        </Box>
     );
 }
 
@@ -1197,10 +831,10 @@ function SummaryBoardFigure() {
 }
 
 function researchFigureFor(key) {
-    if (key === 'lof') return <GeneSignalBoardFigure />;
-    if (key === 'regulator') return <RegulatorScreenFigure />;
-    if (key === 'program') return <ProgramAssemblyFigure />;
-    return <TraitAssociationFigure />;
+    if (key === 'lof') return <ImageFigure alt="LoF gene evidence" image={homeFigureLofGene} ratio="1 / 0.58" />;
+    if (key === 'regulator') return <ImageFigure alt="Program scatter" image={homeFigureProgramScatter} ratio="1 / 0.58" />;
+    if (key === 'program') return <ImageFigure alt="Trait-program network" image={homeFigureTraitProgramNetwork} ratio="1 / 0.58" />;
+    return <ImageFigure alt="Cross-trait heatmap" image={homeFigureCrossTraitHeatmap} ratio="1 / 0.58" />;
 }
 
 function FlowStageCard({ figure, item, navigate }) {
@@ -1431,6 +1065,21 @@ function FeaturedTraitCard({ compact = false, onOpenFeaturedTrait, trait }) {
                                 border: '1px solid rgba(255,255,255,0.14)',
                             })}
                         />
+                    </Stack>
+                    <Stack direction="row" spacing={0.55} useFlexGap flexWrap="wrap">
+                        {trait.evidence.map((item) => (
+                            <Chip
+                                key={`${trait.fileId}-${item.tab}`}
+                                label={item.label}
+                                size="small"
+                                sx={summaryChipSx(theme, {
+                                    color: '#fff',
+                                    backgroundColor: 'rgba(15,23,42,0.34)',
+                                    border: '1px solid rgba(255,255,255,0.16)',
+                                    backdropFilter: 'blur(8px)',
+                                })}
+                            />
+                        ))}
                     </Stack>
                     <Box>
                         <Typography
@@ -1994,7 +1643,7 @@ export default function Home() {
                                             Signal snapshot
                                         </Typography>
                                     </Box>
-                                    <SignalLandscapeFigure compact />
+                                    <ImageFigure alt="Trait Manhattan view" image={homeFigureGwasManhattan} ratio="1 / 0.58" />
                                 </Stack>
                             </Box>
 
@@ -2056,7 +1705,7 @@ export default function Home() {
                         <FigureCard
                             title="Dependency structure"
                             description="LoF genes, regulators, programs, and traits stay in one dependency graph rather than being shown as isolated picture tiles."
-                            figure={<AnalysisFlowFigure />}
+                            figure={<ImageFigure alt="Trait-program network overview" image={homeFigureTraitProgramNetwork} ratio="1 / 0.58" />}
                             chips={['LoF genes', 'regulators', 'programs', 'traits']}
                         />
                         <FigureCard
@@ -2098,7 +1747,7 @@ export default function Home() {
                                     }),
                                 }}
                             >
-                                <WorkflowFigure />
+                                <ImageFigure alt="Browser workflow" image={homeFigureBrowserWorkflow} ratio="1 / 0.44" />
                             </Box>
                             <Box
                                 sx={{

@@ -1,0 +1,33 @@
+<svg width="960" height="420" viewBox="0 0 960 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="420" rx="32" fill="#F8FAFC"/>
+  <rect x="24" y="24" width="912" height="372" rx="26" fill="white" stroke="#E2E8F0" stroke-width="2"/>
+  <text x="54" y="72" fill="#2563EB" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">Browser workflow</text>
+  <text x="54" y="102" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="15">Move from trait entry to signal filtering, program context, and final export retrieval</text>
+  <path d="M136 238C204 188 262 166 334 178C408 190 462 286 544 274C642 258 694 146 804 138" stroke="#CBD5E1" stroke-width="16" stroke-linecap="round"/>
+  <path d="M136 238C204 188 262 166 334 178C408 190 462 286 544 274C642 258 694 146 804 138" stroke="#5B8DEF" stroke-opacity="0.9" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="800,126 826,136 804,152" fill="#5B8DEF"/>
+  <circle cx="128" cy="236" r="42" fill="#2563EB" fill-opacity="0.12" stroke="#93C5FD" stroke-width="3"/>
+  <circle cx="128" cy="236" r="14" fill="#2563EB"/>
+  <text x="128" y="242" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">1</text>
+  <rect x="56" y="302" width="146" height="72" rx="18" fill="#F8FAFC" stroke="#BFDBFE" stroke-width="2"/>
+  <text x="129" y="332" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Trait registry</text>
+  <text x="129" y="355" text-anchor="middle" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="14">metadata intake</text>
+  <circle cx="322" cy="178" r="42" fill="#EA580C" fill-opacity="0.12" stroke="#FDBA74" stroke-width="3"/>
+  <circle cx="322" cy="178" r="14" fill="#B45309"/>
+  <text x="322" y="184" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">2</text>
+  <rect x="250" y="236" width="152" height="74" rx="18" fill="#FFF7ED" stroke="#FED7AA" stroke-width="2"/>
+  <text x="326" y="266" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Signal screen</text>
+  <text x="326" y="290" text-anchor="middle" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="14">CHR / BP / P / rsID</text>
+  <circle cx="536" cy="276" r="42" fill="#0F766E" fill-opacity="0.12" stroke="#99F6E4" stroke-width="3"/>
+  <circle cx="536" cy="276" r="14" fill="#0F766E"/>
+  <text x="536" y="282" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">3</text>
+  <rect x="458" y="322" width="160" height="72" rx="18" fill="#F0FDFA" stroke="#CCFBF1" stroke-width="2"/>
+  <text x="538" y="352" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Gene and program</text>
+  <text x="538" y="375" text-anchor="middle" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="14">contextual evidence</text>
+  <circle cx="806" cy="138" r="42" fill="#475569" fill-opacity="0.12" stroke="#CBD5E1" stroke-width="3"/>
+  <circle cx="806" cy="138" r="14" fill="#334155"/>
+  <text x="806" y="144" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">4</text>
+  <rect x="736" y="202" width="140" height="74" rx="18" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="806" y="232" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">Data reuse</text>
+  <text x="806" y="256" text-anchor="middle" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="14">browse and download</text>
+</svg>

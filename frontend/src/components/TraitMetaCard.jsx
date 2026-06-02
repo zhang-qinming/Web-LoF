@@ -3,7 +3,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import {
     OpenInNew, Person, Article, People,
     Public, Numbers, Dns, Link as LinkIcon,
-    BarChart, CalendarMonth, Category, DatasetLinked, Inventory2,
+    BarChart, CalendarMonth, Category, DatasetLinked, Inventory2, Insights,
 } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
@@ -115,6 +115,12 @@ function formatCases(info) {
     return [cases, controls].filter(Boolean).join(' / ');
 }
 
+function formatMetric(value, digits = 4) {
+    if (value == null || value === '') return '—';
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toFixed(digits) : String(value);
+}
+
 export default function TraitMetaCard({ fileId, listData }) {
     const theme = useTheme();
     const { data } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
@@ -155,12 +161,12 @@ export default function TraitMetaCard({ fileId, listData }) {
                         </Box>
 
                         <Box sx={{ display: 'flex', gap: 1, mb: 2.5, flexWrap: 'wrap' }}>
-                            <Chip icon={<Dns />} label={info.file_id} size="small" sx={summaryChipSx(theme, { fontFamily: 'monospace' })} />
-                            {info.gwas_id && info.gwas_id !== info.file_id && (
-                                <Tooltip title="GWAS Catalog ID">
-                                    <Chip label={info.gwas_id} size="small" variant="outlined" sx={summaryChipSx(theme, { fontFamily: 'monospace' })} />
-                                </Tooltip>
-                            )}
+                            <Chip
+                                icon={<Dns />}
+                                label={info.lof_id || info.file_id}
+                                size="small"
+                                sx={summaryChipSx(theme, { fontFamily: 'monospace' })}
+                            />
                             {info.gwas_source_batch && (
                                 <Chip
                                     label={info.gwas_source_batch}
@@ -213,6 +219,14 @@ export default function TraitMetaCard({ fileId, listData }) {
                                 <Field icon={Inventory2} label="Significant loci" value={formatCount(info.n_sig)} theme={theme} />
                                 <Field icon={Dns} label="LoF ID" value={info.lof_id || info.file_id || '—'} mono theme={theme} />
                                 <Field icon={LinkIcon} label="Source link" value={info.url ? 'Open source' : '—'} href={info.url || undefined} theme={theme} />
+                            </InfoSection>
+                        </Box>
+
+                        <Box sx={{ mt: 2 }}>
+                            <InfoSection title="Heritability" theme={theme}>
+                                <Field icon={Insights} label="LDSC enrichment" value={formatMetric(info.enrichment)} theme={theme} />
+                                <Field icon={Insights} label="Coefficient z-score" value={formatMetric(info.coefficient_z_score)} theme={theme} />
+                                <Field icon={Dns} label="Source file" value={info.heritability_source_file || '—'} mono theme={theme} />
                             </InfoSection>
                         </Box>
                     </>

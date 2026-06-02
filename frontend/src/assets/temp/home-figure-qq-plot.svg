@@ -1,0 +1,75 @@
+<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
+  <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
+  <text x="62" y="82" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">QQ plot</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="13">Observed vs expected P-value quantiles</text>
+
+  <!-- axes -->
+  <line x1="110" y1="330" x2="580" y2="330" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="110" y1="330" x2="110" y2="118" stroke="#CBD5E1" stroke-width="1.5"/>
+  <!-- diagonal reference -->
+  <line x1="110" y1="330" x2="500" y2="118" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <!-- labels -->
+  <text x="340" y="366" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Expected -log₁₀(P)</text>
+  <text transform="rotate(-90 72 210)" x="72" y="210" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Observed -log₁₀(P)</text>
+
+  <!-- y-axis ticks -->
+  <text x="100" y="334" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">0</text>
+  <text x="100" y="277" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">4</text>
+  <text x="100" y="224" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">8</text>
+  <text x="100" y="171" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">12</text>
+  <text x="100" y="122" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">16</text>
+  <!-- x-axis ticks -->
+  <text x="110" y="346" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">0</text>
+  <text x="208" y="346" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">2</text>
+  <text x="306" y="346" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">4</text>
+  <text x="404" y="346" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">6</text>
+
+  <!-- confidence band (shaded area around diagonal) -->
+  <path d="M110 330 L480 106 L500 90 L520 90 L500 106 L130 330 Z" fill="#DBEAFE" fill-opacity="0.25"/>
+
+  <!-- QQ points: follow diagonal at low values, then deviate upward = genomic inflation -->
+  <!-- Dense cluster on diagonal (low P, well-calibrated) -->
+  <circle cx="118" cy="324" r="3" fill="#93C5FD" fill-opacity="0.55"/>
+  <circle cx="124" cy="320" r="3" fill="#93C5FD" fill-opacity="0.55"/>
+  <circle cx="130" cy="316" r="3" fill="#93C5FD" fill-opacity="0.55"/>
+  <circle cx="136" cy="312" r="3" fill="#93C5FD" fill-opacity="0.58"/>
+  <circle cx="142" cy="308" r="3" fill="#93C5FD" fill-opacity="0.58"/>
+  <circle cx="148" cy="304" r="3" fill="#93C5FD" fill-opacity="0.6"/>
+  <circle cx="154" cy="300" r="3" fill="#93C5FD" fill-opacity="0.6"/>
+  <circle cx="160" cy="296" r="3" fill="#93C5FD" fill-opacity="0.6"/>
+  <circle cx="166" cy="292" r="3" fill="#93C5FD" fill-opacity="0.62"/>
+  <circle cx="172" cy="288" r="3" fill="#93C5FD" fill-opacity="0.62"/>
+  <circle cx="178" cy="284" r="3" fill="#60A5FA" fill-opacity="0.65"/>
+  <circle cx="184" cy="280" r="3" fill="#60A5FA" fill-opacity="0.65"/>
+  <circle cx="190" cy="276" r="3" fill="#60A5FA" fill-opacity="0.65"/>
+  <circle cx="196" cy="272" r="3" fill="#60A5FA" fill-opacity="0.68"/>
+  <circle cx="202" cy="268" r="3" fill="#60A5FA" fill-opacity="0.68"/>
+  <circle cx="208" cy="264" r="3" fill="#60A5FA" fill-opacity="0.7"/>
+  <circle cx="214" cy="260" r="3" fill="#60A5FA" fill-opacity="0.7"/>
+  <circle cx="220" cy="256" r="3" fill="#60A5FA" fill-opacity="0.72"/>
+
+  <!-- Start deviating upward from diagonal (inflation begins) -->
+  <circle cx="226" cy="250" r="3" fill="#3B82F6" fill-opacity="0.72"/>
+  <circle cx="232" cy="244" r="3" fill="#3B82F6" fill-opacity="0.72"/>
+  <circle cx="238" cy="236" r="3" fill="#3B82F6" fill-opacity="0.75"/>
+  <circle cx="244" cy="228" r="3" fill="#3B82F6" fill-opacity="0.75"/>
+  <circle cx="250" cy="220" r="3" fill="#3B82F6" fill-opacity="0.78"/>
+  <circle cx="256" cy="210" r="3" fill="#3B82F6" fill-opacity="0.78"/>
+  <circle cx="262" cy="202" r="3" fill="#3B82F6" fill-opacity="0.8"/>
+  <circle cx="268" cy="192" r="3" fill="#2563EB" fill-opacity="0.82"/>
+  <circle cx="274" cy="184" r="3" fill="#2563EB" fill-opacity="0.82"/>
+
+  <!-- Strong deviation (true signal) -->
+  <circle cx="280" cy="174" r="3" fill="#2563EB" fill-opacity="0.85"/>
+  <circle cx="286" cy="162" r="3" fill="#2563EB" fill-opacity="0.85"/>
+  <circle cx="292" cy="150" r="3" fill="#2563EB" fill-opacity="0.88"/>
+  <circle cx="298" cy="140" r="3.5" fill="#1D4ED8" fill-opacity="0.9"/>
+  <circle cx="306" cy="128" r="3.5" fill="#1D4ED8" fill-opacity="0.9"/>
+  <circle cx="316" cy="116" r="3.5" fill="#1D4ED8" fill-opacity="0.92"/>
+  <circle cx="330" cy="104" r="3.5" fill="#1D4ED8" fill-opacity="0.92"/>
+
+  <!-- lambda label -->
+  <text x="440" y="296" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">λ = 1.08</text>
+  <text x="440" y="314" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11">slight inflation</text>
+</svg>

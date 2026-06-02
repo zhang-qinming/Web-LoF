@@ -1,5 +1,7 @@
 const pool = require('./db');
 const { config } = require('../lib/config');
+
+let hasTraitHeritabilityTablePromise = null;
 const SORT_COLUMN_MAP = {
     file_id: 'fm.file_id',
     trait_name: 'fm.trait_name',
@@ -26,6 +28,22 @@ function buildMetaOrderBy(sortBy, order) {
     const column = SORT_COLUMN_MAP[sortBy] || SORT_COLUMN_MAP.trait_name;
     const direction = String(order || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
     return `ORDER BY ${column} ${direction}`;
+}
+
+async function hasTraitHeritabilityTable() {
+    if (!hasTraitHeritabilityTablePromise) {
+        hasTraitHeritabilityTablePromise = pool.query(
+            `SELECT 1
+             FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'trait_heritability'
+             LIMIT 1`
+        )
+            .then(([rows]) => rows.length > 0)
+            .catch(() => false);
+    }
+
+    return hasTraitHeritabilityTablePromise;
 }
 
 async function getTraits({ page = 1, limit = 20, sortBy = 'trait_name', order = 'ASC', search = '' } = {}) {
@@ -95,6 +113,15 @@ async function getTraitMeta(fileId) {
     const safeFileId = String(fileId || '').trim();
     if (!safeFileId || safeFileId.length > 255) return null;
 
+    const includeHeritability = await hasTraitHeritabilityTable();
+    const heritabilitySelect = includeHeritability ? `,
+                th.source_file AS heritability_source_file,
+                th.enrichment, th.coefficient_z_score,
+                th.notes AS heritability_notes` : '';
+    const heritabilityJoin = includeHeritability
+        ? '\n         LEFT JOIN trait_heritability th ON th.file_id = fm.file_id OR th.gwas_id = fm.gwas_id'
+        : '';
+
     const [rows] = await pool.query(
         `SELECT fm.file_id, fm.gwas_id, fm.trait_name,
                 gm.sample_size, gm.n_case, gm.n_control, gm.population,
@@ -102,10 +129,11 @@ async function getTraitMeta(fileId) {
                 gm.qc_score, gm.collect_date, gm.url,
                 gm.mesh_term, gm.mesh_id,
                 gm.source_batch AS gwas_source_batch,
-                lm.lof_id
+                lm.lof_id${heritabilitySelect}
          FROM file_metadata fm
          LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id
          LEFT JOIN lof_meta lm ON lm.file_id = fm.file_id
+         ${heritabilityJoin}
          WHERE fm.file_id = ? OR fm.gwas_id = ?
          LIMIT 1`,
         [safeFileId, safeFileId]

@@ -19,7 +19,7 @@ import {
     Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { AccountTreeOutlined, OpenInNew, ScienceOutlined, TableChartOutlined } from '@mui/icons-material';
+import { AccountTreeOutlined, OpenInNew } from '@mui/icons-material';
 import useSWR from 'swr';
 import { getProgramTraits } from '../api/gwas';
 import { StatePanel } from './PageScaffold';
@@ -48,31 +48,6 @@ function colorTone(theme, color) {
     if (color === 'regulator_enriched') return metricChipTone(theme, 'accent');
     if (color === 'both_enriched') return metricChipTone(theme, 'success');
     return metricChipTone(theme, 'neutral');
-}
-
-function SummaryStrip({ summary }) {
-    const theme = useTheme();
-    const items = [
-        { label: 'traits', value: summary.totalTraits, tone: 'neutral', icon: <TableChartOutlined /> },
-        { label: 'program selected', value: summary.selectedByProgram, tone: 'primary', icon: <ScienceOutlined /> },
-        { label: 'regulator selected', value: summary.selectedByRegulator, tone: 'accent', icon: <AccountTreeOutlined /> },
-        { label: 'both', value: summary.bothSelected, tone: 'success', icon: <AccountTreeOutlined /> },
-        { label: 'visible genes', value: summary.totalGenes, tone: 'warning', icon: <ScienceOutlined /> },
-    ];
-
-    return (
-        <Stack direction="row" spacing={0.8} sx={{ flexWrap: 'wrap' }}>
-            {items.map((item) => (
-                <Chip
-                    key={item.label}
-                    icon={React.cloneElement(item.icon, { sx: { fontSize: 16 } })}
-                    label={`${Number(item.value || 0).toLocaleString()} ${item.label}`}
-                    size="small"
-                    sx={summaryChipSx(theme, metricChipTone(theme, item.tone))}
-                />
-            ))}
-        </Stack>
-    );
 }
 
 export default function ProgramAssociatedTraits({ programId }) {
@@ -158,7 +133,6 @@ export default function ProgramAssociatedTraits({ programId }) {
                         <ToggleButton value="regulator">Regulator</ToggleButton>
                         <ToggleButton value="both">Both</ToggleButton>
                     </ToggleButtonGroup>
-                    <SummaryStrip summary={data.summary || {}} />
                 </Stack>
             </Box>
 

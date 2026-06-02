@@ -198,6 +198,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const plotRef = useRef(null);
     const tableSectionRef = useRef(null);
     const hasAutoSelectedDefaultVariant = useRef(false);
+    const exportBaseName = useMemo(() => sanitizeFileNamePart(fileId || gwasId || 'trait'), [fileId, gwasId]);
 
     const [loading, setLoading] = useState(true);
     const [payload, setPayload] = useState(null);
@@ -616,7 +617,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
 
     const layout = useMemo(() => ({
         title: {
-            text: `${gwasId || fileId} - Manhattan`,
+            text: `${fileId || gwasId} - Manhattan`,
             x: 0.01,
             font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
         },
@@ -791,9 +792,9 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         const width = normalizeExportSize(exportWidth, DEFAULT_EXPORT_WIDTH);
         const height = normalizeExportSize(exportHeight, DEFAULT_EXPORT_HEIGHT);
         Plotly.toImage(gd, { format: exportFmt, width, height }).then((dataUrl) => {
-            downloadDataUrl(dataUrl, `${sanitizeFileNamePart(gwasId || fileId)}-${variant}-manhattan.${exportFmt}`);
+            downloadDataUrl(dataUrl, `${exportBaseName}-${variant}-manhattan.${exportFmt}`);
         });
-    }, [exportFmt, exportHeight, exportWidth, fileId, gwasId, variant]);
+    }, [exportBaseName, exportFmt, exportHeight, exportWidth, variant]);
 
     const downloadCSV = useCallback(() => {
         const cols = ['SNP', 'CHR', 'BP', 'P', '-log10(P)', 'Gene', 'distance_to_gene', 'Program', 'Geneset', 'Primary Program', 'Primary Geneset'];
@@ -804,8 +805,8 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             row.primaryProgram || '', row.primaryGeneset || '',
         ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
         const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
-        downloadBlob(blob, `manhattan_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`);
-    }, [processedRows, gwasId, fileId, variantLabel]);
+        downloadBlob(blob, `manhattan_${variantLabel}_${exportBaseName}.csv`);
+    }, [exportBaseName, processedRows, variantLabel]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,

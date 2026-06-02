@@ -1,0 +1,61 @@
+<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- background -->
+  <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
+  <!-- inner panel -->
+  <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
+  <!-- title -->
+  <text x="62" y="82" fill="#0F766E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Trait-program graph</text>
+  <text x="62" y="108" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14">Programs arranged around a central trait with directional links and gene groups</text>
+
+  <!-- central trait node -->
+  <rect x="290" y="160" width="140" height="94" rx="20" fill="#7B8798"/>
+  <rect x="290" y="160" width="140" height="94" rx="20" stroke="#64748B" stroke-width="2" fill="none"/>
+  <text x="360" y="200" text-anchor="middle" fill="white" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Trait</text>
+  <text x="360" y="228" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="Inter, Arial, sans-serif" font-size="14">central node</text>
+
+  <!-- left program nodes -->
+  <rect x="72" y="126" width="142" height="58" rx="16" fill="#FDE7CC" stroke="#F2994A" stroke-width="2"/>
+  <text x="143" y="160" text-anchor="middle" fill="#8A5416" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">Program A</text>
+  <text x="143" y="176" text-anchor="middle" fill="#B45309" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">12 genes</text>
+
+  <rect x="72" y="228" width="142" height="58" rx="16" fill="#D8E7F8" stroke="#4F8CC9" stroke-width="2"/>
+  <text x="143" y="262" text-anchor="middle" fill="#1D4E89" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">Program B</text>
+  <text x="143" y="278" text-anchor="middle" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">9 genes</text>
+
+  <!-- right regulator nodes -->
+  <rect x="498" y="116" width="142" height="54" rx="16" fill="#DDF3E7" stroke="#3CA370" stroke-width="2"/>
+  <text x="569" y="148" text-anchor="middle" fill="#166534" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">positive regulators</text>
+
+  <rect x="498" y="192" width="142" height="54" rx="16" fill="#FDE7CC" stroke="#F2994A" stroke-width="2"/>
+  <text x="569" y="224" text-anchor="middle" fill="#8A5416" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">program module</text>
+
+  <rect x="498" y="268" width="142" height="54" rx="16" fill="#D8E7F8" stroke="#4F8CC9" stroke-width="2"/>
+  <text x="569" y="300" text-anchor="middle" fill="#1D4E89" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">negative regulators</text>
+
+  <!-- edges: left programs → trait -->
+  <path d="M214 155C252 155 260 176 290 192" stroke="#EF4E2F" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <path d="M214 257C252 257 264 240 290 224" stroke="#347DCC" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <!-- arrowheads left -->
+  <polygon points="286,186 292,194 282,194" fill="#EF4E2F"/>
+  <polygon points="286,224 292,224 284,232" fill="#347DCC"/>
+
+  <!-- edges: trait → right regulators -->
+  <path d="M430 192C460 180 470 152 498 143" stroke="#3CA370" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <path d="M430 208C462 208 472 216 498 219" stroke="#F2994A" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <path d="M430 224C460 240 470 278 498 295" stroke="#4F8CC9" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <!-- arrowheads right -->
+  <polygon points="496,143 488,138 488,148" fill="#3CA370"/>
+  <polygon points="496,219 488,214 488,224" fill="#F2994A"/>
+  <!-- X for inhibitory edge -->
+  <line x1="492" y1="290" x2="502" y2="300" stroke="#4F8CC9" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="502" y1="290" x2="492" y2="300" stroke="#4F8CC9" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- bottom legend boxes -->
+  <rect x="76" y="312" width="200" height="46" rx="14" fill="#FAFAFA" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="96" y="336" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">left: programs selected by burden</text>
+  <text x="96" y="352" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="10">directional effect strength</text>
+
+  <rect x="426" y="312" width="224" height="46" rx="14" fill="#FAFAFA" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="446" y="336" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">right: regulator groups → programs</text>
+  <text x="446" y="352" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="10">positive (→), inhibitory (✕)</text>
+</svg>

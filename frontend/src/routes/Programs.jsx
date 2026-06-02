@@ -75,7 +75,7 @@ function ProgramOverview({ data, programId, onTabChange }) {
         .slice(0, 16);
 
     return (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.25fr) minmax(320px, 0.75fr)' }, gap: 2 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.38fr) minmax(260px, 0.62fr)' }, gap: 2 }}>
             <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
                 <Box sx={sectionPanelHeaderSx(theme, { justifyContent: 'space-between' })}>
                     <Box>
@@ -124,8 +124,23 @@ function ProgramOverview({ data, programId, onTabChange }) {
                 <Box sx={sectionPanelHeaderSx(theme)}>
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1rem' })}>Top genes preview</Typography>
                 </Box>
-                <Box sx={{ p: 1.5 }}>
-                    <Stack direction="row" spacing={0.55} sx={{ flexWrap: 'wrap' }}>
+                <Box
+                    sx={{
+                        p: 1.5,
+                        minHeight: { lg: 318 },
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                    }}
+                >
+                    <Box
+                        sx={{
+                            width: '100%',
+                            display: 'grid',
+                            gridTemplateColumns: { xs: 'repeat(auto-fit, minmax(120px, 1fr))', sm: 'repeat(auto-fit, minmax(132px, 1fr))' },
+                            gap: 0.8,
+                            alignContent: 'start',
+                        }}
+                    >
                         {topGenes.length ? topGenes.map(([gene, count]) => (
                             <Chip
                                 key={gene}
@@ -134,12 +149,25 @@ function ProgramOverview({ data, programId, onTabChange }) {
                                 component={RouterLink}
                                 clickable
                                 to={`/genes?query=${encodeURIComponent(gene)}`}
-                                sx={summaryChipSx(theme, metricChipTone(theme, count > 2 ? 'primary' : 'subtle'))}
+                                sx={summaryChipSx(theme, {
+                                    ...metricChipTone(theme, count > 2 ? 'primary' : 'subtle'),
+                                    width: '100%',
+                                    maxWidth: '100%',
+                                    justifyContent: 'space-between',
+                                    px: 0.9,
+                                    '& .MuiChip-label': {
+                                        width: '100%',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        gap: 1,
+                                        overflow: 'hidden',
+                                    },
+                                })}
                             />
                         )) : (
                             <Typography sx={captionSx(theme, { fontSize: '0.8rem' })}>No top gene preview is available for {programId}.</Typography>
                         )}
-                    </Stack>
+                    </Box>
                 </Box>
             </Paper>
         </Box>

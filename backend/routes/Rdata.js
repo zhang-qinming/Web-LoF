@@ -1,3 +1,4 @@
+const fs = require('fs');
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -145,6 +146,52 @@ function getSearchRank(entry, query) {
     return 4;
 }
 
+function compareSearchEntries(a, b, query) {
+    return (
+        getSearchRank(a, query) - getSearchRank(b, query)
+        || Number(b.type === 'file') - Number(a.type === 'file')
+        || a.depth - b.depth
+        || a.path.length - b.path.length
+        || a.path.localeCompare(b.path)
+    );
+}
+
+function insertLimitedSearchMatch(matches, entry, query, maxMatches) {
+    if (!Number.isFinite(maxMatches) || maxMatches <= 0) return;
+
+    let low = 0;
+    let high = matches.length;
+    while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        if (compareSearchEntries(entry, matches[mid], query) < 0) high = mid;
+        else low = mid + 1;
+    }
+
+    if (low >= maxMatches) return;
+    matches.splice(low, 0, entry);
+    if (matches.length > maxMatches) matches.pop();
+}
+
+function findSearchMatches(searchIndex, query, maxMatches = Number.POSITIVE_INFINITY) {
+    const useLimitedBuffer = Number.isFinite(maxMatches);
+    const matches = [];
+    let totalCount = 0;
+
+    for (const entry of searchIndex) {
+        if (!entry.nameLower.includes(query) && !entry.pathLower.includes(query)) continue;
+        totalCount += 1;
+
+        if (useLimitedBuffer) insertLimitedSearchMatch(matches, entry, query, maxMatches);
+        else matches.push(entry);
+    }
+
+    if (!useLimitedBuffer) {
+        matches.sort((a, b) => compareSearchEntries(a, b, query));
+    }
+
+    return { matches, totalCount };
+}
+
 async function createZipArchive(options) {
     const archiverModule = await import('archiver');
     const archiver = archiverModule.default || archiverModule;
@@ -264,30 +311,33 @@ async function buildSearchIndex() {
     async function scan(fullPath) {
         let dirEntries = [];
         try {
-            dirEntries = await dataStore.list(fullPath);
+            dirEntries = await fs.promises.readdir(fullPath, { withFileTypes: true });
             searchIndexStats.dirs += 1;
         } catch (err) {
             return;
         }
 
-        dirEntries.sort((a, b) => Number(b.type === 'dir') - Number(a.type === 'dir') || a.name.localeCompare(b.name));
+        dirEntries = dirEntries
+            .filter((entry) => entry.isDirectory() || entry.isFile())
+            .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
 
         for (const entry of dirEntries) {
             const childPath = dataStore.pathImpl.join(fullPath, entry.name);
             const relPath = toRelativePath(childPath);
+            const isDirectory = entry.isDirectory();
 
             entries.push({
                 name: entry.name,
                 path: relPath,
-                type: entry.type,
-                size: entry.size || 0,
+                type: isDirectory ? 'dir' : 'file',
+                size: isDirectory ? 0 : null,
                 depth: relPath ? relPath.split('/').length : 0,
                 nameLower: entry.name.toLowerCase(),
                 pathLower: relPath.toLowerCase(),
             });
             searchIndexStats.entries = entries.length;
 
-            if (entry.type === 'dir') {
+            if (isDirectory) {
                 await scan(childPath);
             }
         }
@@ -509,28 +559,39 @@ router.get('/api/data/search', asyncRoute(async (req, res) => {
     if (!q || q.length < 2) return res.json({ results: [], totalCount: 0, truncated: false });
 
     const forceRefresh = config.data.allowSearchRefresh && req.query.refresh === '1';
+    const limit = req.query.limit == null ? null : parsePositiveInt(req.query.limit, 50, 200);
+    const page = limit ? parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER) : 1;
+    const offset = limit ? (page - 1) * limit : 0;
+    const maxMatches = limit ? offset + limit : Number.POSITIVE_INFINITY;
     const searchIndex = await getSearchIndex(forceRefresh);
-    const matches = searchIndex.filter((entry) => entry.nameLower.includes(q) || entry.pathLower.includes(q));
+    const { matches, totalCount } = findSearchMatches(searchIndex, q, maxMatches);
+    const pagedMatches = limit ? matches.slice(offset, offset + limit) : matches;
+    const results = await Promise.all(pagedMatches.map(async (entry) => {
+        if (entry.type === 'file' && !Number.isFinite(entry.size)) {
+            try {
+                const stat = await dataStore.stat(resolveRelativePath(entry.path));
+                entry.size = stat?.isFile ? (stat.size || 0) : 0;
+            } catch (err) {
+                entry.size = 0;
+            }
+        }
 
-    matches.sort((a, b) => (
-        getSearchRank(a, q) - getSearchRank(b, q)
-        || Number(b.type === 'file') - Number(a.type === 'file')
-        || a.depth - b.depth
-        || a.path.length - b.path.length
-        || a.path.localeCompare(b.path)
-    ));
-
-    const results = matches.map(({ name, path: relPath, type, size }) => ({
-        name,
-        path: relPath,
-        type,
-        size,
+        return {
+            name: entry.name,
+            path: entry.path,
+            type: entry.type,
+            size: Number.isFinite(entry.size) ? entry.size : 0,
+        };
     }));
+    const totalPages = limit ? Math.max(1, Math.ceil(totalCount / limit)) : 1;
 
     res.json({
         results,
-        totalCount: matches.length,
-        truncated: false,
+        totalCount,
+        truncated: limit ? totalCount > (offset + results.length) : false,
+        page,
+        limit,
+        totalPages,
     });
 }));
 

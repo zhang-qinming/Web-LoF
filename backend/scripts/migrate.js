@@ -30,7 +30,7 @@ async function migrate() {
         console.log('Schema migration completed successfully.');
 
         const [tables] = await pool.query(
-            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ('file_id_mapping','trait','file_metadata','gene_annotation','gene_set','gene_set_member','gwas_variant','lof_burden','gene_posterior','gene_regulation','go_enrichment','cnmf_program','cnmf_spectra','program_enrichment','regulator_enrichment','perturb_effect','trans_eqtl','trait_program_edge','gene_program_trait_edge')",
+            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ('file_id_mapping','trait','file_metadata','trait_ldsc','gene_annotation','gene_set','gene_set_member','gwas_variant','lof_burden','gene_posterior','gene_regulation','go_enrichment','cnmf_program','cnmf_spectra','program_enrichment','regulator_enrichment','perturb_effect','trans_eqtl','trait_program_edge','gene_program_trait_edge')",
             [dbName]
         );
         console.log('Created tables:', tables.map((item) => item.TABLE_NAME).join(', '));
