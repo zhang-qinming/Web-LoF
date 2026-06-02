@@ -8,7 +8,6 @@ const { parseTsvStream } = require('../lib/tsv');
 
 const router = express.Router();
 
-const crossTraitStore = createFileStore(config.paths.crossTraitHeatmapDir);
 const metaTraitsStore = createFileStore(`${config.paths.crossTraitHeatmapDir}/meta/traits`);
 const effectsStore = createFileStore(`${config.paths.crossTraitHeatmapDir}/tables/effects`);
 
@@ -19,9 +18,41 @@ const DEFAULT_SEARCH_LIMIT = 12;
 const MAX_SEARCH_LIMIT = 30;
 const EFFECT_CACHE_TTL_MS = 2 * 60 * 1000;
 const TARGET_CACHE_TTL_MS = 5 * 60 * 1000;
+const CURATED_RECOMMENDED_TARGET_IDS = [
+    'GCST90081632', // hypertension
+    'GCST90081711', // type 2 diabetes
+    'GCST90083719', // type 1 diabetes
+    'GCST90081644', // myocardial infarction
+    'GCST90084022', // stroke
+    'GCST90083752', // hypercholesterolemia
+    'GCST90083750', // overweight and obesity
+    'GCST90083786', // schizophrenia
+    'GCST90083805', // Alzheimer's disease
+    'GCST90083803', // Parkinson's disease
+    'GCST90084127', // asthma
+    'GCST90081860', // rheumatoid arthritis
+    'GCST90082286', // smoking status
+    'GCST90081543', // coffee consumed
+    'GCST90083791', // major depressive disorder
+    'GCST90084570', // chronic kidney disease
+    'GCST90081868', // atrial fibrillation
+    'GCST90081732', // migraine
+];
 
 const effectRowsCache = new Map();
 const recommendedTargetsCache = new Map();
+
+function isMissingStoreError(err) {
+    return Boolean(
+        err
+        && (
+            err.code === 'ENOENT'
+            || err.code === 2
+            || /no such file/i.test(err.message || '')
+            || /does not exist/i.test(err.message || '')
+        )
+    );
+}
 
 function escapeLike(value) {
     return String(value).replace(/[\\%_]/g, (match) => `\\${match}`);
@@ -56,6 +87,15 @@ function getFreshCache(cache, key, ttlMs) {
 
 function setCache(cache, key, value) {
     cache.set(key, { at: Date.now(), value });
+}
+
+async function listStoreEntries(store) {
+    try {
+        return await store.list(store.rootPath);
+    } catch (err) {
+        if (isMissingStoreError(err)) return [];
+        throw err;
+    }
 }
 
 async function getTraitMetaById(traitId) {
@@ -217,12 +257,21 @@ function summarizeMatrix(matrix) {
 }
 
 async function getAvailableTraitIds() {
-    const entries = await metaTraitsStore.list(metaTraitsStore.rootPath);
-    return entries
-        .filter((entry) => entry.type === 'file' && entry.name.endsWith('.tsv'))
-        .map((entry) => entry.name.replace(/\.tsv$/i, ''))
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b));
+    const [metaEntries, effectEntries] = await Promise.all([
+        listStoreEntries(metaTraitsStore),
+        listStoreEntries(effectsStore),
+    ]);
+    const ids = new Set();
+
+    [metaEntries, effectEntries].forEach((entries) => {
+        entries
+            .filter((entry) => entry.type === 'file' && entry.name.endsWith('.tsv'))
+            .map((entry) => entry.name.replace(/\.tsv$/i, ''))
+            .filter(Boolean)
+            .forEach((traitId) => ids.add(traitId));
+    });
+
+    return [...ids].sort((a, b) => a.localeCompare(b));
 }
 
 async function getRecommendedTargets(sourceTraitId) {
@@ -231,16 +280,10 @@ async function getRecommendedTargets(sourceTraitId) {
     if (cached) return cached;
 
     const availableIds = await getAvailableTraitIds();
-    const targetMetaText = await crossTraitStore.readFile(crossTraitStore.resolve('meta/trait_targets.tsv'));
-    const lines = String(targetMetaText || '').split(/\r?\n/).slice(1).map((line) => line.trim()).filter(Boolean);
-    const recommendedIds = [];
-
-    lines.forEach((line) => {
-        const [traitId] = line.split('\t');
-        const normalized = normalizeTraitId(traitId);
-        if (!normalized || normalized === safeSourceId || !availableIds.includes(normalized)) return;
-        if (!recommendedIds.includes(normalized)) recommendedIds.push(normalized);
-    });
+    const availableIdSet = new Set(availableIds);
+    const recommendedIds = CURATED_RECOMMENDED_TARGET_IDS.filter(
+        (traitId) => traitId !== safeSourceId && availableIdSet.has(traitId),
+    );
 
     if (recommendedIds.length < MAX_TARGET_IDS) {
         availableIds.forEach((traitId) => {
@@ -284,7 +327,7 @@ router.get('/api/cross-trait/:fileId/status', asyncRoute(async (req, res) => {
     const meta = await getTraitMetaById(fileId);
     const candidates = pickTraitIdCandidates(fileId, meta);
     let resolvedTraitId = '';
-    let hasMeta = false;
+    let hasMeta = Boolean(meta);
     let hasEffects = false;
 
     for (const candidate of candidates) {
@@ -303,7 +346,7 @@ router.get('/api/cross-trait/:fileId/status', asyncRoute(async (req, res) => {
         resolvedTraitId: resolvedTraitId || candidates[0] || fileId,
         hasMeta,
         hasEffects,
-        available: hasMeta && hasEffects,
+        available: hasEffects,
     });
 }));
 
@@ -313,7 +356,13 @@ router.get('/api/cross-trait/:fileId/targets', asyncRoute(async (req, res) => {
 
     const meta = await getTraitMetaById(fileId);
     const candidates = pickTraitIdCandidates(fileId, meta);
-    const resolvedSourceId = candidates[0] || fileId;
+    let resolvedSourceId = candidates[0] || fileId;
+    for (const candidate of candidates) {
+        const rows = await getEffectRows(candidate);
+        if (!rows) continue;
+        resolvedSourceId = candidate;
+        break;
+    }
     const targets = await getRecommendedTargets(resolvedSourceId);
 
     res.json({

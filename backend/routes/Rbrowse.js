@@ -70,8 +70,8 @@ async function countDataOutputs(rootPath) {
 }
 
 async function buildHomeStats() {
-    const [traitCount, programFiles, dataOutputs] = await Promise.all([
-        metaModel.getTraitCount(),
+    const [metaSummary, programFiles, dataOutputs] = await Promise.all([
+        metaModel.getHomeSummary(),
         (async () => {
             const exists = await regulationStore.exists(regulationStore.rootPath);
             if (!exists) return 0;
@@ -82,7 +82,7 @@ async function buildHomeStats() {
     ]);
 
     return {
-        traits: traitCount,
+        ...metaSummary,
         programs: programFiles,
         dataOutputs,
     };

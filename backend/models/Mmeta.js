@@ -151,4 +151,33 @@ async function getTraitCount() {
     return Number(total) || 0;
 }
 
-module.exports = { getTraits, getTraitByName, getTraitMeta, getTraitCount };
+async function getHomeSummary() {
+    const [[row]] = await pool.query(
+        `SELECT
+                COUNT(DISTINCT CASE
+                    WHEN fm.trait_name IS NOT NULL AND fm.trait_name != '' THEN fm.file_id
+                END) AS traits,
+                COALESCE(SUM(CASE WHEN gm.n_variants IS NULL THEN 0 ELSE gm.n_variants END), 0) AS variants,
+                COALESCE(SUM(CASE WHEN gm.n_sig IS NULL THEN 0 ELSE gm.n_sig END), 0) AS significantLoci,
+                MIN(gm.year) AS minYear,
+                MAX(gm.year) AS maxYear,
+                MAX(NULLIF(gm.collect_date, '')) AS latestCollectDate,
+                COUNT(DISTINCT NULLIF(gm.source_batch, '')) AS sourceBatches,
+                COUNT(DISTINCT NULLIF(gm.population, '')) AS populations
+         FROM file_metadata fm
+         LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id`
+    );
+
+    return {
+        traits: Number(row?.traits) || 0,
+        variants: Number(row?.variants) || 0,
+        significantLoci: Number(row?.significantLoci) || 0,
+        minYear: row?.minYear ? Number(row.minYear) : null,
+        maxYear: row?.maxYear ? Number(row.maxYear) : null,
+        latestCollectDate: row?.latestCollectDate || null,
+        sourceBatches: Number(row?.sourceBatches) || 0,
+        populations: Number(row?.populations) || 0,
+    };
+}
+
+module.exports = { getTraits, getTraitByName, getTraitMeta, getTraitCount, getHomeSummary };

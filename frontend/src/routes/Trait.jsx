@@ -110,10 +110,23 @@ export default function Trait() {
                     userSelectedTabRef.current = true;
                     setTab(v);
                 }}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
                 sx={{
-                    mb: 3, '& .MuiTab-root': { textTransform: 'none', fontWeight: 500, fontSize: '0.9rem' },
+                    mb: 3,
+                    '& .MuiTab-root': {
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: '0.9rem',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                    },
                     '& .Mui-selected': { fontWeight: 700 },
                     '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
+                    '& .MuiTabs-scrollButtons': {
+                        borderRadius: 1.5,
+                    },
                 }}>
                 <Tab label="Program Scatter" disabled={!hasProgramScatter} />
                 <Tab label="Trait Program Graph" disabled={!hasProgramGraph} />
