@@ -33,12 +33,25 @@ const TAB_KEY_TO_INDEX = {
     'cross-trait-heatmap': 7,
 };
 
+const TAB_INDEX_TO_KEY = [
+    'program-scatter',
+    'trait-program-graph',
+    'manhattan',
+    'burden-volcano',
+    'posterior-volcano',
+    'gene-evidence',
+    'gene-qq',
+    'cross-trait-heatmap',
+];
+
 export default function Trait() {
     const theme = useTheme();
     const { traitName } = useParams();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const fileId = traitName;
-    const requestedTab = TAB_KEY_TO_INDEX[searchParams.get('tab')] ?? 2;
+    const requestedTabKey = searchParams.get('tab');
+    const hasExplicitTab = Object.prototype.hasOwnProperty.call(TAB_KEY_TO_INDEX, requestedTabKey);
+    const requestedTab = hasExplicitTab ? TAB_KEY_TO_INDEX[requestedTabKey] : 2;
     const [tab, setTab] = React.useState(requestedTab);
     const userSelectedTabRef = React.useRef(false);
     const { data: scatterListData } = useSWR('/api/programs/list', fetcher);
@@ -56,6 +69,13 @@ export default function Trait() {
     const hasProgramGraph = Boolean(graphFileId);
     const preferredTab = hasProgramScatter ? 0 : hasProgramGraph ? 1 : 2;
 
+    const syncTabParam = React.useCallback((nextTab, options = {}) => {
+        const tabKey = TAB_INDEX_TO_KEY[nextTab] || TAB_INDEX_TO_KEY[2];
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set('tab', tabKey);
+        setSearchParams(nextParams, options);
+    }, [searchParams, setSearchParams]);
+
     React.useEffect(() => {
         userSelectedTabRef.current = false;
         setTab(requestedTab);
@@ -64,13 +84,16 @@ export default function Trait() {
     React.useEffect(() => {
         if (!availabilityReady) return;
 
-        setTab((current) => {
-            if (current === 0) return hasProgramScatter ? current : preferredTab;
-            if (current === 1) return hasProgramGraph ? current : preferredTab;
-            if (current === 2) return userSelectedTabRef.current ? current : preferredTab;
-            return current;
-        });
-    }, [availabilityReady, hasProgramGraph, hasProgramScatter, preferredTab]);
+        let nextTab = tab;
+        if (tab === 0) nextTab = hasProgramScatter ? tab : preferredTab;
+        else if (tab === 1) nextTab = hasProgramGraph ? tab : preferredTab;
+        else if (tab === 2 && !userSelectedTabRef.current && !hasExplicitTab) nextTab = preferredTab;
+
+        if (nextTab !== tab) {
+            setTab(nextTab);
+            syncTabParam(nextTab, { replace: true });
+        }
+    }, [availabilityReady, hasExplicitTab, hasProgramGraph, hasProgramScatter, preferredTab, syncTabParam, tab]);
 
     if (!fileId) {
         return (
@@ -109,6 +132,7 @@ export default function Trait() {
                 onChange={(e, v) => {
                     userSelectedTabRef.current = true;
                     setTab(v);
+                    syncTabParam(v);
                 }}
                 variant="scrollable"
                 scrollButtons="auto"

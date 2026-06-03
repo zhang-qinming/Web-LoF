@@ -1,0 +1,101 @@
+<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
+  <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
+  <text x="62" y="82" fill="#A21CAF" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Posterior volcano</text>
+  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">GCST90081631 posterior effect distribution</text>
+  <line x1="104" y1="318" x2="620" y2="318" stroke="#CBD5E1" stroke-width="2"/>
+  <line x1="104" y1="318" x2="104" y2="118" stroke="#CBD5E1" stroke-width="2"/>
+  <line x1="360" y1="318" x2="360" y2="118" stroke="#CBD5E1" stroke-width="1.6" stroke-dasharray="7 7"/>
+  <line x1="104" y1="276" x2="620" y2="276" stroke="#F0ABFC" stroke-width="1.7" stroke-dasharray="8 7"/>
+  <text x="360" y="356" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="13">Posterior mean</text>
+  <text transform="rotate(-90 76 236)" x="76" y="236" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="13">-log10(P)</text>
+  <g fill="#94A3B8" fill-opacity="0.32">
+    <circle cx="362" cy="316" r="2.0"/>
+    <circle cx="364" cy="314" r="2.0"/>
+    <circle cx="361" cy="317" r="2.0"/>
+    <circle cx="362" cy="316" r="2.0"/>
+    <circle cx="360" cy="318" r="2.0"/>
+    <circle cx="361" cy="317" r="2.0"/>
+    <circle cx="362" cy="316" r="2.0"/>
+    <circle cx="356" cy="314" r="2.0"/>
+    <circle cx="364" cy="314" r="2.0"/>
+    <circle cx="361" cy="317" r="2.0"/>
+    <circle cx="332" cy="309" r="2.2"/>
+    <circle cx="356" cy="314" r="2.0"/>
+    <circle cx="362" cy="316" r="2.0"/>
+    <circle cx="362" cy="317" r="2.0"/>
+    <circle cx="363" cy="315" r="2.0"/>
+    <circle cx="365" cy="312" r="2.1"/>
+    <circle cx="317" cy="299" r="2.4"/>
+    <circle cx="357" cy="315" r="2.0"/>
+    <circle cx="362" cy="316" r="2.0"/>
+    <circle cx="373" cy="308" r="2.1"/>
+    <circle cx="365" cy="313" r="2.0"/>
+    <circle cx="370" cy="313" r="2.0"/>
+    <circle cx="296" cy="287" r="2.6"/>
+    <circle cx="359" cy="318" r="2.0"/>
+    <circle cx="361" cy="317" r="2.0"/>
+    <circle cx="356" cy="314" r="2.0"/>
+    <circle cx="412" cy="280" r="2.7"/>
+    <circle cx="361" cy="317" r="2.0"/>
+    <circle cx="324" cy="314" r="2.0"/>
+    <circle cx="309" cy="260" r="2.9"/>
+    <circle cx="371" cy="313" r="2.0"/>
+    <circle cx="355" cy="313" r="2.0"/>
+    <circle cx="353" cy="305" r="2.2"/>
+    <circle cx="406" cy="302" r="2.3"/>
+    <circle cx="356" cy="314" r="2.0"/>
+    <circle cx="398" cy="308" r="2.2"/>
+    <circle cx="359" cy="318" r="2.0"/>
+    <circle cx="363" cy="317" r="2.0"/>
+    <circle cx="355" cy="314" r="2.0"/>
+    <circle cx="372" cy="312" r="2.0"/>
+    <circle cx="351" cy="315" r="2.0"/>
+    <circle cx="454" cy="289" r="2.5"/>
+    <circle cx="358" cy="316" r="2.0"/>
+    <circle cx="374" cy="308" r="2.1"/>
+  </g>
+  <g stroke="#FFFFFF" stroke-width="1">
+    <circle cx="488.9" cy="182.3" r="3.8" fill="#A21CAF" fill-opacity="0.9"><title>MGARP: post_mean=0.630, -log10P=6.04</title></circle>
+    <circle cx="495.0" cy="132.8" r="4.4" fill="#A21CAF" fill-opacity="0.9"><title>NOS3: post_mean=0.660, -log10P=8.25</title></circle>
+    <circle cx="494.6" cy="194.9" r="3.7" fill="#A21CAF" fill-opacity="0.9"><title>SLC44A2: post_mean=0.658, -log10P=5.48</title></circle>
+    <circle cx="477.5" cy="169.8" r="4.0" fill="#A21CAF" fill-opacity="0.9"><title>PKD1: post_mean=0.574, -log10P=6.60</title></circle>
+    <circle cx="436.8" cy="208.7" r="3.4" fill="#A21CAF" fill-opacity="0.9"><title>PROB1: post_mean=0.375, -log10P=4.87</title></circle>
+    <circle cx="484.9" cy="151.5" r="4.2" fill="#A21CAF" fill-opacity="0.9"><title>ROBO1: post_mean=0.611, -log10P=7.42</title></circle>
+    <circle cx="453.5" cy="197.6" r="3.7" fill="#A21CAF" fill-opacity="0.9"><title>YLPM1: post_mean=0.457, -log10P=5.36</title></circle>
+    <circle cx="416.8" cy="233.5" r="3.1" fill="#A21CAF" fill-opacity="0.9"><title>ZNF114: post_mean=0.277, -log10P=3.76</title></circle>
+    <circle cx="452.6" cy="233.7" r="3.1" fill="#A21CAF" fill-opacity="0.9"><title>KRT10: post_mean=0.453, -log10P=3.75</title></circle>
+    <circle cx="440.3" cy="220.0" r="3.3" fill="#A21CAF" fill-opacity="0.9"><title>CACNA1F: post_mean=0.393, -log10P=4.36</title></circle>
+    <circle cx="505.5" cy="217.2" r="3.4" fill="#A21CAF" fill-opacity="0.9"><title>UBR3: post_mean=0.711, -log10P=4.49</title></circle>
+    <circle cx="228.5" cy="234.5" r="3.1" fill="#2563EB" fill-opacity="0.9"><title>CYP11A1: post_mean=-0.643, -log10P=3.72</title></circle>
+    <circle cx="545.4" cy="234.8" r="3.1" fill="#A21CAF" fill-opacity="0.9"><title>GDF5-AS1: post_mean=0.906, -log10P=3.71</title></circle>
+    <circle cx="569.7" cy="152.4" r="4.2" fill="#A21CAF" fill-opacity="0.9"><title>PKD2: post_mean=1.025, -log10P=7.38</title></circle>
+    <circle cx="285.4" cy="232.5" r="3.1" fill="#2563EB" fill-opacity="0.9"><title>CPO: post_mean=-0.365, -log10P=3.81</title></circle>
+    <circle cx="442.6" cy="231.8" r="3.1" fill="#A21CAF" fill-opacity="0.9"><title>UBR2: post_mean=0.403, -log10P=3.84</title></circle>
+    <circle cx="517.9" cy="211.4" r="3.4" fill="#A21CAF" fill-opacity="0.9"><title>MAP4K4: post_mean=0.772, -log10P=4.75</title></circle>
+    <circle cx="464.8" cy="156.5" r="4.1" fill="#A21CAF" fill-opacity="0.9"><title>SMAD6: post_mean=0.512, -log10P=7.19</title></circle>
+    <circle cx="422.6" cy="235.2" r="3.0" fill="#A21CAF" fill-opacity="0.9"><title>ARHGAP10: post_mean=0.306, -log10P=3.69</title></circle>
+    <circle cx="458.1" cy="223.4" r="3.2" fill="#A21CAF" fill-opacity="0.9"><title>CTDP1: post_mean=0.479, -log10P=4.21</title></circle>
+    <circle cx="470.0" cy="203.0" r="3.6" fill="#A21CAF" fill-opacity="0.9"><title>ZMYM5: post_mean=0.537, -log10P=5.12</title></circle>
+    <circle cx="420.3" cy="212.9" r="3.4" fill="#A21CAF" fill-opacity="0.9"><title>SAMD11: post_mean=0.295, -log10P=4.68</title></circle>
+    <circle cx="584.1" cy="149.3" r="4.3" fill="#A21CAF" fill-opacity="0.9"><title>FES: post_mean=1.095, -log10P=7.51</title></circle>
+    <circle cx="236.1" cy="225.2" r="3.2" fill="#2563EB" fill-opacity="0.9"><title>CFAP95: post_mean=-0.605, -log10P=4.13</title></circle>
+    <circle cx="196.7" cy="212.7" r="3.4" fill="#2563EB" fill-opacity="0.9"><title>PANK1: post_mean=-0.798, -log10P=4.69</title></circle>
+    <circle cx="435.4" cy="227.2" r="3.2" fill="#A21CAF" fill-opacity="0.9"><title>ZNF843: post_mean=0.369, -log10P=4.04</title></circle>
+    <circle cx="449.7" cy="211.4" r="3.4" fill="#A21CAF" fill-opacity="0.9"><title>IGF2R: post_mean=0.438, -log10P=4.75</title></circle>
+    <circle cx="429.0" cy="223.2" r="3.2" fill="#A21CAF" fill-opacity="0.9"><title>MEPE: post_mean=0.337, -log10P=4.22</title></circle>
+    <circle cx="510.6" cy="222.8" r="3.2" fill="#A21CAF" fill-opacity="0.9"><title>PRPF38B: post_mean=0.736, -log10P=4.24</title></circle>
+    <circle cx="492.5" cy="223.4" r="3.2" fill="#A21CAF" fill-opacity="0.9"><title>TM2D2: post_mean=0.647, -log10P=4.21</title></circle>
+    <circle cx="456.7" cy="223.3" r="3.2" fill="#A21CAF" fill-opacity="0.9"><title>KPNA5: post_mean=0.473, -log10P=4.22</title></circle>
+    <circle cx="498.3" cy="194.8" r="3.7" fill="#A21CAF" fill-opacity="0.9"><title>GUCY1A1: post_mean=0.675, -log10P=5.49</title></circle>
+    <circle cx="452.4" cy="227.7" r="3.1" fill="#A21CAF" fill-opacity="0.9"><title>PCDHGA8: post_mean=0.451, -log10P=4.02</title></circle>
+    <circle cx="512.5" cy="144.6" r="4.3" fill="#A21CAF" fill-opacity="0.9"><title>TNPO3: post_mean=0.745, -log10P=7.72</title></circle>
+    <circle cx="433.2" cy="228.8" r="3.1" fill="#A21CAF" fill-opacity="0.9"><title>SCN5A: post_mean=0.358, -log10P=3.97</title></circle>
+    <circle cx="470.5" cy="229.4" r="3.1" fill="#A21CAF" fill-opacity="0.9"><title>ETV4: post_mean=0.540, -log10P=3.95</title></circle>
+    <circle cx="488.3" cy="202.2" r="3.6" fill="#A21CAF" fill-opacity="0.9"><title>ITPRID2: post_mean=0.627, -log10P=5.15</title></circle>
+    <circle cx="467.5" cy="216.5" r="3.3" fill="#A21CAF" fill-opacity="0.9"><title>CELSR3: post_mean=0.525, -log10P=4.52</title></circle>
+  </g>
+  <rect x="438" y="64" width="170" height="58" rx="14" fill="#FAE8FF" stroke="#F5D0FE"/>
+  <text x="458" y="88" fill="#A21CAF" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">38 significant genes</text>
+  <text x="458" y="107" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="12">18,456 full rows</text>
+</svg>

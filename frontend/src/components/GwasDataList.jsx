@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useDeferredValue, useMemo, useRef } from 'react';
 import useSWR from 'swr';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import { fetcher } from '../api/gwas';
 import {
@@ -167,7 +167,12 @@ function headerLayoutSx(column = {}) {
     };
 }
 
-function TraitRow({ row, index, columns, theme }) {
+function buildTraitHref(row, figureTab) {
+    const path = `/trait/${encodeURIComponent(row.file_id)}`;
+    return figureTab ? `${path}?tab=${encodeURIComponent(figureTab)}` : path;
+}
+
+function TraitRow({ row, index, columns, theme, figureTab }) {
     return (
         <TableRow
             sx={{
@@ -195,7 +200,7 @@ function TraitRow({ row, index, columns, theme }) {
                     {col.id === 'trait_name' ? (
                         <Link
                             component={RouterLink}
-                            to={`/trait/${encodeURIComponent(row.file_id)}`}
+                            to={buildTraitHref(row, figureTab)}
                             underline="hover"
                             sx={{ color: theme.palette.primary.main, fontWeight: 600, fontSize: '0.85rem' }}
                         >
@@ -271,6 +276,8 @@ export default function GwasDataList({
     defaultOrder = 'ASC',
 }) {
     const theme = useTheme();
+    const [searchParams] = useSearchParams();
+    const figureTab = searchParams.get('tab') || '';
     const rootRef = useRef(null);
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
@@ -502,7 +509,7 @@ export default function GwasDataList({
                                     ) : (
                                         <>
                                             {rows.map((row, index) => (
-                                                <TraitRow key={row.id || index} row={row} index={index} columns={columns} theme={theme} />
+                                                <TraitRow key={row.id || index} row={row} index={index} columns={columns} theme={theme} figureTab={figureTab} />
                                             ))}
                                         </>
                                     )}
