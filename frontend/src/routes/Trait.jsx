@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { Box, Typography, Tabs, Tab } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Timeline } from '@mui/icons-material';
@@ -44,9 +44,22 @@ const TAB_INDEX_TO_KEY = [
     'cross-trait-heatmap',
 ];
 
+const FIGURE_FOCUS_HASH = '#trait-figure-panel';
+
+function getVisibleHeaderOffset() {
+    const headers = Array.from(document.querySelectorAll('.header, .mobile-header'));
+    const visibleHeader = headers.find((header) => {
+        const style = window.getComputedStyle(header);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+    });
+
+    return visibleHeader?.getBoundingClientRect().height || 0;
+}
+
 export default function Trait() {
     const theme = useTheme();
     const { traitName } = useParams();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const fileId = traitName;
     const requestedTabKey = searchParams.get('tab');
@@ -54,6 +67,7 @@ export default function Trait() {
     const requestedTab = hasExplicitTab ? TAB_KEY_TO_INDEX[requestedTabKey] : 2;
     const [tab, setTab] = React.useState(requestedTab);
     const userSelectedTabRef = React.useRef(false);
+    const figurePanelRef = React.useRef(null);
     const { data: scatterListData } = useSWR('/api/programs/list', fetcher);
     const { data: graphListData } = useSWR('/api/programs/graph-list', fetcher);
     const { data: metaData } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
@@ -68,6 +82,7 @@ export default function Trait() {
     const hasProgramScatter = Boolean(scatterFileId);
     const hasProgramGraph = Boolean(graphFileId);
     const preferredTab = hasProgramScatter ? 0 : hasProgramGraph ? 1 : 2;
+    const shouldFocusFigure = location.hash === FIGURE_FOCUS_HASH;
 
     const syncTabParam = React.useCallback((nextTab, options = {}) => {
         const tabKey = TAB_INDEX_TO_KEY[nextTab] || TAB_INDEX_TO_KEY[2];
@@ -95,6 +110,35 @@ export default function Trait() {
         }
     }, [availabilityReady, hasExplicitTab, hasProgramGraph, hasProgramScatter, preferredTab, syncTabParam, tab]);
 
+    const scrollFigurePanelIntoView = React.useCallback(() => {
+        const panel = figurePanelRef.current;
+        if (!panel) return;
+
+        const top = panel.getBoundingClientRect().top + window.scrollY - getVisibleHeaderOffset() - 8;
+        window.scrollTo({ top: Math.max(0, top), left: 0, behavior: 'auto' });
+    }, []);
+
+    React.useLayoutEffect(() => {
+        if (!fileId || !shouldFocusFigure) return undefined;
+
+        const rafIds = [];
+        const queueScroll = () => {
+            const firstFrame = window.requestAnimationFrame(() => {
+                const secondFrame = window.requestAnimationFrame(scrollFigurePanelIntoView);
+                rafIds.push(secondFrame);
+            });
+            rafIds.push(firstFrame);
+        };
+
+        queueScroll();
+        const settleTimer = window.setTimeout(queueScroll, 420);
+
+        return () => {
+            rafIds.forEach((rafId) => window.cancelAnimationFrame(rafId));
+            window.clearTimeout(settleTimer);
+        };
+    }, [availabilityReady, fileId, metaData, scrollFigurePanelIntoView, shouldFocusFigure, tab]);
+
     if (!fileId) {
         return (
             <PageFrame
@@ -121,7 +165,7 @@ export default function Trait() {
     }
 
     return (
-        <Box sx={{ maxWidth: 1560, mx: 'auto', px: { xs: 2, md: 3 }, py: 4 }}>
+        <Box sx={{ width: '100%', maxWidth: 1500, minWidth: 0, mx: 'auto', px: { xs: 2, md: 3 }, py: 4 }}>
             <TraitMetaCard fileId={fileId} listData={scatterListData} />
 
             <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 1, mt: 4 })}>
@@ -162,7 +206,11 @@ export default function Trait() {
                 <Tab label="Cross-trait Heatmap" />
             </Tabs>
 
-            <Box sx={{ minHeight: 400 }}>
+            <Box
+                id="trait-figure-panel"
+                ref={figurePanelRef}
+                sx={{ minHeight: 400, scrollMarginTop: { xs: 7, md: 8 } }}
+            >
                 {tab === 0 && hasProgramScatter && <ProgramScatter key={scatterFileId} fileId={scatterFileId} />}
                 {tab === 0 && !hasProgramScatter && (
                     <StatePanel

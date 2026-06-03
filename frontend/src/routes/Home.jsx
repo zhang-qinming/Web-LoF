@@ -35,6 +35,8 @@ import {
     Storage,
 } from '@mui/icons-material';
 import axios from 'axios';
+import ReleaseLogSection from '../components/ReleaseLogSection';
+import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
 import { downloadDataPaths } from '../utils/download';
 import { captionSx, panelSx, summaryChipSx } from '../themeUtils';
 import homeFigureBurdenVolcano from '../assets/home-figure-burden-volcano.svg';
@@ -58,6 +60,7 @@ const FEATURED_TRAIT = {
     name: 'Non-cancer illness code, self-reported',
     nSig: 32357,
 };
+const FIGURE_FOCUS_HASH = 'trait-figure-panel';
 const numberFormatter = new Intl.NumberFormat('en-US');
 const compactNumberFormatter = new Intl.NumberFormat('en-US', {
     notation: 'compact',
@@ -91,7 +94,7 @@ const shimmerSx = {
 };
 
 function traitTabPath(tab) {
-    return `/trait/${encodeURIComponent(FEATURED_TRAIT.fileId)}?tab=${encodeURIComponent(tab)}`;
+    return `/trait/${encodeURIComponent(FEATURED_TRAIT.fileId)}?tab=${encodeURIComponent(tab)}#${FIGURE_FOCUS_HASH}`;
 }
 
 const traitFigureCards = [
@@ -1082,6 +1085,31 @@ function Home() {
             <HomeSearch theme={theme} />
 
             <FigureGateway items={traitFigureCards} />
+
+            <ReleaseLogSection
+                heading="Recent releases"
+                subtitle="The latest milestones stay on Home; the complete release log lives in About."
+                limit={3}
+                newestFirst
+                outerSx={{
+                    maxWidth: 1180,
+                    mx: 'auto',
+                    px: { xs: 2, sm: 3, lg: 4 },
+                    pb: { xs: 7, md: 9 },
+                }}
+                showNotes={false}
+                action={(
+                    <Button
+                        component={RouterLink}
+                        to={`/about#${RELEASE_LOG_ANCHOR}`}
+                        size="small"
+                        variant="outlined"
+                        endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
+                    >
+                        Full release log
+                    </Button>
+                )}
+            />
         </Box>
     );
 }

@@ -7,6 +7,7 @@ import {
     Stack,
     Typography,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import TraitProgramGraphSummary from './TraitProgramGraphSummary';
@@ -33,6 +34,7 @@ import {
 } from './traitProgramGraph/shared';
 
 export default function TraitProgramGraph({ fileId, traitLabel }) {
+    const navigate = useNavigate();
     const { data, error, isLoading } = useSWR(
         fileId ? `/api/programs/${fileId}/graph` : null,
         fetcher,
@@ -197,6 +199,17 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         setSelectedGene(null);
     }, []);
 
+    const openProgram = useCallback((program) => {
+        if (!program) return;
+        navigate(`/programs/${encodeURIComponent(program)}`);
+    }, [navigate]);
+
+    const openGene = useCallback((gene) => {
+        const label = gene?.geneLabel || gene?.gene || gene?.ensg || gene?.highlightKey;
+        if (!label) return;
+        navigate(`/genes?query=${encodeURIComponent(label)}`);
+    }, [navigate]);
+
     const selectedGeneOccurrences = useMemo(
         () => (selectedGeneKey ? (geneOccurrences.get(selectedGeneKey) || []) : []),
         [geneOccurrences, selectedGeneKey],
@@ -245,15 +258,12 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 onSelectedGeneClear={() => setSelectedGene(null)}
                 onSelectedProgramClear={() => setSelectedProgram(null)}
                 onSideFilterChange={setSideFilter}
-                reset={reset}
                 selectedGene={selectedGene}
                 selectedGeneKey={selectedGeneKey}
                 selectedGeneOccurrences={selectedGeneOccurrences}
                 selectedProgram={selectedProgram}
                 sideFilter={sideFilter}
                 svgRef={svgRef}
-                zoomIn={zoomIn}
-                zoomOut={zoomOut}
             />
 
             <TraitProgramGraphCanvas
@@ -263,11 +273,16 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
+                onOpenGene={openGene}
+                onOpenProgram={openProgram}
                 onSelectGene={handleSelectGene}
                 onSelectProgram={handleSelectProgram}
                 onWheel={onWheel}
+                resetView={reset}
                 rightLayout={rightLayout}
+                selectedGene={selectedGene}
                 selectedGeneKey={selectedGeneKey}
+                selectedGeneOccurrences={selectedGeneOccurrences}
                 selectedProgram={selectedProgram}
                 svgHeight={svgHeight}
                 svgRef={svgRef}
@@ -277,6 +292,8 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 traitNodeHeightValue={traitNodeHeightValue}
                 transform={transform}
                 visibleSides={visibleSides}
+                zoomIn={zoomIn}
+                zoomOut={zoomOut}
             />
 
             <Box sx={{ width: '100%' }}>
@@ -292,8 +309,11 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         modules={summaryModules}
                         side="program"
                         selectedProgram={selectedProgram}
+                        selectedGeneKey={selectedGeneKey}
                         onSelectProgram={handleSelectProgram}
                         onToggleExpanded={toggleExpanded}
+                        onOpenProgram={openProgram}
+                        onOpenGene={openGene}
                         sideMeta={SIDE_META.program}
                         sideMetaMap={SIDE_META}
                         programColor={programColor}

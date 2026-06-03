@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
     Box,
     Button,
@@ -21,6 +21,8 @@ import {
     StorageOutlined,
 } from '@mui/icons-material';
 import { PageFrame } from '../components/PageScaffold';
+import ReleaseLogSection from '../components/ReleaseLogSection';
+import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
 import { captionSx, metricChipTone, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
 
 const COPY = {
@@ -36,6 +38,9 @@ const COPY = {
             { label: 'Open Data Browser', to: '/data' },
         ],
         heroChips: ['Trait-level browsing', 'Program enrichment', 'Downloadable outputs'],
+        releaseEyebrow: 'Release',
+        releaseTitle: 'Full release log',
+        releaseSubtitle: 'A longer milestone view of the project since March 15, 2026, written as readable product notes instead of raw commit text.',
         sections: [
             {
                 icon: InsightsOutlined,
@@ -94,6 +99,9 @@ const COPY = {
             { label: '打开数据浏览器', to: '/data' },
         ],
         heroChips: ['Trait 级浏览', 'Program enrichment', '结果下载'],
+        releaseEyebrow: 'Release',
+        releaseTitle: '完整版本记录',
+        releaseSubtitle: '这里汇总了 2026 年 3 月 15 日以来的主要里程碑，用可读的版本说明而不是直接复制 git 提交信息。',
         sections: [
             {
                 icon: InsightsOutlined,
@@ -204,8 +212,25 @@ function SectionCard({ section, index }) {
 
 export default function About() {
     const theme = useTheme();
+    const location = useLocation();
     const [language, setLanguage] = React.useState('en');
     const copy = COPY[language];
+
+    React.useEffect(() => {
+        if (!location.hash) return undefined;
+
+        const targetId = location.hash.replace(/^#/, '');
+        const target = document.getElementById(targetId);
+        if (!target) return undefined;
+
+        const rafId = window.requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: 'auto', block: 'start' });
+        });
+
+        return () => {
+            window.cancelAnimationFrame(rafId);
+        };
+    }, [location.hash]);
 
     return (
         <PageFrame
@@ -277,6 +302,14 @@ export default function About() {
                     <SectionCard key={section.title} section={section} index={index} />
                 ))}
             </Box>
+
+            <ReleaseLogSection
+                anchorId={RELEASE_LOG_ANCHOR}
+                eyebrow={copy.releaseEyebrow}
+                heading={copy.releaseTitle}
+                subtitle={copy.releaseSubtitle}
+                outerSx={{ mb: 2 }}
+            />
 
             <Paper
                 elevation={0}

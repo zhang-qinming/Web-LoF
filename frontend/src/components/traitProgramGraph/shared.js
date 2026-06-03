@@ -74,6 +74,13 @@ export const INLINE_LEGEND_GROUPS = [
             { label: 'both', color: PROGRAM_COLORS.both_enriched },
         ],
     },
+    {
+        label: 'Regulator group',
+        items: [
+            { label: 'positive', color: EFFECT_COLORS.positive },
+            { label: 'negative', color: EFFECT_COLORS.negative },
+        ],
+    },
 ];
 
 export function clamp(value, min, max) {

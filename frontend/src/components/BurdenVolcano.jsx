@@ -690,9 +690,16 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const hasVisiblePoints = plotData.some((trace) => Array.isArray(trace.x) && trace.x.length > 0);
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={toolbarSx(theme)}>
-                <Box sx={{ minWidth: 220, mr: 0.5 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+            <Box
+                sx={toolbarSx(theme, {
+                    display: 'grid',
+                    gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) auto' },
+                    alignItems: 'start',
+                    gap: 1.5,
+                })}
+            >
+                <Box sx={{ minWidth: 0, maxWidth: { lg: '62ch' } }}>
                     <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.35 }}>
                         {title}
                     </Typography>
@@ -704,47 +711,67 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                     </Typography>
                 </Box>
 
-                <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    value={variantControlValue}
-                    onChange={handleVariantChange}
-                    sx={statusToggleSx(theme)}
-                >
-                    <ToggleButton value="hits">Hits TSV</ToggleButton>
-                    <ToggleButton value="full" disabled={Boolean(payload) && !availableVariants.full}>Full TSV</ToggleButton>
-                </ToggleButtonGroup>
-
-                <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    value={effectMode}
-                    onChange={(_, value) => { if (value) setEffectMode(value); }}
-                    sx={statusToggleSx(theme)}
-                >
-                    <ToggleButton value={EFFECT_MODES.ALL}>All</ToggleButton>
-                    <ToggleButton value={EFFECT_MODES.POSITIVE}>Positive</ToggleButton>
-                    <ToggleButton value={EFFECT_MODES.NEGATIVE}>Negative</ToggleButton>
-                </ToggleButtonGroup>
-
-                <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    value={significantOnly ? 'significant' : 'all'}
-                    onChange={(_, value) => {
-                        if (!value) return;
-                        setSignificantOnly(value === 'significant');
+                <Box
+                    sx={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 1,
+                        minWidth: 0,
+                        justifyContent: { xs: 'flex-start', lg: 'flex-end' },
                     }}
-                    sx={statusToggleSx(theme)}
                 >
-                    <ToggleButton value="all">All genes</ToggleButton>
-                    <ToggleButton value="significant">Sig only</ToggleButton>
-                </ToggleButtonGroup>
+                    <Chip icon={<Timeline />} label={`${filteredRows.length.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                    <Chip icon={<Insights />} label={`${counts.significant.toLocaleString()} highlighted`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
+                    <Chip icon={<Science />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.positive.color, 0.1), color: VOLCANO_STYLE.positive.strong, border: `1px solid ${alpha(VOLCANO_STYLE.positive.strong, 0.2)}` })} />
+                    <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.negative.color, 0.1), color: VOLCANO_STYLE.negative.strong, border: `1px solid ${alpha(VOLCANO_STYLE.negative.strong, 0.2)}` })} />
+                </Box>
 
-                <Chip icon={<Timeline />} label={`${filteredRows.length.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                <Chip icon={<Insights />} label={`${counts.significant.toLocaleString()} highlighted`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
-                <Chip icon={<Science />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.positive.color, 0.1), color: VOLCANO_STYLE.positive.strong, border: `1px solid ${alpha(VOLCANO_STYLE.positive.strong, 0.2)}` })} />
-                <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.negative.color, 0.1), color: VOLCANO_STYLE.negative.strong, border: `1px solid ${alpha(VOLCANO_STYLE.negative.strong, 0.2)}` })} />
+                <Box
+                    sx={{
+                        gridColumn: '1 / -1',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 1,
+                        minWidth: 0,
+                    }}
+                >
+                    <ToggleButtonGroup
+                        exclusive
+                        size="small"
+                        value={variantControlValue}
+                        onChange={handleVariantChange}
+                        sx={statusToggleSx(theme)}
+                    >
+                        <ToggleButton value="hits">Hits TSV</ToggleButton>
+                        <ToggleButton value="full" disabled={Boolean(payload) && !availableVariants.full}>Full TSV</ToggleButton>
+                    </ToggleButtonGroup>
+
+                    <ToggleButtonGroup
+                        exclusive
+                        size="small"
+                        value={effectMode}
+                        onChange={(_, value) => { if (value) setEffectMode(value); }}
+                        sx={statusToggleSx(theme)}
+                    >
+                        <ToggleButton value={EFFECT_MODES.ALL}>All</ToggleButton>
+                        <ToggleButton value={EFFECT_MODES.POSITIVE}>Positive</ToggleButton>
+                        <ToggleButton value={EFFECT_MODES.NEGATIVE}>Negative</ToggleButton>
+                    </ToggleButtonGroup>
+
+                    <ToggleButtonGroup
+                        exclusive
+                        size="small"
+                        value={significantOnly ? 'significant' : 'all'}
+                        onChange={(_, value) => {
+                            if (!value) return;
+                            setSignificantOnly(value === 'significant');
+                        }}
+                        sx={statusToggleSx(theme)}
+                    >
+                        <ToggleButton value="all">All genes</ToggleButton>
+                        <ToggleButton value="significant">Sig only</ToggleButton>
+                    </ToggleButtonGroup>
+                </Box>
             </Box>
 
             <Box sx={toolbarSx(theme)}>

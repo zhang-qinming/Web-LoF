@@ -187,6 +187,9 @@ export default function BurdenVolcanoTable({
             variant="outlined"
             sx={plotFrameSx(theme, {
                 mt: 2,
+                width: '100%',
+                maxWidth: '100%',
+                minWidth: 0,
                 borderRadius: 2,
                 overflow: 'hidden',
                 position: 'relative',
@@ -219,8 +222,17 @@ export default function BurdenVolcanoTable({
                 </Button>
             </Box>
 
-            <Collapse in={tableOpen}>
-                <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 520, overflowX: 'auto', overflowY: 'auto' })}>
+            <Collapse in={tableOpen} unmountOnExit>
+                <TableContainer
+                    sx={stickyTableContainerSx(theme, {
+                        width: '100%',
+                        maxWidth: '100%',
+                        minWidth: 0,
+                        maxHeight: 520,
+                        overflowX: 'auto',
+                        overflowY: 'auto',
+                    })}
+                >
                     <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: tableMinWidth })}>
                         <colgroup>
                             {columnSpecs.map((column) => (

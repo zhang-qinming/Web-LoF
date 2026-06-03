@@ -13,15 +13,11 @@ import {
     Slider,
     Stack,
     Switch,
-    Tooltip,
     Typography,
     Box,
 } from '@mui/material';
 import {
     Download,
-    RestartAlt,
-    ZoomIn,
-    ZoomOut,
 } from '@mui/icons-material';
 import {
     SIDE_META,
@@ -57,15 +53,12 @@ export default function TraitProgramGraphControls({
     onSelectedGeneClear,
     onSelectedProgramClear,
     onSideFilterChange,
-    reset,
     selectedGene,
     selectedGeneKey,
     selectedGeneOccurrences,
     selectedProgram,
     sideFilter,
     svgRef,
-    zoomIn,
-    zoomOut,
 }) {
     return (
         <Card variant="outlined" sx={{ borderRadius: 3, borderColor: 'rgba(15,23,42,0.10)' }}>
@@ -156,19 +149,6 @@ export default function TraitProgramGraphControls({
                         justifyContent={{ xs: 'flex-start', xl: 'flex-end' }}
                         sx={{ minWidth: { xl: 280 } }}
                     >
-                        <Tooltip title="Zoom in">
-                            <Button size="small" variant="outlined" onClick={zoomIn} startIcon={<ZoomIn />}>
-                                Zoom
-                            </Button>
-                        </Tooltip>
-                        <Tooltip title="Zoom out">
-                            <Button size="small" variant="outlined" onClick={zoomOut} startIcon={<ZoomOut />}>
-                                Out
-                            </Button>
-                        </Tooltip>
-                        <Button size="small" variant="outlined" onClick={reset} startIcon={<RestartAlt />}>
-                            Reset view
-                        </Button>
                         <Button size="small" variant="outlined" onClick={clearSelection}>
                             Clear highlight
                         </Button>

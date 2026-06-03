@@ -1,5 +1,11 @@
 import React, { useCallback } from 'react';
-import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
+import { Box, Button, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
+import {
+    OpenInNew,
+    RestartAlt,
+    ZoomIn,
+    ZoomOut,
+} from '@mui/icons-material';
 import {
     computeEdgeStyle,
     directionFromSign,
@@ -124,18 +130,166 @@ function SectionNote({ x, y, lines }) {
     );
 }
 
+function selectedGeneLabel(gene) {
+    return gene?.geneLabel || gene?.gene || gene?.ensg || gene?.highlightKey || '';
+}
+
+function ZoomToolbar({ scale, zoomIn, zoomOut, resetView }) {
+    const zoomLabel = `${Math.round(scale * 100)}%`;
+
+    return (
+        <Box
+            data-graph-clickable="true"
+            onPointerDown={(event) => event.stopPropagation()}
+            sx={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 3,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 0.75,
+                py: 0.65,
+                borderRadius: 1.5,
+                bgcolor: 'rgba(255,255,255,0.94)',
+                border: '1px solid rgba(15,23,42,0.12)',
+                boxShadow: '0 12px 34px rgba(15,23,42,0.12)',
+                backdropFilter: 'blur(8px)',
+            }}
+        >
+            <Chip
+                label={zoomLabel}
+                size="small"
+                sx={{
+                    height: 26,
+                    minWidth: 58,
+                    borderRadius: 1,
+                    fontWeight: 900,
+                    color: '#0f172a',
+                    bgcolor: 'rgba(15,23,42,0.06)',
+                }}
+            />
+            <Tooltip title="Zoom out">
+                <IconButton size="small" aria-label="Zoom out" onClick={zoomOut}>
+                    <ZoomOut fontSize="small" />
+                </IconButton>
+            </Tooltip>
+            <Tooltip title="Zoom in">
+                <IconButton size="small" aria-label="Zoom in" onClick={zoomIn}>
+                    <ZoomIn fontSize="small" />
+                </IconButton>
+            </Tooltip>
+            <Tooltip title="Reset view">
+                <IconButton size="small" aria-label="Reset view" onClick={resetView}>
+                    <RestartAlt fontSize="small" />
+                </IconButton>
+            </Tooltip>
+        </Box>
+    );
+}
+
+function SelectionActions({
+    onOpenGene,
+    onOpenProgram,
+    selectedGene,
+    selectedGeneOccurrences,
+    selectedProgram,
+}) {
+    if (!selectedProgram && !selectedGene) return null;
+
+    const geneLabel = selectedGeneLabel(selectedGene);
+    const occurrenceCount = selectedGeneOccurrences?.length || 0;
+
+    return (
+        <Box
+            data-graph-clickable="true"
+            onPointerDown={(event) => event.stopPropagation()}
+            sx={{
+                position: 'absolute',
+                left: 12,
+                bottom: 12,
+                zIndex: 3,
+                maxWidth: { xs: 'calc(100% - 24px)', sm: 460 },
+                p: 1,
+                borderRadius: 1.5,
+                bgcolor: 'rgba(255,255,255,0.95)',
+                border: '1px solid rgba(15,23,42,0.12)',
+                boxShadow: '0 16px 42px rgba(15,23,42,0.14)',
+                backdropFilter: 'blur(8px)',
+            }}
+        >
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
+                {selectedProgram && (
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                        <Chip
+                            label={selectedProgram}
+                            size="small"
+                            sx={{
+                                borderRadius: 1,
+                                fontWeight: 900,
+                                color: '#245089',
+                                bgcolor: 'rgba(79,140,201,0.12)',
+                                maxWidth: 190,
+                            }}
+                        />
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<OpenInNew />}
+                            onClick={() => onOpenProgram?.(selectedProgram)}
+                            sx={{ textTransform: 'none', fontWeight: 800, whiteSpace: 'nowrap' }}
+                        >
+                            Open program
+                        </Button>
+                    </Stack>
+                )}
+                {selectedGene && (
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                        <Chip
+                            label={`${geneLabel} - ${occurrenceCount} rows`}
+                            size="small"
+                            sx={{
+                                borderRadius: 1,
+                                fontWeight: 900,
+                                color: '#8f2f20',
+                                bgcolor: 'rgba(239,78,47,0.12)',
+                                maxWidth: 230,
+                            }}
+                        />
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<OpenInNew />}
+                            onClick={() => onOpenGene?.(selectedGene)}
+                            sx={{ textTransform: 'none', fontWeight: 800, whiteSpace: 'nowrap' }}
+                        >
+                            Open gene
+                        </Button>
+                    </Stack>
+                )}
+            </Stack>
+        </Box>
+    );
+}
+
 export default function TraitProgramGraphCanvas({
     clearSelection,
     isDragging,
     leftLayout,
+    onOpenGene,
+    onOpenProgram,
     onPointerDown,
     onPointerMove,
     onPointerUp,
     onSelectGene,
     onSelectProgram,
     onWheel,
+    resetView,
     rightLayout,
+    selectedGene,
     selectedGeneKey,
+    selectedGeneOccurrences,
     selectedProgram,
     svgHeight,
     svgRef,
@@ -145,6 +299,8 @@ export default function TraitProgramGraphCanvas({
     traitNodeHeightValue,
     transform,
     visibleSides,
+    zoomIn,
+    zoomOut,
 }) {
     const renderGeneColumns = useCallback(({
         columns,
@@ -179,6 +335,10 @@ export default function TraitProgramGraphCanvas({
                     key={`${gene.id}:${column}`}
                     data-graph-clickable="true"
                     onClick={() => onSelectGene(gene)}
+                    onDoubleClick={(event) => {
+                        event.stopPropagation();
+                        onOpenGene?.(gene);
+                    }}
                     style={{ cursor: 'pointer' }}
                 >
                     <text
@@ -213,7 +373,7 @@ export default function TraitProgramGraphCanvas({
                 {columns.right.map((gene, index) => renderGene(gene, 'right', index))}
             </g>
         );
-    }, [onSelectGene, selectedGeneKey, selectedProgram]);
+    }, [onOpenGene, onSelectGene, selectedGeneKey, selectedProgram]);
 
     const renderLeftProgramModule = useCallback((module) => {
         if (!visibleSides.has(module.side)) return null;
@@ -249,6 +409,10 @@ export default function TraitProgramGraphCanvas({
                 <g
                     data-graph-clickable="true"
                     onClick={() => onSelectProgram(module.program)}
+                    onDoubleClick={(event) => {
+                        event.stopPropagation();
+                        onOpenProgram?.(module.program);
+                    }}
                     style={{ cursor: 'pointer' }}
                 >
                     <rect
@@ -305,6 +469,7 @@ export default function TraitProgramGraphCanvas({
         );
     }, [
         leftLayout.modules.length,
+        onOpenProgram,
         onSelectProgram,
         renderGeneColumns,
         selectedGeneKey,
@@ -321,6 +486,8 @@ export default function TraitProgramGraphCanvas({
         const moduleGeneMatches = hasGeneSelection && group.genes.some((gene) => gene.highlightKey === selectedGeneKey);
         const muted = (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
         const groupColor = group.sign === 'negative' ? EFFECT_COLORS.negative : EFFECT_COLORS.positive;
+        const groupFill = group.sign === 'negative' ? 'rgba(52,125,204,0.10)' : 'rgba(239,78,47,0.10)';
+        const groupHeaderFill = group.sign === 'negative' ? 'rgba(52,125,204,0.16)' : 'rgba(239,78,47,0.16)';
 
         return (
             <g key={`${module.program}:regulator:${group.key}`}>
@@ -330,12 +497,32 @@ export default function TraitProgramGraphCanvas({
                     width={RIGHT_REGULATOR_W}
                     height={height}
                     rx="6"
-                    fill="#fff"
-                    fillOpacity={muted ? 0.38 : 1}
+                    fill={groupFill}
+                    fillOpacity={muted ? 0.42 : 1}
                     stroke={groupColor}
                     strokeWidth="2.6"
                 />
-                <text x={RIGHT_REGULATOR_X + 14} y={yTop + 28} fontSize="24" fontWeight="900" fill={groupColor}>
+                <rect
+                    x={RIGHT_REGULATOR_X}
+                    y={yTop}
+                    width="14"
+                    height={height}
+                    rx="6"
+                    fill={groupColor}
+                    fillOpacity={muted ? 0.34 : 0.9}
+                    pointerEvents="none"
+                />
+                <rect
+                    x={RIGHT_REGULATOR_X + 14}
+                    y={yTop + 8}
+                    width={RIGHT_REGULATOR_W - 28}
+                    height="32"
+                    rx="5"
+                    fill={groupHeaderFill}
+                    fillOpacity={muted ? 0.32 : 1}
+                    pointerEvents="none"
+                />
+                <text x={RIGHT_REGULATOR_X + 28} y={yTop + 30} fontSize="23" fontWeight="900" fill={muted ? '#8a8f98' : groupColor}>
                     {group.title}
                 </text>
                 {group.genes.length ? renderGeneColumns({
@@ -420,6 +607,10 @@ export default function TraitProgramGraphCanvas({
                 <g
                     data-graph-clickable="true"
                     onClick={() => onSelectProgram(module.program)}
+                    onDoubleClick={(event) => {
+                        event.stopPropagation();
+                        onOpenProgram?.(module.program);
+                    }}
                     style={{ cursor: 'pointer' }}
                 >
                     <rect
@@ -469,6 +660,7 @@ export default function TraitProgramGraphCanvas({
         );
     }, [
         onSelectProgram,
+        onOpenProgram,
         renderRegulatorGroup,
         rightLayout.modules.length,
         selectedGeneKey,
@@ -505,8 +697,7 @@ export default function TraitProgramGraphCanvas({
                         Trait-Program-Gene graph
                     </Typography>
                     <Typography sx={{ mt: 0.6, fontSize: 13.5, color: '#667085', maxWidth: 880 }}>
-                        Program edges point from program to trait. Regulator edges point from regulator genes to program.
-                        Scroll normally moves the page; use Ctrl/Command + wheel or the buttons to zoom the graph.
+                        Program burden evidence connects programs to the trait; regulator evidence connects genes through programs.
                     </Typography>
                 </Box>
 
@@ -564,6 +755,8 @@ export default function TraitProgramGraphCanvas({
                 sx={{
                     px: { xs: 0.5, md: 1 },
                     py: 1,
+                    position: 'relative',
+                    overflow: 'hidden',
                     background: '#fff',
                     cursor: isDragging ? 'grabbing' : 'grab',
                     touchAction: 'pan-y',
@@ -576,6 +769,19 @@ export default function TraitProgramGraphCanvas({
                 onPointerLeave={onPointerUp}
                 onWheel={onWheel}
             >
+                <ZoomToolbar
+                    scale={transform.scale}
+                    zoomIn={zoomIn}
+                    zoomOut={zoomOut}
+                    resetView={resetView}
+                />
+                <SelectionActions
+                    onOpenGene={onOpenGene}
+                    onOpenProgram={onOpenProgram}
+                    selectedGene={selectedGene}
+                    selectedGeneOccurrences={selectedGeneOccurrences}
+                    selectedProgram={selectedProgram}
+                />
                 <svg
                     ref={svgRef}
                     width="100%"

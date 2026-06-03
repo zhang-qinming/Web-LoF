@@ -1,6 +1,6 @@
 import './App.css';
 import React, { Suspense } from 'react';
-import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import {
     FaDna,
     FaEnvelope,
@@ -45,9 +45,20 @@ function NotFound() {
     );
 }
 
+function ScrollToTopOnPathChange() {
+    const { pathname } = useLocation();
+
+    React.useLayoutEffect(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, [pathname]);
+
+    return null;
+}
+
 function App() {
     return (
         <BrowserRouter>
+            <ScrollToTopOnPathChange />
             <div className="app-container">
                 <header className="header hidden-mobile">
                     <nav className="nav">
