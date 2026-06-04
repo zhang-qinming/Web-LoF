@@ -1,7 +1,10 @@
 import React, { useCallback } from 'react';
 import { Box, Button, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import {
+    CloseFullscreen,
+    Download,
     OpenInNew,
+    OpenInFull,
     RestartAlt,
     ZoomIn,
     ZoomOut,
@@ -12,31 +15,25 @@ import {
     displayGeneLabel,
     edgeColorFromSign,
     effectColorFromGene,
+    exportPng,
+    exportSvg,
     formatGeneTooltip,
     formatProgramTooltip,
-    geneBoxHeight,
-    GENE_ROW_H,
     INLINE_LEGEND_GROUPS,
-    LEFT_PROGRAM_W,
-    LEFT_PROGRAM_X,
     programColor,
     programDisplayLines,
     programFillOpacity,
     programStripeOpacity,
-    REGULATOR_GROUP_GAP,
-    RIGHT_PROGRAM_H,
-    RIGHT_PROGRAM_W,
-    RIGHT_PROGRAM_X,
-    RIGHT_REGULATOR_W,
-    RIGHT_REGULATOR_X,
+    sanitizeFileNamePart,
     SIDE_META,
+    splitGeneDisplayColumns,
     splitGenesByEffect,
+    regulatorGeneBoxHeight,
     SVG_WIDTH,
     toFiniteNumber,
-    TRAIT_CENTER_X,
-    TRAIT_NODE_W,
     traitPortY,
     EFFECT_COLORS,
+    EFFECT_COLOR_RGB,
     EDGE_TARGET_GAP,
 } from './shared';
 
@@ -128,6 +125,10 @@ function SectionNote({ x, y, lines }) {
             ))}
         </g>
     );
+}
+
+function centeredLineY(top, height, lineCount, lineStep, index) {
+    return top + (height / 2) - (((lineCount - 1) * lineStep) / 2) + (index * lineStep);
 }
 
 function selectedGeneLabel(gene) {
@@ -228,8 +229,8 @@ function SelectionActions({
                             sx={{
                                 borderRadius: 1,
                                 fontWeight: 900,
-                                color: '#245089',
-                                bgcolor: 'rgba(79,140,201,0.12)',
+                                color: '#334155',
+                                bgcolor: 'rgba(15,23,42,0.07)',
                                 maxWidth: 190,
                             }}
                         />
@@ -252,8 +253,8 @@ function SelectionActions({
                             sx={{
                                 borderRadius: 1,
                                 fontWeight: 900,
-                                color: '#8f2f20',
-                                bgcolor: 'rgba(239,78,47,0.12)',
+                                color: EFFECT_COLORS.positive,
+                                bgcolor: `rgba(${EFFECT_COLOR_RGB.positive},0.12)`,
                                 maxWidth: 230,
                             }}
                         />
@@ -275,10 +276,14 @@ function SelectionActions({
 
 export default function TraitProgramGraphCanvas({
     clearSelection,
+    exportFileName,
+    graphLayout,
+    isFullGraph,
     isDragging,
     leftLayout,
     onOpenGene,
     onOpenProgram,
+    onGraphViewModeToggle,
     onPointerDown,
     onPointerMove,
     onPointerUp,
@@ -302,6 +307,10 @@ export default function TraitProgramGraphCanvas({
     zoomIn,
     zoomOut,
 }) {
+    const layout = graphLayout;
+    const exportStem = sanitizeFileNamePart(exportFileName || 'trait-program-gene');
+    const exportSuffix = isFullGraph ? 'full' : 'compact';
+
     const renderGeneColumns = useCallback(({
         columns,
         x,
@@ -314,28 +323,41 @@ export default function TraitProgramGraphCanvas({
     }) => {
         const columnGap = 12;
         const dividerX = x + (width / 2);
-        const leftTextX = x + 14;
-        const rightTextX = x + width - 14;
-        const rowStartY = y + (titleRows > 1 ? 78 : 52);
+        const rowStartY = y + (titleRows > 1 ? layout.geneHeaderHTall : layout.geneHeaderH) + (layout.geneRowH / 2);
+        const sidePadding = 14;
+        const sideAreas = {
+            left: {
+                start: x + sidePadding,
+                end: dividerX - columnGap,
+            },
+            right: {
+                start: dividerX + columnGap,
+                end: x + width - sidePadding,
+            },
+        };
 
-        const renderGene = (gene, column, index) => {
+        const renderGene = (gene, column, subcolumnIndex, rowIndex, subcolumnCount) => {
             const geneMatched = Boolean(selectedGeneKey) && gene.highlightKey === selectedGeneKey;
             const geneProgramSelected = selectedProgram === selectedProgramName;
             const geneMuted = (Boolean(selectedProgram) && !geneProgramSelected) || (Boolean(selectedGeneKey) && !geneMatched);
-            const rowY = rowStartY + (index * GENE_ROW_H);
-            const textX = column === 'left'
-                ? (textAnchor === 'end' ? dividerX - columnGap : leftTextX)
-                : (textAnchor === 'end' ? rightTextX : dividerX + columnGap);
-            const anchor = column === 'left'
-                ? (textAnchor === 'end' ? 'end' : 'start')
-                : (textAnchor === 'end' ? 'end' : 'start');
+            const rowY = rowStartY + (rowIndex * layout.geneRowH);
+            const area = sideAreas[column];
+            const subcolumnWidth = Math.max(1, (area.end - area.start) / subcolumnCount);
+            const textX = textAnchor === 'end'
+                ? area.end - ((subcolumnCount - 1 - subcolumnIndex) * subcolumnWidth)
+                : area.start + (subcolumnIndex * subcolumnWidth);
+            const anchor = textAnchor === 'end' ? 'end' : 'start';
 
             return (
                 <g
-                    key={`${gene.id}:${column}`}
+                    key={`${gene.id}:${column}:${subcolumnIndex}:${rowIndex}`}
                     data-graph-clickable="true"
-                    onClick={() => onSelectGene(gene)}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onSelectGene(gene);
+                    }}
                     onDoubleClick={(event) => {
+                        event.preventDefault();
                         event.stopPropagation();
                         onOpenGene?.(gene);
                     }}
@@ -345,7 +367,8 @@ export default function TraitProgramGraphCanvas({
                         x={textX}
                         y={rowY}
                         textAnchor={anchor}
-                        fontSize="22"
+                        dominantBaseline="middle"
+                        fontSize={layout.geneFontSize}
                         fontWeight={geneMatched ? 900 : 800}
                         fontStyle={gene.isDiscordant ? 'normal' : 'normal'}
                         fill={geneMuted ? '#b5b5b5' : effectColorFromGene(gene)}
@@ -362,18 +385,68 @@ export default function TraitProgramGraphCanvas({
             <g>
                 <line
                     x1={dividerX}
-                    y1={y + 42}
+                    y1={y + layout.geneDividerTopInset}
                     x2={dividerX}
-                    y2={y + height - 18}
+                    y2={y + height - layout.geneDividerBottomInset}
                     stroke="#555"
                     strokeWidth="1.5"
                     strokeDasharray="2 3"
                 />
-                {columns.left.map((gene, index) => renderGene(gene, 'left', index))}
-                {columns.right.map((gene, index) => renderGene(gene, 'right', index))}
+                {splitGeneDisplayColumns(columns.left, layout).map((genes, subcolumnIndex, subcolumns) => (
+                    genes.map((gene, rowIndex) => renderGene(gene, 'left', subcolumnIndex, rowIndex, subcolumns.length))
+                ))}
+                {splitGeneDisplayColumns(columns.right, layout).map((genes, subcolumnIndex, subcolumns) => (
+                    genes.map((gene, rowIndex) => renderGene(gene, 'right', subcolumnIndex, rowIndex, subcolumns.length))
+                ))}
             </g>
         );
-    }, [onOpenGene, onSelectGene, selectedGeneKey, selectedProgram]);
+    }, [layout, onOpenGene, onSelectGene, selectedGeneKey, selectedProgram]);
+
+    const renderRegulatorGeneList = useCallback(({ genes, x, y, selectedProgramName }) => {
+        const rowStartY = y + layout.geneHeaderH + (layout.geneRowH / 2);
+        const textX = x + 28;
+
+        return (
+            <g>
+                {genes.map((gene, rowIndex) => {
+                    const geneMatched = Boolean(selectedGeneKey) && gene.highlightKey === selectedGeneKey;
+                    const geneProgramSelected = selectedProgram === selectedProgramName;
+                    const geneMuted = (Boolean(selectedProgram) && !geneProgramSelected) || (Boolean(selectedGeneKey) && !geneMatched);
+
+                    return (
+                        <g
+                            key={`${gene.id}:regulator-single:${rowIndex}`}
+                            data-graph-clickable="true"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onSelectGene(gene);
+                            }}
+                            onDoubleClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onOpenGene?.(gene);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <text
+                                x={textX}
+                                y={rowStartY + (rowIndex * layout.geneRowH)}
+                                textAnchor="start"
+                                dominantBaseline="middle"
+                                fontSize={layout.geneFontSize}
+                                fontWeight={geneMatched ? 900 : 800}
+                                fill={geneMuted ? '#b5b5b5' : effectColorFromGene(gene)}
+                                opacity={geneMuted ? 0.55 : 1}
+                            >
+                                {displayGeneLabel(gene)}
+                            </text>
+                            <title>{formatGeneTooltip(gene)}</title>
+                        </g>
+                    );
+                })}
+            </g>
+        );
+    }, [layout, onOpenGene, onSelectGene, selectedGeneKey, selectedProgram]);
 
     const renderLeftProgramModule = useCallback((module) => {
         if (!visibleSides.has(module.side)) return null;
@@ -387,16 +460,16 @@ export default function TraitProgramGraphCanvas({
         const muted = (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
         const edgeStyle = computeEdgeStyle(score, edgeHighlighted, muted);
         const centerY = module.yCenter;
-        const traitLeftX = TRAIT_CENTER_X - (TRAIT_NODE_W / 2);
+        const traitLeftX = layout.traitCenterX - (layout.traitNodeW / 2);
         const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, leftLayout.modules.length, traitNodeHeightValue);
         const boxHeight = module.height;
-        const titleLines = programDisplayLines(module, 19);
+        const titleLines = programDisplayLines(module, layout.leftProgramLabelChars);
         const nodeColor = programColor(module);
 
         return (
             <g key={`${module.program}:program`}>
                 <ArrowOrCap
-                    x1={LEFT_PROGRAM_X + LEFT_PROGRAM_W}
+                    x1={layout.leftProgramX + layout.leftProgramW}
                     y1={centerY}
                     x2={traitLeftX}
                     y2={traitTargetY}
@@ -416,9 +489,9 @@ export default function TraitProgramGraphCanvas({
                     style={{ cursor: 'pointer' }}
                 >
                     <rect
-                        x={LEFT_PROGRAM_X}
+                        x={layout.leftProgramX}
                         y={module.yTop}
-                        width={LEFT_PROGRAM_W}
+                        width={layout.leftProgramW}
                         height={boxHeight}
                         rx="6"
                         fill={nodeColor}
@@ -427,7 +500,7 @@ export default function TraitProgramGraphCanvas({
                         strokeWidth={isProgramSelected ? 3.2 : 2.6}
                     />
                     <rect
-                        x={LEFT_PROGRAM_X}
+                        x={layout.leftProgramX}
                         y={module.yTop}
                         width="12"
                         height={boxHeight}
@@ -439,10 +512,17 @@ export default function TraitProgramGraphCanvas({
                     {titleLines.map((line, index) => (
                         <text
                             key={line}
-                            x={LEFT_PROGRAM_X + (LEFT_PROGRAM_W / 2)}
-                            y={module.yTop + 31 + (index * 25)}
+                            x={layout.leftProgramX + (layout.leftProgramW / 2)}
+                            y={centeredLineY(
+                                module.yTop,
+                                titleLines.length > 1 ? layout.geneHeaderHTall : layout.geneHeaderH,
+                                titleLines.length,
+                                layout.leftProgramTitleStep,
+                                index,
+                            )}
                             textAnchor="middle"
-                            fontSize="26"
+                            dominantBaseline="middle"
+                            fontSize={layout.leftProgramTitleFontSize}
                             fontWeight="900"
                             fill="#111"
                         >
@@ -450,14 +530,20 @@ export default function TraitProgramGraphCanvas({
                         </text>
                     ))}
                     {module.collapsed ? (
-                        <text x={LEFT_PROGRAM_X + 16} y={module.yTop + 58} fontSize="18" fill="#555">
+                        <text
+                            x={layout.leftProgramX + 16}
+                            y={module.yTop + (boxHeight / 2)}
+                            dominantBaseline="middle"
+                            fontSize="18"
+                            fill="#555"
+                        >
                             {module.emptyReason || 'No overlap'}
                         </text>
                     ) : renderGeneColumns({
                         columns: module.geneColumns,
-                        x: LEFT_PROGRAM_X,
+                        x: layout.leftProgramX,
                         y: module.yTop,
-                        width: LEFT_PROGRAM_W,
+                        width: layout.leftProgramW,
                         height: boxHeight,
                         textAnchor: 'start',
                         selectedProgramName: module.program,
@@ -469,6 +555,7 @@ export default function TraitProgramGraphCanvas({
         );
     }, [
         leftLayout.modules.length,
+        layout,
         onOpenProgram,
         onSelectProgram,
         renderGeneColumns,
@@ -479,31 +566,40 @@ export default function TraitProgramGraphCanvas({
         visibleSides,
     ]);
 
-    const renderRegulatorGroup = useCallback((module, group, yTop, height) => {
-        const columns = splitGenesByEffect(group.genes);
+    const renderRegulatorGroup = useCallback((module, group, x, yTop, width, height) => {
         const isProgramSelected = selectedProgram === module.program;
         const hasGeneSelection = Boolean(selectedGeneKey);
         const moduleGeneMatches = hasGeneSelection && group.genes.some((gene) => gene.highlightKey === selectedGeneKey);
         const muted = (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
         const groupColor = group.sign === 'negative' ? EFFECT_COLORS.negative : EFFECT_COLORS.positive;
-        const groupFill = group.sign === 'negative' ? 'rgba(52,125,204,0.10)' : 'rgba(239,78,47,0.10)';
-        const groupHeaderFill = group.sign === 'negative' ? 'rgba(52,125,204,0.16)' : 'rgba(239,78,47,0.16)';
+        const groupRgb = group.sign === 'negative' ? EFFECT_COLOR_RGB.negative : EFFECT_COLOR_RGB.positive;
+        const groupFill = `rgba(${groupRgb},0.10)`;
+        const groupHeaderFill = `rgba(${groupRgb},0.16)`;
 
         return (
             <g key={`${module.program}:regulator:${group.key}`}>
                 <rect
-                    x={RIGHT_REGULATOR_X}
+                    x={x}
                     y={yTop}
-                    width={RIGHT_REGULATOR_W}
+                    width={width}
                     height={height}
                     rx="6"
-                    fill={groupFill}
-                    fillOpacity={muted ? 0.42 : 1}
+                    fill="#fff"
                     stroke={groupColor}
                     strokeWidth="2.6"
                 />
                 <rect
-                    x={RIGHT_REGULATOR_X}
+                    x={x}
+                    y={yTop}
+                    width={width}
+                    height={height}
+                    rx="6"
+                    fill={groupFill}
+                    fillOpacity={muted ? 0.32 : 1}
+                    pointerEvents="none"
+                />
+                <rect
+                    x={x}
                     y={yTop}
                     width="14"
                     height={height}
@@ -513,30 +609,47 @@ export default function TraitProgramGraphCanvas({
                     pointerEvents="none"
                 />
                 <rect
-                    x={RIGHT_REGULATOR_X + 14}
+                    x={x + 14}
                     y={yTop + 8}
-                    width={RIGHT_REGULATOR_W - 28}
+                    width={width - 28}
                     height="32"
                     rx="5"
                     fill={groupHeaderFill}
                     fillOpacity={muted ? 0.32 : 1}
                     pointerEvents="none"
                 />
-                <text x={RIGHT_REGULATOR_X + 28} y={yTop + 30} fontSize="23" fontWeight="900" fill={muted ? '#8a8f98' : groupColor}>
+                <text
+                    x={x + 28}
+                    y={yTop + 24}
+                    dominantBaseline="middle"
+                    fontSize="21"
+                    fontWeight="900"
+                    fill={muted ? '#8a8f98' : groupColor}
+                >
                     {group.title}
                 </text>
-                {group.genes.length ? renderGeneColumns({
-                    columns,
-                    x: RIGHT_REGULATOR_X,
-                    y: yTop,
-                    width: RIGHT_REGULATOR_W,
-                    height,
-                    textAnchor: 'start',
-                    selectedProgramName: module.program,
-                }) : null}
+                {group.genes.length && layout.regulatorGeneLayout === 'single'
+                    ? renderRegulatorGeneList({
+                        genes: group.genes,
+                        x,
+                        y: yTop,
+                        selectedProgramName: module.program,
+                    })
+                    : null}
+                {group.genes.length && layout.regulatorGeneLayout !== 'single'
+                    ? renderGeneColumns({
+                        columns: splitGenesByEffect(group.genes),
+                        x,
+                        y: yTop,
+                        width,
+                        height,
+                        textAnchor: 'start',
+                        selectedProgramName: module.program,
+                    })
+                    : null}
             </g>
         );
-    }, [renderGeneColumns, selectedGeneKey, selectedProgram]);
+    }, [layout, renderGeneColumns, renderRegulatorGeneList, selectedGeneKey, selectedProgram]);
 
     const renderRightProgramModule = useCallback((module) => {
         if (!visibleSides.has(module.side)) return null;
@@ -550,28 +663,46 @@ export default function TraitProgramGraphCanvas({
         const programScore = module.programScore;
         const programEdgeStyle = computeEdgeStyle(programScore, edgeHighlighted, muted);
         const programY = module.yCenter;
-        const programBoxY = programY - (RIGHT_PROGRAM_H / 2);
-        const traitRightX = TRAIT_CENTER_X + (TRAIT_NODE_W / 2);
+        const programBoxY = programY - (layout.rightProgramH / 2);
+        const traitRightX = layout.traitCenterX + (layout.traitNodeW / 2);
         const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, rightLayout.modules.length, traitNodeHeightValue);
-        const programLines = programDisplayLines(module, 19);
+        const programLines = programDisplayLines(module, layout.rightProgramLabelChars);
         const nodeColor = programColor(module);
-        const groupLayouts = [];
+        const regulatorGroups = module.regulatorGroups || [];
         let cursorY = module.yTop;
-        (module.regulatorGroups || []).forEach((group, index) => {
-            const height = module.regulatorGroupHeights?.[group.key] || geneBoxHeight(splitGenesByEffect(group.genes));
-            groupLayouts.push({
+        const groupGap = regulatorGroups.length > 1 ? layout.regulatorGroupGap : 0;
+        const groupWidth = regulatorGroups.length > 1 && layout.regulatorGroupLayout === 'horizontal'
+            ? (layout.rightRegulatorW - ((regulatorGroups.length - 1) * groupGap)) / regulatorGroups.length
+            : layout.rightRegulatorW;
+        const groupLayouts = regulatorGroups.map((group, index) => {
+            const height = module.regulatorGroupHeights?.[group.key] || regulatorGeneBoxHeight(group.genes, layout);
+            if (layout.regulatorGroupLayout === 'vertical') {
+                const positioned = {
+                    ...group,
+                    height,
+                    width: layout.rightRegulatorW,
+                    x: layout.rightRegulatorX,
+                    yTop: cursorY,
+                    centerY: cursorY + (height / 2),
+                };
+                cursorY += height + (index < regulatorGroups.length - 1 ? layout.regulatorGroupGap : 0);
+                return positioned;
+            }
+
+            return {
                 ...group,
                 height,
-                yTop: cursorY,
-                centerY: cursorY + (height / 2),
-            });
-            cursorY += height + (index < (module.regulatorGroups.length - 1) ? REGULATOR_GROUP_GAP : 0);
+                width: groupWidth,
+                x: layout.rightRegulatorX + (index * (groupWidth + groupGap)),
+                yTop: module.yTop + ((module.height - height) / 2),
+                centerY: module.yTop + (module.height / 2),
+            };
         });
 
         return (
             <g key={`${module.program}:regulator`}>
                 <ArrowOrCap
-                    x1={RIGHT_PROGRAM_X}
+                    x1={layout.rightProgramX}
                     y1={programY}
                     x2={traitRightX}
                     y2={traitTargetY}
@@ -592,10 +723,10 @@ export default function TraitProgramGraphCanvas({
                     return (
                         <ArrowOrCap
                             key={`${module.program}:${group.key}:edge`}
-                            x1={RIGHT_REGULATOR_X}
+                            x1={group.x}
                             y1={group.centerY}
-                            x2={RIGHT_PROGRAM_X + RIGHT_PROGRAM_W}
-                            y2={programY + ((index - ((groupLayouts.length - 1) / 2)) * 14)}
+                            x2={layout.rightProgramX + layout.rightProgramW}
+                            y2={programY + ((index - ((groupLayouts.length - 1) / 2)) * layout.regulatorEdgeTargetSpacing)}
                             color={bucketColor}
                             direction={bucketDirection}
                             opacity={bucketEdgeStyle.opacity}
@@ -614,10 +745,10 @@ export default function TraitProgramGraphCanvas({
                     style={{ cursor: 'pointer' }}
                 >
                     <rect
-                        x={RIGHT_PROGRAM_X}
+                        x={layout.rightProgramX}
                         y={programBoxY}
-                        width={RIGHT_PROGRAM_W}
-                        height={RIGHT_PROGRAM_H}
+                        width={layout.rightProgramW}
+                        height={layout.rightProgramH}
                         rx="5"
                         fill={nodeColor}
                         fillOpacity={programFillOpacity(module, muted)}
@@ -625,10 +756,10 @@ export default function TraitProgramGraphCanvas({
                         strokeWidth={isProgramSelected ? 3.2 : 2.4}
                     />
                     <rect
-                        x={RIGHT_PROGRAM_X}
+                        x={layout.rightProgramX}
                         y={programBoxY}
                         width="12"
-                        height={RIGHT_PROGRAM_H}
+                        height={layout.rightProgramH}
                         rx="5"
                         fill={nodeColor}
                         fillOpacity={programStripeOpacity(module, muted)}
@@ -637,10 +768,17 @@ export default function TraitProgramGraphCanvas({
                     {programLines.map((line, index) => (
                         <text
                             key={line}
-                            x={RIGHT_PROGRAM_X + (RIGHT_PROGRAM_W / 2)}
-                            y={programBoxY + 30 + (index * 24)}
+                            x={layout.rightProgramX + (layout.rightProgramW / 2)}
+                            y={centeredLineY(
+                                programBoxY,
+                                layout.rightProgramH,
+                                programLines.length,
+                                layout.rightProgramTitleStep,
+                                index,
+                            )}
                             textAnchor="middle"
-                            fontSize="25"
+                            dominantBaseline="middle"
+                            fontSize={layout.rightProgramTitleFontSize}
                             fontWeight="900"
                             fill="#111"
                         >
@@ -653,7 +791,9 @@ export default function TraitProgramGraphCanvas({
                 {groupLayouts.map((group) => renderRegulatorGroup(
                     module,
                     group,
+                    group.x,
                     group.yTop,
+                    group.width,
                     group.height,
                 ))}
             </g>
@@ -661,6 +801,7 @@ export default function TraitProgramGraphCanvas({
     }, [
         onSelectProgram,
         onOpenProgram,
+        layout,
         renderRegulatorGroup,
         rightLayout.modules.length,
         selectedGeneKey,
@@ -683,7 +824,7 @@ export default function TraitProgramGraphCanvas({
             <Box
                 sx={{
                     px: { xs: 2, md: 2.5 },
-                    py: 2,
+                    py: 1.25,
                     borderBottom: '1px solid rgba(15,23,42,0.06)',
                     display: 'flex',
                     alignItems: 'flex-start',
@@ -693,15 +834,60 @@ export default function TraitProgramGraphCanvas({
                 }}
             >
                 <Box>
-                    <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: 26, lineHeight: 1.1 }}>
+                    <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: 23, lineHeight: 1.1 }}>
                         Trait-Program-Gene graph
                     </Typography>
-                    <Typography sx={{ mt: 0.6, fontSize: 13.5, color: '#667085', maxWidth: 880 }}>
+                    <Typography sx={{ mt: 0.35, fontSize: 12.5, color: '#667085', maxWidth: 880 }}>
                         Program burden evidence connects programs to the trait; regulator evidence connects genes through programs.
                     </Typography>
                 </Box>
 
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <Button
+                        size="small"
+                        variant={isFullGraph ? 'contained' : 'outlined'}
+                        startIcon={isFullGraph ? <CloseFullscreen /> : <OpenInFull />}
+                        onClick={onGraphViewModeToggle}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 800,
+                            borderRadius: 1,
+                            px: 1.25,
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {isFullGraph ? 'Compact view' : 'Full view'}
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Download />}
+                        onClick={() => svgRef.current && exportSvg(svgRef.current, `${exportStem}_trait_program_gene_${exportSuffix}.svg`)}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 800,
+                            borderRadius: 1,
+                            px: 1.25,
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        Export SVG
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Download />}
+                        onClick={() => svgRef.current && exportPng(svgRef.current, `${exportStem}_trait_program_gene_${exportSuffix}.png`)}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 800,
+                            borderRadius: 1,
+                            px: 1.25,
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        Export PNG
+                    </Button>
                     {visibleSides.has('program') && (
                         <Chip
                             label={`${SIDE_META.program.shortLabel} modules ${leftLayout.modules.length}`}
@@ -725,8 +911,8 @@ export default function TraitProgramGraphCanvas({
                         gap: 2,
                         flexWrap: 'wrap',
                         width: '100%',
-                        mt: 1.25,
-                        pt: 1.25,
+                        mt: 0.75,
+                        pt: 0.75,
                         borderTop: '1px solid rgba(15,23,42,0.06)',
                     }}
                 >
@@ -754,7 +940,7 @@ export default function TraitProgramGraphCanvas({
             <Box
                 sx={{
                     px: { xs: 0.5, md: 1 },
-                    py: 1,
+                    py: 0.5,
                     position: 'relative',
                     overflow: 'hidden',
                     background: '#fff',
@@ -805,14 +991,14 @@ export default function TraitProgramGraphCanvas({
                             program burden effects
                         </text>
                         <text
-                            x={RIGHT_PROGRAM_X}
+                            x={layout.rightProgramX}
                             y="36"
                             className="section-title"
                         >
                             Programs selected by
                         </text>
                         <text
-                            x={RIGHT_PROGRAM_X}
+                            x={layout.rightProgramX}
                             y="62"
                             className="section-title"
                         >
@@ -825,9 +1011,9 @@ export default function TraitProgramGraphCanvas({
                             style={{ cursor: 'pointer' }}
                         >
                             <rect
-                                x={TRAIT_CENTER_X - (TRAIT_NODE_W / 2)}
+                                x={layout.traitCenterX - (layout.traitNodeW / 2)}
                                 y={traitCenterY - (traitNodeHeightValue / 2)}
-                                width={TRAIT_NODE_W}
+                                width={layout.traitNodeW}
                                 height={traitNodeHeightValue}
                                 rx="7"
                                 fill="#929b9b"
@@ -837,9 +1023,16 @@ export default function TraitProgramGraphCanvas({
                             {traitDisplayLines.map((line, index) => (
                                 <text
                                     key={line}
-                                    x={TRAIT_CENTER_X}
-                                    y={traitCenterY - (((traitDisplayLines.length - 1) * 22) / 2) + 8 + (index * 22)}
+                                    x={layout.traitCenterX}
+                                    y={centeredLineY(
+                                        traitCenterY - (traitNodeHeightValue / 2),
+                                        traitNodeHeightValue,
+                                        traitDisplayLines.length,
+                                        layout.traitTextLineStep,
+                                        index,
+                                    )}
                                     textAnchor="middle"
+                                    dominantBaseline="middle"
                                     fontSize={traitFontSize}
                                     fontWeight="900"
                                     fill="#fff"
@@ -852,16 +1045,20 @@ export default function TraitProgramGraphCanvas({
                         {leftLayout.modules.map(renderLeftProgramModule)}
                         {rightLayout.modules.map(renderRightProgramModule)}
 
-                        <SectionNote
-                            x={LEFT_PROGRAM_X + LEFT_PROGRAM_W + 16}
-                            y={traitCenterY - 310}
-                            lines={['Directions determined by', 'program burden effects']}
-                        />
-                        <SectionNote
-                            x={TRAIT_CENTER_X + 76}
-                            y={traitCenterY - 310}
-                            lines={['Directions determined by', 'program-trait and regulator-program signs']}
-                        />
+                        {layout.showSectionNotes && (
+                            <>
+                                <SectionNote
+                                    x={layout.leftProgramX + layout.leftProgramW + 16}
+                                    y={traitCenterY - 310}
+                                    lines={['Directions determined by', 'program burden effects']}
+                                />
+                                <SectionNote
+                                    x={layout.traitCenterX + 76}
+                                    y={traitCenterY - 310}
+                                    lines={['Directions determined by', 'program-trait and regulator-program signs']}
+                                />
+                            </>
+                        )}
                     </g>
                 </svg>
             </Box>

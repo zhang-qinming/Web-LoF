@@ -39,14 +39,16 @@ import ReleaseLogSection from '../components/ReleaseLogSection';
 import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
 import { downloadDataPaths } from '../utils/download';
 import { captionSx, panelSx, summaryChipSx } from '../themeUtils';
-import homeFigureBurdenVolcano from '../assets/home-figure-burden-volcano.svg';
-import homeFigureCrossTraitHeatmap from '../assets/home-figure-cross-trait-heatmap.svg';
-import homeFigureGwasManhattan from '../assets/home-figure-gwas-manhattan.svg';
-import homeFigureLofGene from '../assets/home-figure-lof-gene.svg';
-import homeFigurePosteriorVolcano from '../assets/home-figure-posterior-volcano.svg';
-import homeFigureProgramScatter from '../assets/home-figure-program-scatter.svg';
-import homeFigureTraitProgramNetwork from '../assets/home-figure-trait-program-network.svg';
-import homeFigureQqPlot from '../assets/temp/home-figure-qq-plot.svg';
+import homeFigureBurdenVolcano from '../assets/home/home-figure-burden-volcano.svg';
+import homeFigureCrossTraitHeatmap from '../assets/home/home-figure-cross-trait-heatmap.svg';
+import homeFigureGwasManhattan from '../assets/home/home-figure-gwas-manhattan.svg';
+import homeFigureLofGene from '../assets/home/home-figure-lof-gene.svg';
+import homeFigurePosteriorVolcano from '../assets/home/home-figure-posterior-volcano.svg';
+import homeFigureProgramScatter from '../assets/home/home-figure-program-scatter.svg';
+import homeFigureTraitProgramNetwork from '../assets/home/home-figure-trait-program-network.svg';
+import homeFigureQqPlot from '../assets/home/home-figure-qq-plot.svg';
+import homeFigureBrowserWorkflow from '../assets/temp/home-figure-browser-workflow.svg';
+import homeFigureDataBrowser from '../assets/temp/home-figure-data-browser.svg';
 
 const accent = '#ff6b4a';
 const siteName = 'TraitVista';
@@ -68,6 +70,79 @@ const compactNumberFormatter = new Intl.NumberFormat('en-US', {
 });
 
 const quickSearchSeeds = ['manhattan', 'summary', 'network', 'metadata'];
+
+const questionEntrances = [
+    {
+        eyebrow: 'Trait-first',
+        title: 'I Have a Trait',
+        description: 'Search a trait or file ID, then inspect GWAS signals, gene evidence, and linked programs.',
+        to: '/trait',
+        icon: QueryStats,
+        color: '#2563eb',
+    },
+    {
+        eyebrow: 'Gene-first',
+        title: 'I Have a Gene',
+        description: 'Start from a gene and review associated programs and trait-level evidence.',
+        to: '/genes',
+        icon: Biotech,
+        color: '#0f766e',
+    },
+    {
+        eyebrow: 'Program-first',
+        title: 'I Have a Program',
+        description: 'Open a program to compare associated traits and gene regulation context.',
+        to: '/programs',
+        icon: Hub,
+        color: '#7c3aed',
+    },
+    {
+        eyebrow: 'Files-first',
+        title: 'I Need Result Files',
+        description: 'Browse indexed outputs, open folders, and download result files for downstream analysis.',
+        to: '/data',
+        icon: InsertDriveFile,
+        color: '#b45309',
+    },
+];
+
+const workflowSteps = [
+    {
+        label: 'Search Trait',
+        detail: 'Find a trait by file ID, GWAS ID, or trait name.',
+        to: '/trait',
+        icon: Search,
+        color: '#2563eb',
+    },
+    {
+        label: 'Inspect GWAS Signal',
+        detail: 'Open Manhattan peaks and variant tables for the selected trait.',
+        to: traitTabPath('manhattan'),
+        icon: QueryStats,
+        color: '#0284c7',
+    },
+    {
+        label: 'Check Gene Evidence',
+        detail: 'Review LoF burden, posterior effects, and gene-level QQ evidence.',
+        to: traitTabPath('gene-evidence'),
+        icon: Biotech,
+        color: '#0f766e',
+    },
+    {
+        label: 'Compare Programs',
+        detail: 'Move from the trait to program scatter and graph views.',
+        to: traitTabPath('program-scatter'),
+        icon: Hub,
+        color: '#7c3aed',
+    },
+    {
+        label: 'Download Results',
+        detail: 'Collect TSV and figure outputs from the result file browser.',
+        to: '/data',
+        icon: FileDownload,
+        color: '#b45309',
+    },
+];
 
 const loadingBarSx = {
     height: 3,
@@ -162,7 +237,21 @@ const traitFigureCards = [
         icon: QueryStats,
         color: '#c2410c',
     },
+    {
+        title: 'Result File Browser',
+        description: 'Indexed result files and folders for review or download.',
+        image: homeFigureDataBrowser,
+        to: '/data',
+        icon: InsertDriveFile,
+        color: '#b45309',
+    },
 ];
+
+const featuredTraitPreviewCards = traitFigureCards.filter((item) => (
+    item.title === 'Manhattan'
+    || item.title === 'Trait Program Graph'
+    || item.title === 'Gene Evidence'
+));
 
 function fmtCount(value) {
     const numericValue = Number(value);
@@ -211,6 +300,370 @@ function buildDataBrowserHref({ path = '', search = '' } = {}) {
     else if (search) params.set('q', search);
     const queryString = params.toString();
     return `/data${queryString ? `?${queryString}` : ''}`;
+}
+
+function SectionHeading({ eyebrow, title, description, theme, align = 'center' }) {
+    return (
+        <Stack spacing={0.65} alignItems={align === 'center' ? 'center' : 'flex-start'} sx={{ mb: { xs: 2.5, md: 3.4 } }}>
+            {eyebrow && (
+                <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 850, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+                    {eyebrow}
+                </Typography>
+            )}
+            <Typography
+                component="h2"
+                sx={{
+                    color: '#111827',
+                    fontFamily: 'Georgia, Cambria, serif',
+                    fontSize: { xs: '1.85rem', md: '2.35rem' },
+                    fontWeight: 850,
+                    lineHeight: 1.08,
+                    letterSpacing: 0,
+                    textAlign: align,
+                    textWrap: 'balance',
+                }}
+            >
+                {title}
+            </Typography>
+            {description && (
+                <Typography sx={captionSx(theme, { maxWidth: 720, textAlign: align, fontSize: { xs: '0.9rem', md: '0.96rem' } })}>
+                    {description}
+                </Typography>
+            )}
+        </Stack>
+    );
+}
+
+function ExploreByQuestion({ theme }) {
+    return (
+        <Box
+            component="section"
+            sx={{
+                maxWidth: 1180,
+                mx: 'auto',
+                px: { xs: 2, sm: 3, lg: 4 },
+                pb: { xs: 5.5, md: 7 },
+            }}
+        >
+            <SectionHeading
+                eyebrow="Explore by question"
+                title="Start from the evidence you already have"
+                description="TraitVista is organized around research starting points: a trait, a gene, a program, or the result files behind the figures."
+                theme={theme}
+            />
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
+                    gap: { xs: 1.5, md: 1.8 },
+                }}
+            >
+                {questionEntrances.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                        <Box
+                            key={item.title}
+                            component={RouterLink}
+                            to={item.to}
+                            sx={panelSx(theme, {
+                                minHeight: 188,
+                                p: 1.8,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 1.1,
+                                color: 'inherit',
+                                textDecoration: 'none',
+                                borderColor: alpha(item.color, 0.16),
+                                backgroundColor: 'rgba(255,255,255,0.96)',
+                                transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
+                                '&:hover': {
+                                    transform: 'translateY(-4px)',
+                                    borderColor: alpha(item.color, 0.34),
+                                    boxShadow: `0 20px 42px ${alpha(item.color, 0.13)}`,
+                                },
+                                '&:focus-visible': {
+                                    outline: `3px solid ${alpha(item.color, 0.24)}`,
+                                    outlineOffset: 3,
+                                },
+                            })}
+                        >
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                                <Box
+                                    sx={{
+                                        width: 34,
+                                        height: 34,
+                                        borderRadius: 1,
+                                        display: 'grid',
+                                        placeItems: 'center',
+                                        bgcolor: alpha(item.color, 0.09),
+                                        color: item.color,
+                                        flex: '0 0 auto',
+                                    }}
+                                    aria-hidden="true"
+                                >
+                                    <Icon sx={{ fontSize: 18 }} />
+                                </Box>
+                                <Typography sx={{ color: item.color, fontSize: '0.7rem', fontWeight: 850, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                                    {item.eyebrow}
+                                </Typography>
+                            </Stack>
+                            <Box sx={{ minWidth: 0 }}>
+                                <Typography component="h3" sx={{ color: '#111827', fontSize: '1.08rem', fontWeight: 850, lineHeight: 1.2 }}>
+                                    {item.title}
+                                </Typography>
+                                <Typography sx={captionSx(theme, { mt: 0.75, fontSize: '0.84rem', lineHeight: 1.55 })}>
+                                    {item.description}
+                                </Typography>
+                            </Box>
+                            <Stack direction="row" spacing={0.55} alignItems="center" sx={{ mt: 'auto', color: item.color }}>
+                                <Typography component="span" sx={{ fontSize: '0.78rem', fontWeight: 850, color: 'inherit' }}>
+                                    Open Path
+                                </Typography>
+                                <ArrowForward sx={{ fontSize: 14 }} />
+                            </Stack>
+                        </Box>
+                    );
+                })}
+            </Box>
+        </Box>
+    );
+}
+
+function WorkflowSection({ theme }) {
+    return (
+        <Box
+            component="section"
+            sx={{
+                maxWidth: 1180,
+                mx: 'auto',
+                px: { xs: 2, sm: 3, lg: 4 },
+                pb: { xs: 5.5, md: 7.5 },
+            }}
+        >
+            <Box
+                sx={panelSx(theme, {
+                    p: { xs: 1.6, md: 2.2 },
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: '0.92fr 1.08fr' },
+                    gap: { xs: 2.2, md: 3 },
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.96)',
+                    overflow: 'hidden',
+                })}
+            >
+                <Box>
+                    <SectionHeading
+                        eyebrow="Workflow"
+                        title="Move from association to evidence"
+                        description="A typical session moves from trait lookup into signal inspection, gene support, program context, and result downloads."
+                        theme={theme}
+                        align="left"
+                    />
+                    <Box
+                        sx={{
+                            border: `1px solid ${theme.custom.border.soft}`,
+                            borderRadius: 1,
+                            overflow: 'hidden',
+                            bgcolor: '#f8fbff',
+                        }}
+                    >
+                        <Box
+                            component="img"
+                            src={homeFigureBrowserWorkflow}
+                            alt="TraitVista research workflow"
+                            loading="lazy"
+                            sx={{
+                                width: '100%',
+                                display: 'block',
+                                objectFit: 'cover',
+                            }}
+                        />
+                    </Box>
+                </Box>
+                <Stack spacing={1.1}>
+                    {workflowSteps.map((step, index) => {
+                        const Icon = step.icon;
+
+                        return (
+                            <Box
+                                key={step.label}
+                                component={RouterLink}
+                                to={step.to}
+                                sx={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '42px minmax(0, 1fr) auto',
+                                    alignItems: 'center',
+                                    gap: 1.25,
+                                    px: { xs: 1.2, md: 1.4 },
+                                    py: 1.15,
+                                    borderRadius: 1,
+                                    border: `1px solid ${alpha(step.color, 0.15)}`,
+                                    bgcolor: alpha(step.color, 0.035),
+                                    color: 'inherit',
+                                    textDecoration: 'none',
+                                    transition: 'background-color 160ms ease, border-color 160ms ease, transform 160ms ease',
+                                    '&:hover': {
+                                        bgcolor: alpha(step.color, 0.065),
+                                        borderColor: alpha(step.color, 0.3),
+                                        transform: 'translateX(3px)',
+                                    },
+                                    '&:focus-visible': {
+                                        outline: `3px solid ${alpha(step.color, 0.22)}`,
+                                        outlineOffset: 2,
+                                    },
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        width: 34,
+                                        height: 34,
+                                        borderRadius: 1,
+                                        display: 'grid',
+                                        placeItems: 'center',
+                                        bgcolor: '#fff',
+                                        color: step.color,
+                                        boxShadow: '0 8px 18px rgba(15,23,42,0.06)',
+                                    }}
+                                    aria-hidden="true"
+                                >
+                                    <Icon sx={{ fontSize: 17 }} />
+                                </Box>
+                                <Box sx={{ minWidth: 0 }}>
+                                    <Typography sx={{ color: '#111827', fontSize: '0.93rem', fontWeight: 850, lineHeight: 1.25 }}>
+                                        {index + 1}. {step.label}
+                                    </Typography>
+                                    <Typography sx={captionSx(theme, { mt: 0.25, fontSize: '0.78rem', lineHeight: 1.45 })}>
+                                        {step.detail}
+                                    </Typography>
+                                </Box>
+                                <ArrowForward sx={{ color: step.color, fontSize: 16 }} />
+                            </Box>
+                        );
+                    })}
+                </Stack>
+            </Box>
+        </Box>
+    );
+}
+
+function FeaturedTraitCaseStudy({ theme }) {
+    const traitHref = `/trait/${encodeURIComponent(FEATURED_TRAIT.fileId)}`;
+    const traitFigureCount = traitFigureCards.filter((item) => item.to.startsWith('/trait/')).length;
+
+    return (
+        <Box
+            component="section"
+            sx={{
+                maxWidth: 1180,
+                mx: 'auto',
+                px: { xs: 2, sm: 3, lg: 4 },
+                pb: { xs: 5.5, md: 7.5 },
+            }}
+        >
+            <Box
+                sx={panelSx(theme, {
+                    p: { xs: 1.6, md: 2.2 },
+                    backgroundColor: 'rgba(255,255,255,0.96)',
+                    overflow: 'hidden',
+                })}
+            >
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', lg: '0.9fr 1.1fr' },
+                        gap: { xs: 2.2, lg: 3 },
+                        alignItems: 'start',
+                    }}
+                >
+                    <Box>
+                        <SectionHeading
+                            eyebrow="Featured trait case study"
+                            title={FEATURED_TRAIT.name}
+                            description="Open a complete example analysis before choosing a query. This trait links GWAS signal views with program and gene-level evidence."
+                            theme={theme}
+                            align="left"
+                        />
+                        <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
+                            <Chip label={FEATURED_TRAIT.fileId} size="small" sx={summaryChipSx(theme)} />
+                            <Chip label={FEATURED_TRAIT.gwasId} size="small" sx={summaryChipSx(theme)} />
+                            <Chip label={`${fmtMetricCount(FEATURED_TRAIT.nSig)} significant signals`} size="small" sx={summaryChipSx(theme)} />
+                            <Chip label={`${traitFigureCount} figure views`} size="small" sx={summaryChipSx(theme)} />
+                        </Stack>
+                        <Button
+                            component={RouterLink}
+                            to={traitHref}
+                            variant="contained"
+                            endIcon={<ArrowForward />}
+                            sx={{
+                                mt: 2,
+                                bgcolor: '#1f2933',
+                                borderRadius: 999,
+                                px: 2.4,
+                                '&:hover': { bgcolor: '#111827' },
+                            }}
+                        >
+                            Open This Trait
+                        </Button>
+                    </Box>
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+                            gap: 1.35,
+                        }}
+                    >
+                        {featuredTraitPreviewCards.map((item) => {
+                            const Icon = item.icon;
+
+                            return (
+                                <Box
+                                    key={item.title}
+                                    component={RouterLink}
+                                    to={item.to}
+                                    sx={{
+                                        minWidth: 0,
+                                        borderRadius: 1,
+                                        border: `1px solid ${alpha(item.color, 0.16)}`,
+                                        bgcolor: alpha(item.color, 0.035),
+                                        color: 'inherit',
+                                        textDecoration: 'none',
+                                        overflow: 'hidden',
+                                        transition: 'transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease',
+                                        '&:hover': {
+                                            transform: 'translateY(-4px)',
+                                            borderColor: alpha(item.color, 0.32),
+                                            boxShadow: `0 18px 34px ${alpha(item.color, 0.12)}`,
+                                        },
+                                        '&:focus-visible': {
+                                            outline: `3px solid ${alpha(item.color, 0.22)}`,
+                                            outlineOffset: 3,
+                                        },
+                                    }}
+                                >
+                                    <Box sx={{ aspectRatio: '720 / 420', bgcolor: '#fff', overflow: 'hidden' }}>
+                                        <Box
+                                            component="img"
+                                            src={item.image}
+                                            alt=""
+                                            loading="lazy"
+                                            sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                        />
+                                    </Box>
+                                    <Stack direction="row" spacing={0.7} alignItems="center" sx={{ px: 1.2, py: 1.1 }}>
+                                        <Icon sx={{ color: item.color, fontSize: 17, flex: '0 0 auto' }} />
+                                        <Typography component="h3" sx={{ color: '#111827', fontSize: '0.9rem', fontWeight: 850, lineHeight: 1.2 }}>
+                                            {item.title}
+                                        </Typography>
+                                    </Stack>
+                                </Box>
+                            );
+                        })}
+                    </Box>
+                </Box>
+            </Box>
+        </Box>
+    );
 }
 
 function SearchResultsPanel({
@@ -735,6 +1188,8 @@ function DataCoveragePanel({ error, loading, stats, theme }) {
             value: stats?.traits,
             icon: QueryStats,
             color: '#2563eb',
+            to: '/trait',
+            detail: 'Browse trait metadata and GWAS figures.',
         },
         {
             label: 'Variants',
@@ -742,18 +1197,24 @@ function DataCoveragePanel({ error, loading, stats, theme }) {
             icon: Storage,
             color: '#0f766e',
             compact: true,
+            to: '/trait',
+            detail: 'Inspect variant-level GWAS tables by trait.',
         },
         {
             label: 'Programs',
             value: stats?.programs,
             icon: Hub,
             color: '#7c3aed',
+            to: '/programs',
+            detail: 'Compare trait-linked programs.',
         },
         {
             label: 'Result files',
             value: stats?.dataOutputs,
             icon: InsertDriveFile,
             color: '#b45309',
+            to: '/data',
+            detail: 'Open and download indexed outputs.',
         },
     ];
 
@@ -782,6 +1243,8 @@ function DataCoveragePanel({ error, loading, stats, theme }) {
                     return (
                         <Box
                             key={metric.label}
+                            component={RouterLink}
+                            to={metric.to}
                             sx={{
                                 minHeight: 78,
                                 px: 1.4,
@@ -792,7 +1255,19 @@ function DataCoveragePanel({ error, loading, stats, theme }) {
                                 borderRadius: 1,
                                 border: `1px solid ${alpha(metric.color, 0.13)}`,
                                 bgcolor: '#fff',
+                                color: 'inherit',
+                                textDecoration: 'none',
                                 boxShadow: '0 10px 24px rgba(15,23,42,0.045)',
+                                transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
+                                '&:hover': {
+                                    transform: 'translateY(-2px)',
+                                    borderColor: alpha(metric.color, 0.28),
+                                    boxShadow: `0 16px 34px ${alpha(metric.color, 0.12)}`,
+                                },
+                                '&:focus-visible': {
+                                    outline: `3px solid ${alpha(metric.color, 0.22)}`,
+                                    outlineOffset: 3,
+                                },
                             }}
                         >
                             <Box
@@ -825,6 +1300,9 @@ function DataCoveragePanel({ error, loading, stats, theme }) {
                                 <Typography sx={{ mt: 0.35, color: '#64748b', fontSize: '0.72rem', lineHeight: 1.2 }}>
                                     {metric.label}
                                 </Typography>
+                                <Typography sx={{ mt: 0.35, color: '#64748b', fontSize: '0.67rem', lineHeight: 1.25, display: { xs: 'none', lg: 'block' } }}>
+                                    {metric.detail}
+                                </Typography>
                             </Box>
                         </Box>
                     );
@@ -845,15 +1323,16 @@ function DataCoveragePanel({ error, loading, stats, theme }) {
 }
 
 function FigureCard({ item }) {
+    const theme = useTheme();
     const Icon = item.icon;
 
     return (
         <Box
             component={RouterLink}
             to={item.to}
-            aria-label={`Open ${item.title} in Trait figures`}
+            aria-label={`Open ${item.title}`}
             sx={{
-                minHeight: { xs: 292, md: 304 },
+                minHeight: { xs: 318, md: 334 },
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: 1,
@@ -904,6 +1383,7 @@ function FigureCard({ item }) {
                 />
                 <Box
                     className="figure-card-description"
+                    aria-hidden="true"
                     sx={{
                         position: 'absolute',
                         left: 12,
@@ -924,11 +1404,16 @@ function FigureCard({ item }) {
                     {item.description}
                 </Box>
             </Box>
-            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ px: 1.5, pt: 1.25, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ px: 1.5, pt: 1.25, minWidth: 0 }}>
                 <Icon sx={{ color: item.color, fontSize: 18, flex: '0 0 auto' }} />
-                <Typography component="h3" sx={{ color: '#111827', fontSize: '1rem', fontWeight: 850, lineHeight: 1.22 }}>
-                    {item.title}
-                </Typography>
+                <Box sx={{ minWidth: 0 }}>
+                    <Typography component="h3" sx={{ color: '#111827', fontSize: '1rem', fontWeight: 850, lineHeight: 1.22 }}>
+                        {item.title}
+                    </Typography>
+                    <Typography sx={captionSx(theme, { mt: 0.55, fontSize: '0.78rem', lineHeight: 1.42 })}>
+                        {item.description}
+                    </Typography>
+                </Box>
             </Stack>
             <Stack direction="row" spacing={0.55} alignItems="center" sx={{ mt: 'auto', px: 1.5, pt: 1, pb: 1.25, color: item.color }}>
                 <Typography component="span" sx={{ fontSize: '0.78rem', fontWeight: 800, color: 'inherit' }}>
@@ -941,6 +1426,8 @@ function FigureCard({ item }) {
 }
 
 function FigureGateway({ items }) {
+    const theme = useTheme();
+
     return (
         <Box
             component="section"
@@ -951,14 +1438,12 @@ function FigureGateway({ items }) {
                 pb: { xs: 6, md: 8 },
             }}
         >
-            <Stack spacing={0.6} alignItems="center" sx={{ mb: { xs: 2.8, md: 3.8 } }}>
-                <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 850, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
-                    Trait figures
-                </Typography>
-                <Typography component="h2" sx={{ color: '#111827', fontFamily: 'Georgia, Cambria, serif', fontSize: { xs: '1.9rem', md: '2.4rem' }, fontWeight: 850, lineHeight: 1.08, textAlign: 'center' }}>
-                    Choose a view
-                </Typography>
-            </Stack>
+            <SectionHeading
+                eyebrow="Evidence modules"
+                title="Open the data layer you need"
+                description="Each module links to a real browser view for GWAS variants, Manhattan hits, gene evidence, program context, cross-trait comparison, or result files."
+                theme={theme}
+            />
             <Box
                 sx={{
                     display: 'grid',
@@ -1008,8 +1493,8 @@ function Home() {
                     maxWidth: 1120,
                     mx: 'auto',
                     px: { xs: 2, sm: 3, lg: 4 },
-                    pt: { xs: 5, md: 7 },
-                    pb: { xs: 4.8, md: 6.4 },
+                    pt: { xs: 4.6, md: 6.2 },
+                    pb: { xs: 4.2, md: 5.4 },
                     textAlign: 'center',
                 }}
             >
@@ -1040,40 +1525,48 @@ function Home() {
                         lineHeight: 1.72,
                     }}
                 >
-                    A GWAS trait browser for figure-level exploration.
+                    A GWAS trait browser for moving from association signals to gene and program evidence.
                 </Typography>
-                <Button
-                    variant="contained"
-                    size="large"
-                    endIcon={<ArrowForward />}
-                    component={RouterLink}
-                    to="/trait"
-                    sx={{
-                        mt: { xs: 2.4, md: 3 },
-                        px: 3.2,
-                        py: 1.15,
-                        borderRadius: 999,
-                        bgcolor: '#1f2933',
-                        '&:hover': { bgcolor: '#111827' },
-                    }}
-                >
-                    Browse Traits
-                </Button>
-                <Stack direction="row" spacing={0.8} justifyContent="center" useFlexGap flexWrap="wrap" sx={{ mt: 1.5 }}>
-                    <Chip
-                        label={`${FEATURED_TRAIT.fileId} / ${FEATURED_TRAIT.gwasId} - ${fmtCount(FEATURED_TRAIT.nSig)} loci`}
-                        size="small"
-                        sx={summaryChipSx(theme, {
-                            bgcolor: alpha(theme.palette.primary.main, 0.07),
-                            border: `1px solid ${alpha(theme.palette.primary.main, 0.16)}`,
-                        })}
-                    />
-                    <Chip
-                        label={FEATURED_TRAIT.name}
-                        size="small"
-                        sx={summaryChipSx(theme, { bgcolor: '#fff' })}
-                    />
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1} justifyContent="center" sx={{ mt: { xs: 2.4, md: 3 } }}>
+                    <Button
+                        variant="contained"
+                        size="large"
+                        endIcon={<ArrowForward />}
+                        component={RouterLink}
+                        to="/trait"
+                        sx={{
+                            px: 3.2,
+                            py: 1.15,
+                            borderRadius: 999,
+                            bgcolor: '#1f2933',
+                            '&:hover': { bgcolor: '#111827' },
+                        }}
+                    >
+                        Start With a Trait
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        size="large"
+                        endIcon={<InsertDriveFile />}
+                        component={RouterLink}
+                        to="/data"
+                        sx={{
+                            px: 2.8,
+                            py: 1.05,
+                            borderRadius: 999,
+                            color: '#1f2933',
+                            borderColor: 'rgba(31,41,51,0.22)',
+                            bgcolor: 'rgba(255,255,255,0.72)',
+                            '&:hover': {
+                                borderColor: 'rgba(31,41,51,0.36)',
+                                bgcolor: '#fff',
+                            },
+                        }}
+                    >
+                        Browse Result Files
+                    </Button>
                 </Stack>
+
                 <DataCoveragePanel
                     error={homeStatsError}
                     loading={homeStatsLoading}
@@ -1081,6 +1574,12 @@ function Home() {
                     theme={theme}
                 />
             </Box>
+
+            <ExploreByQuestion theme={theme} />
+
+            <WorkflowSection theme={theme} />
+
+            <FeaturedTraitCaseStudy theme={theme} />
 
             <HomeSearch theme={theme} />
 

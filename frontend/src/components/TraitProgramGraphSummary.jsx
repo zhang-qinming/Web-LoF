@@ -14,7 +14,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { stickyTableContainerSx, stickyTableHeaderCellSx, stickyTableSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
 export default function TraitProgramGraphSummary({
@@ -317,8 +317,16 @@ export default function TraitProgramGraphSummary({
                                                             fontSize: 11,
                                                             fontWeight: 800,
                                                             color: effectColors[sign] || '#475467',
-                                                            bgcolor: sign === 'negative' ? 'rgba(52,125,204,0.10)' : sign === 'positive' ? 'rgba(239,78,47,0.10)' : 'rgba(15,23,42,0.06)',
-                                                            border: `1px solid ${sign === 'negative' ? 'rgba(52,125,204,0.24)' : sign === 'positive' ? 'rgba(239,78,47,0.24)' : 'rgba(15,23,42,0.10)'}`,
+                                                            bgcolor: sign === 'negative'
+                                                                ? alpha(effectColors.negative, 0.10)
+                                                                : sign === 'positive'
+                                                                    ? alpha(effectColors.positive, 0.10)
+                                                                    : 'rgba(15,23,42,0.06)',
+                                                            border: `1px solid ${sign === 'negative'
+                                                                ? alpha(effectColors.negative, 0.24)
+                                                                : sign === 'positive'
+                                                                    ? alpha(effectColors.positive, 0.24)
+                                                                    : 'rgba(15,23,42,0.10)'}`,
                                                             cursor: 'pointer',
                                                         }}
                                                     />

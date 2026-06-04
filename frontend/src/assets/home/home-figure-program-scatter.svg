@@ -1,95 +1,86 @@
 <svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="program-scatter-clip">
+      <rect x="96" y="118" width="528" height="214" rx="6"/>
+    </clipPath>
+  </defs>
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#0F766E" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Program × regulator</text>
+  <text x="62" y="82" fill="#0F766E" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Program x Regulator</text>
+  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">Absolute score gates define enrichment</text>
 
-  <line x1="108" y1="324" x2="612" y2="324" stroke="#CBD5E1" stroke-width="2"/>
-  <line x1="108" y1="324" x2="108" y2="124" stroke="#CBD5E1" stroke-width="2"/>
-  <line x1="364" y1="124" x2="364" y2="324" stroke="#94A3B8" stroke-width="1.6" stroke-dasharray="7 6"/>
-  <line x1="108" y1="226" x2="612" y2="226" stroke="#94A3B8" stroke-width="1.6" stroke-dasharray="7 6"/>
-  <text x="474" y="352" fill="#334155" font-family="Arial, Helvetica, sans-serif" font-size="13">program burden</text>
-  <text transform="rotate(-90 80 242)" x="80" y="242" fill="#334155" font-family="Arial, Helvetica, sans-serif" font-size="13">regulator corr</text>
+  <rect x="96" y="118" width="528" height="214" rx="6" fill="#FBFEFF" stroke="#E5E7EB"/>
+  <rect x="248" y="160" width="224" height="112" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <g stroke="#E2E8F0" stroke-width="1">
+    <line x1="96" y1="160" x2="624" y2="160"/>
+    <line x1="96" y1="216" x2="624" y2="216"/>
+    <line x1="96" y1="272" x2="624" y2="272"/>
+    <line x1="248" y1="118" x2="248" y2="332"/>
+    <line x1="360" y1="118" x2="360" y2="332"/>
+    <line x1="472" y1="118" x2="472" y2="332"/>
+  </g>
+  <line x1="96" y1="216" x2="624" y2="216" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="7 6"/>
+  <line x1="360" y1="118" x2="360" y2="332" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="7 6"/>
+  <line x1="248" y1="118" x2="248" y2="332" stroke="#64748B" stroke-width="1.2" stroke-dasharray="4 5" stroke-opacity="0.75"/>
+  <line x1="472" y1="118" x2="472" y2="332" stroke="#64748B" stroke-width="1.2" stroke-dasharray="4 5" stroke-opacity="0.75"/>
+  <line x1="96" y1="160" x2="624" y2="160" stroke="#64748B" stroke-width="1.2" stroke-dasharray="4 5" stroke-opacity="0.75"/>
+  <line x1="96" y1="272" x2="624" y2="272" stroke="#64748B" stroke-width="1.2" stroke-dasharray="4 5" stroke-opacity="0.75"/>
+  <line x1="96" y1="332" x2="624" y2="332" stroke="#CBD5E1" stroke-width="2"/>
+  <line x1="96" y1="332" x2="96" y2="118" stroke="#CBD5E1" stroke-width="2"/>
 
-  <circle cx="336" cy="238" r="3.1" fill="#CBD5E1" fill-opacity="0.72"/>
-  <circle cx="348" cy="214" r="3.2" fill="#CBD5E1" fill-opacity="0.68"/>
-  <circle cx="352" cy="246" r="3.1" fill="#CBD5E1" fill-opacity="0.72"/>
-  <circle cx="360" cy="226" r="3.3" fill="#CBD5E1" fill-opacity="0.75"/>
-  <circle cx="366" cy="252" r="3.1" fill="#CBD5E1" fill-opacity="0.68"/>
-  <circle cx="374" cy="222" r="3.2" fill="#CBD5E1" fill-opacity="0.7"/>
-  <circle cx="382" cy="236" r="3.3" fill="#CBD5E1" fill-opacity="0.72"/>
-  <circle cx="390" cy="210" r="3.1" fill="#CBD5E1" fill-opacity="0.66"/>
-  <circle cx="396" cy="244" r="3.2" fill="#CBD5E1" fill-opacity="0.68"/>
-  <circle cx="404" cy="228" r="3.1" fill="#CBD5E1" fill-opacity="0.7"/>
-  <circle cx="414" cy="252" r="3.2" fill="#CBD5E1" fill-opacity="0.66"/>
-  <circle cx="424" cy="234" r="3.1" fill="#CBD5E1" fill-opacity="0.64"/>
+  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">Program score</text>
+  <text transform="rotate(-90 73 236)" x="73" y="236" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">Regulator score</text>
+  <text x="500" y="308" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="10">|program| high</text>
+  <text x="104" y="144" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="10">|regulator| high</text>
 
-  <circle cx="174" cy="196" r="3.8" fill="#FDBA74" fill-opacity="0.72"/>
-  <circle cx="192" cy="184" r="3.9" fill="#FB923C" fill-opacity="0.78"/>
-  <circle cx="206" cy="192" r="4.1" fill="#F59E0B" fill-opacity="0.82"/>
-  <circle cx="218" cy="176" r="4.4" fill="#F59E0B" fill-opacity="0.86"/>
-  <circle cx="238" cy="164" r="5.1" fill="#EA580C" fill-opacity="0.9"/>
-  <circle cx="254" cy="198" r="3.8" fill="#FB923C" fill-opacity="0.78"/>
-  <circle cx="270" cy="188" r="4" fill="#F59E0B" fill-opacity="0.82"/>
-  <circle cx="288" cy="210" r="3.7" fill="#FDBA74" fill-opacity="0.72"/>
-  <circle cx="296" cy="204" r="3.8" fill="#FB923C" fill-opacity="0.76"/>
-  <circle cx="308" cy="198" r="3.8" fill="#FB923C" fill-opacity="0.78"/>
-  <circle cx="316" cy="222" r="3.6" fill="#FCD34D" fill-opacity="0.66"/>
-  <circle cx="326" cy="214" r="3.6" fill="#FDBA74" fill-opacity="0.64"/>
+  <g clip-path="url(#program-scatter-clip)">
+    <g fill="#B8C0CC" fill-opacity="0.58">
+      <circle cx="282" cy="206" r="3"/>
+      <circle cx="302" cy="226" r="3.2"/>
+      <circle cx="320" cy="198" r="2.9"/>
+      <circle cx="338" cy="240" r="3.1"/>
+      <circle cx="354" cy="214" r="3"/>
+      <circle cx="374" cy="234" r="3.1"/>
+      <circle cx="392" cy="202" r="2.9"/>
+      <circle cx="412" cy="248" r="3"/>
+      <circle cx="432" cy="220" r="3.2"/>
+      <circle cx="452" cy="238" r="2.8"/>
+      <circle cx="332" cy="258" r="2.8"/>
+      <circle cx="386" cy="184" r="2.9"/>
+    </g>
 
-  <circle cx="168" cy="288" r="3.6" fill="#60A5FA" fill-opacity="0.72"/>
-  <circle cx="180" cy="302" r="3.8" fill="#2563EB" fill-opacity="0.82"/>
-  <circle cx="202" cy="296" r="4.2" fill="#1D4ED8" fill-opacity="0.9"/>
-  <circle cx="216" cy="292" r="3.9" fill="#3B82F6" fill-opacity="0.82"/>
-  <circle cx="230" cy="286" r="4.2" fill="#2563EB" fill-opacity="0.88"/>
-  <circle cx="240" cy="270" r="3.8" fill="#60A5FA" fill-opacity="0.76"/>
-  <circle cx="248" cy="278" r="3.8" fill="#3B82F6" fill-opacity="0.8"/>
-  <circle cx="258" cy="272" r="3.7" fill="#60A5FA" fill-opacity="0.76"/>
-  <circle cx="274" cy="264" r="3.8" fill="#60A5FA" fill-opacity="0.8"/>
-  <circle cx="286" cy="260" r="3.7" fill="#93C5FD" fill-opacity="0.7"/>
-  <circle cx="310" cy="256" r="3.7" fill="#60A5FA" fill-opacity="0.76"/>
-  <circle cx="326" cy="248" r="3.6" fill="#93C5FD" fill-opacity="0.72"/>
-  <circle cx="338" cy="254" r="3.5" fill="#BFDBFE" fill-opacity="0.64"/>
+    <g stroke="rgba(17,24,39,0.18)" stroke-width="1">
+      <circle cx="170" cy="198" r="4.2" fill="#E69F00" fill-opacity="0.9"/>
+      <circle cx="196" cy="226" r="4.6" fill="#E69F00" fill-opacity="0.92"/>
+      <circle cx="222" cy="244" r="4.1" fill="#E69F00" fill-opacity="0.88"/>
+      <circle cx="492" cy="202" r="4.2" fill="#E69F00" fill-opacity="0.9"/>
+      <circle cx="522" cy="238" r="4.9" fill="#E69F00" fill-opacity="0.94"/>
+      <circle cx="558" cy="218" r="4.3" fill="#E69F00" fill-opacity="0.88"/>
 
-  <circle cx="396" cy="200" r="3.8" fill="#5EEAD4" fill-opacity="0.74"/>
-  <circle cx="404" cy="216" r="3.8" fill="#5EEAD4" fill-opacity="0.76"/>
-  <circle cx="416" cy="220" r="3.7" fill="#99F6E4" fill-opacity="0.7"/>
-  <circle cx="420" cy="204" r="3.9" fill="#2DD4BF" fill-opacity="0.82"/>
-  <circle cx="428" cy="218" r="3.8" fill="#5EEAD4" fill-opacity="0.74"/>
-  <circle cx="438" cy="196" r="4" fill="#14B8A6" fill-opacity="0.86"/>
-  <circle cx="446" cy="174" r="3.9" fill="#14B8A6" fill-opacity="0.82"/>
-  <circle cx="452" cy="208" r="3.8" fill="#2DD4BF" fill-opacity="0.8"/>
-  <circle cx="464" cy="188" r="4" fill="#14B8A6" fill-opacity="0.88"/>
-  <circle cx="472" cy="160" r="4.3" fill="#0F766E" fill-opacity="0.94"/>
-  <circle cx="486" cy="186" r="3.8" fill="#14B8A6" fill-opacity="0.82"/>
-  <circle cx="492" cy="172" r="4.2" fill="#0F766E" fill-opacity="0.92"/>
-  <circle cx="504" cy="166" r="4.1" fill="#0F766E" fill-opacity="0.9"/>
-  <circle cx="512" cy="152" r="4.6" fill="#0F766E" fill-opacity="0.96"/>
-  <circle cx="534" cy="178" r="4" fill="#0D9488" fill-opacity="0.88"/>
-  <circle cx="540" cy="196" r="3.7" fill="#2DD4BF" fill-opacity="0.76"/>
-  <circle cx="554" cy="194" r="3.8" fill="#14B8A6" fill-opacity="0.82"/>
-  <circle cx="576" cy="184" r="3.7" fill="#0D9488" fill-opacity="0.8"/>
+      <circle cx="294" cy="142" r="4.2" fill="#0072B2" fill-opacity="0.88"/>
+      <circle cx="326" cy="150" r="4.7" fill="#0072B2" fill-opacity="0.92"/>
+      <circle cx="398" cy="144" r="4.4" fill="#0072B2" fill-opacity="0.9"/>
+      <circle cx="430" cy="286" r="4.5" fill="#0072B2" fill-opacity="0.9"/>
+      <circle cx="344" cy="300" r="4.8" fill="#0072B2" fill-opacity="0.92"/>
+      <circle cx="288" cy="292" r="4.1" fill="#0072B2" fill-opacity="0.86"/>
 
-  <circle cx="386" cy="258" r="3.5" fill="#BFDBFE" fill-opacity="0.62"/>
-  <circle cx="396" cy="246" r="3.6" fill="#93C5FD" fill-opacity="0.68"/>
-  <circle cx="414" cy="256" r="3.7" fill="#60A5FA" fill-opacity="0.74"/>
-  <circle cx="424" cy="264" r="3.7" fill="#60A5FA" fill-opacity="0.72"/>
-  <circle cx="432" cy="250" r="3.6" fill="#93C5FD" fill-opacity="0.66"/>
-  <circle cx="450" cy="262" r="3.8" fill="#3B82F6" fill-opacity="0.78"/>
-  <circle cx="466" cy="270" r="3.8" fill="#3B82F6" fill-opacity="0.8"/>
-  <circle cx="478" cy="276" r="4.1" fill="#2563EB" fill-opacity="0.86"/>
-  <circle cx="496" cy="266" r="3.9" fill="#2563EB" fill-opacity="0.84"/>
-  <circle cx="510" cy="288" r="3.8" fill="#3B82F6" fill-opacity="0.8"/>
-  <circle cx="540" cy="280" r="3.7" fill="#60A5FA" fill-opacity="0.72"/>
+      <circle cx="172" cy="142" r="4.7" fill="#009E73" fill-opacity="0.9"/>
+      <circle cx="218" cy="136" r="5.4" fill="#009E73" fill-opacity="0.96"/>
+      <circle cx="508" cy="144" r="5.8" fill="#009E73" fill-opacity="0.96"/>
+      <circle cx="566" cy="152" r="4.8" fill="#009E73" fill-opacity="0.9"/>
+      <circle cx="194" cy="296" r="4.8" fill="#009E73" fill-opacity="0.9"/>
+      <circle cx="540" cy="300" r="5.1" fill="#009E73" fill-opacity="0.94"/>
+    </g>
+  </g>
 
-  <circle cx="238" cy="164" r="11.2" fill="none" stroke="#111827" stroke-opacity="0.15" stroke-width="1.2"/>
-  <circle cx="512" cy="152" r="12.8" fill="none" stroke="#111827" stroke-opacity="0.16" stroke-width="1.2"/>
-
-  <rect x="142" y="348" width="10" height="10" rx="5" fill="#F59E0B"/>
-  <text x="160" y="357" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">mixed</text>
-  <rect x="236" y="348" width="10" height="10" rx="5" fill="#CBD5E1"/>
-  <text x="254" y="357" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">center</text>
-  <rect x="322" y="348" width="10" height="10" rx="5" fill="#14B8A6"/>
-  <text x="340" y="357" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">conc +</text>
-  <rect x="414" y="348" width="10" height="10" rx="5" fill="#2563EB"/>
-  <text x="432" y="357" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">conc −</text>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#475569">
+    <circle cx="126" cy="368" r="5" fill="#009E73"/>
+    <text x="140" y="372">both</text>
+    <circle cx="208" cy="368" r="5" fill="#E69F00"/>
+    <text x="222" y="372">program only</text>
+    <circle cx="330" cy="368" r="5" fill="#0072B2"/>
+    <text x="344" y="372">regulator only</text>
+    <circle cx="468" cy="368" r="5" fill="#B8C0CC"/>
+    <text x="482" y="372">below gate</text>
+  </g>
 </svg>

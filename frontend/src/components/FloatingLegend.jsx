@@ -324,7 +324,7 @@ export default function FloatingLegend({
             const heightPx = nodeRect.height;
             const maxTop = Math.max(SAFE_MARGIN, parentRect.height - heightPx - SAFE_MARGIN);
             const defaultSide = Math.max(SAFE_MARGIN, defaultSideOffset);
-            const leftSide = SAFE_MARGIN;
+            const leftSide = defaultSide;
             const rightSide = Math.max(SAFE_MARGIN, parentRect.width - widthPx - defaultSide);
 
             const topCandidates = [
@@ -337,17 +337,29 @@ export default function FloatingLegend({
                 Math.max(SAFE_MARGIN, Math.round((parentRect.height - heightPx) * 0.54)),
             ].map((value) => Math.min(maxTop, Math.max(SAFE_MARGIN, value)));
 
-            const baseCandidates = [
-                { placement: 'right', side: rightSide, top: Math.min(maxTop, Math.max(SAFE_MARGIN, defaultTop)) },
-                { placement: 'left', side: leftSide, top: Math.min(maxTop, Math.max(SAFE_MARGIN, defaultTop)) },
-            ];
+            const preferredPlacement = defaultPlacement === 'left' ? 'left' : 'right';
+            const fallbackPlacement = preferredPlacement === 'left' ? 'right' : 'left';
+            const sideForPlacement = {
+                left: leftSide,
+                right: rightSide,
+            };
+            const placementOrder = [preferredPlacement, fallbackPlacement];
+
+            const baseCandidates = placementOrder.map((placement) => ({
+                placement,
+                side: sideForPlacement[placement],
+                top: Math.min(maxTop, Math.max(SAFE_MARGIN, defaultTop)),
+            }));
 
             const allCandidates = [
                 ...baseCandidates,
-                ...topCandidates.flatMap((top) => [
-                    { placement: 'right', side: rightSide, top },
-                    { placement: 'left', side: leftSide, top },
-                ]),
+                ...topCandidates.flatMap((top) => (
+                    placementOrder.map((placement) => ({
+                        placement,
+                        side: sideForPlacement[placement],
+                        top,
+                    }))
+                )),
             ];
 
             const protectedRects = [
@@ -357,7 +369,7 @@ export default function FloatingLegend({
 
             const scored = allCandidates.map((candidate, index) => {
                 const rect = getLegendRect(candidate, widthPx, heightPx, candidate.placement);
-                let score = candidate.placement === 'right' ? 0 : 90;
+                let score = candidate.placement === preferredPlacement ? 0 : 90;
                 score += Math.abs(candidate.top - defaultTop) * 1.2;
                 if (index > 1) score += 20;
 

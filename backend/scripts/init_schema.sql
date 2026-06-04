@@ -125,6 +125,25 @@ CREATE TABLE IF NOT EXISTS trait_program_edge (
     INDEX idx_tpe_trait_program (trait_id, program)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS gene_info_hg37_matched (
+    chromosome          VARCHAR(50)  DEFAULT NULL,
+    begin_pos           BIGINT       DEFAULT NULL,
+    end_pos             BIGINT       DEFAULT NULL,
+    symbol              VARCHAR(100) DEFAULT NULL,
+    gene_name           VARCHAR(255) DEFAULT NULL,
+    gene_id             VARCHAR(50)  DEFAULT NULL,
+    gene_type           VARCHAR(100) DEFAULT NULL,
+    synonyms            TEXT         DEFAULT NULL,
+    hgnc                VARCHAR(50)  DEFAULT NULL,
+    ensembl             VARCHAR(30)  NOT NULL,
+    description         TEXT         DEFAULT NULL,
+    PRIMARY KEY (ensembl),
+    INDEX idx_gih37m_symbol (symbol),
+    INDEX idx_gih37m_gene_id (gene_id),
+    INDEX idx_gih37m_gene_type (gene_type),
+    INDEX idx_gih37m_hgnc (hgnc)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS gene_program_trait_edge (
     id                         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     edge_key                   VARCHAR(320) NOT NULL,

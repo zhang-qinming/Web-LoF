@@ -1,25 +1,28 @@
 import React from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { releaseEntries } from './releaseLogData';
+import { releaseEntries as defaultReleaseEntries } from './releaseLogData';
 
 export default function ReleaseLogSection({
     action = null,
     anchorId,
     eyebrow = 'Release',
-    heading = 'A curated build log since March 15, 2026',
+    entries = defaultReleaseEntries,
+    heading = 'A curated build log since May 7, 2026',
     limit,
     newestFirst = false,
     outerSx = {},
+    showDetails,
     showNotes = true,
     subtitle = 'Notes are written for humans rather than copied line-for-line from git, but the milestones still follow the arc of the project.',
 }) {
     const theme = useTheme();
     const accent = '#ff6b4a';
-    const entries = React.useMemo(() => {
-        const orderedEntries = newestFirst ? [...releaseEntries].reverse() : releaseEntries;
+    const shouldShowDetails = showDetails ?? showNotes;
+    const resolvedEntries = React.useMemo(() => {
+        const orderedEntries = newestFirst ? [...entries].reverse() : entries;
         return limit ? orderedEntries.slice(0, limit) : orderedEntries;
-    }, [limit, newestFirst]);
+    }, [entries, limit, newestFirst]);
 
     return (
         <Box
@@ -117,12 +120,12 @@ export default function ReleaseLogSection({
                         },
                     }}
                 >
-                    {entries.map((entry) => {
+                    {resolvedEntries.map((entry) => {
                         const Icon = entry.icon;
 
                         return (
                             <Box
-                                key={entry.date}
+                                key={`${entry.date}-${entry.title}`}
                                 sx={{
                                     position: 'relative',
                                     display: 'grid',
@@ -200,6 +203,37 @@ export default function ReleaseLogSection({
                                         <Typography sx={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.68 }}>
                                             {entry.summary}
                                         </Typography>
+                                        {shouldShowDetails && entry.highlights?.length ? (
+                                            <Box
+                                                component="ul"
+                                                sx={{
+                                                    mt: 1.05,
+                                                    mb: 0,
+                                                    pl: 2.15,
+                                                    display: 'grid',
+                                                    gap: 0.55,
+                                                    color: '#475569',
+                                                    '& li::marker': {
+                                                        color: alpha(entry.color, 0.84),
+                                                    },
+                                                }}
+                                            >
+                                                {entry.highlights.map((highlight) => (
+                                                    <Typography
+                                                        key={`${entry.date}-${highlight}`}
+                                                        component="li"
+                                                        sx={{
+                                                            color: '#475569',
+                                                            fontSize: '0.82rem',
+                                                            lineHeight: 1.62,
+                                                            pr: { md: 1 },
+                                                        }}
+                                                    >
+                                                        {highlight}
+                                                    </Typography>
+                                                ))}
+                                            </Box>
+                                        ) : null}
                                         {showNotes ? (
                                             <Typography sx={{ mt: 0.9, color: '#64748b', fontSize: '0.78rem', lineHeight: 1.55 }}>
                                                 {entry.note}

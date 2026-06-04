@@ -12,17 +12,14 @@ import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import TraitProgramGraphSummary from './TraitProgramGraphSummary';
 import TraitProgramGraphCanvas from './traitProgramGraph/TraitProgramGraphCanvas';
-import TraitProgramGraphControls from './traitProgramGraph/TraitProgramGraphControls';
 import {
     buildModuleBlueprints,
-    DEFAULT_MAX_GENES,
     EFFECT_COLORS,
     edgeColorFromScore,
     effectSignFromGene,
     formatNumber,
-    GRAPH_BOTTOM_PADDING,
-    GRAPH_TOP_PADDING,
-    normalizeGeneLimit,
+    GRAPH_LAYOUTS,
+    GRAPH_VIEW_MODES,
     positionModules,
     programColor,
     programSelectionLabel,
@@ -33,6 +30,11 @@ import {
     useGraphTransform,
 } from './traitProgramGraph/shared';
 
+function normalizeGeneQueryValue(value) {
+    const text = String(value || '').trim();
+    return text.replace(/^\((.+)\)$/, '$1').trim();
+}
+
 export default function TraitProgramGraph({ fileId, traitLabel }) {
     const navigate = useNavigate();
     const { data, error, isLoading } = useSWR(
@@ -42,14 +44,10 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
     const graph = data;
     const svgRef = useRef(null);
 
-    const [gammaThreshold, setGammaThreshold] = useState(0);
-    const [maxGenesPerProgram, setMaxGenesPerProgram] = useState(DEFAULT_MAX_GENES);
-    const [discordantOnly, setDiscordantOnly] = useState(false);
-    const [gammaSign, setGammaSign] = useState('all');
-    const [sideFilter, setSideFilter] = useState('both');
     const [selectedProgram, setSelectedProgram] = useState(null);
     const [selectedGene, setSelectedGene] = useState(null);
     const [expandedPrograms, setExpandedPrograms] = useState(() => new Set());
+    const [graphViewMode, setGraphViewMode] = useState(GRAPH_VIEW_MODES.compact);
 
     const {
         transform,
@@ -64,47 +62,50 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         shouldSuppressClick,
     } = useGraphTransform();
 
+    const graphLayout = GRAPH_LAYOUTS[graphViewMode] || GRAPH_LAYOUTS.compact;
+    const isFullGraph = graphViewMode === GRAPH_VIEW_MODES.full;
+
     const filters = useMemo(() => ({
-        gammaThreshold,
-        maxGenesPerProgram: normalizeGeneLimit(maxGenesPerProgram),
-        discordantOnly,
-        gammaSign,
-        sideFilter,
-    }), [discordantOnly, gammaSign, gammaThreshold, maxGenesPerProgram, sideFilter]);
+        gammaThreshold: 0,
+        maxGenesPerProgram: graphLayout.defaultMaxGenes,
+        discordantOnly: false,
+        gammaSign: 'all',
+        sideFilter: 'both',
+    }), [graphLayout.defaultMaxGenes]);
 
     useEffect(() => {
         setSelectedProgram(null);
         setSelectedGene(null);
         setExpandedPrograms(new Set());
+        setGraphViewMode(GRAPH_VIEW_MODES.compact);
         reset();
     }, [fileId, reset]);
 
     const leftPrograms = useMemo(() => graph?.layout?.leftPrograms || [], [graph]);
     const rightPrograms = useMemo(() => graph?.layout?.rightPrograms || [], [graph]);
-    const hiddenPrograms = useMemo(() => graph?.layout?.hiddenPrograms || [], [graph]);
 
     const leftBlueprint = useMemo(
-        () => buildModuleBlueprints(leftPrograms, 'program', filters, expandedPrograms),
-        [expandedPrograms, filters, leftPrograms],
+        () => buildModuleBlueprints(leftPrograms, 'program', filters, expandedPrograms, graphLayout),
+        [expandedPrograms, filters, graphLayout, leftPrograms],
     );
     const rightBlueprint = useMemo(
-        () => buildModuleBlueprints(rightPrograms, 'regulator', filters, expandedPrograms),
-        [expandedPrograms, filters, rightPrograms],
+        () => buildModuleBlueprints(rightPrograms, 'regulator', filters, expandedPrograms, graphLayout),
+        [expandedPrograms, filters, graphLayout, rightPrograms],
     );
 
     const svgHeight = useMemo(() => {
-        const contentHeight = Math.max(leftBlueprint.contentHeight, rightBlueprint.contentHeight, 560);
-        return Math.max(940, Math.ceil(contentHeight + GRAPH_TOP_PADDING + GRAPH_BOTTOM_PADDING));
-    }, [leftBlueprint.contentHeight, rightBlueprint.contentHeight]);
+        const contentHeight = Math.max(leftBlueprint.contentHeight, rightBlueprint.contentHeight, graphLayout.minContentHeight);
+        return Math.max(graphLayout.minSvgHeight, Math.ceil(contentHeight + graphLayout.graphTopPadding + graphLayout.graphBottomPadding));
+    }, [graphLayout, leftBlueprint.contentHeight, rightBlueprint.contentHeight]);
     const traitCenterY = useMemo(() => Math.round(svgHeight / 2), [svgHeight]);
 
     const leftLayout = useMemo(
-        () => positionModules(leftBlueprint.modules, 'program', traitCenterY),
-        [leftBlueprint.modules, traitCenterY],
+        () => positionModules(leftBlueprint.modules, 'program', traitCenterY, graphLayout),
+        [graphLayout, leftBlueprint.modules, traitCenterY],
     );
     const rightLayout = useMemo(
-        () => positionModules(rightBlueprint.modules, 'regulator', traitCenterY),
-        [rightBlueprint.modules, traitCenterY],
+        () => positionModules(rightBlueprint.modules, 'regulator', traitCenterY, graphLayout),
+        [graphLayout, rightBlueprint.modules, traitCenterY],
     );
 
     const allModules = useMemo(
@@ -132,11 +133,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
 
     const selectedGeneKey = selectedGene?.highlightKey || null;
 
-    const visibleSides = useMemo(() => {
-        if (sideFilter === 'program') return new Set(['program']);
-        if (sideFilter === 'regulator') return new Set(['regulator']);
-        return new Set(['program', 'regulator']);
-    }, [sideFilter]);
+    const visibleSides = useMemo(() => new Set(['program', 'regulator']), []);
     const summaryModules = useMemo(
         () => allModules.filter((module) => visibleSides.has(module.side)),
         [allModules, visibleSides],
@@ -199,13 +196,20 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         setSelectedGene(null);
     }, []);
 
+    const toggleGraphViewMode = useCallback(() => {
+        setGraphViewMode((current) => (
+            current === GRAPH_VIEW_MODES.full ? GRAPH_VIEW_MODES.compact : GRAPH_VIEW_MODES.full
+        ));
+        reset();
+    }, [reset]);
+
     const openProgram = useCallback((program) => {
         if (!program) return;
         navigate(`/programs/${encodeURIComponent(program)}`);
     }, [navigate]);
 
     const openGene = useCallback((gene) => {
-        const label = gene?.geneLabel || gene?.gene || gene?.ensg || gene?.highlightKey;
+        const label = normalizeGeneQueryValue(gene?.gene || gene?.ensg || gene?.highlightKey || gene?.geneLabel);
         if (!label) return;
         navigate(`/genes?query=${encodeURIComponent(label)}`);
     }, [navigate]);
@@ -219,10 +223,8 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         const label = traitLabel || graph?.traitNode?.label || fileId;
         return splitTraitTextLines(label, 18);
     }, [fileId, graph?.traitNode?.label, traitLabel]);
-    const traitFontSize = useMemo(() => traitTextFontSize(traitDisplayLines), [traitDisplayLines]);
-    const traitNodeHeightValue = useMemo(() => traitNodeHeight(traitDisplayLines), [traitDisplayLines]);
-
-    const hiddenCollapsedCount = hiddenPrograms.filter((program) => program.collapsed || !program.hasOverlap).length;
+    const traitFontSize = useMemo(() => traitTextFontSize(traitDisplayLines, graphLayout), [graphLayout, traitDisplayLines]);
+    const traitNodeHeightValue = useMemo(() => traitNodeHeight(traitDisplayLines, graphLayout), [graphLayout, traitDisplayLines]);
 
     if (isLoading) {
         return (
@@ -242,34 +244,14 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
 
     return (
         <Stack spacing={2.5}>
-            <TraitProgramGraphControls
-                clearSelection={clearSelection}
-                discordantOnly={discordantOnly}
-                fileId={fileId}
-                gammaSign={gammaSign}
-                gammaThreshold={gammaThreshold}
-                graph={graph}
-                hiddenCollapsedCount={hiddenCollapsedCount}
-                maxGenesPerProgram={maxGenesPerProgram}
-                onDiscordantOnlyChange={setDiscordantOnly}
-                onGammaSignChange={setGammaSign}
-                onGammaThresholdChange={setGammaThreshold}
-                onMaxGenesPerProgramChange={setMaxGenesPerProgram}
-                onSelectedGeneClear={() => setSelectedGene(null)}
-                onSelectedProgramClear={() => setSelectedProgram(null)}
-                onSideFilterChange={setSideFilter}
-                selectedGene={selectedGene}
-                selectedGeneKey={selectedGeneKey}
-                selectedGeneOccurrences={selectedGeneOccurrences}
-                selectedProgram={selectedProgram}
-                sideFilter={sideFilter}
-                svgRef={svgRef}
-            />
-
             <TraitProgramGraphCanvas
                 clearSelection={clearSelection}
+                exportFileName={fileId}
+                graphLayout={graphLayout}
+                isFullGraph={isFullGraph}
                 isDragging={isDragging}
                 leftLayout={leftLayout}
+                onGraphViewModeToggle={toggleGraphViewMode}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}

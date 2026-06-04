@@ -22,7 +22,7 @@ import {
 } from '@mui/icons-material';
 import { PageFrame } from '../components/PageScaffold';
 import ReleaseLogSection from '../components/ReleaseLogSection';
-import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
+import { RELEASE_LOG_ANCHOR, releaseEntriesByLocale } from '../components/releaseLogData';
 import { captionSx, metricChipTone, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
 
 const COPY = {
@@ -40,7 +40,7 @@ const COPY = {
         heroChips: ['Trait-level browsing', 'Program enrichment', 'Downloadable outputs'],
         releaseEyebrow: 'Release',
         releaseTitle: 'Full release log',
-        releaseSubtitle: 'A longer milestone view of the project since March 15, 2026, written as readable product notes instead of raw commit text.',
+        releaseSubtitle: 'A longer milestone view of the project since May 7, 2026, written as readable product notes instead of raw commit text.',
         sections: [
             {
                 icon: InsightsOutlined,
@@ -99,9 +99,9 @@ const COPY = {
             { label: '打开数据浏览器', to: '/data' },
         ],
         heroChips: ['Trait 级浏览', 'Program enrichment', '结果下载'],
-        releaseEyebrow: 'Release',
+        releaseEyebrow: '版本',
         releaseTitle: '完整版本记录',
-        releaseSubtitle: '这里汇总了 2026 年 3 月 15 日以来的主要里程碑，用可读的版本说明而不是直接复制 git 提交信息。',
+        releaseSubtitle: '这里汇总了 2026 年 5 月 7 日以来的主要里程碑，用可读的版本说明而不是直接复制 git 提交信息。',
         sections: [
             {
                 icon: InsightsOutlined,
@@ -306,6 +306,7 @@ export default function About() {
             <ReleaseLogSection
                 anchorId={RELEASE_LOG_ANCHOR}
                 eyebrow={copy.releaseEyebrow}
+                entries={releaseEntriesByLocale[language]}
                 heading={copy.releaseTitle}
                 subtitle={copy.releaseSubtitle}
                 outerSx={{ mb: 2 }}

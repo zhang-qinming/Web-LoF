@@ -1,63 +1,84 @@
 <svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="gene-evidence-clip">
+      <rect x="96" y="118" width="528" height="214" rx="6"/>
+    </clipPath>
+  </defs>
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#6D3BF5" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">LoF gene scatter</text>
+  <text x="62" y="82" fill="#7A4B35" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Posterior vs regulation</text>
+  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">GeneBayes effect against perturb-seq signal</text>
 
-  <line x1="104" y1="324" x2="620" y2="324" stroke="#CBD5E1" stroke-width="2"/>
-  <line x1="104" y1="324" x2="104" y2="126" stroke="#CBD5E1" stroke-width="2"/>
-  <line x1="362" y1="126" x2="362" y2="324" stroke="#D8C7FF" stroke-width="1.6" stroke-dasharray="7 7"/>
-  <line x1="104" y1="228" x2="620" y2="228" stroke="#D8C7FF" stroke-width="1.6" stroke-dasharray="7 7"/>
-  <text x="546" y="352" fill="#334155" font-family="Arial, Helvetica, sans-serif" font-size="13">post_mean</text>
-  <text transform="rotate(-90 72 242)" x="72" y="242" fill="#334155" font-family="Arial, Helvetica, sans-serif" font-size="13">signed -log10(P)</text>
+  <rect x="96" y="118" width="528" height="214" rx="6" fill="#FBFEFF" stroke="#E5E7EB"/>
+  <g stroke="#E2E8F0" stroke-width="1">
+    <line x1="96" y1="164" x2="624" y2="164"/>
+    <line x1="96" y1="218" x2="624" y2="218"/>
+    <line x1="96" y1="276" x2="624" y2="276"/>
+    <line x1="228" y1="118" x2="228" y2="332"/>
+    <line x1="360" y1="118" x2="360" y2="332"/>
+    <line x1="492" y1="118" x2="492" y2="332"/>
+  </g>
+  <line x1="96" y1="164" x2="624" y2="164" stroke="#B45309" stroke-width="1.3" stroke-dasharray="4 6" stroke-opacity="0.58"/>
+  <line x1="96" y1="276" x2="624" y2="276" stroke="#B45309" stroke-width="1.3" stroke-dasharray="4 6" stroke-opacity="0.58"/>
+  <line x1="96" y1="218" x2="624" y2="218" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="7 6"/>
+  <line x1="360" y1="118" x2="360" y2="332" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="7 6"/>
+  <line x1="96" y1="332" x2="624" y2="332" stroke="#CBD5E1" stroke-width="2"/>
+  <line x1="96" y1="332" x2="96" y2="118" stroke="#CBD5E1" stroke-width="2"/>
 
-  <circle cx="142" cy="284" r="2.7" fill="#DDD6FE" fill-opacity="0.66"/>
-  <circle cx="166" cy="268" r="2.6" fill="#DDD6FE" fill-opacity="0.7"/>
-  <circle cx="182" cy="255" r="2.8" fill="#DDD6FE" fill-opacity="0.76"/>
-  <circle cx="201" cy="244" r="2.7" fill="#C4B5FD" fill-opacity="0.76"/>
-  <circle cx="218" cy="252" r="2.8" fill="#DDD6FE" fill-opacity="0.72"/>
-  <circle cx="236" cy="231" r="2.9" fill="#C4B5FD" fill-opacity="0.78"/>
-  <circle cx="259" cy="225" r="3" fill="#C4B5FD" fill-opacity="0.78"/>
-  <circle cx="272" cy="242" r="2.7" fill="#DDD6FE" fill-opacity="0.72"/>
-  <circle cx="291" cy="218" r="2.8" fill="#C4B5FD" fill-opacity="0.78"/>
-  <circle cx="312" cy="246" r="2.6" fill="#DDD6FE" fill-opacity="0.68"/>
-  <circle cx="344" cy="248" r="2.5" fill="#DDD6FE" fill-opacity="0.66"/>
-  <circle cx="358" cy="238" r="2.5" fill="#DDD6FE" fill-opacity="0.66"/>
-  <circle cx="382" cy="246" r="2.7" fill="#FBCFE8" fill-opacity="0.68"/>
-  <circle cx="404" cy="234" r="2.8" fill="#FBCFE8" fill-opacity="0.7"/>
-  <circle cx="419" cy="220" r="2.8" fill="#F9A8D4" fill-opacity="0.72"/>
-  <circle cx="441" cy="210" r="2.9" fill="#FBCFE8" fill-opacity="0.72"/>
-  <circle cx="462" cy="194" r="3" fill="#F9A8D4" fill-opacity="0.74"/>
-  <circle cx="479" cy="202" r="2.8" fill="#FBCFE8" fill-opacity="0.7"/>
-  <circle cx="503" cy="186" r="3" fill="#F9A8D4" fill-opacity="0.74"/>
-  <circle cx="522" cy="176" r="3.1" fill="#F9A8D4" fill-opacity="0.76"/>
-  <circle cx="546" cy="187" r="2.9" fill="#FBCFE8" fill-opacity="0.7"/>
-  <circle cx="558" cy="180" r="2.8" fill="#FBCFE8" fill-opacity="0.68"/>
+  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">post_mean</text>
+  <text transform="rotate(-90 73 236)" x="73" y="236" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">signed -log10(P)</text>
+  <text x="550" y="158" fill="#92400E" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">FDR 0.05</text>
+  <text x="544" y="291" fill="#92400E" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">-FDR 0.05</text>
 
-  <circle cx="186" cy="212" r="3.8" fill="#93C5FD"/>
-  <circle cx="206" cy="198" r="3.9" fill="#93C5FD"/>
-  <circle cx="226" cy="186" r="4.2" fill="#60A5FA"/>
-  <circle cx="248" cy="178" r="4" fill="#60A5FA"/>
-  <circle cx="284" cy="192" r="4.1" fill="#93C5FD"/>
-  <circle cx="308" cy="184" r="3.8" fill="#93C5FD"/>
-  <circle cx="388" cy="176" r="4.1" fill="#A78BFA"/>
-  <circle cx="430" cy="158" r="4.5" fill="#8B5CF6"/>
-  <circle cx="470" cy="146" r="4.9" fill="#7C3AED"/>
-  <circle cx="520" cy="152" r="4.7" fill="#7C3AED"/>
-  <circle cx="548" cy="172" r="4.4" fill="#8B5CF6"/>
+  <g clip-path="url(#gene-evidence-clip)">
+    <g fill-opacity="0.34">
+      <circle cx="258" cy="205" r="2.4" fill="#4F7DA8"/>
+      <circle cx="280" cy="230" r="2.6" fill="#C55F39"/>
+      <circle cx="306" cy="214" r="2.3" fill="#B6C0CF"/>
+      <circle cx="324" cy="242" r="2.5" fill="#C55F39"/>
+      <circle cx="342" cy="194" r="2.4" fill="#4F7DA8"/>
+      <circle cx="358" cy="222" r="2.6" fill="#B6C0CF"/>
+      <circle cx="376" cy="236" r="2.4" fill="#4F7DA8"/>
+      <circle cx="394" cy="204" r="2.5" fill="#C55F39"/>
+      <circle cx="416" cy="226" r="2.4" fill="#B6C0CF"/>
+      <circle cx="436" cy="196" r="2.5" fill="#C55F39"/>
+      <circle cx="454" cy="246" r="2.3" fill="#4F7DA8"/>
+      <circle cx="474" cy="214" r="2.4" fill="#C55F39"/>
+      <circle cx="336" cy="258" r="2.2" fill="#C55F39"/>
+      <circle cx="404" cy="184" r="2.3" fill="#C55F39"/>
+      <circle cx="300" cy="186" r="2.2" fill="#4F7DA8"/>
+      <circle cx="454" cy="260" r="2.2" fill="#4F7DA8"/>
+    </g>
 
-  <circle cx="244" cy="164" r="5.5" fill="#7C3AED"/>
-  <circle cx="286" cy="148" r="5.8" fill="#7C3AED"/>
-  <circle cx="322" cy="136" r="5.8" fill="#7C3AED"/>
-  <circle cx="438" cy="150" r="5.8" fill="#7C3AED"/>
-  <circle cx="490" cy="132" r="6.8" fill="#7C3AED"/>
+    <g stroke="rgba(15,23,42,0.16)" stroke-width="0.8">
+      <circle cx="432" cy="154" r="4.8" fill="#C55F39" fill-opacity="0.88"/>
+      <circle cx="468" cy="142" r="5.8" fill="#C55F39" fill-opacity="0.95"/>
+      <circle cx="508" cy="150" r="5.1" fill="#C55F39" fill-opacity="0.9"/>
+      <circle cx="548" cy="132" r="6.2" fill="#C55F39" fill-opacity="0.96"/>
+      <circle cx="300" cy="292" r="4.6" fill="#C55F39" fill-opacity="0.84"/>
+      <circle cx="244" cy="304" r="5.3" fill="#C55F39" fill-opacity="0.9"/>
+      <circle cx="210" cy="286" r="4.4" fill="#C55F39" fill-opacity="0.82"/>
 
-  <circle cx="244" cy="164" r="11" fill="none" stroke="#111827" stroke-opacity="0.15" stroke-width="1.2"/>
-  <circle cx="490" cy="132" r="12.8" fill="none" stroke="#111827" stroke-opacity="0.16" stroke-width="1.2"/>
+      <rect x="206" y="142" width="9.8" height="9.8" rx="1.7" fill="#4F7DA8" fill-opacity="0.9" transform="rotate(45 210.9 146.9)"/>
+      <rect x="258" y="154" width="10.8" height="10.8" rx="1.8" fill="#4F7DA8" fill-opacity="0.94" transform="rotate(45 263.4 159.4)"/>
+      <rect x="482" y="284" width="10.2" height="10.2" rx="1.8" fill="#4F7DA8" fill-opacity="0.9" transform="rotate(45 487.1 289.1)"/>
+      <rect x="538" y="300" width="9.8" height="9.8" rx="1.7" fill="#4F7DA8" fill-opacity="0.86" transform="rotate(45 542.9 304.9)"/>
 
-  <rect x="126" y="348" width="10" height="10" rx="5" fill="#7C3AED"/>
-  <text x="144" y="357" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">posterior</text>
-  <rect x="266" y="348" width="10" height="10" rx="5" fill="#60A5FA"/>
-  <text x="284" y="357" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">same sign</text>
-  <rect x="400" y="348" width="10" height="10" rx="5" fill="#F9A8D4"/>
-  <text x="418" y="357" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">opposite sign</text>
+      <circle cx="214" cy="218" r="4.1" fill="#7A8CA8" fill-opacity="0.72"/>
+      <circle cx="246" cy="226" r="4.5" fill="#7A8CA8" fill-opacity="0.76"/>
+      <circle cx="492" cy="212" r="4.6" fill="#7A8CA8" fill-opacity="0.78"/>
+      <circle cx="524" cy="232" r="4.2" fill="#7A8CA8" fill-opacity="0.72"/>
+    </g>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#475569">
+    <circle cx="126" cy="368" r="5" fill="#C55F39"/>
+    <text x="140" y="372">concordant</text>
+    <rect x="244" y="363" width="9" height="9" rx="1.6" fill="#4F7DA8" transform="rotate(45 248.5 367.5)"/>
+    <text x="262" y="372">discordant</text>
+    <circle cx="370" cy="368" r="5" fill="#7A8CA8"/>
+    <text x="384" y="372">posterior only</text>
+    <circle cx="500" cy="368" r="5" fill="#B6C0CF" fill-opacity="0.75"/>
+    <text x="514" y="372">background</text>
+  </g>
 </svg>

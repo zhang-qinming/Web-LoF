@@ -5,6 +5,17 @@ const { normalizeIdentifier, parsePositiveInt } = require('../lib/request');
 
 const router = express.Router();
 
+router.get('/api/genes', asyncRoute(async (req, res) => {
+    const rawLimit = String(req.query.limit ?? '').trim();
+    const limit = rawLimit === '0' ? 0 : parsePositiveInt(req.query.limit, 25, 200);
+    const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
+    const sortBy = normalizeIdentifier(req.query.sortBy || 'totalTraits', 50) || 'totalTraits';
+    const order = String(req.query.order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const result = await geneProgramModel.getGenes({ page, limit, sortBy, order });
+    res.json(result);
+}));
+
 router.get('/api/genes/search', asyncRoute(async (req, res) => {
     const query = normalizeIdentifier(req.query.q || req.query.query, 120);
     if (!query) return res.json({ query: '', totalGenes: 0, genes: [] });

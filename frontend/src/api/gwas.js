@@ -123,6 +123,13 @@ export async function getDataFileText(path) {
     return res.data;
 }
 
+export async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 'desc' } = {}) {
+    const res = await axios.get(`${API_BASE}/genes`, {
+        params: { page, limit, sortBy, order },
+    });
+    return res.data;
+}
+
 export async function searchGenes(query, { limit = 20 } = {}) {
     const res = await axios.get(`${API_BASE}/genes/search`, {
         params: { q: query, limit },

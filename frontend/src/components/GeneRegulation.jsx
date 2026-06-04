@@ -2,13 +2,12 @@ import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import Plot from 'react-plotly.js';
 import Plotly from 'plotly.js-basic-dist';
 import {
-    Box, Typography, Alert, CircularProgress, Button, ButtonBase, Select, MenuItem,
+    Box, Typography, Alert, CircularProgress, Button, Select, MenuItem,
     Chip, Paper,
-    TextField, Dialog, DialogTitle, DialogContent, DialogActions, Popover,
+    TextField, Dialog, DialogTitle, DialogContent, DialogActions,
     ToggleButtonGroup, ToggleButton,
 } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
-import { ExpandMore, Input, Search } from '@mui/icons-material';
+import { useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import FloatingLegend from './FloatingLegend';
@@ -20,10 +19,8 @@ import {
     buildPlotHoverToneNeutral,
     chartLayoutTokens,
     compactToggleGroupSx,
-    metricChipTone,
     plotFrameSx,
     sectionPanelHeaderSx,
-    summaryChipSx,
 } from '../themeUtils';
 
 const TOP_HIT_COUNT = 100;
@@ -72,7 +69,7 @@ function getEffectRange(rows) {
 }
 
 // ============================================================
-export default function GeneRegulation({ programId, onProgramChange, programs }) {
+export default function GeneRegulation({ programId }) {
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
     const compactToggleStyles = useMemo(() => compactToggleGroupSx(theme), [theme]);
@@ -81,40 +78,6 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
     );
     const { data: infoData } = useSWR('/api/programs/info', fetcher);
     const pinfo = (infoData && programId) ? (infoData[`P${programId}`] || infoData[programId]) : null;
-    const programOptions = useMemo(() => {
-        const seen = new Set();
-        return (programs || [])
-            .map((item) => {
-                const id = String(item?.id || '').trim();
-                if (!id || seen.has(id)) return null;
-                seen.add(id);
-                const info = infoData?.[`P${id}`] || infoData?.[id];
-                return {
-                    id,
-                    label: `P${id}`,
-                    annotation: info?.curated_annotation || 'Unannotated',
-                };
-            })
-            .filter(Boolean)
-            .sort((a, b) => Number(a.id) - Number(b.id));
-    }, [infoData, programs]);
-    const selectedProgram = useMemo(
-        () => programOptions.find((item) => item.id === String(programId || '')) || null,
-        [programId, programOptions],
-    );
-    const [programSearch, setProgramSearch] = useState('');
-    const [programPickerAnchor, setProgramPickerAnchor] = useState(null);
-    const programPickerOpen = Boolean(programPickerAnchor);
-    const filteredProgramOptions = useMemo(() => {
-        const query = programSearch.trim().toLowerCase();
-        if (!query) return programOptions;
-        const normalizedId = query.replace(/^p/, '');
-        return programOptions.filter((option) => (
-            option.label.toLowerCase().includes(query)
-            || option.annotation.toLowerCase().includes(query)
-            || option.id.includes(normalizedId)
-        ));
-    }, [programOptions, programSearch]);
 
     const plotElRef = useRef(null);
 
@@ -123,7 +86,6 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
     }, []);
 
     useEffect(() => { setPage(1); }, [programId]);
-    useEffect(() => { setProgramSearch(''); }, [programId]);
 
     // ---- 数据 ----
     const rows = useMemo(() => {
@@ -471,23 +433,6 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
         else { setSortBy(col); setSortDir(col === 'gene' ? 'asc' : 'desc'); }
     }, [sortBy]);
 
-    const openProgramPicker = useCallback((event) => {
-        setProgramPickerAnchor(event.currentTarget);
-    }, []);
-
-    const closeProgramPicker = useCallback(() => {
-        setProgramPickerAnchor(null);
-        setProgramSearch('');
-    }, []);
-
-    const selectProgram = useCallback((id) => {
-        if (id && id !== String(programId || '')) {
-            onProgramChange?.(id);
-        }
-        setProgramPickerAnchor(null);
-        setProgramSearch('');
-    }, [onProgramChange, programId]);
-
     const downloadCSV = useCallback(() => {
         const hdr = 'Gene,Effect Size (lm_es),P-value (lm_p),-log10(P)';
         const body = rows.map(r => [r.gene, r.es, r.p, r.negLogP].join(',')).join('\n');
@@ -508,153 +453,6 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
 
     return (
         <Box sx={{ position: 'relative' }}>
-            {/* ---- 头部：选择器 + 统计 ---- */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(320px, 440px)' }, gap: 2, mb: 2, alignItems: 'start' }}>
-                <Paper
-                    variant="outlined"
-                    sx={plotFrameSx(theme, { p: 1 })}
-                >
-                    <Typography sx={{ px: 1, pb: 0.75, fontSize: '0.76rem', fontWeight: 700, color: theme.palette.text.secondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Program
-                    </Typography>
-                    <ButtonBase
-                        data-program-picker-trigger="true"
-                        onClick={openProgramPicker}
-                        sx={{
-                            width: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 1.25,
-                            px: 1.25,
-                            py: 1.1,
-                            borderRadius: 1,
-                            textAlign: 'left',
-                            border: `1px solid ${theme.custom.border.soft}`,
-                            backgroundColor: theme.palette.background.paper,
-                            transition: `transform ${theme.custom.motion.swift}, border-color ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}, background-color ${theme.custom.motion.swift}`,
-                            '&:hover': {
-                                borderColor: alpha(theme.palette.primary.main, 0.28),
-                                backgroundColor: theme.custom.surface.raised,
-                                boxShadow: theme.custom.shadow.focus,
-                                transform: 'translateY(-1px)',
-                            },
-                        }}
-                    >
-                        <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontSize: '0.98rem', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.2 }}>
-                                {selectedProgram?.label || 'Select program'}
-                            </Typography>
-                            <Typography sx={{ mt: 0.35, fontSize: '0.8rem', color: theme.palette.text.secondary, lineHeight: 1.45 }}>
-                                {selectedProgram?.annotation || 'Open the program list to switch views'}
-                            </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-                            <ExpandMore sx={{ color: theme.palette.text.secondary }} />
-                        </Box>
-                    </ButtonBase>
-                </Paper>
-            </Box>
-
-            <Popover
-                open={programPickerOpen}
-                anchorEl={programPickerAnchor}
-                onClose={closeProgramPicker}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                PaperProps={{
-                    sx: plotFrameSx(theme, {
-                        mt: 0.75,
-                        width: { xs: 'min(92vw, 520px)', sm: 500 },
-                        overflow: 'hidden',
-                        boxShadow: theme.custom.shadow.float,
-                    }),
-                }}
-            >
-                <Box sx={sectionPanelHeaderSx(theme, { display: 'block', p: 1.25 })}>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, mb: 1 }}>
-                        <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: theme.palette.text.primary }}>
-                                Program list
-                            </Typography>
-                            <Typography sx={{ mt: 0.2, fontSize: '0.78rem', color: theme.palette.text.secondary }}>
-                                Browse by program id or annotation
-                            </Typography>
-                        </Box>
-                        <Chip
-                            label={`${filteredProgramOptions.length}/${programOptions.length}`}
-                            size="small"
-                            sx={summaryChipSx(theme, { ...metricChipTone(theme, 'primary'), flexShrink: 0 })}
-                        />
-                    </Box>
-                    <TextField
-                        autoFocus
-                        fullWidth
-                        size="small"
-                        value={programSearch}
-                        onChange={(event) => setProgramSearch(event.target.value)}
-                        placeholder="Search P54 or ER lumen"
-                        InputProps={{
-                            startAdornment: <Search fontSize="small" sx={{ color: theme.custom.chart.axisSoft, mr: 0.75 }} />,
-                        }}
-                    />
-                </Box>
-
-                <Box data-program-picker-list="true" sx={{ maxHeight: 440, overflowY: 'auto', p: 1 }}>
-                    {filteredProgramOptions.length > 0 ? filteredProgramOptions.map((option) => {
-                        const selected = option.id === String(programId || '');
-                        return (
-                            <ButtonBase
-                                key={option.id}
-                                data-program-option={option.id}
-                                onClick={() => selectProgram(option.id)}
-                                sx={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    alignItems: 'flex-start',
-                                    justifyContent: 'space-between',
-                                    gap: 1,
-                                    px: 1.25,
-                                    py: 1,
-                                    mb: 0.75,
-                                    borderRadius: 1,
-                                    textAlign: 'left',
-                                    border: selected ? `1px solid ${alpha(theme.palette.primary.main, 0.28)}` : `1px solid ${theme.custom.border.soft}`,
-                                    backgroundColor: selected ? alpha(theme.palette.primary.main, 0.08) : theme.palette.background.paper,
-                                    transition: `transform ${theme.custom.motion.swift}, border-color ${theme.custom.motion.swift}, background-color ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}`,
-                                    '&:hover': {
-                                        transform: 'translateY(-1px)',
-                                        borderColor: alpha(theme.palette.primary.main, 0.24),
-                                        backgroundColor: selected ? alpha(theme.palette.primary.main, 0.1) : theme.custom.surface.raised,
-                                        boxShadow: theme.custom.shadow.panel,
-                                    },
-                                }}
-                            >
-                                <Box sx={{ minWidth: 0 }}>
-                                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.25 }}>
-                                        {option.label}
-                                    </Typography>
-                                    <Typography sx={{ mt: 0.3, fontSize: '0.8rem', color: theme.palette.text.secondary, lineHeight: 1.45 }}>
-                                        {option.annotation}
-                                    </Typography>
-                                </Box>
-                            </ButtonBase>
-                        );
-                    }) : (
-                        <Box sx={{ px: 1, py: 3, textAlign: 'center' }}>
-                            <Input sx={{ fontSize: 28, color: theme.custom.chart.axisSoft }} />
-                            <Typography sx={{ mt: 1, fontSize: '0.88rem', fontWeight: 600, color: theme.palette.text.primary }}>
-                                No matching programs
-                            </Typography>
-                            <Typography sx={{ mt: 0.35, fontSize: '0.78rem', color: theme.palette.text.secondary }}>
-                                Try program id, annotation keywords, or a shorter search.
-                            </Typography>
-                        </Box>
-                    )}
-                </Box>
-            </Popover>
-
-            {/* ---- 火山图 ---- */}
             {(plotData.length > 0 || isLoading) && (
                 <Paper
                     variant="outlined"
@@ -687,7 +485,7 @@ export default function GeneRegulation({ programId, onProgramChange, programs })
                                         Volcano plot
                                     </Typography>
                                     <Typography sx={{ fontSize: '0.82rem', color: theme.palette.text.secondary, mt: 0.25 }}>
-                                        {titleText}
+                                        Gene-level effect size and significance across visible genes.
                                     </Typography>
                                 </Box>
                             </Box>

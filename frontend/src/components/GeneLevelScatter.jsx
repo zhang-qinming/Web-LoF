@@ -55,31 +55,58 @@ const DEFAULT_LABEL_LIMIT = 10;
 const EVIDENCE_CLASSES = {
     background: {
         label: 'Neutral / low support',
-        color: '#b6c0cf',
+        color: '#b8c2d0',
         symbol: 'circle',
         rank: 0,
     },
     posterior_high: {
-        label: 'Posterior-supported',
-        color: '#7a8ca8',
+        label: 'Posterior-high signal',
+        color: '#b45a78',
         symbol: 'circle',
         rank: 1,
     },
     regulation_supported: {
         label: 'Concordant signal',
-        color: '#c55f39',
+        color: '#c45a32',
         symbol: 'circle',
         rank: 3,
     },
     direction_discordant: {
         label: 'Discordant signal',
-        color: '#4f7da8',
+        color: '#3f78a8',
         symbol: 'diamond',
         rank: 2,
     },
 };
 
 const EVIDENCE_ORDER = ['background', 'posterior_high', 'regulation_supported', 'direction_discordant'];
+
+const MARKER_STYLE_BY_CLASS = {
+    background: {
+        opacity: 0.34,
+        sizeBoost: 0,
+        lineColor: 'rgba(255,255,255,0)',
+        lineWidth: 0,
+    },
+    posterior_high: {
+        opacity: 0.88,
+        sizeBoost: 1.25,
+        lineColor: 'rgba(112, 36, 68, 0.3)',
+        lineWidth: 0.4,
+    },
+    regulation_supported: {
+        opacity: 0.94,
+        sizeBoost: 2.2,
+        lineColor: 'rgba(127, 29, 29, 0.34)',
+        lineWidth: 0.55,
+    },
+    direction_discordant: {
+        opacity: 0.94,
+        sizeBoost: 2.1,
+        lineColor: 'rgba(30, 64, 175, 0.32)',
+        lineWidth: 0.55,
+    },
+};
 
 const VIEW_MODES = {
     ALL: 'all',
@@ -117,6 +144,24 @@ function parseBoolean(value) {
     return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
 }
 
+function resolveEvidenceClass(raw, flags) {
+    const rawClass = String(raw.evidence_class || '').trim();
+    if (rawClass && rawClass !== 'background' && EVIDENCE_CLASSES[rawClass]) return rawClass;
+    if (flags.isRegSig && flags.isDiscordant) return 'direction_discordant';
+    if (flags.isRegSig && flags.isConcordant) return 'regulation_supported';
+    if (flags.isHighEffect) return 'posterior_high';
+    return EVIDENCE_CLASSES[rawClass] ? rawClass : 'background';
+}
+
+function evidenceChipTone(theme, key, bgAlpha = 0.09, borderAlpha = 0.22) {
+    const color = EVIDENCE_CLASSES[key].color;
+    return {
+        backgroundColor: alpha(color, bgAlpha),
+        color,
+        border: `1px solid ${alpha(color, borderAlpha)}`,
+    };
+}
+
 function parseTsv(text) {
     const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.length > 0);
     if (lines.length < 2) return [];
@@ -129,11 +174,20 @@ function parseTsv(text) {
             raw[header] = cells[i] ?? '';
         });
 
-        const evidenceClass = EVIDENCE_CLASSES[raw.evidence_class] ? raw.evidence_class : 'background';
         const gene = String(raw.gene || '').trim();
         const ensg = String(raw.ensg || '').trim();
         const label = String(raw.label || '').trim();
         const rowKey = `${ensg || gene || 'gene'}-${index}`;
+        const isConcordant = parseBoolean(raw.is_concordant);
+        const isDiscordant = parseBoolean(raw.is_discordant);
+        const isRegSig = parseBoolean(raw.is_reg_sig);
+        const isHighEffect = parseBoolean(raw.is_high_effect);
+        const evidenceClass = resolveEvidenceClass(raw, {
+            isConcordant,
+            isDiscordant,
+            isRegSig,
+            isHighEffect,
+        });
 
         return {
             rowKey,
@@ -155,10 +209,10 @@ function parseTsv(text) {
             combinedScore: toFiniteNumber(raw.combined_score),
             postMeanSign: String(raw.post_mean_sign || '').trim(),
             regulationSign: String(raw.regulation_sign || '').trim(),
-            isConcordant: parseBoolean(raw.is_concordant),
-            isDiscordant: parseBoolean(raw.is_discordant),
-            isRegSig: parseBoolean(raw.is_reg_sig),
-            isHighEffect: parseBoolean(raw.is_high_effect),
+            isConcordant,
+            isDiscordant,
+            isRegSig,
+            isHighEffect,
             evidenceClass,
             evidenceClassLabel: EVIDENCE_CLASSES[evidenceClass].label,
         };
@@ -215,10 +269,10 @@ function getBackgroundPointColor(row) {
     const sameDirection = (x >= 0 && y >= 0) || (x <= 0 && y <= 0);
 
     if (sameDirection) {
-        return x >= 0 ? 'rgba(197, 95, 57, 0.42)' : 'rgba(79, 125, 168, 0.42)';
+        return x >= 0 ? 'rgba(196, 90, 50, 0.42)' : 'rgba(63, 120, 168, 0.42)';
     }
 
-    return x >= 0 ? 'rgba(197, 95, 57, 0.26)' : 'rgba(79, 125, 168, 0.26)';
+    return x >= 0 ? 'rgba(196, 90, 50, 0.26)' : 'rgba(63, 120, 168, 0.26)';
 }
 
 function getBackgroundGroupKey(row) {
@@ -234,13 +288,13 @@ function getBackgroundGroupKey(row) {
 function getBackgroundHoverColor(groupKey) {
     switch (groupKey) {
         case 'background_pos_same':
-            return '#c55f39';
+            return EVIDENCE_CLASSES.regulation_supported.color;
         case 'background_neg_same':
-            return '#4f7da8';
+            return EVIDENCE_CLASSES.direction_discordant.color;
         case 'background_pos_cross':
-            return '#c55f39';
+            return EVIDENCE_CLASSES.regulation_supported.color;
         case 'background_neg_cross':
-            return '#4f7da8';
+            return EVIDENCE_CLASSES.direction_discordant.color;
         default:
             return EVIDENCE_CLASSES.background.color;
     }
@@ -411,13 +465,14 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                 ? getBackgroundGroupKey(row)
                 : row.evidenceClass;
             const group = grouped[groupKey] || grouped.background;
+            const markerStyle = MARKER_STYLE_BY_CLASS[row.evidenceClass] || MARKER_STYLE_BY_CLASS.background;
             const scoreScale = clamp(Math.sqrt(Math.max(row.combinedScore || 0, 0)) / 4, 0, 1.6);
             group.x.push(row.postMean);
             group.y.push(row.signedLogP);
             group.text.push(buildHoverText(row));
             group.customdata.push([row.rowKey]);
-            group.sizes.push(pointSize + scoreScale);
-            group.opacity.push(row.evidenceClass === 'background' ? 0.34 : 0.86);
+            group.sizes.push(pointSize + markerStyle.sizeBoost + scoreScale);
+            group.opacity.push(markerStyle.opacity);
             group.colors.push(row.evidenceClass === 'background' ? getBackgroundPointColor(row) : EVIDENCE_CLASSES[row.evidenceClass].color);
         });
 
@@ -433,32 +488,38 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
 
         return renderOrder
             .filter((key) => grouped[key]?.x.length > 0)
-            .map((key) => ({
-                type: 'scattergl',
-                mode: 'markers',
-                name: key.startsWith('background') ? EVIDENCE_CLASSES.background.label : EVIDENCE_CLASSES[key].label,
-                x: grouped[key].x,
-                y: grouped[key].y,
-                text: grouped[key].text,
-                customdata: grouped[key].customdata,
-                hovertemplate: '%{text}<extra></extra>',
-                hoverlabel: buildPlotHoverTone(theme, key.startsWith('background') ? getBackgroundHoverColor(key) : EVIDENCE_CLASSES[key].color, {
-                    bgAlpha: key.startsWith('background') ? 0.14 : 0.18,
-                    borderAlpha: key.startsWith('background') ? 0.26 : 0.4,
-                }),
-                marker: {
-                    color: grouped[key].colors,
-                    symbol: key.startsWith('background') ? EVIDENCE_CLASSES.background.symbol : EVIDENCE_CLASSES[key].symbol,
-                    size: grouped[key].sizes,
-                    opacity: grouped[key].opacity,
-                    line: {
-                        color: key.startsWith('background') ? 'rgba(255,255,255,0)' : 'rgba(15,23,42,0.18)',
-                        width: key.startsWith('background') ? 0 : 0.2,
+            .map((key) => {
+                const isBackground = key.startsWith('background');
+                const classKey = isBackground ? 'background' : key;
+                const markerStyle = MARKER_STYLE_BY_CLASS[classKey] || MARKER_STYLE_BY_CLASS.background;
+
+                return {
+                    type: 'scattergl',
+                    mode: 'markers',
+                    name: isBackground ? EVIDENCE_CLASSES.background.label : EVIDENCE_CLASSES[key].label,
+                    x: grouped[key].x,
+                    y: grouped[key].y,
+                    text: grouped[key].text,
+                    customdata: grouped[key].customdata,
+                    hovertemplate: '%{text}<extra></extra>',
+                    hoverlabel: buildPlotHoverTone(theme, isBackground ? getBackgroundHoverColor(key) : EVIDENCE_CLASSES[key].color, {
+                        bgAlpha: isBackground ? 0.14 : 0.18,
+                        borderAlpha: isBackground ? 0.26 : 0.4,
+                    }),
+                    marker: {
+                        color: grouped[key].colors,
+                        symbol: EVIDENCE_CLASSES[classKey].symbol,
+                        size: grouped[key].sizes,
+                        opacity: grouped[key].opacity,
+                        line: {
+                            color: markerStyle.lineColor,
+                            width: markerStyle.lineWidth,
+                        },
                     },
-                },
-                legendgroup: key.startsWith('background') ? 'background' : key,
-                showlegend: !key.startsWith('background') || key === 'background_pos_same',
-            }));
+                    legendgroup: isBackground ? 'background' : key,
+                    showlegend: !isBackground || key === 'background_pos_same',
+                };
+            });
     }, [filteredRows, pointSize, theme]);
 
     const labelTrace = useMemo(() => {
@@ -497,7 +558,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                 size: pointSize + 12,
                 color: 'rgba(255,255,255,0)',
                 line: { color: '#111827', width: 2.4 },
-                symbol: 'circle',
+                symbol: EVIDENCE_CLASSES[row.evidenceClass].symbol,
             },
         }];
     }, [highlight.rowKey, pointSize, rows]);
@@ -516,12 +577,12 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     key,
                     label: EVIDENCE_CLASSES[key].label,
                     color: EVIDENCE_CLASSES[key].color,
-                    colors: key === 'background' ? ['rgba(197, 95, 57, 0.34)', 'rgba(79, 125, 168, 0.34)'] : undefined,
+                    colors: key === 'background' ? ['rgba(196, 90, 50, 0.34)', 'rgba(63, 120, 168, 0.34)'] : undefined,
                     symbol: EVIDENCE_CLASSES[key].symbol,
                     note: key === 'background'
                         ? 'Muted background genes; tint follows quadrant direction.'
                         : key === 'posterior_high'
-                            ? 'Strong posterior support without a matched regulation call.'
+                            ? 'High GeneBayes posterior effect without matched regulation support.'
                             : key === 'regulation_supported'
                                 ? 'Posterior and perturb-seq regulation agree.'
                                 : 'Posterior and perturb-seq regulation disagree.',
@@ -613,7 +674,6 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             },
             shapes,
             annotations,
-            transition: { duration: 220, easing: 'cubic-in-out' },
         };
     }, [axisStyle, chartTokens, fileId, filteredRows, payload.fileId, theme, thresholdY, traitLabel]);
 
@@ -792,9 +852,9 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                 />
 
                 <Chip icon={<Biotech />} label={`${counts.filtered.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                <Chip icon={<Insights />} label={`${counts.supported.toLocaleString()} supported`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha('#B40426', 0.08), color: '#B40426', border: `1px solid ${alpha('#B40426', 0.22)}` })} />
-                <Chip icon={<FilterAlt />} label={`${counts.discordant.toLocaleString()} discordant`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha('#3B4CC0', 0.08), color: '#3B4CC0', border: `1px solid ${alpha('#3B4CC0', 0.22)}` })} />
-                <Chip icon={<Science />} label={`${counts.posteriorHigh.toLocaleString()} high posterior`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                <Chip icon={<Insights />} label={`${counts.supported.toLocaleString()} supported`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'regulation_supported'))} />
+                <Chip icon={<FilterAlt />} label={`${counts.discordant.toLocaleString()} discordant`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'direction_discordant'))} />
+                <Chip icon={<Science />} label={`${counts.posteriorHigh.toLocaleString()} high posterior`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'posterior_high', 0.1, 0.24))} />
             </Box>
 
             <Box sx={toolbarSx(theme)}>
@@ -833,7 +893,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     CSV
                 </Button>
                 <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    Warm markers indicate concordant signal, cool markers indicate discordant signal, and muted blue-grey points mark posterior-supported genes without regulation support.
+                    Rose markers highlight posterior-high genes; warm and cool markers distinguish concordant and discordant regulation support, while pale points remain low-support background.
                 </Typography>
             </Box>
 

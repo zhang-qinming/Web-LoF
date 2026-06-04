@@ -55,8 +55,8 @@ const DEFAULT_POINT_SIZE = 5;
 const DEFAULT_LABEL_LIMIT = 4;
 const MAX_COMPARE_TRAITS = 6;
 const NOMINAL_LOGP = -Math.log10(0.05);
-const BASE_POINT_COLOR = '#c8d0dc';
-const TRAIT_PALETTE = ['#356fbb', '#d96a3a', '#1f8a70', '#8d5fd3', '#b7791f', '#c44569'];
+const BASE_POINT_COLOR = '#8fa0b6';
+const TRAIT_PALETTE = ['#155e9f', '#c45121', '#047857', '#6d4cc2', '#9a5b12', '#b42358'];
 
 const TAIL_META = {
     negative: {
@@ -399,7 +399,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
-    const [showTraitStamp, setShowTraitStamp] = useState(true);
+    const [showTraitStamp, setShowTraitStamp] = useState(false);
     const [traitStampText, setTraitStampText] = useState('');
     const [availableTraits, setAvailableTraits] = useState([]);
     const [selectedTraits, setSelectedTraits] = useState([]);
@@ -630,14 +630,17 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const axisStyle = useMemo(() => ({
         zeroline: false,
         showgrid: true,
-        gridwidth: 0.5,
-        gridcolor: chartTokens.gridColor,
+        gridwidth: 1,
+        gridcolor: alpha(theme.palette.text.secondary, 0.075),
         showline: true,
         linewidth: 1,
-        linecolor: chartTokens.axisSoft,
-        ticks: 'inside',
-        tickfont: { size: 13, color: chartTokens.axisColor, family: theme.typography.fontFamily },
-    }), [chartTokens, theme.typography.fontFamily]);
+        linecolor: alpha(theme.palette.text.secondary, 0.24),
+        ticks: 'outside',
+        ticklen: 5,
+        tickwidth: 1,
+        tickcolor: alpha(theme.palette.text.secondary, 0.24),
+        tickfont: { size: 12, color: chartTokens.axisColor, family: theme.typography.fontFamily },
+    }), [chartTokens.axisColor, theme.palette.text.secondary, theme.typography.fontFamily]);
 
     const envelopeTraces = useMemo(() => (
         showEnvelope ? buildEnvelope(filteredRows) : []
@@ -672,14 +675,14 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             const group = grouped.get(groupKey);
             const normalizedDeviation = clamp((row.absDeviation || 0) / deviationCap, 0, 1);
             const intensity = normalizedDeviation ** 0.72;
-            const deviationScale = intensity * 1.6;
+            const deviationScale = intensity * 1.9;
             const traitColor = traitColorMap.get(row.sourceFileId) || TAIL_META[row.tailSide].color;
             group.x.push(row.expected);
             group.y.push(row.observed);
             group.text.push(buildHoverText(row));
             group.customdata.push([row.rowKey]);
             group.sizes.push(pointSize + deviationScale);
-            group.colors.push(mixColors(BASE_POINT_COLOR, traitColor, 0.5 + (intensity * 0.5), 0.62 + (intensity * 0.3)));
+            group.colors.push(mixColors(BASE_POINT_COLOR, traitColor, 0.66 + (intensity * 0.28), 0.68 + (intensity * 0.22)));
             group.opacity.push(1);
         });
 
@@ -702,8 +705,8 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     size: group.sizes,
                     opacity: group.opacity,
                     line: {
-                        color: 'rgba(255,255,255,0)',
-                        width: 0,
+                        color: alpha(theme.palette.background.paper, 0.86),
+                        width: 0.45,
                     },
                 },
             }));
@@ -781,20 +784,43 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         const shapes = [];
         const annotations = [];
 
+        if (axisRange[0] < 0 && axisRange[1] > 0) {
+            const zeroGuide = alpha(theme.palette.text.secondary, 0.16);
+            shapes.push(
+                {
+                    type: 'line',
+                    x0: 0,
+                    y0: axisRange[0],
+                    x1: 0,
+                    y1: axisRange[1],
+                    line: { color: zeroGuide, width: 0.9 },
+                },
+                {
+                    type: 'line',
+                    x0: axisRange[0],
+                    y0: 0,
+                    x1: axisRange[1],
+                    y1: 0,
+                    line: { color: zeroGuide, width: 0.9 },
+                },
+            );
+        }
+
         if (showTraitStamp && traitStampText.trim()) {
             annotations.push({
                 xref: 'paper',
                 yref: 'paper',
-                x: 0.016,
-                y: 0.985,
-                xanchor: 'left',
-                yanchor: 'top',
+                x: 0.985,
+                y: 0.045,
+                xanchor: 'right',
+                yanchor: 'bottom',
+                align: 'right',
                 showarrow: false,
                 text: `<b>${traitStampText.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>`,
-                font: { size: 11, color: theme.palette.text.primary, family: theme.typography.fontFamily },
-                bgcolor: alpha(theme.palette.background.paper, 0.94),
-                bordercolor: theme.custom.border.strong,
-                borderpad: 5,
+                font: { size: 10.5, color: theme.palette.text.secondary, family: theme.typography.fontFamily },
+                bgcolor: alpha(theme.palette.background.paper, 0.86),
+                bordercolor: alpha(theme.palette.text.secondary, 0.18),
+                borderpad: 4,
             });
         }
 
@@ -805,7 +831,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 y0: axisRange[0],
                 x1: axisRange[1],
                 y1: axisRange[1],
-                line: { color: chartTokens.axisSoft, width: 1.2, dash: 'dash' },
+                line: { color: alpha(chartTokens.axisColor, 0.72), width: 1.35, dash: 'longdash' },
             });
             annotations.push({
                 xref: 'paper',
@@ -828,7 +854,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     x1: axisRange[1],
                     y0: NOMINAL_LOGP,
                     y1: NOMINAL_LOGP,
-                    line: { color: chartTokens.threshold, width: 1, dash: 'dot' },
+                    line: { color: alpha(chartTokens.threshold, 0.72), width: 1, dash: 'dot' },
                 },
                 {
                     type: 'line',
@@ -836,7 +862,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     x1: axisRange[1],
                     y0: -NOMINAL_LOGP,
                     y1: -NOMINAL_LOGP,
-                    line: { color: chartTokens.threshold, width: 1, dash: 'dot' },
+                    line: { color: alpha(chartTokens.threshold, 0.72), width: 1, dash: 'dot' },
                 },
             );
         }
@@ -849,7 +875,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     x1: axisRange[1],
                     y0: fdrGuide,
                     y1: fdrGuide,
-                    line: { color: chartTokens.threshold, width: 1.1, dash: 'dot' },
+                    line: { color: alpha(chartTokens.threshold, 0.72), width: 1.1, dash: 'dot' },
                 },
                 {
                     type: 'line',
@@ -857,7 +883,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     x1: axisRange[1],
                     y0: -fdrGuide,
                     y1: -fdrGuide,
-                    line: { color: chartTokens.threshold, width: 1.1, dash: 'dot' },
+                    line: { color: alpha(chartTokens.threshold, 0.72), width: 1.1, dash: 'dot' },
                 },
             );
             annotations.push({
@@ -876,33 +902,36 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         return {
             title: {
                 text: 'Gene-level QQ',
-                font: { size: 18, color: theme.palette.text.primary, family: theme.typography.fontFamily },
+                font: { size: 17, color: theme.palette.text.primary, family: theme.typography.fontFamily },
                 x: 0.02,
                 xanchor: 'left',
             },
-            paper_bgcolor: chartTokens.paperBg,
+            paper_bgcolor: theme.palette.background.paper,
             plot_bgcolor: chartTokens.plotBg,
-            margin: { l: 76, r: 28, t: 92, b: 70 },
+            margin: { l: 72, r: 28, t: 62, b: 60 },
             hovermode: 'closest',
+            hoverdistance: 16,
             dragmode: 'pan',
             showlegend: false,
             xaxis: {
                 ...axisStyle,
-                title: { text: 'Expected signed -log10(P)', font: { size: 14, color: theme.palette.text.primary } },
+                title: { text: 'Expected signed -log10(P)', font: { size: 13, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 12 },
                 range: axisRange,
                 fixedrange: false,
+                automargin: true,
             },
             yaxis: {
                 ...axisStyle,
-                title: { text: 'Observed signed -log10(P)', font: { size: 14, color: theme.palette.text.primary } },
+                title: { text: 'Observed signed -log10(P)', font: { size: 13, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 12 },
                 range: axisRange,
                 fixedrange: false,
+                automargin: true,
             },
             shapes,
             annotations,
             transition: { duration: 220, easing: 'cubic-in-out' },
         };
-    }, [axisRange, axisStyle, chartTokens, fdrGuide, showExpectedLine, showFdrLine, showNominalLine, showTraitStamp, theme, traitStampText]);
+    }, [axisRange, axisStyle, chartTokens.axisColor, chartTokens.plotBg, chartTokens.threshold, fdrGuide, showExpectedLine, showFdrLine, showNominalLine, showTraitStamp, theme, traitStampText]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -975,7 +1004,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setShowFdrLine(true);
         setShowEnvelope(false);
         setShowTopLabels(true);
-        setShowTraitStamp(true);
+        setShowTraitStamp(false);
         setSelectedTraits(primaryTrait ? [primaryTrait] : []);
         setTraitStampText(buildTraitStamp(primaryTrait ? [primaryTrait] : [], String(traitLabel || gwasId || fileId || '').trim()));
         setPointSize(DEFAULT_POINT_SIZE);
@@ -1167,11 +1196,17 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     CSV
                 </Button>
                 <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    The trait stamp is written into the plot itself, so exported images can carry your current comparison set. Color encodes trait identity; marker shape still indicates positive vs negative tail.
+                    Enable trait stamp when exported images need an in-plot trait label. Color encodes trait identity; marker shape still indicates positive vs negative tail.
                 </Typography>
             </Box>
 
-            <Card elevation={0} sx={plotFrameSx(theme)}>
+            <Card
+                elevation={0}
+                sx={plotFrameSx(theme, {
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+                    boxShadow: '0 14px 32px rgba(15, 23, 42, 0.06)',
+                })}
+            >
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {isLoading && (
                         <Box sx={{ minHeight: 640, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1230,10 +1265,10 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                                 collapsed={legendCollapsed}
                                 onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
                                 title="Traits"
-                                width={{ expanded: 236, collapsed: 118 }}
-                                defaultPlacement="right"
-                                defaultTop={68}
-                                defaultSideOffset={10}
+                                width={{ expanded: 260, collapsed: 118 }}
+                                defaultPlacement="left"
+                                defaultTop={64}
+                                defaultSideOffset={12}
                                 anchorPlotRef={plotElRef}
                                 showScale={false}
                             />

@@ -9,10 +9,10 @@ const PROGRAM_SELECTION_LABELS = {
 };
 
 export const PROGRAM_COLORS = {
-    other: '#98a2b3',
-    program_enriched: '#f2994a',
-    regulator_enriched: '#4f8cc9',
-    both_enriched: '#3ca370',
+    other: '#b8c0cc',
+    program_enriched: '#E69F00',
+    regulator_enriched: '#0072B2',
+    both_enriched: '#009E73',
 };
 
 export const SIDE_META = {
@@ -20,41 +20,138 @@ export const SIDE_META = {
         label: 'Program burden selected',
         shortLabel: 'Program',
         scoreLabel: 'Program score',
-        accent: '#f2994a',
-        softBg: 'rgba(242, 153, 74, 0.08)',
+        accent: '#E69F00',
+        softBg: 'rgba(230, 159, 0, 0.10)',
     },
     regulator: {
         label: 'Regulator-program selected',
         shortLabel: 'Regulator',
         scoreLabel: 'Regulator score',
-        accent: '#4f8cc9',
-        softBg: 'rgba(79, 140, 201, 0.08)',
+        accent: '#0072B2',
+        softBg: 'rgba(0, 114, 178, 0.09)',
     },
 };
 
 export const EFFECT_COLORS = {
-    positive: '#ef4e2f',
-    negative: '#347dcc',
+    positive: '#C2410C',
+    negative: '#3B5BDB',
     neutral: '#6b7280',
 };
 
-export const DEFAULT_MAX_GENES = 8;
+export const EFFECT_COLOR_RGB = {
+    positive: '194, 65, 12',
+    negative: '59, 91, 219',
+    neutral: '107, 114, 128',
+};
+
+export const GRAPH_VIEW_MODES = {
+    compact: 'compact',
+    full: 'full',
+};
+
 export const SVG_WIDTH = 1680;
-export const TRAIT_CENTER_X = 560;
-export const TRAIT_NODE_W = 232;
-const TRAIT_NODE_MIN_H = 128;
-export const LEFT_PROGRAM_X = 24;
-export const LEFT_PROGRAM_W = 266;
-export const RIGHT_PROGRAM_X = 820;
-export const RIGHT_PROGRAM_W = 266;
-export const RIGHT_PROGRAM_H = 62;
-export const RIGHT_REGULATOR_X = 1234;
-export const RIGHT_REGULATOR_W = 310;
-export const GENE_ROW_H = 25;
-export const MODULE_GAP = 42;
-export const REGULATOR_GROUP_GAP = 18;
-export const GRAPH_TOP_PADDING = 168;
-export const GRAPH_BOTTOM_PADDING = 96;
+export const GRAPH_LAYOUTS = {
+    compact: {
+        mode: GRAPH_VIEW_MODES.compact,
+        defaultMaxGenes: 6,
+        traitCenterX: 560,
+        traitNodeW: 260,
+        traitNodeMinH: 134,
+        traitExtraLineH: 24,
+        traitTextLineStep: 25,
+        leftProgramX: 24,
+        leftProgramW: 350,
+        rightProgramX: 760,
+        rightProgramW: 218,
+        rightProgramH: 56,
+        rightRegulatorX: 1060,
+        rightRegulatorW: 580,
+        geneRowH: 22,
+        geneFontSize: 19,
+        geneHeaderH: 48,
+        geneHeaderHTall: 70,
+        geneDividerTopInset: 38,
+        geneDividerBottomInset: 14,
+        moduleGap: 22,
+        regulatorGroupGap: 12,
+        regulatorEdgeTargetSpacing: 24,
+        graphTopPadding: 108,
+        graphBottomPadding: 58,
+        minContentHeight: 460,
+        minSvgHeight: 780,
+        geneSubcolumnThreshold: Number.POSITIVE_INFINITY,
+        regulatorGroupLayout: 'vertical',
+        regulatorGeneLayout: 'single',
+        regulatorGroupTitleSuffix: '',
+        leftProgramTitleFontSize: 24,
+        rightProgramTitleFontSize: 21,
+        leftProgramTitleStep: 22,
+        rightProgramTitleStep: 20,
+        leftProgramLabelChars: 24,
+        rightProgramLabelChars: 14,
+        showSectionNotes: false,
+    },
+    full: {
+        mode: GRAPH_VIEW_MODES.full,
+        defaultMaxGenes: 8,
+        traitCenterX: 560,
+        traitNodeW: 232,
+        traitNodeMinH: 128,
+        traitExtraLineH: 22,
+        traitTextLineStep: 22,
+        leftProgramX: 24,
+        leftProgramW: 266,
+        rightProgramX: 820,
+        rightProgramW: 266,
+        rightProgramH: 62,
+        rightRegulatorX: 1234,
+        rightRegulatorW: 310,
+        geneRowH: 25,
+        geneFontSize: 22,
+        geneHeaderH: 52,
+        geneHeaderHTall: 78,
+        geneDividerTopInset: 42,
+        geneDividerBottomInset: 18,
+        moduleGap: 42,
+        regulatorGroupGap: 18,
+        regulatorEdgeTargetSpacing: 28,
+        graphTopPadding: 168,
+        graphBottomPadding: 96,
+        minContentHeight: 560,
+        minSvgHeight: 940,
+        geneSubcolumnThreshold: Number.POSITIVE_INFINITY,
+        regulatorGroupLayout: 'vertical',
+        regulatorGeneLayout: 'effectColumns',
+        regulatorGroupTitleSuffix: ' regulators',
+        leftProgramTitleFontSize: 26,
+        rightProgramTitleFontSize: 25,
+        leftProgramTitleStep: 25,
+        rightProgramTitleStep: 24,
+        leftProgramLabelChars: 19,
+        rightProgramLabelChars: 19,
+        showSectionNotes: true,
+    },
+};
+
+export const DEFAULT_GRAPH_LAYOUT = GRAPH_LAYOUTS.compact;
+export const DEFAULT_MAX_GENES = DEFAULT_GRAPH_LAYOUT.defaultMaxGenes;
+export const TRAIT_CENTER_X = DEFAULT_GRAPH_LAYOUT.traitCenterX;
+export const TRAIT_NODE_W = DEFAULT_GRAPH_LAYOUT.traitNodeW;
+export const LEFT_PROGRAM_X = DEFAULT_GRAPH_LAYOUT.leftProgramX;
+export const LEFT_PROGRAM_W = DEFAULT_GRAPH_LAYOUT.leftProgramW;
+export const RIGHT_PROGRAM_X = DEFAULT_GRAPH_LAYOUT.rightProgramX;
+export const RIGHT_PROGRAM_W = DEFAULT_GRAPH_LAYOUT.rightProgramW;
+export const RIGHT_PROGRAM_H = DEFAULT_GRAPH_LAYOUT.rightProgramH;
+export const RIGHT_REGULATOR_X = DEFAULT_GRAPH_LAYOUT.rightRegulatorX;
+export const RIGHT_REGULATOR_W = DEFAULT_GRAPH_LAYOUT.rightRegulatorW;
+export const GENE_ROW_H = DEFAULT_GRAPH_LAYOUT.geneRowH;
+export const GENE_FONT_SIZE = DEFAULT_GRAPH_LAYOUT.geneFontSize;
+export const GENE_HEADER_H = DEFAULT_GRAPH_LAYOUT.geneHeaderH;
+export const GENE_HEADER_H_TALL = DEFAULT_GRAPH_LAYOUT.geneHeaderHTall;
+export const MODULE_GAP = DEFAULT_GRAPH_LAYOUT.moduleGap;
+export const REGULATOR_GROUP_GAP = DEFAULT_GRAPH_LAYOUT.regulatorGroupGap;
+export const GRAPH_TOP_PADDING = DEFAULT_GRAPH_LAYOUT.graphTopPadding;
+export const GRAPH_BOTTOM_PADDING = DEFAULT_GRAPH_LAYOUT.graphBottomPadding;
 const TRAIT_PORT_INSET = 22;
 export const EDGE_TARGET_GAP = 28;
 
@@ -243,15 +340,16 @@ function regulatorSignFromGene(gene) {
     return gene.regulatorProgramSign === 'negative' ? 'negative' : 'positive';
 }
 
-function groupRegulatorGenesByBucket(genes) {
+function groupRegulatorGenesByBucket(genes, layout = DEFAULT_GRAPH_LAYOUT) {
     const groups = genes.reduce((map, gene) => {
         const regulatorSign = regulatorSignFromGene(gene);
         const bucket = `${regulatorSign}_regulators`;
         if (!map.has(bucket)) {
+            const signTitle = regulatorSign === 'negative' ? 'Negative' : 'Positive';
             map.set(bucket, {
                 key: bucket,
                 sign: regulatorSign,
-                title: regulatorSign === 'negative' ? 'Negative regulators' : 'Positive regulators',
+                title: `${signTitle}${layout.regulatorGroupTitleSuffix || ''}`,
                 genes: [],
             });
         }
@@ -270,9 +368,34 @@ function groupRegulatorGenesByBucket(genes) {
         });
 }
 
-export function geneBoxHeight(columns, titleRows = 1) {
-    const rows = Math.max(columns.left.length, columns.right.length, 1);
-    return (titleRows > 1 ? 78 : 52) + (rows * GENE_ROW_H);
+export function geneBoxHeight(columns, titleRows = 1, layout = DEFAULT_GRAPH_LAYOUT) {
+    return (titleRows > 1 ? layout.geneHeaderHTall : layout.geneHeaderH) + (geneVisualRowCount(columns, layout) * layout.geneRowH);
+}
+
+export function regulatorGeneBoxHeight(genes, layout = DEFAULT_GRAPH_LAYOUT) {
+    if (layout.regulatorGeneLayout === 'single') {
+        return layout.geneHeaderH + (Math.max(genes.length, 1) * layout.geneRowH);
+    }
+
+    return geneBoxHeight(splitGenesByEffect(genes), 1, layout);
+}
+
+function geneDisplayColumnCount(genes, layout = DEFAULT_GRAPH_LAYOUT) {
+    return genes.length > layout.geneSubcolumnThreshold ? 2 : 1;
+}
+
+export function geneVisualRowCount(columns, layout = DEFAULT_GRAPH_LAYOUT) {
+    const rowCountForSide = (genes) => Math.max(1, Math.ceil(genes.length / geneDisplayColumnCount(genes, layout)));
+    return Math.max(rowCountForSide(columns.left), rowCountForSide(columns.right), 1);
+}
+
+export function splitGeneDisplayColumns(genes, layout = DEFAULT_GRAPH_LAYOUT) {
+    const columnCount = geneDisplayColumnCount(genes, layout);
+    const rowCount = Math.ceil(genes.length / columnCount);
+
+    return Array.from({ length: columnCount }, (_item, index) => (
+        genes.slice(index * rowCount, (index + 1) * rowCount)
+    ));
 }
 
 function splitTextLines(value, maxChars = 22, maxLines = 2) {
@@ -354,9 +477,9 @@ export function splitTraitTextLines(value, maxChars = 18) {
     return lines;
 }
 
-export function traitNodeHeight(lines) {
+export function traitNodeHeight(lines, layout = DEFAULT_GRAPH_LAYOUT) {
     const extraLines = Math.max(0, lines.length - 2);
-    return TRAIT_NODE_MIN_H + (extraLines * 22);
+    return layout.traitNodeMinH + (extraLines * layout.traitExtraLineH);
 }
 
 export function programDisplayLines(module, maxChars = 22) {
@@ -364,12 +487,22 @@ export function programDisplayLines(module, maxChars = 22) {
     return splitTextLines(label, maxChars, 2);
 }
 
-export function traitTextFontSize(lines) {
+export function traitTextFontSize(lines, layout = DEFAULT_GRAPH_LAYOUT) {
     const longest = Math.max(...lines.map((line) => line.length), 0);
-    if (lines.length <= 1) return longest <= 8 ? 33 : 28;
-    if (lines.length === 2) return longest <= 10 ? 28 : 25;
-    if (lines.length === 3) return longest <= 12 ? 24 : 21;
-    return 20;
+    if (layout.mode === GRAPH_VIEW_MODES.full) {
+        if (lines.length <= 1) return longest <= 8 ? 33 : 28;
+        if (lines.length === 2) return longest <= 10 ? 28 : 25;
+        if (lines.length === 3) return longest <= 12 ? 24 : 21;
+        return 20;
+    }
+    if (lines.length <= 1) {
+        if (longest <= 8) return 38;
+        if (longest <= 14) return 34;
+        return 30;
+    }
+    if (lines.length === 2) return longest <= 10 ? 32 : 29;
+    if (lines.length === 3) return longest <= 12 ? 27 : 24;
+    return 22;
 }
 
 export function traitPortY(index, total, traitNodeHeightValue) {
@@ -535,7 +668,7 @@ export function computeEdgeStyle(score, highlighted, muted) {
     };
 }
 
-export function buildModuleBlueprints(programs, side, filters, expandedPrograms) {
+export function buildModuleBlueprints(programs, side, filters, expandedPrograms, layout = DEFAULT_GRAPH_LAYOUT) {
     const allowedSign = filters.gammaSign;
     const threshold = filters.gammaThreshold;
     const maxGenes = filters.maxGenesPerProgram;
@@ -554,24 +687,26 @@ export function buildModuleBlueprints(programs, side, filters, expandedPrograms)
         const expanded = expandedPrograms.has(`${program.program}:${side}`);
         const visibleGenes = expanded ? filteredGenes : filteredGenes.slice(0, maxGenes);
         const geneColumns = splitGenesByEffect(visibleGenes);
-        const regulatorGroups = side === 'regulator' ? groupRegulatorGenesByBucket(visibleGenes) : null;
+        const regulatorGroups = side === 'regulator' ? groupRegulatorGenesByBucket(visibleGenes, layout) : null;
         const titleRows = programDisplayLines(program, 19).length || 1;
         const regulatorGroupHeights = regulatorGroups
             ? regulatorGroups.reduce((acc, group) => {
-                acc[group.key] = geneBoxHeight(splitGenesByEffect(group.genes));
+                acc[group.key] = regulatorGeneBoxHeight(group.genes, layout);
                 return acc;
             }, {})
             : null;
-        const regulatorGroupsHeight = regulatorGroups
+        const regulatorGroupsHeight = regulatorGroups && layout.regulatorGroupLayout === 'vertical'
             ? regulatorGroups.reduce((sum, group, index) => (
-                sum + (regulatorGroupHeights[group.key] || 0) + (index > 0 ? REGULATOR_GROUP_GAP : 0)
+                sum + (regulatorGroupHeights[group.key] || 0) + (index > 0 ? layout.regulatorGroupGap : 0)
             ), 0)
-            : 0;
+            : regulatorGroups
+                ? Math.max(...regulatorGroups.map((group) => regulatorGroupHeights[group.key] || 0), 0)
+                : 0;
         const height = program.collapsed
             ? 74
             : side === 'regulator'
-                ? Math.max(RIGHT_PROGRAM_H + 34, regulatorGroupsHeight)
-                : geneBoxHeight(geneColumns, titleRows);
+                ? Math.max(layout.rightProgramH + (layout.mode === GRAPH_VIEW_MODES.full ? 34 : 24), regulatorGroupsHeight)
+                : geneBoxHeight(geneColumns, titleRows, layout);
 
         return {
             ...program,
@@ -589,22 +724,22 @@ export function buildModuleBlueprints(programs, side, filters, expandedPrograms)
     });
 
     const contentHeight = modules.length
-        ? modules.reduce((sum, module) => sum + module.height, 0) + ((modules.length - 1) * MODULE_GAP)
+        ? modules.reduce((sum, module) => sum + module.height, 0) + ((modules.length - 1) * layout.moduleGap)
         : 0;
 
     return { modules, contentHeight };
 }
 
-export function positionModules(modules, side, traitCenterY) {
+export function positionModules(modules, side, traitCenterY, layout = DEFAULT_GRAPH_LAYOUT) {
     const contentHeight = modules.length
-        ? modules.reduce((sum, module) => sum + module.height, 0) + ((modules.length - 1) * MODULE_GAP)
+        ? modules.reduce((sum, module) => sum + module.height, 0) + ((modules.length - 1) * layout.moduleGap)
         : 0;
-    const startY = Math.max(GRAPH_TOP_PADDING, traitCenterY - (contentHeight / 2));
+    const startY = Math.max(layout.graphTopPadding, traitCenterY - (contentHeight / 2));
     let cursorY = startY;
 
     const positionedModules = modules.map((module, index) => {
-        const xProgram = side === 'program' ? LEFT_PROGRAM_X : RIGHT_PROGRAM_X;
-        const rectXGenes = side === 'program' ? LEFT_PROGRAM_X : RIGHT_REGULATOR_X;
+        const xProgram = side === 'program' ? layout.leftProgramX : layout.rightProgramX;
+        const rectXGenes = side === 'program' ? layout.leftProgramX : layout.rightRegulatorX;
         const positioned = {
             ...module,
             layoutIndex: index,
@@ -613,7 +748,7 @@ export function positionModules(modules, side, traitCenterY) {
             yTop: cursorY,
             yCenter: cursorY + (module.height / 2),
         };
-        cursorY += module.height + MODULE_GAP;
+        cursorY += module.height + layout.moduleGap;
         return positioned;
     });
 

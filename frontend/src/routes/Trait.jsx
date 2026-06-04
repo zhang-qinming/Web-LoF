@@ -25,7 +25,7 @@ function findAvailableId(files, candidates) {
 const TAB_KEY_TO_INDEX = {
     'program-scatter': 0,
     'trait-program-graph': 1,
-    manhattan: 2,
+    'manhattan': 2,
     'burden-volcano': 3,
     'posterior-volcano': 4,
     'gene-evidence': 5,
@@ -166,7 +166,7 @@ export default function Trait() {
 
     return (
         <Box sx={{ width: '100%', maxWidth: 1500, minWidth: 0, mx: 'auto', px: { xs: 2, md: 3 }, py: 4 }}>
-            <TraitMetaCard fileId={fileId} listData={scatterListData} />
+            <TraitMetaCard fileId={fileId} scatterListData={scatterListData} graphListData={graphListData} />
 
             <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 1, mt: 4 })}>
                 Figures
