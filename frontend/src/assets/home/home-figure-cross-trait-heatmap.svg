@@ -1,67 +1,66 @@
 <svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- background -->
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
+  <!-- inner panel -->
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#2563EB" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Cross-trait heatmap</text>
-  <g transform="translate(134 138)">
-    <rect width="396" height="180" rx="16" fill="#F8FAFC" stroke="#E2E8F0"/>
-    <g transform="translate(18 18)">
-      <rect x="0" y="0" width="34" height="22" rx="5" fill="#5B83AE"/>
-      <rect x="40" y="0" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="80" y="0" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="120" y="0" width="34" height="22" rx="5" fill="#6A8CB4"/>
-      <rect x="160" y="0" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="200" y="0" width="34" height="22" rx="5" fill="#D47C58"/>
-      <rect x="240" y="0" width="34" height="22" rx="5" fill="#4E7CA8"/>
-      <rect x="280" y="0" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="320" y="0" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="0" y="28" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="40" y="28" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="80" y="28" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="120" y="28" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="160" y="28" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="200" y="28" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="240" y="28" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="280" y="28" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="320" y="28" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="0" y="56" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="40" y="56" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="80" y="56" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="120" y="56" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="160" y="56" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="200" y="56" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="240" y="56" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="280" y="56" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="320" y="56" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="0" y="84" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="40" y="84" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="80" y="84" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="120" y="84" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="160" y="84" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="200" y="84" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="240" y="84" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="280" y="84" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="320" y="84" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="0" y="112" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="40" y="112" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="80" y="112" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="120" y="112" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="160" y="112" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="200" y="112" width="34" height="22" rx="5" fill="#EEF2F6"/>
-      <rect x="240" y="112" width="34" height="22" rx="5" fill="#C96A43"/>
-      <rect x="280" y="112" width="34" height="22" rx="5" fill="#527EA8"/>
-      <rect x="320" y="112" width="34" height="22" rx="5" fill="#EEF2F6"/>
+  <!-- title -->
+  <text x="62" y="82" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Cross-trait heatmap</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="13">Diverging post_mean color scale</text>
+
+  <!-- heatmap grid container -->
+  <g transform="translate(120 158)">
+    <rect width="416" height="196" rx="14" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+
+    <!-- row labels -->
+    <text x="-8" y="32" text-anchor="end" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">BRCA1</text>
+    <text x="-8" y="62" text-anchor="end" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">TP53</text>
+    <text x="-8" y="92" text-anchor="end" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">APOE</text>
+    <text x="-8" y="122" text-anchor="end" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">FTO</text>
+    <text x="-8" y="152" text-anchor="end" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">IL6</text>
+    <text x="-8" y="182" text-anchor="end" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">TNF</text>
+
+    <!-- column labels (rotated) -->
+    <text transform="rotate(-45 30 -6)" x="30" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">immune</text>
+    <text transform="rotate(-45 70 -6)" x="70" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">metabolic</text>
+    <text transform="rotate(-45 110 -6)" x="110" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">cardio</text>
+    <text transform="rotate(-45 150 -6)" x="150" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">neuro</text>
+    <text transform="rotate(-45 190 -6)" x="190" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">renal</text>
+    <text transform="rotate(-45 230 -6)" x="230" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">hepatic</text>
+    <text transform="rotate(-45 270 -6)" x="270" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">endo</text>
+    <text transform="rotate(-45 310 -6)" x="310" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">resp</text>
+    <text transform="rotate(-45 350 -6)" x="350" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">psych</text>
+    <text transform="rotate(-45 390 -6)" x="390" y="-6" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600">BMI</text>
+
+    <!-- cells: 10 columns × 6 rows -->
+    <g transform="translate(10 16)">
+      <!-- row 1 -->
+      <rect x="0"   y="0" width="36" height="24" rx="5" fill="#4E7CA8"/><rect x="40"  y="0" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="80"  y="0" width="36" height="24" rx="5" fill="#C96A43"/><rect x="120" y="0" width="36" height="24" rx="5" fill="#6A8CB4"/><rect x="160" y="0" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="200" y="0" width="36" height="24" rx="5" fill="#D47C58"/><rect x="240" y="0" width="36" height="24" rx="5" fill="#5B83AE"/><rect x="280" y="0" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="320" y="0" width="36" height="24" rx="5" fill="#C96A43"/><rect x="360" y="0" width="36" height="24" rx="5" fill="#7A9DBE"/>
+      <!-- row 2 -->
+      <rect x="0"   y="30" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="40"  y="30" width="36" height="24" rx="5" fill="#527EA8"/><rect x="80"  y="30" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="120" y="30" width="36" height="24" rx="5" fill="#D47C58"/><rect x="160" y="30" width="36" height="24" rx="5" fill="#527EA8"/><rect x="200" y="30" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="240" y="30" width="36" height="24" rx="5" fill="#C96A43"/><rect x="280" y="30" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="320" y="30" width="36" height="24" rx="5" fill="#527EA8"/><rect x="360" y="30" width="36" height="24" rx="5" fill="#D8875F"/>
+      <!-- row 3 -->
+      <rect x="0"   y="60" width="36" height="24" rx="5" fill="#C96A43"/><rect x="40"  y="60" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="80"  y="60" width="36" height="24" rx="5" fill="#527EA8"/><rect x="120" y="60" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="160" y="60" width="36" height="24" rx="5" fill="#C96A43"/><rect x="200" y="60" width="36" height="24" rx="5" fill="#527EA8"/><rect x="240" y="60" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="280" y="60" width="36" height="24" rx="5" fill="#D47C58"/><rect x="320" y="60" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="360" y="60" width="36" height="24" rx="5" fill="#4E7CA8"/>
+      <!-- row 4 -->
+      <rect x="0"   y="90" width="36" height="24" rx="5" fill="#527EA8"/><rect x="40"  y="90" width="36" height="24" rx="5" fill="#C96A43"/><rect x="80"  y="90" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="120" y="90" width="36" height="24" rx="5" fill="#5B83AE"/><rect x="160" y="90" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="200" y="90" width="36" height="24" rx="5" fill="#C96A43"/><rect x="240" y="90" width="36" height="24" rx="5" fill="#527EA8"/><rect x="280" y="90" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="320" y="90" width="36" height="24" rx="5" fill="#C96A43"/><rect x="360" y="90" width="36" height="24" rx="5" fill="#EEF2F6"/>
+      <!-- row 5 -->
+      <rect x="0"   y="120" width="36" height="24" rx="5" fill="#D47C58"/><rect x="40"  y="120" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="80"  y="120" width="36" height="24" rx="5" fill="#4E7CA8"/><rect x="120" y="120" width="36" height="24" rx="5" fill="#C96A43"/><rect x="160" y="120" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="200" y="120" width="36" height="24" rx="5" fill="#527EA8"/><rect x="240" y="120" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="280" y="120" width="36" height="24" rx="5" fill="#C96A43"/><rect x="320" y="120" width="36" height="24" rx="5" fill="#527EA8"/><rect x="360" y="120" width="36" height="24" rx="5" fill="#D47C58"/>
+      <!-- row 6 -->
+      <rect x="0"   y="150" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="40"  y="150" width="36" height="24" rx="5" fill="#527EA8"/><rect x="80"  y="150" width="36" height="24" rx="5" fill="#C96A43"/><rect x="120" y="150" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="160" y="150" width="36" height="24" rx="5" fill="#527EA8"/><rect x="200" y="150" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="240" y="150" width="36" height="24" rx="5" fill="#D47C58"/><rect x="280" y="150" width="36" height="24" rx="5" fill="#527EA8"/><rect x="320" y="150" width="36" height="24" rx="5" fill="#EEF2F6"/><rect x="360" y="150" width="36" height="24" rx="5" fill="#C96A43"/>
     </g>
   </g>
-  <text x="144" y="336" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">immune</text>
-  <text x="144" y="120" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">traits</text>
-  <text transform="rotate(-90 98 254)" x="98" y="254" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">genes</text>
-  <text x="573" y="172" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">positive</text>
-  <text x="573" y="315" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">negative</text>
-  <rect x="564" y="186" width="18" height="112" rx="9" fill="url(#heatbar)"/>
-  <rect x="529" y="74" width="88" height="40" rx="14" fill="#EFF6FF" stroke="#DBEAFE"/>
-  <text x="573" y="99" text-anchor="middle" fill="#1D4ED8" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">post_mean</text>
+
+  <!-- axis labels -->
+  <text x="348" y="370" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600">target traits</text>
+  <text transform="rotate(-90 78 240)" x="70" y="220" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600">genes</text>
+
+  <!-- color bar -->
+  <text x="558" y="152" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">positive</text>
+  <text x="558" y="308" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600">negative</text>
+  <rect x="572" y="164" width="18" height="130" rx="9" fill="url(#heatbar)"/>
+
+  <!-- annotation removed to avoid overlap -->
+
   <defs>
-    <linearGradient id="heatbar" x1="573" y1="186" x2="573" y2="298" gradientUnits="userSpaceOnUse">
+    <linearGradient id="heatbar" x1="581" y1="164" x2="581" y2="294" gradientUnits="userSpaceOnUse">
       <stop stop-color="#C96A43"/>
       <stop offset="0.5" stop-color="#EEF2F6"/>
       <stop offset="1" stop-color="#527EA8"/>

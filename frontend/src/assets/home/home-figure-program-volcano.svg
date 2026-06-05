@@ -1,0 +1,61 @@
+<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
+  <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
+  <text x="62" y="82" fill="#7C3AED" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Program trait effects</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="13">Program-trait association strength with top programs highlighted</text>
+
+  <line x1="104" y1="330" x2="620" y2="330" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="104" y1="330" x2="104" y2="128" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="104" y1="206" x2="620" y2="206" stroke="#E9D5FF" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <line x1="362" y1="128" x2="362" y2="330" stroke="#E9D5FF" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+  <text x="362" y="356" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Signed program burden score</text>
+  <text transform="rotate(-90 72 240)" x="72" y="240" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Association significance</text>
+
+  <g fill="#DDD6FE" fill-opacity="0.62">
+    <circle cx="318" cy="322" r="2.8"/><circle cx="338" cy="325" r="2.8"/><circle cx="356" cy="320" r="2.8"/>
+    <circle cx="371" cy="324" r="2.8"/><circle cx="387" cy="321" r="2.8"/><circle cx="402" cy="326" r="2.8"/>
+    <circle cx="295" cy="323" r="2.8"/><circle cx="419" cy="319" r="2.8"/><circle cx="278" cy="325" r="2.8"/>
+    <circle cx="436" cy="322" r="2.8"/><circle cx="260" cy="321" r="2.8"/><circle cx="449" cy="326" r="2.8"/>
+    <circle cx="285" cy="312" r="2.8"/><circle cx="302" cy="308" r="2.8"/><circle cx="324" cy="314" r="2.8"/>
+    <circle cx="341" cy="306" r="2.8"/><circle cx="365" cy="311" r="2.8"/><circle cx="382" cy="309" r="2.8"/>
+    <circle cx="399" cy="315" r="2.8"/><circle cx="415" cy="307" r="2.8"/><circle cx="433" cy="313" r="2.8"/>
+    <circle cx="268" cy="310" r="2.8"/><circle cx="451" cy="308" r="2.8"/><circle cx="246" cy="316" r="2.8"/>
+    <circle cx="466" cy="314" r="2.8"/><circle cx="252" cy="298" r="2.9"/><circle cx="276" cy="293" r="2.9"/>
+    <circle cx="305" cy="300" r="2.9"/><circle cx="328" cy="296" r="2.9"/><circle cx="347" cy="292" r="2.9"/>
+    <circle cx="374" cy="299" r="2.9"/><circle cx="393" cy="295" r="2.9"/><circle cx="418" cy="301" r="2.9"/>
+    <circle cx="440" cy="293" r="2.9"/><circle cx="461" cy="298" r="2.9"/><circle cx="232" cy="302" r="2.9"/>
+    <circle cx="480" cy="296" r="2.9"/><circle cx="234" cy="282" r="2.9"/><circle cx="262" cy="278" r="2.9"/>
+    <circle cx="291" cy="284" r="2.9"/><circle cx="316" cy="276" r="2.9"/><circle cx="350" cy="281" r="2.9"/>
+    <circle cx="380" cy="277" r="2.9"/><circle cx="410" cy="283" r="2.9"/><circle cx="442" cy="279" r="2.9"/>
+    <circle cx="468" cy="285" r="2.9"/><circle cx="210" cy="286" r="2.9"/><circle cx="496" cy="280" r="2.9"/>
+    <circle cx="212" cy="268" r="3.0"/><circle cx="245" cy="262" r="3.0"/><circle cx="279" cy="270" r="3.0"/>
+    <circle cx="320" cy="264" r="3.0"/><circle cx="400" cy="266" r="3.0"/><circle cx="445" cy="260" r="3.0"/>
+    <circle cx="482" cy="268" r="3.0"/><circle cx="516" cy="272" r="3.0"/><circle cx="190" cy="266" r="3.0"/>
+    <circle cx="538" cy="264" r="3.0"/>
+  </g>
+
+  <g>
+    <circle cx="180" cy="158" r="4.6" fill="#0F766E" fill-opacity="0.94"/>
+    <circle cx="558" cy="150" r="4.8" fill="#0F766E" fill-opacity="0.95"/>
+    <circle cx="214" cy="198" r="4.0" fill="#E69F00" fill-opacity="0.92"/>
+    <circle cx="530" cy="190" r="4.0" fill="#E69F00" fill-opacity="0.92"/>
+    <circle cx="230" cy="236" r="3.6" fill="#0072B2" fill-opacity="0.88"/>
+    <circle cx="506" cy="230" r="3.6" fill="#0072B2" fill-opacity="0.88"/>
+    <circle cx="570" cy="174" r="4.3" fill="#0F766E" fill-opacity="0.9"/>
+    <circle cx="192" cy="180" r="4.2" fill="#0F766E" fill-opacity="0.9"/>
+  </g>
+
+  <text x="180" y="146" text-anchor="middle" fill="#064E3B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="700">P12</text>
+  <text x="558" y="138" text-anchor="middle" fill="#064E3B" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="700">P54</text>
+  <text x="570" y="164" text-anchor="middle" fill="#064E3B" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="700">P88</text>
+
+  <circle cx="104" cy="360" r="4" fill="#0F766E"/>
+  <text x="114" y="364" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">both selected</text>
+  <circle cx="208" cy="360" r="4" fill="#E69F00"/>
+  <text x="218" y="364" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">program selected</text>
+  <circle cx="336" cy="360" r="4" fill="#0072B2"/>
+  <text x="346" y="364" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">regulator selected</text>
+  <circle cx="470" cy="360" r="4" fill="#DDD6FE"/>
+  <text x="480" y="364" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">background traits</text>
+</svg>

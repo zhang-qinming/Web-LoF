@@ -700,7 +700,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 })}
             >
                 <Box sx={{ minWidth: 0, maxWidth: { lg: '62ch' } }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.35 }}>
+                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
                         {title}
                     </Typography>
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
@@ -781,7 +781,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                         sx={{
                             color: theme.palette.text.secondary,
                             fontSize: '0.72rem',
-                            textTransform: 'uppercase',
+                            textTransform: 'none',
                             letterSpacing: 0.8,
                             fontWeight: 500,
                         }}

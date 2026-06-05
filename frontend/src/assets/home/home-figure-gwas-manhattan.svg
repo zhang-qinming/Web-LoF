@@ -2,141 +2,78 @@
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
   <text x="62" y="82" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Trait Manhattan view</text>
-  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="13">GWAS hits by chromosome position</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="13">GWAS points arranged by chromosome, with sparse locus peaks</text>
 
-  <!-- axes -->
   <line x1="92" y1="326" x2="636" y2="326" stroke="#CBD5E1" stroke-width="1.5"/>
   <line x1="92" y1="326" x2="92" y2="126" stroke="#CBD5E1" stroke-width="1.5"/>
-  <!-- threshold -->
   <line x1="92" y1="196" x2="636" y2="196" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="6 5"/>
-  <!-- labels -->
   <text x="364" y="390" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">chromosome</text>
-  <text transform="rotate(-90 60 236)" x="60" y="236" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">-log₁₀(P)</text>
+  <text transform="rotate(-90 60 236)" x="60" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">-log10(P)</text>
 
-  <!-- y-axis ticks -->
   <text x="82" y="330" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">0</text>
   <text x="82" y="268" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">4</text>
   <text x="82" y="200" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">8</text>
   <text x="82" y="162" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">10</text>
 
-  <!-- ALL POINTS r=3 uniform, r=3.5 for sig hits only -->
-
-  <!-- chr1 blue — baseline + 1 peak -->
-  <circle cx="106" cy="320" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="112" cy="316" r="3" fill="#93C5FD" fill-opacity="0.52"/>
-  <circle cx="117" cy="322" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="123" cy="312" r="3" fill="#93C5FD" fill-opacity="0.55"/>
-  <circle cx="128" cy="318" r="3" fill="#93C5FD" fill-opacity="0.52"/>
-  <circle cx="134" cy="308" r="3" fill="#60A5FA" fill-opacity="0.6"/>
-  <circle cx="139" cy="314" r="3" fill="#93C5FD" fill-opacity="0.55"/>
-  <circle cx="144" cy="296" r="3" fill="#60A5FA" fill-opacity="0.65"/>
-  <circle cx="149" cy="274" r="3" fill="#3B82F6" fill-opacity="0.72"/>
-  <circle cx="154" cy="244" r="3" fill="#3B82F6" fill-opacity="0.78"/>
-  <circle cx="159" cy="188" r="3.5" fill="#2563EB" fill-opacity="0.9"/>
-  <circle cx="164" cy="256" r="3" fill="#3B82F6" fill-opacity="0.72"/>
-  <circle cx="169" cy="302" r="3" fill="#60A5FA" fill-opacity="0.6"/>
-  <circle cx="174" cy="318" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="179" cy="322" r="3" fill="#93C5FD" fill-opacity="0.5"/>
+  <g fill="#93C5FD" fill-opacity="0.62">
+    <circle cx="106" cy="320" r="2.5"/><circle cx="112" cy="305" r="2.5"/><circle cx="119" cy="316" r="2.5"/>
+    <circle cx="126" cy="288" r="2.5"/><circle cx="133" cy="322" r="2.5"/><circle cx="141" cy="302" r="2.5"/>
+    <circle cx="148" cy="246" r="2.7"/><circle cx="156" cy="314" r="2.5"/><circle cx="164" cy="276" r="2.6"/>
+    <circle cx="173" cy="318" r="2.5"/>
+  </g>
   <text x="142" y="348" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">1</text>
 
-  <!-- chr2 gray — baseline only -->
-  <circle cx="192" cy="318" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="197" cy="314" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="202" cy="320" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="207" cy="310" r="3" fill="#94A3B8" fill-opacity="0.55"/>
-  <circle cx="212" cy="316" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="217" cy="306" r="3" fill="#94A3B8" fill-opacity="0.58"/>
-  <circle cx="222" cy="312" r="3" fill="#94A3B8" fill-opacity="0.55"/>
-  <circle cx="227" cy="318" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="232" cy="294" r="3" fill="#94A3B8" fill-opacity="0.6"/>
-  <circle cx="237" cy="316" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="242" cy="320" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
+  <g fill="#CBD5E1" fill-opacity="0.68">
+    <circle cx="190" cy="318" r="2.5"/><circle cx="197" cy="300" r="2.5"/><circle cx="204" cy="322" r="2.5"/>
+    <circle cx="211" cy="292" r="2.5"/><circle cx="218" cy="310" r="2.5"/><circle cx="225" cy="318" r="2.5"/>
+    <circle cx="232" cy="282" r="2.5"/><circle cx="239" cy="306" r="2.5"/>
+  </g>
   <text x="217" y="348" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">2</text>
 
-  <!-- chr3 blue — baseline + small bump -->
-  <circle cx="254" cy="318" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="259" cy="314" r="3" fill="#93C5FD" fill-opacity="0.52"/>
-  <circle cx="264" cy="320" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="269" cy="312" r="3" fill="#93C5FD" fill-opacity="0.52"/>
-  <circle cx="274" cy="306" r="3" fill="#60A5FA" fill-opacity="0.58"/>
-  <circle cx="279" cy="318" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="284" cy="286" r="3" fill="#60A5FA" fill-opacity="0.65"/>
-  <circle cx="289" cy="262" r="3" fill="#3B82F6" fill-opacity="0.7"/>
-  <circle cx="294" cy="296" r="3" fill="#60A5FA" fill-opacity="0.6"/>
-  <circle cx="299" cy="318" r="3" fill="#93C5FD" fill-opacity="0.5"/>
+  <g fill="#93C5FD" fill-opacity="0.64">
+    <circle cx="254" cy="318" r="2.5"/><circle cx="261" cy="296" r="2.5"/><circle cx="268" cy="310" r="2.5"/>
+    <circle cx="275" cy="288" r="2.5"/><circle cx="282" cy="316" r="2.5"/><circle cx="289" cy="260" r="2.6"/>
+    <circle cx="296" cy="302" r="2.5"/><circle cx="303" cy="322" r="2.5"/>
+  </g>
   <text x="276" y="348" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">3</text>
 
-  <!-- chr6 gray — STRONG PEAK -->
-  <circle cx="312" cy="320" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="317" cy="316" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="322" cy="318" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="327" cy="310" r="3" fill="#94A3B8" fill-opacity="0.55"/>
-  <circle cx="332" cy="312" r="3" fill="#94A3B8" fill-opacity="0.55"/>
-  <circle cx="337" cy="300" r="3" fill="#94A3B8" fill-opacity="0.6"/>
-  <circle cx="342" cy="280" r="3" fill="#64748B" fill-opacity="0.68"/>
-  <circle cx="347" cy="252" r="3" fill="#475569" fill-opacity="0.76"/>
-  <circle cx="352" cy="212" r="3" fill="#334155" fill-opacity="0.84"/>
-  <circle cx="357" cy="168" r="3.5" fill="#1E293B" fill-opacity="0.9"/>
-  <circle cx="362" cy="144" r="3.5" fill="#0F172A" fill-opacity="0.94"/>
-  <circle cx="367" cy="162" r="3.5" fill="#1E293B" fill-opacity="0.9"/>
-  <circle cx="372" cy="220" r="3" fill="#475569" fill-opacity="0.78"/>
-  <circle cx="377" cy="268" r="3" fill="#64748B" fill-opacity="0.68"/>
-  <circle cx="382" cy="302" r="3" fill="#94A3B8" fill-opacity="0.58"/>
-  <circle cx="387" cy="318" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="392" cy="316" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="397" cy="322" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
+  <g fill="#CBD5E1" fill-opacity="0.68">
+    <circle cx="312" cy="320" r="2.5"/><circle cx="319" cy="304" r="2.5"/><circle cx="326" cy="316" r="2.5"/>
+    <circle cx="333" cy="286" r="2.5"/><circle cx="340" cy="312" r="2.5"/><circle cx="347" cy="270" r="2.6"/>
+    <circle cx="354" cy="318" r="2.5"/><circle cx="361" cy="146" r="3.8" fill="#0F172A" fill-opacity="0.95"/>
+    <circle cx="368" cy="188" r="3.2" fill="#334155" fill-opacity="0.88"/><circle cx="375" cy="296" r="2.5"/>
+    <circle cx="382" cy="322" r="2.5"/><circle cx="389" cy="308" r="2.5"/><circle cx="396" cy="318" r="2.5"/>
+  </g>
   <text x="354" y="348" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">6</text>
 
-  <!-- chr9 blue — moderate peak -->
-  <circle cx="408" cy="320" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="413" cy="316" r="3" fill="#93C5FD" fill-opacity="0.52"/>
-  <circle cx="418" cy="318" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="423" cy="310" r="3" fill="#60A5FA" fill-opacity="0.55"/>
-  <circle cx="428" cy="304" r="3" fill="#60A5FA" fill-opacity="0.58"/>
-  <circle cx="433" cy="282" r="3" fill="#3B82F6" fill-opacity="0.68"/>
-  <circle cx="438" cy="248" r="3" fill="#3B82F6" fill-opacity="0.76"/>
-  <circle cx="443" cy="206" r="3.5" fill="#2563EB" fill-opacity="0.86"/>
-  <circle cx="448" cy="264" r="3" fill="#3B82F6" fill-opacity="0.7"/>
-  <circle cx="453" cy="302" r="3" fill="#60A5FA" fill-opacity="0.58"/>
-  <circle cx="458" cy="318" r="3" fill="#93C5FD" fill-opacity="0.5"/>
+  <g fill="#93C5FD" fill-opacity="0.64">
+    <circle cx="408" cy="320" r="2.5"/><circle cx="415" cy="300" r="2.5"/><circle cx="422" cy="312" r="2.5"/>
+    <circle cx="429" cy="286" r="2.5"/><circle cx="436" cy="318" r="2.5"/><circle cx="443" cy="206" r="3.1" fill="#2563EB" fill-opacity="0.86"/>
+    <circle cx="450" cy="274" r="2.6"/><circle cx="457" cy="310" r="2.5"/>
+  </g>
   <text x="433" y="348" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">9</text>
 
-  <!-- chr12 gray — baseline -->
-  <circle cx="470" cy="318" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="475" cy="314" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="480" cy="320" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="485" cy="310" r="3" fill="#94A3B8" fill-opacity="0.55"/>
-  <circle cx="490" cy="316" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="495" cy="304" r="3" fill="#94A3B8" fill-opacity="0.58"/>
-  <circle cx="500" cy="312" r="3" fill="#94A3B8" fill-opacity="0.55"/>
-  <circle cx="505" cy="318" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="510" cy="296" r="3" fill="#94A3B8" fill-opacity="0.6"/>
-  <circle cx="515" cy="316" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
+  <g fill="#CBD5E1" fill-opacity="0.68">
+    <circle cx="470" cy="318" r="2.5"/><circle cx="477" cy="302" r="2.5"/><circle cx="484" cy="320" r="2.5"/>
+    <circle cx="491" cy="292" r="2.5"/><circle cx="498" cy="314" r="2.5"/><circle cx="505" cy="278" r="2.6"/>
+    <circle cx="512" cy="306" r="2.5"/><circle cx="519" cy="318" r="2.5"/>
+  </g>
   <text x="492" y="348" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">12</text>
 
-  <!-- chr17 blue — strong peak -->
-  <circle cx="528" cy="318" r="3" fill="#93C5FD" fill-opacity="0.5"/>
-  <circle cx="533" cy="316" r="3" fill="#93C5FD" fill-opacity="0.52"/>
-  <circle cx="538" cy="312" r="3" fill="#93C5FD" fill-opacity="0.52"/>
-  <circle cx="543" cy="306" r="3" fill="#60A5FA" fill-opacity="0.58"/>
-  <circle cx="548" cy="290" r="3" fill="#60A5FA" fill-opacity="0.65"/>
-  <circle cx="553" cy="264" r="3" fill="#3B82F6" fill-opacity="0.7"/>
-  <circle cx="558" cy="228" r="3" fill="#3B82F6" fill-opacity="0.78"/>
-  <circle cx="563" cy="178" r="3.5" fill="#2563EB" fill-opacity="0.88"/>
-  <circle cx="568" cy="154" r="3.5" fill="#1D4ED8" fill-opacity="0.92"/>
-  <circle cx="573" cy="194" r="3.5" fill="#2563EB" fill-opacity="0.86"/>
-  <circle cx="578" cy="260" r="3" fill="#3B82F6" fill-opacity="0.7"/>
-  <circle cx="583" cy="304" r="3" fill="#60A5FA" fill-opacity="0.58"/>
-  <circle cx="588" cy="318" r="3" fill="#93C5FD" fill-opacity="0.5"/>
+  <g fill="#93C5FD" fill-opacity="0.64">
+    <circle cx="528" cy="318" r="2.5"/><circle cx="535" cy="296" r="2.5"/><circle cx="542" cy="312" r="2.5"/>
+    <circle cx="549" cy="282" r="2.5"/><circle cx="556" cy="228" r="3.0" fill="#3B82F6" fill-opacity="0.82"/>
+    <circle cx="563" cy="154" r="3.6" fill="#1D4ED8" fill-opacity="0.94"/><circle cx="570" cy="304" r="2.5"/>
+    <circle cx="577" cy="262" r="2.6"/><circle cx="584" cy="316" r="2.5"/>
+  </g>
   <text x="558" y="348" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">17</text>
 
-  <!-- chrX gray — baseline -->
-  <circle cx="600" cy="318" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="605" cy="314" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="610" cy="320" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
-  <circle cx="615" cy="310" r="3" fill="#94A3B8" fill-opacity="0.55"/>
-  <circle cx="620" cy="316" r="3" fill="#CBD5E1" fill-opacity="0.52"/>
-  <circle cx="625" cy="300" r="3" fill="#94A3B8" fill-opacity="0.58"/>
-  <circle cx="630" cy="318" r="3" fill="#CBD5E1" fill-opacity="0.5"/>
+  <g fill="#CBD5E1" fill-opacity="0.68">
+    <circle cx="600" cy="318" r="2.5"/><circle cx="607" cy="304" r="2.5"/><circle cx="614" cy="322" r="2.5"/>
+    <circle cx="621" cy="292" r="2.5"/><circle cx="628" cy="316" r="2.5"/>
+  </g>
   <text x="615" y="348" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">X</text>
+
+  <circle cx="361" cy="146" r="7" fill="#0F172A" fill-opacity="0.08"/>
+  <circle cx="563" cy="154" r="7" fill="#1D4ED8" fill-opacity="0.10"/>
 </svg>

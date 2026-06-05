@@ -334,7 +334,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={toolbarSx(theme)}>
                 <Box sx={{ minWidth: 220, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.35 }}>
+                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
                         Cross-trait Heatmap
                     </Typography>
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
@@ -395,7 +395,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                         backgroundColor: alpha(theme.palette.background.paper, 0.8),
                     }}
                 >
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.7 }}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
                         Gene rows
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>

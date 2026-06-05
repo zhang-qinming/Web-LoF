@@ -443,6 +443,14 @@ router.get('/api/programs/:programId/traits', asyncRoute(async (req, res) => {
     res.json(data);
 }));
 
+router.get('/api/programs/:programId/genes', asyncRoute(async (req, res) => {
+    const safeProgramId = normalizeSafeBaseName(req.params.programId);
+    if (!safeProgramId) return res.status(400).json({ error: 'Invalid programId' });
+
+    const data = await geneProgramModel.getProgramGenes(safeProgramId);
+    res.json(data);
+}));
+
 router.get('/api/programs/:fileId/graph', asyncRoute(async (req, res) => {
     const safeFileId = normalizeSafeBaseName(req.params.fileId);
     if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });

@@ -144,13 +144,25 @@ export async function getRecommendedGenes({ limit = 12 } = {}) {
     return res.data;
 }
 
-export async function getGenePrograms(geneId) {
-    const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/programs`);
+export async function getGenePrograms(geneId, {
+    page = 1,
+    limit = 50,
+    sortBy = 'absGamma',
+    order = 'desc',
+} = {}) {
+    const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/programs`, {
+        params: { page, limit, sortBy, order },
+    });
     return res.data;
 }
 
 export async function getProgramTraits(programId) {
     const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/traits`);
+    return res.data;
+}
+
+export async function getProgramGenes(programId) {
+    const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/genes`);
     return res.data;
 }
 

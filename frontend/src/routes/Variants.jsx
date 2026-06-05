@@ -417,7 +417,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                 borderBottom: `2px solid ${neutralTone.headerBorder}`,
             })}>
                 <FolderOpen sx={{ fontSize: 17, color: theme.palette.primary.light, flexShrink: 0 }} />
-                <Typography noWrap variant="caption" sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', flex: 1 }}>
+                <Typography noWrap variant="caption" sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.75rem', textTransform: 'none', letterSpacing: '0.04em', flex: 1 }}>
                     {dir.split('/').pop() || 'data'}
                 </Typography>
                 <Chip label={totalCount} size="small" sx={summaryChipSx(theme, { height: 20, fontSize: '0.65rem', ...metricChipTone(theme, 'neutral') })} />
@@ -641,7 +641,7 @@ const ExitingColumnGhost = React.memo(function ExitingColumnGhost({ dir, theme }
                 gap: 1,
             }}>
                 <FolderOpen sx={{ fontSize: 17, color: theme.palette.primary.light, flexShrink: 0 }} />
-                <Typography noWrap variant="caption" sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', flex: 1 }}>
+                <Typography noWrap variant="caption" sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.75rem', textTransform: 'none', letterSpacing: '0.04em', flex: 1 }}>
                     {dir.split('/').pop() || 'data'}
                 </Typography>
             </Box>

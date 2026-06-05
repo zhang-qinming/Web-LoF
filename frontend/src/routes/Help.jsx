@@ -323,7 +323,7 @@ const TEXT = {
                         route: '/programs',
                         role: 'cNMF program annotation browser.',
                         usage: [
-                            'Browse Program, Annotation, Representative GO, GO P, and Top Genes columns.',
+                            'Browse Program, Annotation, GO Term, Accession, Ontology, GO P, and Top Genes columns.',
                             'Sort supported columns and open a Program ID to reach its detail page.',
                         ],
                     },
@@ -816,7 +816,7 @@ const TEXT = {
                         route: '/programs',
                         role: 'cNMF program 注释浏览表。',
                         usage: [
-                            '浏览 Program、Annotation、Representative GO、GO P 和 Top Genes 等列。',
+                            '浏览 Program、Annotation、GO Term、Accession、Ontology、GO P 和 Top Genes 等列。',
                             '支持排序，并可通过 Program ID 打开详情页。',
                         ],
                     },
@@ -1359,7 +1359,7 @@ export default function Help() {
                                         bgcolor: theme.custom.surface.raised,
                                     }}
                                 >
-                                    <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontWeight: 800, textTransform: 'uppercase', mb: 0.8 }}>
+                                    <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontWeight: 800, textTransform: 'none', mb: 0.8 }}>
                                         {group.group}
                                     </Typography>
                                     <Stack direction="row" spacing={0.6} useFlexGap flexWrap="wrap">

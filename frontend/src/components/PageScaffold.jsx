@@ -32,6 +32,7 @@ export function PageFrame({
                 <Box
                     sx={{
                         display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' },
                         alignItems: { xs: 'flex-start', md: 'center' },
                         justifyContent: 'space-between',
                         gap: 2,
@@ -50,7 +51,11 @@ export function PageFrame({
                             </Typography>
                         )}
                     </Box>
-                    {actions && <Box sx={{ flexShrink: 0 }}>{actions}</Box>}
+                    {actions && (
+                        <Box sx={{ width: { xs: '100%', sm: 'auto' }, maxWidth: '100%', flexShrink: 0 }}>
+                            {actions}
+                        </Box>
+                    )}
                 </Box>
             )}
             {children}

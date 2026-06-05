@@ -1,25 +1,27 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Link as RouterLink, useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
 import {
-    Box, Button, ButtonBase, Chip, Paper, Popover, Skeleton, Stack, Tab, Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, TableSortLabel, Tabs, TextField, Typography,
+    Box, Button, ButtonBase, Chip, InputAdornment, Paper, Popover, Skeleton, Stack, Table, TableBody, TableCell, TableContainer,
+    TableHead, TableRow, TableSortLabel, TextField, Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { AccountTreeOutlined, BiotechOutlined, ExpandMore, HubOutlined, InsightsOutlined, OpenInNew, ScienceOutlined, Search, TableChartOutlined } from '@mui/icons-material';
+import { AccountTreeOutlined, BiotechOutlined, DownloadOutlined, ExpandMore, HubOutlined, OpenInNew, ScienceOutlined, Search, TableChartOutlined } from '@mui/icons-material';
 import useSWR from 'swr';
-import { fetcher, getProgramTraits } from '../api/gwas';
-import GeneRegulation from '../components/GeneRegulation';
+import { fetcher, getProgramGenes, getProgramTraits } from '../api/gwas';
 import ProgramAssociatedTraits from '../components/ProgramAssociatedTraits';
 import { PageFrame } from '../components/PageScaffold';
+import { downloadBlob } from '../utils/download';
 import {
     captionSx,
+    groupedTableColumnHeaderCellSx,
+    groupedTableHeaderMetrics,
+    groupedTableHeaderCellSx,
     metricChipTone,
     panelSx,
     sectionPanelHeaderSx,
     sectionTitleSx,
     stickyTableContainerSx,
     stickyTableSx,
-    stickyTableHeaderCellSx,
     summaryChipSx,
     tableRowRevealSx,
     tableTone,
@@ -29,34 +31,312 @@ function numSort(a, b) {
     return (parseInt(String(a).replace(/\D/g, '')) || 0) - (parseInt(String(b).replace(/\D/g, '')) || 0);
 }
 
-function scoreMagnitude(row) {
-    return Math.abs(Number(row.programScore) || 0) + Math.abs(Number(row.regulatorScore) || 0);
+const GO_ACCESSION_PATTERN = /GO[:_]\d+/i;
+
+const PROGRAM_TABLE_COLUMNS = [
+    { key: 'program', label: 'Program', align: 'left', tone: 'identity', width: 100 },
+    { key: 'curated_annotation', label: 'Annotation', align: 'left', tone: 'annotation', width: 360 },
+    { key: 'go_term', label: 'GO Term', align: 'left', tone: 'annotation', width: 320 },
+    { key: 'go_accession', label: 'Accession', align: 'left', tone: 'annotation', width: 132 },
+    { key: 'go_ontology', label: 'Ontology', align: 'left', tone: 'annotation', width: 116 },
+    { key: 'go_enrichment_p', label: 'P-value', align: 'right', tone: 'metric', width: 112 },
+    { key: 'top10_genes', label: 'Top10 Gene', align: 'left', tone: 'genes', width: 380 },
+];
+
+const PROGRAM_TABLE_GROUPS = [
+    { label: 'Program', span: 1, tone: 'identity' },
+    { label: 'Functional Annotation', span: 4, tone: 'annotation' },
+    { label: 'GO Evidence', span: 1, tone: 'metric' },
+    { label: 'Gene Preview', span: 1, tone: 'genes' },
+];
+const PROGRAM_TABLE_TITLE_HEADER_HEIGHT = 64;
+
+const PROGRAM_INFO_COLUMNS = [
+    { key: 'program', label: 'Program', align: 'center', tone: 'identity', width: 120 },
+    { key: 'annotation', label: 'Annotation', align: 'left', tone: 'annotation', width: 360 },
+    { key: 'goTerm', label: 'GO Term', align: 'left', tone: 'annotation', width: 300 },
+    { key: 'goOntology', label: 'GO Ontology', align: 'center', tone: 'annotation', width: 150 },
+    { key: 'associatedGenes', label: 'Associated Genes', align: 'right', tone: 'genes', width: 150 },
+    { key: 'associatedTraits', label: 'Associated Traits', align: 'right', tone: 'metric', width: 150 },
+];
+
+const PROGRAM_GENE_COLUMNS = [
+    { key: 'geneSymbol', label: 'Symbol', align: 'center', tone: 'genes', width: 150 },
+    { key: 'ensgId', label: 'ENSEMBL id', align: 'center', tone: 'identity', width: 180 },
+    { key: 'location', label: 'Location', align: 'center', tone: 'annotation', width: 220 },
+    { key: 'geneType', label: 'Gene Type', align: 'center', tone: 'annotation', width: 180 },
+    { key: 'direction', label: 'Direction in Program', align: 'center', tone: 'metric', width: 210 },
+    { key: 'value', label: 'Value', align: 'right', tone: 'metric', width: 140 },
+];
+
+const DETAIL_TABLE_TITLE_HEADER_HEIGHT = 56;
+
+const programSortLabelSx = {
+    fontSize: '0.68rem',
+    m: 0,
+    '& .MuiTableSortLabel-icon': {
+        fontSize: '0.82rem',
+        margin: 0,
+    },
+};
+
+function escapeCsvValue(value) {
+    const text = value == null ? '' : String(value);
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-const PROGRAM_DETAIL_TABS = new Set(['overview', 'traits', 'regulation']);
+function buildGoUrl(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    const accession = extractGoAccession(text);
+    if (accession) {
+        return `https://amigo.geneontology.org/amigo/term/${accession}`;
+    }
+    return `https://amigo.geneontology.org/amigo/search/ontology?q=${encodeURIComponent(text)}`;
+}
+
+function extractGoAccession(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    const match = text.match(GO_ACCESSION_PATTERN);
+    return match ? match[0].replace('_', ':').toUpperCase() : '';
+}
+
+function splitTopGenes(value) {
+    return String(value || '')
+        .split(/[;,]\s*/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function buildProgramTableCsv(rows) {
+    const header = ['Program', 'Annotation', 'GO Term', 'Accession', 'Ontology', 'P-value', 'Top10 Gene'];
+    const lines = [
+        header.map(escapeCsvValue).join(','),
+        ...rows.map((row) => [
+            row.program || '',
+            row.curated_annotation || '',
+            row.go_term || '',
+            row.go_accession || '',
+            row.go_ontology || '',
+            row.go_enrichment_p || '',
+            row.top10_genes || '',
+        ].map(escapeCsvValue).join(',')),
+    ];
+    return `${lines.join('\n')}\n`;
+}
+
+function programSortDescription(sortBy, sortDir) {
+    const column = PROGRAM_TABLE_COLUMNS.find((item) => item.key === sortBy);
+    return `${column?.label || sortBy} ${sortDir === 'desc' ? 'descending' : 'ascending'}`;
+}
+
+function sortDescription(columns, sortBy, sortDir) {
+    const column = columns.find((item) => item.key === sortBy);
+    return `${column?.label || sortBy} ${sortDir === 'desc' ? 'descending' : 'ascending'}`;
+}
+
+function compareProgramInfoRows(a, b, sortBy, sortDir) {
+    let result = 0;
+    if (['associatedGenes', 'associatedTraits'].includes(sortBy)) {
+        result = (Number(a?.[sortBy]) || 0) - (Number(b?.[sortBy]) || 0);
+    } else {
+        result = String(a?.[sortBy] || '').localeCompare(String(b?.[sortBy] || ''), undefined, {
+            sensitivity: 'base',
+            numeric: true,
+        });
+    }
+    return sortDir === 'desc' ? -result : result;
+}
+
+function compareProgramGeneRows(a, b, sortBy, sortDir) {
+    let result = 0;
+    if (sortBy === 'value') {
+        result = (Number(a?.value) || 0) - (Number(b?.value) || 0);
+    } else if (sortBy === 'location') {
+        result = String(a?.location || '').localeCompare(String(b?.location || ''), undefined, { numeric: true, sensitivity: 'base' });
+    } else {
+        result = String(a?.[sortBy] || '').localeCompare(String(b?.[sortBy] || ''), undefined, {
+            sensitivity: 'base',
+            numeric: true,
+        });
+    }
+
+    if (result === 0) {
+        result = String(a?.geneSymbol || a?.ensgId || '').localeCompare(String(b?.geneSymbol || b?.ensgId || ''), undefined, {
+            sensitivity: 'base',
+            numeric: true,
+        });
+    }
+    return sortDir === 'desc' ? -result : result;
+}
+
+function buildProgramInfoCsv(rows) {
+    const lines = [
+        PROGRAM_INFO_COLUMNS.map((column) => escapeCsvValue(column.label)).join(','),
+        ...rows.map((row) => PROGRAM_INFO_COLUMNS.map((column) => escapeCsvValue(row[column.key] ?? '')).join(',')),
+    ];
+    return `${lines.join('\n')}\n`;
+}
+
+function buildProgramGeneCsv(rows) {
+    const lines = [
+        PROGRAM_GENE_COLUMNS.map((column) => escapeCsvValue(column.label)).join(','),
+        ...rows.map((row) => PROGRAM_GENE_COLUMNS.map((column) => escapeCsvValue(row[column.key] ?? '')).join(',')),
+    ];
+    return `${lines.join('\n')}\n`;
+}
+
+function formatProgramGeneValue(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '-';
+    if (Math.abs(number) >= 100) return number.toFixed(1);
+    if (Math.abs(number) >= 1) return number.toFixed(3);
+    return number.toPrecision(3);
+}
+
+function programTableCellSx(theme, tone, align = 'left', overrides = {}) {
+    return {
+        py: 0.72,
+        px: 1,
+        textAlign: align,
+        fontSize: '0.74rem',
+        lineHeight: 1.32,
+        borderBottom: `1px solid ${theme.custom.border.soft}`,
+        bgcolor: tone.cellSoft,
+        color: theme.palette.text.primary,
+        verticalAlign: 'middle',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        ...overrides,
+    };
+}
+
+function detailTableTitleCellSx(theme) {
+    return {
+        position: 'sticky',
+        top: 0,
+        zIndex: '43 !important',
+        height: DETAIL_TABLE_TITLE_HEADER_HEIGHT,
+        py: 0.75,
+        px: 1.25,
+        bgcolor: theme.custom.surface.raised,
+        backgroundColor: `${theme.custom.surface.raised} !important`,
+        borderBottom: `1px solid ${theme.custom.border.soft}`,
+        color: theme.palette.text.primary,
+    };
+}
+
+function detailTableColumnHeaderSx(theme, tone, align) {
+    return groupedTableColumnHeaderCellSx(theme, tone, align, {
+        top: DETAIL_TABLE_TITLE_HEADER_HEIGHT,
+    });
+}
+
+function detailTableFooterSx(theme) {
+    return {
+        px: { xs: 1.25, md: 1.6 },
+        py: 1,
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+        alignItems: 'center',
+        gap: 1,
+        background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.028)}, ${theme.custom.surface.subtle})`,
+        borderTop: `1px solid ${theme.custom.border.soft}`,
+    };
+}
+
+function detailTableCellSx(theme, tone, align = 'left', overrides = {}) {
+    return {
+        py: 0.78,
+        px: 1,
+        textAlign: align,
+        fontSize: '0.74rem',
+        lineHeight: 1.3,
+        borderBottom: `1px solid ${theme.custom.border.soft}`,
+        bgcolor: tone.cellSoft,
+        color: theme.palette.text.primary,
+        verticalAlign: 'middle',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        ...overrides,
+    };
+}
+
+function programTableTitleCellSx(theme) {
+    return {
+        position: 'sticky',
+        top: 0,
+        zIndex: '43 !important',
+        height: PROGRAM_TABLE_TITLE_HEADER_HEIGHT,
+        py: 0.75,
+        px: 1.25,
+        bgcolor: theme.custom.surface.raised,
+        backgroundColor: `${theme.custom.surface.raised} !important`,
+        borderBottom: `1px solid ${theme.custom.border.soft}`,
+        color: theme.palette.text.primary,
+    };
+}
+
+function programTableGroupHeaderSx(theme, tone) {
+    return groupedTableHeaderCellSx(theme, tone, {
+        top: PROGRAM_TABLE_TITLE_HEADER_HEIGHT,
+    });
+}
+
+function programTableColumnHeaderSx(theme, tone, align) {
+    return groupedTableColumnHeaderCellSx(theme, tone, align, {
+        top: PROGRAM_TABLE_TITLE_HEADER_HEIGHT + groupedTableHeaderMetrics.groupHeight,
+    });
+}
 
 function ProgramSummaryChips({ summary }) {
     const theme = useTheme();
     const items = [
-        { label: 'traits', value: summary?.totalTraits, tone: 'neutral', icon: <TableChartOutlined /> },
-        { label: 'program selected', value: summary?.selectedByProgram, tone: 'primary', icon: <ScienceOutlined /> },
-        { label: 'regulator selected', value: summary?.selectedByRegulator, tone: 'accent', icon: <AccountTreeOutlined /> },
-        { label: 'both', value: summary?.bothSelected, tone: 'success', icon: <HubOutlined /> },
-        { label: 'visible genes', value: summary?.totalGenes, tone: 'warning', icon: <BiotechOutlined /> },
+        { label: 'Traits', value: summary?.totalTraits, tone: 'neutral', icon: <TableChartOutlined /> },
+        { label: 'Program', value: summary?.selectedByProgram, tone: 'primary', icon: <ScienceOutlined /> },
+        { label: 'Regulator', value: summary?.selectedByRegulator, tone: 'accent', icon: <AccountTreeOutlined /> },
+        { label: 'Both', value: summary?.bothSelected, tone: 'success', icon: <HubOutlined /> },
+        { label: 'Genes', value: summary?.totalGenes, tone: 'warning', icon: <BiotechOutlined /> },
     ];
 
     return (
-        <Stack direction="row" spacing={0.7} sx={{ flexWrap: 'wrap' }}>
-            {items.map((item) => (
-                <Chip
-                    key={item.label}
-                    icon={React.cloneElement(item.icon, { sx: { fontSize: 15 } })}
-                    label={`${Number(item.value || 0).toLocaleString()} ${item.label}`}
-                    size="small"
-                    sx={summaryChipSx(theme, metricChipTone(theme, item.tone))}
-                />
-            ))}
-        </Stack>
+        <Box
+            sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(5, minmax(92px, 1fr))', xl: 'repeat(5, 104px)' },
+                gap: 0.75,
+                width: { xs: '100%', xl: 'auto' },
+            }}
+        >
+            {items.map((item) => {
+                const colors = metricChipTone(theme, item.tone);
+                return (
+                    <Box
+                        key={item.label}
+                        sx={{
+                            px: 1,
+                            py: 0.8,
+                            borderRadius: 1,
+                            border: colors.border,
+                            bgcolor: colors.backgroundColor,
+                            color: colors.color,
+                            minWidth: 0,
+                        }}
+                    >
+                        <Stack direction="row" spacing={0.55} alignItems="center">
+                            {React.cloneElement(item.icon, { sx: { fontSize: 15, flexShrink: 0 } })}
+                            <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 850, fontFamily: 'monospace' }}>
+                                {(Number(item.value) || 0).toLocaleString()}
+                            </Typography>
+                        </Stack>
+                        <Typography sx={{ mt: 0.25, fontSize: '0.62rem', fontWeight: 800, textTransform: 'none', letterSpacing: '0.06em' }}>
+                            {item.label}
+                        </Typography>
+                    </Box>
+                );
+            })}
+        </Box>
     );
 }
 
@@ -118,7 +398,7 @@ function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
             >
                 <Box sx={{ minWidth: 0 }}>
                     <Typography variant="h5" sx={sectionTitleSx(theme, { lineHeight: 1.2 })}>
-                        Program {selectedProgram?.label || '—'}
+                        Program {selectedProgram?.label || '-'}
                     </Typography>
                     <Typography sx={captionSx(theme, { fontSize: '0.86rem', mt: 0.35 })}>
                         {selectedProgram?.annotation || 'Program annotation is not available'}
@@ -226,198 +506,353 @@ function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
     );
 }
 
-function ProgramOverview({ data, programId, onTabChange }) {
+function ProgramInfoTable({ row, loading }) {
     const theme = useTheme();
-    const traits = data?.traits || [];
-    const topTraits = [...traits].sort((a, b) => scoreMagnitude(b) - scoreMagnitude(a)).slice(0, 8);
-    const geneCounts = new Map();
+    const tones = {
+        identity: tableTone(theme, 'neutral'),
+        annotation: tableTone(theme, 'success'),
+        genes: tableTone(theme, 'accent'),
+        metric: tableTone(theme, 'primary'),
+    };
+    const [sortBy, setSortBy] = useState('program');
+    const [sortDir, setSortDir] = useState('asc');
 
-    traits.forEach((trait) => {
-        (trait.topGenes || []).forEach((gene) => {
-            if (!gene) return;
-            geneCounts.set(gene, (geneCounts.get(gene) || 0) + 1);
-        });
-    });
-    const topGenes = [...geneCounts.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .slice(0, 24);
+    const rows = useMemo(() => (
+        row ? [row].sort((a, b) => compareProgramInfoRows(a, b, sortBy, sortDir)) : []
+    ), [row, sortBy, sortDir]);
+
+    const handleSort = useCallback((key) => {
+        if (sortBy === key) {
+            setSortDir((value) => (value === 'asc' ? 'desc' : 'asc'));
+            return;
+        }
+        setSortBy(key);
+        setSortDir(['associatedGenes', 'associatedTraits'].includes(key) ? 'desc' : 'asc');
+    }, [sortBy]);
+
+    const handleDownload = useCallback(() => {
+        downloadBlob(new Blob([buildProgramInfoCsv(rows)], { type: 'text/csv;charset=utf-8;' }), `${row?.program || 'program'}-information.csv`);
+    }, [row?.program, rows]);
+
+    const skeletonRows = Array.from({ length: 1 }, (_, index) => (
+        <TableRow key={index}>
+            {PROGRAM_INFO_COLUMNS.map((column) => (
+                <TableCell key={column.key} sx={{ py: 1.2, px: 1 }}>
+                    <Skeleton />
+                </TableCell>
+            ))}
+        </TableRow>
+    ));
 
     return (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.38fr) minmax(260px, 0.62fr)' }, gap: 2, alignItems: 'stretch' }}>
-            <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
-                <Box sx={sectionPanelHeaderSx(theme, { justifyContent: 'space-between' })}>
-                    <Box>
-                        <Typography sx={sectionTitleSx(theme, { fontSize: '1rem' })}>Top associated traits</Typography>
-                        <Typography sx={captionSx(theme, { fontSize: '0.74rem' })}>Ranked by combined program and regulator score magnitude.</Typography>
-                    </Box>
-                    <Button
-                        size="small"
-                        onClick={() => onTabChange('traits')}
-                        endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-                        sx={{ textTransform: 'none', fontWeight: 750 }}
-                    >
-                        View table
-                    </Button>
-                </Box>
-                <Stack divider={<Box sx={{ borderTop: `1px solid ${theme.custom.border.soft}` }} />} sx={{ p: 1.25 }}>
-                    {topTraits.map((trait, index) => (
-                        <Box key={`${trait.traitId}-${index}`} sx={{ py: 0.9, ...tableRowRevealSx(theme, index) }}>
-                            <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="flex-start">
-                                <Box sx={{ minWidth: 0 }}>
-                                    <Button
-                                        component={RouterLink}
-                                        to={`/trait/${encodeURIComponent(trait.fileId || trait.traitId)}`}
-                                        sx={{ textTransform: 'none', px: 0, justifyContent: 'flex-start', color: theme.palette.text.primary, fontWeight: 800, lineHeight: 1.25 }}
-                                    >
-                                        {trait.traitName || trait.traitId}
-                                    </Button>
-                                    <Typography sx={{ fontSize: '0.68rem', color: theme.palette.text.secondary, fontFamily: 'monospace' }}>
-                                        {trait.traitId}
-                                    </Typography>
-                                </Box>
-                                <Stack direction="row" spacing={0.45} sx={{ flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                    {trait.selectedByProgram && <Chip label="program" size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />}
-                                    {trait.selectedByRegulator && <Chip label="regulator" size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))} />}
+        <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
+            <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1260 })}>
+                    <colgroup>
+                        {PROGRAM_INFO_COLUMNS.map((column) => (
+                            <col key={column.key} style={{ width: column.width }} />
+                        ))}
+                    </colgroup>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell colSpan={PROGRAM_INFO_COLUMNS.length} sx={detailTableTitleCellSx(theme)}>
+                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={0.8} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
+                                    <Box sx={{ minWidth: 0 }}>
+                                        <Typography sx={sectionTitleSx(theme, { fontSize: '0.94rem', lineHeight: 1.2 })}>
+                                            Program Information
+                                        </Typography>
+                                        <Typography sx={captionSx(theme, { fontSize: '0.7rem', lineHeight: 1.35 })}>
+                                            Program annotation, representative GO function, and associated counts.
+                                        </Typography>
+                                    </Box>
+                                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                                        <Chip
+                                            label={`${Number(row?.associatedGenes || 0).toLocaleString()} genes`}
+                                            size="small"
+                                            sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))}
+                                        />
+                                        <Button
+                                            size="small"
+                                            startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
+                                            onClick={handleDownload}
+                                            disabled={!rows.length}
+                                            sx={{ textTransform: 'none', fontSize: '0.72rem', color: theme.palette.text.secondary, flexShrink: 0 }}
+                                        >
+                                            CSV
+                                        </Button>
+                                    </Stack>
                                 </Stack>
-                            </Stack>
-                            <Typography sx={{ mt: 0.4, fontSize: '0.72rem', color: theme.palette.text.secondary }}>
-                                program {Number(trait.programScore || 0).toFixed(3)} / regulator {Number(trait.regulatorScore || 0).toFixed(3)}
-                            </Typography>
-                        </Box>
-                    ))}
-                </Stack>
-            </Paper>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow>
+                            {PROGRAM_INFO_COLUMNS.map((column) => (
+                                <TableCell key={column.key} sx={detailTableColumnHeaderSx(theme, tones[column.tone], column.align)}>
+                                    <TableSortLabel
+                                        active={sortBy === column.key}
+                                        direction={sortBy === column.key ? sortDir : 'asc'}
+                                        hideSortIcon
+                                        onClick={() => handleSort(column.key)}
+                                        sx={programSortLabelSx}
+                                    >
+                                        {column.label}
+                                    </TableSortLabel>
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {loading ? skeletonRows : rows.map((item, index) => (
+                            <TableRow key={item.program} hover sx={tableRowRevealSx(theme, index)}>
+                                <TableCell sx={detailTableCellSx(theme, tones.identity, 'center', { bgcolor: tones.identity.cellStrong, fontFamily: 'monospace', fontWeight: 850 })}>
+                                    {item.program || '-'}
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.annotation, 'left', { whiteSpace: 'normal' })}>
+                                    {item.annotation || '-'}
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.annotation, 'left', { bgcolor: tones.annotation.cellStrong, whiteSpace: 'normal' })}>
+                                    {item.goTerm ? (
+                                        <Button
+                                            component="a"
+                                            href={buildGoUrl(item.goAccession || item.goTerm)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            endIcon={<OpenInNew sx={{ fontSize: 12 }} />}
+                                            sx={{ textTransform: 'none', px: 0, py: 0, color: tones.annotation.headerColor, fontWeight: 760, fontSize: '0.72rem', lineHeight: 1.25 }}
+                                        >
+                                            {item.goTerm}
+                                        </Button>
+                                    ) : '-'}
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.annotation, 'center')}>
+                                    {item.goOntology || '-'}
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.genes, 'right', { fontFamily: 'monospace', fontWeight: 800, bgcolor: tones.genes.cellStrong })}>
+                                    {Number(item.associatedGenes || 0).toLocaleString()}
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.metric, 'right', { fontFamily: 'monospace', fontWeight: 800, bgcolor: tones.metric.cellStrong })}>
+                                    {Number(item.associatedTraits || 0).toLocaleString()}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+            <Box sx={detailTableFooterSx(theme)}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
+                    {loading ? 'Loading program information' : `Showing ${rows.length.toLocaleString()} row`}
+                </Typography>
+                <Chip
+                    label={sortDescription(PROGRAM_INFO_COLUMNS, sortBy, sortDir)}
+                    size="small"
+                    sx={summaryChipSx(theme, { height: 22, color: theme.palette.text.secondary, bgcolor: alpha(theme.palette.text.primary, 0.045) })}
+                />
+            </Box>
+        </Paper>
+    );
+}
 
-            <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' })}>
-                <Box sx={sectionPanelHeaderSx(theme)}>
-                    <Box>
-                        <Typography sx={sectionTitleSx(theme, { fontSize: '1rem' })}>Top genes preview</Typography>
-                        <Typography sx={captionSx(theme, { fontSize: '0.74rem' })}>Single-gene frequency across associated traits.</Typography>
-                    </Box>
-                </Box>
-                <Box
-                    sx={{
-                        p: 1.25,
-                        display: 'flex',
-                        flex: 1,
-                        minHeight: 0,
-                    }}
-                >
-                    <Box sx={{ width: '100%', display: 'flex', minHeight: 0 }}>
-                        {topGenes.length ? (
-                            <Box
+function ProgramGenesTable({ programId }) {
+    const theme = useTheme();
+    const tones = {
+        identity: tableTone(theme, 'neutral'),
+        annotation: tableTone(theme, 'success'),
+        genes: tableTone(theme, 'accent'),
+        metric: tableTone(theme, 'primary'),
+    };
+    const [sortBy, setSortBy] = useState('value');
+    const [sortDir, setSortDir] = useState('desc');
+    const { data, error, isLoading } = useSWR(
+        programId ? ['program-genes', programId] : null,
+        ([, id]) => getProgramGenes(id),
+        { keepPreviousData: true, revalidateOnFocus: false },
+    );
+
+    const rows = useMemo(() => {
+        const source = data?.genes || [];
+        return [...source].sort((a, b) => compareProgramGeneRows(a, b, sortBy, sortDir));
+    }, [data?.genes, sortBy, sortDir]);
+
+    const handleSort = useCallback((key) => {
+        if (sortBy === key) {
+            setSortDir((value) => (value === 'asc' ? 'desc' : 'asc'));
+            return;
+        }
+        setSortBy(key);
+        setSortDir(key === 'value' ? 'desc' : 'asc');
+    }, [sortBy]);
+
+    const handleDownload = useCallback(() => {
+        downloadBlob(new Blob([buildProgramGeneCsv(rows)], { type: 'text/csv;charset=utf-8;' }), `${programId || 'program'}-genes.csv`);
+    }, [programId, rows]);
+
+    const skeletonRows = Array.from({ length: 8 }, (_, index) => (
+        <TableRow key={index}>
+            {PROGRAM_GENE_COLUMNS.map((column) => (
+                <TableCell key={column.key} sx={{ py: 1.1, px: 1 }}>
+                    <Skeleton />
+                </TableCell>
+            ))}
+        </TableRow>
+    ));
+
+    if (error) {
+        return (
+            <Paper elevation={0} sx={panelSx(theme, { p: 1.5 })}>
+                <Typography sx={{ color: theme.palette.error.main, fontWeight: 750 }}>Failed to load program genes.</Typography>
+            </Paper>
+        );
+    }
+
+    if (data?.unavailable) {
+        return (
+            <Paper elevation={0} sx={panelSx(theme, { p: 1.5 })}>
+                <Typography sx={{ color: theme.palette.warning.dark, fontWeight: 750 }}>Program gene SQL index is not available.</Typography>
+            </Paper>
+        );
+    }
+
+    return (
+        <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
+            <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1080 })}>
+                    <colgroup>
+                        {PROGRAM_GENE_COLUMNS.map((column) => (
+                            <col key={column.key} style={{ width: column.width }} />
+                        ))}
+                    </colgroup>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell colSpan={PROGRAM_GENE_COLUMNS.length} sx={detailTableTitleCellSx(theme)}>
+                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={0.8} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
+                                    <Box sx={{ minWidth: 0 }}>
+                                        <Typography sx={sectionTitleSx(theme, { fontSize: '0.94rem', lineHeight: 1.2 })}>
+                                            Program Genes
+                                        </Typography>
+                                        <Typography sx={captionSx(theme, { fontSize: '0.7rem', lineHeight: 1.35 })}>
+                                            Genes associated with {programId}, with genomic annotation and direction in the program.
+                                        </Typography>
+                                    </Box>
+                                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                                        <Chip
+                                            label={`${rows.length.toLocaleString()} genes`}
+                                            size="small"
+                                            sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))}
+                                        />
+                                        <Button
+                                            size="small"
+                                            startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
+                                            onClick={handleDownload}
+                                            disabled={!rows.length}
+                                            sx={{ textTransform: 'none', fontSize: '0.72rem', color: theme.palette.text.secondary, flexShrink: 0 }}
+                                        >
+                                            CSV
+                                        </Button>
+                                    </Stack>
+                                </Stack>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow>
+                            {PROGRAM_GENE_COLUMNS.map((column) => (
+                                <TableCell key={column.key} sx={detailTableColumnHeaderSx(theme, tones[column.tone], column.align)}>
+                                    <TableSortLabel
+                                        active={sortBy === column.key}
+                                        direction={sortBy === column.key ? sortDir : 'asc'}
+                                        hideSortIcon
+                                        onClick={() => handleSort(column.key)}
+                                        sx={programSortLabelSx}
+                                    >
+                                        {column.label}
+                                    </TableSortLabel>
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {isLoading ? skeletonRows : rows.map((item, index) => (
+                            <TableRow
+                                key={`${item.ensgId || item.geneSymbol}-${index}`}
+                                hover
                                 sx={{
-                                    width: '100%',
-                                    flex: 1,
-                                    minHeight: 0,
-                                    borderRadius: 1.15,
-                                    border: `1px solid ${theme.custom.border.soft}`,
-                                    overflow: 'hidden',
-                                    backgroundColor: theme.palette.background.paper,
-                                    display: 'flex',
-                                    flexDirection: 'column',
+                                    ...tableRowRevealSx(theme, index),
+                                    '&:hover td': { bgcolor: alpha(theme.palette.primary.main, 0.035) },
                                 }}
                             >
-                                <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    justifyContent="space-between"
-                                    alignItems="center"
-                                    sx={{
-                                        px: 1.25,
-                                        py: 0.8,
-                                        borderBottom: `1px solid ${theme.custom.border.soft}`,
-                                        backgroundColor: theme.custom.surface.raised,
-                                    }}
-                                >
-                                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: theme.palette.text.secondary }}>
-                                        Gene
-                                    </Typography>
-                                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: theme.palette.text.secondary }}>
-                                        Value
-                                    </Typography>
-                                </Stack>
-                                <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                                    <Stack divider={<Box sx={{ borderTop: `1px solid ${theme.custom.border.soft}` }} />}>
-                                        {topGenes.map(([gene, count], index) => (
-                                            <Stack
-                                                key={gene}
-                                                direction="row"
-                                                spacing={1}
-                                                justifyContent="space-between"
-                                                alignItems="center"
-                                                sx={{
-                                                    px: 1.25,
-                                                    py: 0.82,
-                                                    ...tableRowRevealSx(theme, index),
-                                                }}
-                                            >
-                                                <Button
-                                                    component={RouterLink}
-                                                    to={`/genes?query=${encodeURIComponent(gene)}`}
-                                                    sx={{
-                                                        minWidth: 0,
-                                                        px: 0,
-                                                        py: 0,
-                                                        justifyContent: 'flex-start',
-                                                        textTransform: 'none',
-                                                        color: theme.palette.text.primary,
-                                                        fontWeight: 750,
-                                                        fontSize: '0.84rem',
-                                                        lineHeight: 1.25,
-                                                    }}
-                                                >
-                                                    {gene}
-                                                </Button>
-                                                <Chip
-                                                    label={count}
-                                                    size="small"
-                                                    sx={summaryChipSx(theme, metricChipTone(theme, count > 2 ? 'primary' : 'subtle'))}
-                                                />
-                                            </Stack>
-                                        ))}
-                                    </Stack>
-                                </Box>
-                            </Box>
-                        ) : (
-                            <Typography sx={captionSx(theme, { fontSize: '0.8rem' })}>No top gene preview is available for {programId}.</Typography>
-                        )}
-                    </Box>
-                </Box>
-            </Paper>
-        </Box>
+                                <TableCell sx={detailTableCellSx(theme, tones.genes, 'center', { bgcolor: tones.genes.cellStrong })}>
+                                    <Button
+                                        component={RouterLink}
+                                        to={`/genes?query=${encodeURIComponent(item.geneSymbol || item.ensgId)}`}
+                                        sx={{ textTransform: 'none', px: 0, py: 0, minHeight: 0, color: theme.palette.primary.dark, fontWeight: 800, fontSize: '0.74rem' }}
+                                    >
+                                        {item.geneSymbol || '-'}
+                                    </Button>
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.identity, 'center', { fontFamily: 'monospace', fontSize: '0.7rem' })}>
+                                    {item.ensgId || '-'}
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.annotation, 'center')}>
+                                    {item.location || '-'}
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.annotation, 'center', { bgcolor: tones.annotation.cellStrong })}>
+                                    {item.geneType || '-'}
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.metric, 'center')}>
+                                    <Chip
+                                        label={item.direction || '-'}
+                                        size="small"
+                                        sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'subtle')), maxWidth: '100%', height: 21, fontSize: '0.62rem' }}
+                                    />
+                                </TableCell>
+                                <TableCell sx={detailTableCellSx(theme, tones.metric, 'right', { bgcolor: tones.metric.cellStrong, fontFamily: 'monospace', fontWeight: 800 })}>
+                                    {formatProgramGeneValue(item.value)}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+            <Box sx={detailTableFooterSx(theme)}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
+                    {isLoading ? 'Loading program genes' : `Showing all ${rows.length.toLocaleString()} genes`}
+                </Typography>
+                <Chip
+                    label={sortDescription(PROGRAM_GENE_COLUMNS, sortBy, sortDir)}
+                    size="small"
+                    sx={summaryChipSx(theme, { height: 22, color: theme.palette.text.secondary, bgcolor: alpha(theme.palette.text.primary, 0.045) })}
+                />
+            </Box>
+        </Paper>
     );
 }
 
 export default function Programs() {
     const theme = useTheme();
-    const neutralTone = tableTone(theme, 'neutral');
-    const programHeaderSx = {
-        fontWeight: 700,
-        fontSize: '0.75rem',
-        py: 1,
-        px: 1.5,
-        textTransform: 'uppercase',
-        letterSpacing: '0.03em',
+    const programTableTones = {
+        identity: tableTone(theme, 'neutral'),
+        annotation: tableTone(theme, 'success'),
+        metric: tableTone(theme, 'primary'),
+        genes: tableTone(theme, 'accent'),
     };
     const { programId } = useParams();
     const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
     const { data: info, isLoading: loading } = useSWR('/api/programs/info', fetcher, {
         keepPreviousData: true, revalidateOnFocus: false, revalidateOnReconnect: false,
     });
     const [programs, setPrograms] = useState([]);
+    const [programGeneSearch, setProgramGeneSearch] = useState('');
     const [sortBy, setSortBy] = useState('program');
     const [sortDir, setSortDir] = useState('asc');
-    const requestedTabKey = searchParams.get('tab');
-    const activeTab = PROGRAM_DETAIL_TABS.has(requestedTabKey) ? requestedTabKey : 'overview';
     const normalizedProgramId = programId
         ? (/^P/i.test(programId) ? programId : `P${programId}`)
         : null;
-    const regId = programId ? programId.replace(/^P/i, '') : '';
+    const programNumber = normalizedProgramId ? normalizedProgramId.replace(/^P/i, '') : '';
     const { data: traitData, error: traitError, isLoading: traitLoading } = useSWR(
         normalizedProgramId ? ['program-traits-page', normalizedProgramId] : null,
         ([, id]) => getProgramTraits(id),
+        { keepPreviousData: true, revalidateOnFocus: false },
+    );
+    const { data: geneData, isLoading: geneLoading } = useSWR(
+        normalizedProgramId ? ['program-genes', normalizedProgramId] : null,
+        ([, id]) => getProgramGenes(id),
         { keepPreviousData: true, revalidateOnFocus: false },
     );
 
@@ -425,30 +860,43 @@ export default function Programs() {
         fetch('/api/regulation/list').then(r => r.json()).then(res => setPrograms(res.programs || [])).catch(() => {});
     }, []);
 
-    const syncTabParam = useCallback((nextTab, options = {}) => {
-        const nextParams = new URLSearchParams(searchParams);
-        nextParams.set('tab', nextTab);
-        setSearchParams(nextParams, options);
-    }, [searchParams, setSearchParams]);
-
-    useEffect(() => {
-        if (programId && requestedTabKey !== activeTab) {
-            syncTabParam(activeTab, { replace: true });
-        }
-    }, [activeTab, programId, requestedTabKey, syncTabParam]);
-
     const rows = useMemo(() => {
-        const items = Object.entries(info || {}).map(([k, v]) => ({ key: k, ...v }));
+        const query = programGeneSearch.trim().toLowerCase();
+        const items = Object.entries(info || {}).map(([k, v]) => ({
+            key: k,
+            ...v,
+            go_term: v?.go_term || v?.representative_go || '',
+            go_accession: v?.go_accession || extractGoAccession(v?.representative_go),
+            go_ontology: v?.go_ontology || '',
+        }));
+        const filteredItems = query
+            ? items.filter((item) => splitTopGenes(item.top10_genes).some((gene) => gene.toLowerCase().includes(query)))
+            : items;
         const dir = sortDir === 'asc' ? 1 : -1;
-        items.sort((a, b) => {
+        filteredItems.sort((a, b) => {
             if (sortBy === 'program') return numSort(a.program, b.program) * dir;
             if (sortBy === 'go_enrichment_p') return ((parseFloat(a.go_enrichment_p) || 0) - (parseFloat(b.go_enrichment_p) || 0)) * dir;
             return String(a[sortBy] || '').localeCompare(String(b[sortBy] || '')) * dir;
         });
-        return items;
-    }, [info, sortBy, sortDir]);
+        return filteredItems;
+    }, [info, programGeneSearch, sortBy, sortDir]);
 
-    const annotation = traitData?.program?.annotation || info?.[normalizedProgramId]?.curated_annotation || info?.[regId]?.curated_annotation || '';
+    const selectedProgramInfo = info?.[normalizedProgramId] || info?.[programNumber] || {};
+    const annotation = traitData?.program?.annotation || selectedProgramInfo?.curated_annotation || '';
+    const programCount = Object.keys(info || {}).length;
+    const detailSummary = {
+        ...(traitData?.summary || {}),
+        totalGenes: geneData?.genes?.length ?? traitData?.summary?.totalGenes ?? 0,
+    };
+    const detailInfoRow = normalizedProgramId ? {
+        program: normalizedProgramId,
+        annotation,
+        goTerm: selectedProgramInfo?.go_term || selectedProgramInfo?.representative_go || geneData?.program?.representativeGo || '',
+        goAccession: selectedProgramInfo?.go_accession || extractGoAccession(selectedProgramInfo?.go_term || selectedProgramInfo?.representative_go || geneData?.program?.representativeGo),
+        goOntology: selectedProgramInfo?.go_ontology || '',
+        associatedGenes: geneData?.genes?.length || 0,
+        associatedTraits: traitData?.summary?.totalTraits || 0,
+    } : null;
     const programOptions = useMemo(() => {
         const seen = new Set();
         const sourceIds = programs.length > 0
@@ -472,30 +920,26 @@ export default function Programs() {
     }, [info, programs]);
     const selectedProgramOption = useMemo(() => {
         if (!normalizedProgramId) return null;
-        return programOptions.find((item) => item.id === String(regId || '')) || {
-            id: String(regId || ''),
+        return programOptions.find((item) => item.id === String(programNumber || '')) || {
+            id: String(programNumber || ''),
             label: normalizedProgramId,
             annotation: annotation || 'Program annotation is not available',
         };
-    }, [annotation, normalizedProgramId, programOptions, regId]);
+    }, [annotation, normalizedProgramId, programNumber, programOptions]);
 
     const handleSort = (col) => {
         if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
         else { setSortBy(col); setSortDir('asc'); }
     };
 
-    const handleTabChange = useCallback((nextTab) => {
-        syncTabParam(nextTab);
-    }, [syncTabParam]);
+    const handleProgramTableDownload = useCallback(() => {
+        const csv = buildProgramTableCsv(rows);
+        downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), 'program-annotations.csv');
+    }, [rows]);
 
     const handleProgramSelect = useCallback((id) => {
-        const nextParams = new URLSearchParams(searchParams);
-        nextParams.set('tab', activeTab);
-        navigate({
-            pathname: `/programs/P${id}`,
-            search: `?${nextParams.toString()}`,
-        });
-    }, [activeTab, navigate, searchParams]);
+        navigate(`/programs/P${id}`);
+    }, [navigate]);
 
     if (programId) {
         return (
@@ -510,27 +954,9 @@ export default function Programs() {
                             />
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', xl: 'flex-end' } }}>
-                            <ProgramSummaryChips summary={traitData?.summary || {}} />
+                            <ProgramSummaryChips summary={detailSummary} />
                         </Box>
                     </Stack>
-                </Paper>
-
-                <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden', mb: 1.5 })}>
-                    <Tabs
-                        value={activeTab}
-                        onChange={(event, value) => handleTabChange(value)}
-                        variant="scrollable"
-                        scrollButtons="auto"
-                        sx={{
-                            minHeight: 44,
-                            borderBottom: `1px solid ${theme.custom.border.soft}`,
-                            '& .MuiTab-root': { minHeight: 44, textTransform: 'none', fontWeight: 750 },
-                        }}
-                    >
-                        <Tab icon={<InsightsOutlined sx={{ fontSize: 18 }} />} iconPosition="start" value="overview" label="Overview" />
-                        <Tab icon={<AccountTreeOutlined sx={{ fontSize: 18 }} />} iconPosition="start" value="traits" label="Associated Traits" />
-                        <Tab icon={<ScienceOutlined sx={{ fontSize: 18 }} />} iconPosition="start" value="regulation" label="Gene Regulation" />
-                    </Tabs>
                 </Paper>
 
                 {traitError && (
@@ -539,94 +965,253 @@ export default function Programs() {
                     </Paper>
                 )}
 
-                {activeTab === 'overview' && (
-                    traitLoading ? (
-                        <Paper elevation={0} sx={panelSx(theme, { p: 2 })}>
-                            <Skeleton height={180} />
-                        </Paper>
-                    ) : (
-                        <ProgramOverview data={traitData} programId={normalizedProgramId} onTabChange={handleTabChange} />
-                    )
-                )}
-                {activeTab === 'traits' && <ProgramAssociatedTraits programId={normalizedProgramId} />}
-                {activeTab === 'regulation' && <GeneRegulation programId={regId} />}
+                <Stack spacing={1.5}>
+                    <ProgramInfoTable
+                        row={detailInfoRow}
+                        loading={loading || traitLoading || geneLoading}
+                    />
+                    <ProgramGenesTable programId={normalizedProgramId} />
+                    <ProgramAssociatedTraits
+                        programId={normalizedProgramId}
+                        showAll
+                        noInternalScroll
+                    />
+                </Stack>
             </Box>
         );
     }
 
     const skeleton = Array.from({ length: 12 }, (_, i) => (
         <TableRow key={i}>
-            <TableCell sx={{ py: 1.2, px: 2 }}><Skeleton width={50} /></TableCell>
-            <TableCell sx={{ py: 1.2, px: 2 }}><Skeleton width="80%" /></TableCell>
-            <TableCell sx={{ py: 1.2, px: 2 }}><Skeleton width="60%" /></TableCell>
-            <TableCell sx={{ py: 1.2, px: 2 }}><Skeleton width={80} /></TableCell>
-            <TableCell sx={{ py: 1.2, px: 2 }}><Skeleton /></TableCell>
+            {PROGRAM_TABLE_COLUMNS.map((column) => (
+                <TableCell key={column.key} sx={{ py: 1.2, px: 2 }}>
+                    <Skeleton />
+                </TableCell>
+            ))}
         </TableRow>
     ));
 
     return (
         <PageFrame
-            title="Program Annotations"
-            subtitle="Biological annotations and gene sets for cNMF programs"
-            maxWidth={1200}
+            title={null}
+            subtitle={null}
+            maxWidth={1500}
             compact
-            sx={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}
         >
             <Paper elevation={0} sx={panelSx(theme, {
-                overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column',
+                overflow: 'hidden',
             })}>
-                <TableContainer sx={stickyTableContainerSx(theme, { flex: 1, overflowX: 'auto', overflowY: 'auto' })}>
-                    <Table stickyHeader size="small" sx={stickyTableSx(theme)}>
+                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1520 })}>
+                        <colgroup>
+                            {PROGRAM_TABLE_COLUMNS.map((column) => (
+                                <col key={column.key} style={{ width: column.width }} />
+                            ))}
+                        </colgroup>
                         <TableHead>
                             <TableRow>
-                                <TableCell sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', { ...programHeaderSx, width: 80 })}>
-                                    <TableSortLabel active={sortBy === 'program'} direction={sortDir}
-                                        onClick={() => handleSort('program')}>Program</TableSortLabel>
+                                <TableCell colSpan={PROGRAM_TABLE_COLUMNS.length} sx={programTableTitleCellSx(theme)}>
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.8} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Typography sx={sectionTitleSx(theme, { fontSize: '0.98rem', lineHeight: 1.2 })}>
+                                                Program Annotations
+                                            </Typography>
+                                            <Typography sx={captionSx(theme, { mt: 0.2, fontSize: '0.7rem', lineHeight: 1.35 })}>
+                                                Biological annotations and gene sets for cNMF programs.
+                                            </Typography>
+                                        </Box>
+                                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                                            <TextField
+                                                size="small"
+                                                value={programGeneSearch}
+                                                onChange={(event) => setProgramGeneSearch(event.target.value)}
+                                                placeholder="Filter by gene"
+                                                InputProps={{
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <Search sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                                sx={{
+                                                    width: { xs: '100%', sm: 190 },
+                                                    '& .MuiInputBase-root': {
+                                                        height: 30,
+                                                        fontSize: '0.72rem',
+                                                        bgcolor: theme.palette.background.paper,
+                                                    },
+                                                }}
+                                            />
+                                            <Chip
+                                                label={programGeneSearch.trim()
+                                                    ? `${rows.length.toLocaleString()}/${programCount.toLocaleString()} programs`
+                                                    : `${rows.length.toLocaleString()} programs`}
+                                                size="small"
+                                                sx={summaryChipSx(theme, {
+                                                    height: 22,
+                                                    color: theme.palette.primary.dark,
+                                                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                                    border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
+                                                })}
+                                            />
+                                            <Button
+                                                size="small"
+                                                startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
+                                                onClick={handleProgramTableDownload}
+                                                disabled={!rows.length}
+                                                sx={{ textTransform: 'none', fontSize: '0.72rem', color: theme.palette.text.secondary, flexShrink: 0 }}
+                                            >
+                                                CSV
+                                            </Button>
+                                        </Stack>
+                                    </Stack>
                                 </TableCell>
-                                <TableCell sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', programHeaderSx)}>
-                                    <TableSortLabel active={sortBy === 'curated_annotation'} direction={sortDir}
-                                        onClick={() => handleSort('curated_annotation')}>Annotation</TableSortLabel>
-                                </TableCell>
-                                <TableCell sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', programHeaderSx)}>Representative GO</TableCell>
-                                <TableCell sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', { ...programHeaderSx, width: 90 })}>
-                                    <TableSortLabel active={sortBy === 'go_enrichment_p'} direction={sortDir}
-                                        onClick={() => handleSort('go_enrichment_p')}>GO P</TableSortLabel>
-                                </TableCell>
-                                <TableCell sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', programHeaderSx)}>Top Genes</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                {PROGRAM_TABLE_GROUPS.map((group) => (
+                                    <TableCell
+                                        key={group.label}
+                                        colSpan={group.span}
+                                        sx={programTableGroupHeaderSx(theme, programTableTones[group.tone])}
+                                    >
+                                        {group.label}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                            <TableRow>
+                                {PROGRAM_TABLE_COLUMNS.map((column) => (
+                                    <TableCell
+                                        key={column.key}
+                                        sx={programTableColumnHeaderSx(theme, programTableTones[column.tone], column.align)}
+                                    >
+                                        <TableSortLabel
+                                            active={sortBy === column.key}
+                                            direction={sortBy === column.key ? sortDir : 'asc'}
+                                            hideSortIcon
+                                            onClick={() => handleSort(column.key)}
+                                            sx={programSortLabelSx}
+                                        >
+                                            {column.label}
+                                        </TableSortLabel>
+                                    </TableCell>
+                                ))}
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {loading ? skeleton : rows.map((r, i) => (
                                 <TableRow key={r.program} hover
                                     sx={{
-                                        '& td': { py: 0.6, px: 1.5, borderBottom: '1px solid #f3f4f6' },
                                         ...tableRowRevealSx(theme, i),
                                         '&:hover td': {
                                             backgroundColor: alpha(theme.palette.primary.main, 0.035),
                                         },
                                     }}>
-                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem', color: theme.palette.primary.main, whiteSpace: 'nowrap', cursor: 'pointer' }}
-                                        onClick={() => navigate(`/programs/${r.program}`)}>
-                                        {r.program}
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.identity, 'left', { bgcolor: programTableTones.identity.cellStrong })}>
+                                        <Button
+                                            component={RouterLink}
+                                            to={`/programs/${r.program}`}
+                                            sx={{
+                                                textTransform: 'none',
+                                                px: 0,
+                                                py: 0,
+                                                minHeight: 0,
+                                                justifyContent: 'flex-start',
+                                                color: theme.palette.primary.dark,
+                                                fontFamily: 'monospace',
+                                                fontWeight: 800,
+                                                fontSize: '0.76rem',
+                                            }}
+                                        >
+                                            {r.program}
+                                        </Button>
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.82rem', lineHeight: 1.4 }}>
-                                        {r.curated_annotation}
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.annotation, 'left', { whiteSpace: 'normal' })}>
+                                        <Typography sx={{ fontSize: '0.74rem', lineHeight: 1.35 }}>
+                                            {r.curated_annotation || '-'}
+                                        </Typography>
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>
-                                        {r.representative_go}
+                                    <TableCell sx={{ ...programTableCellSx(theme, programTableTones.annotation, 'left', { whiteSpace: 'normal' }), bgcolor: programTableTones.annotation.cellStrong }}>
+                                        {r.go_term ? (
+                                            <Button
+                                                component="a"
+                                                href={buildGoUrl(r.go_accession || r.go_term)}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                endIcon={<OpenInNew sx={{ fontSize: 11 }} />}
+                                                sx={{
+                                                    textTransform: 'none',
+                                                    px: 0,
+                                                    py: 0,
+                                                    minHeight: 0,
+                                                    justifyContent: 'flex-start',
+                                                    color: programTableTones.annotation.headerColor,
+                                                    fontWeight: 750,
+                                                    fontSize: '0.7rem',
+                                                    lineHeight: 1.25,
+                                                }}
+                                            >
+                                                {r.go_term}
+                                            </Button>
+                                        ) : '-'}
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, fontFamily: 'monospace' }}>
-                                        {r.go_enrichment_p}
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.annotation, 'left', { fontFamily: 'monospace', fontSize: '0.7rem' })}>
+                                        {r.go_accession || '-'}
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis' }}
-                                        title={r.top10_genes}>
-                                        {r.top10_genes}
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.annotation, 'left')}>
+                                        {r.go_ontology || '-'}
+                                    </TableCell>
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.metric, 'right', { bgcolor: programTableTones.metric.cellStrong, fontFamily: 'monospace', fontWeight: 750 })}>
+                                        {r.go_enrichment_p || '-'}
+                                    </TableCell>
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.genes, 'left', { whiteSpace: 'normal' })}>
+                                        <Stack direction="row" spacing={0.45} sx={{ flexWrap: 'wrap' }}>
+                                            {splitTopGenes(r.top10_genes).slice(0, 10).map((gene) => (
+                                                <Chip
+                                                    key={`${r.program}-${gene}`}
+                                                    label={gene}
+                                                    size="small"
+                                                    component={RouterLink}
+                                                    clickable
+                                                    to={`/genes?query=${encodeURIComponent(gene)}`}
+                                                    sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'subtle')), height: 20, fontSize: '0.62rem' }}
+                                                />
+                                            ))}
+                                        </Stack>
                                     </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
                 </TableContainer>
+                <Box
+                    sx={{
+                        px: { xs: 1.5, md: 2 },
+                        py: 1.35,
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+                        alignItems: 'center',
+                        gap: 1.5,
+                        background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.custom.surface.subtle})`,
+                        borderTop: `1px solid ${theme.custom.border.soft}`,
+                    }}
+                >
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
+                        {loading
+                            ? 'Loading programs'
+                            : programGeneSearch.trim()
+                                ? `Showing ${rows.length.toLocaleString()} of ${programCount.toLocaleString()} programs filtered by gene`
+                                : `Showing all ${rows.length.toLocaleString()} programs`}
+                    </Typography>
+                    <Chip
+                        label={programSortDescription(sortBy, sortDir)}
+                        size="small"
+                        sx={summaryChipSx(theme, {
+                            height: 22,
+                            color: theme.palette.text.secondary,
+                            bgcolor: alpha(theme.palette.text.primary, 0.045),
+                        })}
+                    />
+                </Box>
             </Paper>
         </PageFrame>
     );

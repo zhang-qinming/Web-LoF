@@ -804,7 +804,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={toolbarSx(theme)}>
                 <Box sx={{ minWidth: 270, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.35 }}>
+                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
                         Gene-level scatter
                     </Typography>
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
@@ -859,7 +859,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
 
             <Box sx={toolbarSx(theme)}>
                 <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 260 }}>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
                         Point
                     </Typography>
                     <Slider
@@ -873,7 +873,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20 }}>{pointSize}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 250 }}>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
                         Labels
                     </Typography>
                     <Slider

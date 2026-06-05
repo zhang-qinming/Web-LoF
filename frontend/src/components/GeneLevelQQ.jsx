@@ -51,22 +51,22 @@ import GeneLevelQQTable from './GeneLevelQQTable';
 const DATA_DIR = 'gene_level_qq/tables';
 const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 820;
-const DEFAULT_POINT_SIZE = 5;
+const DEFAULT_POINT_SIZE = 7;
 const DEFAULT_LABEL_LIMIT = 4;
 const MAX_COMPARE_TRAITS = 6;
 const NOMINAL_LOGP = -Math.log10(0.05);
-const BASE_POINT_COLOR = '#8fa0b6';
+const BASE_POINT_COLOR = '#53677f';
 const TRAIT_PALETTE = ['#155e9f', '#c45121', '#047857', '#6d4cc2', '#9a5b12', '#b42358'];
 
 const TAIL_META = {
     negative: {
         label: 'Negative tail',
-        color: '#356fbb',
+        color: '#1b6f9f',
         symbol: 'diamond',
     },
     positive: {
         label: 'Positive tail',
-        color: '#d96a3a',
+        color: '#c65d2e',
         symbol: 'circle',
     },
 };
@@ -348,7 +348,7 @@ function buildEnvelope(rows) {
             name: `${TAIL_META[tailSide].label} envelope`,
             x,
             y: upper,
-            line: { color: TAIL_META[tailSide].color, width: 0 },
+            line: { color: 'rgba(100, 116, 139, 0)', width: 0 },
             hoverinfo: 'skip',
             showlegend: false,
         });
@@ -359,8 +359,8 @@ function buildEnvelope(rows) {
             x,
             y: lower,
             fill: 'tonexty',
-            fillcolor: alpha(TAIL_META[tailSide].color, 0.1),
-            line: { color: TAIL_META[tailSide].color, width: 0 },
+            fillcolor: 'rgba(148, 163, 184, 0.16)',
+            line: { color: 'rgba(100, 116, 139, 0)', width: 0 },
             hoverinfo: 'skip',
             showlegend: false,
         });
@@ -384,7 +384,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [showExpectedLine, setShowExpectedLine] = useState(true);
     const [showNominalLine, setShowNominalLine] = useState(false);
     const [showFdrLine, setShowFdrLine] = useState(true);
-    const [showEnvelope, setShowEnvelope] = useState(false);
+    const [showEnvelope, setShowEnvelope] = useState(true);
     const [showTopLabels, setShowTopLabels] = useState(true);
     const [pointSize, setPointSize] = useState(DEFAULT_POINT_SIZE);
     const [labelLimit, setLabelLimit] = useState(DEFAULT_LABEL_LIMIT);
@@ -602,6 +602,8 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         return map;
     }, [activeTraits]);
 
+    const useTailColors = activeTraits.length <= 1;
+
     const groupedTraitOptions = useMemo(() => {
         const availableIds = new Set(availableTraits.map((item) => item.file_id));
         return uniqueTraitOptions([
@@ -631,7 +633,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         zeroline: false,
         showgrid: true,
         gridwidth: 1,
-        gridcolor: alpha(theme.palette.text.secondary, 0.075),
+        gridcolor: alpha(theme.palette.text.secondary, 0.09),
         showline: true,
         linewidth: 1,
         linecolor: alpha(theme.palette.text.secondary, 0.24),
@@ -639,8 +641,8 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         ticklen: 5,
         tickwidth: 1,
         tickcolor: alpha(theme.palette.text.secondary, 0.24),
-        tickfont: { size: 12, color: chartTokens.axisColor, family: theme.typography.fontFamily },
-    }), [chartTokens.axisColor, theme.palette.text.secondary, theme.typography.fontFamily]);
+        tickfont: { size: 12, color: alpha(theme.palette.text.primary, 0.72), family: theme.typography.fontFamily },
+    }), [theme.palette.text.primary, theme.palette.text.secondary, theme.typography.fontFamily]);
 
     const envelopeTraces = useMemo(() => (
         showEnvelope ? buildEnvelope(filteredRows) : []
@@ -675,18 +677,24 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             const group = grouped.get(groupKey);
             const normalizedDeviation = clamp((row.absDeviation || 0) / deviationCap, 0, 1);
             const intensity = normalizedDeviation ** 0.72;
-            const deviationScale = intensity * 1.9;
+            const deviationScale = intensity * 1.5;
             const traitColor = traitColorMap.get(row.sourceFileId) || TAIL_META[row.tailSide].color;
+            const pointColor = useTailColors ? TAIL_META[row.tailSide].color : traitColor;
             group.x.push(row.expected);
             group.y.push(row.observed);
             group.text.push(buildHoverText(row));
             group.customdata.push([row.rowKey]);
             group.sizes.push(pointSize + deviationScale);
-            group.colors.push(mixColors(BASE_POINT_COLOR, traitColor, 0.66 + (intensity * 0.28), 0.68 + (intensity * 0.22)));
+            group.colors.push(mixColors(BASE_POINT_COLOR, pointColor, 0.86 + (intensity * 0.1), 0.92 + (intensity * 0.06)));
             group.opacity.push(1);
         });
 
-        return [...grouped.values()].map((group) => ({
+        return [...grouped.values()].map((group) => {
+            const traceColor = useTailColors
+                ? TAIL_META[group.tailSide].color
+                : traitColorMap.get(group.traitId) || TAIL_META[group.tailSide].color;
+
+            return {
                 type: 'scattergl',
                 mode: 'markers',
                 name: `${group.traitName} · ${TAIL_META[group.tailSide].label}`,
@@ -695,7 +703,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 text: group.text,
                 customdata: group.customdata,
                 hovertemplate: '%{text}<extra></extra>',
-                hoverlabel: buildPlotHoverTone(theme, traitColorMap.get(group.traitId) || TAIL_META[group.tailSide].color, {
+                hoverlabel: buildPlotHoverTone(theme, traceColor, {
                     bgAlpha: 0.16,
                     borderAlpha: 0.36,
                 }),
@@ -705,12 +713,13 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     size: group.sizes,
                     opacity: group.opacity,
                     line: {
-                        color: alpha(theme.palette.background.paper, 0.86),
-                        width: 0.45,
+                        color: 'rgba(255,255,255,0)',
+                        width: 0,
                     },
                 },
-            }));
-    }, [filteredRows, payload.fileId, pointSize, theme, traitColorMap, traitLabel]);
+            };
+        });
+    }, [filteredRows, payload.fileId, pointSize, theme, traitColorMap, traitLabel, useTailColors]);
 
     const labelTrace = useMemo(() => {
         if (!labelRows.length) return [];
@@ -727,13 +736,17 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 return index % 2 === 0 ? 'bottom left' : 'bottom right';
             }),
             textfont: {
-                size: 10,
-                color: labelRows.map((row) => traitColorMap.get(row.sourceFileId) || TAIL_META[row.tailSide].color),
+                size: 10.5,
+                color: labelRows.map((row) => (
+                    useTailColors
+                        ? TAIL_META[row.tailSide].color
+                        : traitColorMap.get(row.sourceFileId) || TAIL_META[row.tailSide].color
+                )),
                 family: theme.typography.fontFamily,
             },
             hoverinfo: 'skip',
         }];
-    }, [labelRows, theme.typography.fontFamily, traitColorMap]);
+    }, [labelRows, theme.typography.fontFamily, traitColorMap, useTailColors]);
 
     const highlightedPoint = useMemo(() => {
         if (!highlight.rowKey) return [];
@@ -762,8 +775,11 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             .map((trait) => ({
                 key: trait.file_id,
                 label: trait.trait_name,
-                note: trait.gwas_id && trait.gwas_id !== trait.trait_name ? trait.gwas_id : '',
+                note: useTailColors
+                    ? 'Blue diamond: negative; orange circle: positive.'
+                    : trait.gwas_id && trait.gwas_id !== trait.trait_name ? trait.gwas_id : '',
                 color: traitColorMap.get(trait.file_id) || TRAIT_PALETTE[0],
+                colors: useTailColors ? [TAIL_META.negative.color, TAIL_META.positive.color] : undefined,
                 count: filteredRows.filter((row) => row.sourceFileId === trait.file_id).length,
             }));
 
@@ -778,7 +794,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         }
 
         return traitItems;
-    }, [activeTraits, filteredRows, showEnvelope, theme.palette.text.secondary, traitColorMap]);
+    }, [activeTraits, filteredRows, showEnvelope, theme.palette.text.secondary, traitColorMap, useTailColors]);
 
     const layout = useMemo(() => {
         const shapes = [];
@@ -831,7 +847,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 y0: axisRange[0],
                 x1: axisRange[1],
                 y1: axisRange[1],
-                line: { color: alpha(chartTokens.axisColor, 0.72), width: 1.35, dash: 'longdash' },
+                line: { color: '#9f1d1d', width: 1.45, dash: 'solid' },
             });
             annotations.push({
                 xref: 'paper',
@@ -842,7 +858,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 yanchor: 'top',
                 showarrow: false,
                 text: '<b>expected line</b>',
-                font: { size: 11, color: chartTokens.axisColor, family: theme.typography.fontFamily },
+                font: { size: 11, color: '#9f1d1d', family: theme.typography.fontFamily },
             });
         }
 
@@ -900,29 +916,23 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         }
 
         return {
-            title: {
-                text: 'Gene-level QQ',
-                font: { size: 17, color: theme.palette.text.primary, family: theme.typography.fontFamily },
-                x: 0.02,
-                xanchor: 'left',
-            },
             paper_bgcolor: theme.palette.background.paper,
             plot_bgcolor: chartTokens.plotBg,
-            margin: { l: 72, r: 28, t: 62, b: 60 },
+            margin: { l: 68, r: 22, t: 28, b: 56 },
             hovermode: 'closest',
             hoverdistance: 16,
             dragmode: 'pan',
             showlegend: false,
             xaxis: {
                 ...axisStyle,
-                title: { text: 'Expected signed -log10(P)', font: { size: 13, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 12 },
+                title: { text: 'Expected signed -log10(P)', font: { size: 12.5, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 10 },
                 range: axisRange,
                 fixedrange: false,
                 automargin: true,
             },
             yaxis: {
                 ...axisStyle,
-                title: { text: 'Observed signed -log10(P)', font: { size: 13, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 12 },
+                title: { text: 'Observed signed -log10(P)', font: { size: 12.5, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 10 },
                 range: axisRange,
                 fixedrange: false,
                 automargin: true,
@@ -931,7 +941,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             annotations,
             transition: { duration: 220, easing: 'cubic-in-out' },
         };
-    }, [axisRange, axisStyle, chartTokens.axisColor, chartTokens.plotBg, chartTokens.threshold, fdrGuide, showExpectedLine, showFdrLine, showNominalLine, showTraitStamp, theme, traitStampText]);
+    }, [axisRange, axisStyle, chartTokens.plotBg, chartTokens.threshold, fdrGuide, showExpectedLine, showFdrLine, showNominalLine, showTraitStamp, theme, traitStampText]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -1002,7 +1012,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setShowExpectedLine(true);
         setShowNominalLine(false);
         setShowFdrLine(true);
-        setShowEnvelope(false);
+        setShowEnvelope(true);
         setShowTopLabels(true);
         setShowTraitStamp(false);
         setSelectedTraits(primaryTrait ? [primaryTrait] : []);
@@ -1076,14 +1086,14 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={toolbarSx(theme)}>
                 <Box sx={{ minWidth: 270, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.35 }}>
+                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
                         Gene-level QQ
                     </Typography>
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
                         Signed deviation from expectation
                     </Typography>
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        Signed QQ plot of perturb-seq gene-level P values. Add multiple traits to overlay them in one frame; color encodes trait, marker shape still separates positive and negative tails.
+                        Signed QQ plot of perturb-seq gene-level P values. One trait uses cool/warm colors for negative and positive tails; trait overlays switch color to trait identity.
                     </Typography>
                 </Box>
 
@@ -1159,7 +1169,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 />
 
                 <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 240 }}>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
                         Point
                     </Typography>
                     <Slider
@@ -1174,7 +1184,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 </Stack>
 
                 <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 240 }}>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
                         Labels
                     </Typography>
                     <Slider
@@ -1196,20 +1206,14 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     CSV
                 </Button>
                 <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    Enable trait stamp when exported images need an in-plot trait label. Color encodes trait identity; marker shape still indicates positive vs negative tail.
+                    Enable trait stamp when exported images need an in-plot trait label. Single-trait color separates tails; multi-trait overlays use color for trait identity.
                 </Typography>
             </Box>
 
-            <Card
-                elevation={0}
-                sx={plotFrameSx(theme, {
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
-                    boxShadow: '0 14px 32px rgba(15, 23, 42, 0.06)',
-                })}
-            >
+            <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {isLoading && (
-                        <Box sx={{ minHeight: 640, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: 620, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -1258,7 +1262,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                                     setTableOpen(true);
                                 }}
                                 useResizeHandler
-                                style={{ width: '100%', height: '640px' }}
+                                style={{ width: '100%', height: '620px' }}
                             />
                             <FloatingLegend
                                 items={legendItems}
@@ -1267,10 +1271,26 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                                 title="Traits"
                                 width={{ expanded: 260, collapsed: 118 }}
                                 defaultPlacement="left"
-                                defaultTop={64}
+                                defaultTop={34}
                                 defaultSideOffset={12}
                                 anchorPlotRef={plotElRef}
                                 showScale={false}
+                                sx={{
+                                    borderRadius: 1.2,
+                                    bgcolor: alpha(theme.palette.background.paper, 0.88),
+                                    border: `1px solid ${alpha(theme.palette.text.secondary, 0.14)}`,
+                                    boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)',
+                                    backdropFilter: 'blur(8px) saturate(1.02)',
+                                    WebkitBackdropFilter: 'blur(8px) saturate(1.02)',
+                                    '&::before': {
+                                        content: '""',
+                                        position: 'absolute',
+                                        inset: 0,
+                                        pointerEvents: 'none',
+                                        background: `linear-gradient(180deg, ${alpha(theme.palette.common.white, 0.42)} 0%, rgba(255,255,255,0) 44%)`,
+                                        opacity: 0.62,
+                                    },
+                                }}
                             />
                         </>
                     )}

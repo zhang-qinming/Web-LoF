@@ -11,6 +11,7 @@ const regulation = require('./routes/Rregulation');
 const gene = require('./routes/Rgene');
 const dataRoute = require('./routes/Rdata');
 const crossTrait = require('./routes/RcrossTrait');
+const geneProgramModel = require('./models/MgeneProgram');
 
 const app = express();
 
@@ -37,4 +38,5 @@ app.use((err, req, res, next) => {
 const { host, port } = config.server;
 app.listen(port, host, () => {
     console.log(`Server running on http://${host}:${port}`);
+    geneProgramModel.warmGeneSummaryCache();
 });

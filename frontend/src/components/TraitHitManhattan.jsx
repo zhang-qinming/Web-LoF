@@ -826,7 +826,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={toolbarStyles}>
                 <Box sx={{ minWidth: 220, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: theme.palette.text.secondary, mb: 0.35 }}>
+                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
                         Trait Manhattan
                     </Typography>
                     <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.25 }}>

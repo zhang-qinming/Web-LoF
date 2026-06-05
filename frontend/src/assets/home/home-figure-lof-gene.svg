@@ -1,13 +1,8 @@
 <svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <clipPath id="gene-evidence-clip">
-      <rect x="96" y="118" width="528" height="214" rx="6"/>
-    </clipPath>
-  </defs>
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
   <text x="62" y="82" fill="#7A4B35" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Posterior vs regulation</text>
-  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">GeneBayes effect against perturb-seq signal</text>
+  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">GeneBayes posterior effect against perturb-seq support</text>
 
   <rect x="96" y="118" width="528" height="214" rx="6" fill="#FBFEFF" stroke="#E5E7EB"/>
   <g stroke="#E2E8F0" stroke-width="1">
@@ -25,53 +20,37 @@
   <line x1="96" y1="332" x2="624" y2="332" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="96" y1="332" x2="96" y2="118" stroke="#CBD5E1" stroke-width="2"/>
 
-  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">post_mean</text>
-  <text transform="rotate(-90 73 236)" x="73" y="236" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">signed -log10(P)</text>
+  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">GeneBayes posterior effect</text>
+  <text transform="rotate(-90 73 236)" x="73" y="236" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">Perturb-seq signed signal</text>
   <text x="550" y="158" fill="#92400E" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">FDR 0.05</text>
   <text x="544" y="291" fill="#92400E" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">-FDR 0.05</text>
 
-  <g clip-path="url(#gene-evidence-clip)">
-    <g fill-opacity="0.34">
-      <circle cx="258" cy="205" r="2.4" fill="#4F7DA8"/>
-      <circle cx="280" cy="230" r="2.6" fill="#C55F39"/>
-      <circle cx="306" cy="214" r="2.3" fill="#B6C0CF"/>
-      <circle cx="324" cy="242" r="2.5" fill="#C55F39"/>
-      <circle cx="342" cy="194" r="2.4" fill="#4F7DA8"/>
-      <circle cx="358" cy="222" r="2.6" fill="#B6C0CF"/>
-      <circle cx="376" cy="236" r="2.4" fill="#4F7DA8"/>
-      <circle cx="394" cy="204" r="2.5" fill="#C55F39"/>
-      <circle cx="416" cy="226" r="2.4" fill="#B6C0CF"/>
-      <circle cx="436" cy="196" r="2.5" fill="#C55F39"/>
-      <circle cx="454" cy="246" r="2.3" fill="#4F7DA8"/>
-      <circle cx="474" cy="214" r="2.4" fill="#C55F39"/>
-      <circle cx="336" cy="258" r="2.2" fill="#C55F39"/>
-      <circle cx="404" cy="184" r="2.3" fill="#C55F39"/>
-      <circle cx="300" cy="186" r="2.2" fill="#4F7DA8"/>
-      <circle cx="454" cy="260" r="2.2" fill="#4F7DA8"/>
-    </g>
-
-    <g stroke="rgba(15,23,42,0.16)" stroke-width="0.8">
-      <circle cx="432" cy="154" r="4.8" fill="#C55F39" fill-opacity="0.88"/>
-      <circle cx="468" cy="142" r="5.8" fill="#C55F39" fill-opacity="0.95"/>
-      <circle cx="508" cy="150" r="5.1" fill="#C55F39" fill-opacity="0.9"/>
-      <circle cx="548" cy="132" r="6.2" fill="#C55F39" fill-opacity="0.96"/>
-      <circle cx="300" cy="292" r="4.6" fill="#C55F39" fill-opacity="0.84"/>
-      <circle cx="244" cy="304" r="5.3" fill="#C55F39" fill-opacity="0.9"/>
-      <circle cx="210" cy="286" r="4.4" fill="#C55F39" fill-opacity="0.82"/>
-
-      <rect x="206" y="142" width="9.8" height="9.8" rx="1.7" fill="#4F7DA8" fill-opacity="0.9" transform="rotate(45 210.9 146.9)"/>
-      <rect x="258" y="154" width="10.8" height="10.8" rx="1.8" fill="#4F7DA8" fill-opacity="0.94" transform="rotate(45 263.4 159.4)"/>
-      <rect x="482" y="284" width="10.2" height="10.2" rx="1.8" fill="#4F7DA8" fill-opacity="0.9" transform="rotate(45 487.1 289.1)"/>
-      <rect x="538" y="300" width="9.8" height="9.8" rx="1.7" fill="#4F7DA8" fill-opacity="0.86" transform="rotate(45 542.9 304.9)"/>
-
-      <circle cx="214" cy="218" r="4.1" fill="#7A8CA8" fill-opacity="0.72"/>
-      <circle cx="246" cy="226" r="4.5" fill="#7A8CA8" fill-opacity="0.76"/>
-      <circle cx="492" cy="212" r="4.6" fill="#7A8CA8" fill-opacity="0.78"/>
-      <circle cx="524" cy="232" r="4.2" fill="#7A8CA8" fill-opacity="0.72"/>
-    </g>
+  <g fill="#B6C0CF" fill-opacity="0.72">
+    <circle cx="158" cy="218" r="2.4"/><circle cx="174" cy="232" r="2.2"/><circle cx="188" cy="206" r="2.4"/>
+    <circle cx="205" cy="246" r="2.3"/><circle cx="222" cy="220" r="2.5"/><circle cx="238" cy="238" r="2.2"/>
+    <circle cx="254" cy="210" r="2.4"/><circle cx="270" cy="232" r="2.3"/><circle cx="286" cy="202" r="2.4"/>
+    <circle cx="302" cy="244" r="2.2"/><circle cx="318" cy="216" r="2.5"/><circle cx="334" cy="232" r="2.2"/>
+    <circle cx="350" cy="206" r="2.4"/><circle cx="366" cy="238" r="2.3"/><circle cx="382" cy="220" r="2.4"/>
+    <circle cx="398" cy="246" r="2.2"/><circle cx="414" cy="210" r="2.5"/><circle cx="430" cy="230" r="2.2"/>
+    <circle cx="446" cy="204" r="2.4"/><circle cx="462" cy="238" r="2.3"/><circle cx="478" cy="222" r="2.4"/>
+    <circle cx="494" cy="248" r="2.2"/><circle cx="510" cy="214" r="2.5"/><circle cx="526" cy="232" r="2.2"/>
+    <circle cx="542" cy="206" r="2.4"/><circle cx="558" cy="244" r="2.3"/>
+    <circle cx="214" cy="258" r="2.2"/><circle cx="248" cy="190" r="2.3"/><circle cx="294" cy="266" r="2.2"/>
+    <circle cx="328" cy="184" r="2.3"/><circle cx="374" cy="258" r="2.2"/><circle cx="408" cy="188" r="2.3"/>
+    <circle cx="452" cy="262" r="2.2"/><circle cx="488" cy="192" r="2.3"/><circle cx="532" cy="256" r="2.2"/>
   </g>
 
-  <g font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#475569">
+  <g>
+    <circle cx="452" cy="150" r="4.7" fill="#C55F39" fill-opacity="0.92"/>
+    <circle cx="520" cy="142" r="5.2" fill="#C55F39" fill-opacity="0.96"/>
+    <circle cx="232" cy="292" r="4.6" fill="#C55F39" fill-opacity="0.88"/>
+    <rect x="246" y="150" width="10" height="10" rx="1.7" fill="#4F7DA8" fill-opacity="0.92" transform="rotate(45 251 155)"/>
+    <rect x="520" y="288" width="10" height="10" rx="1.7" fill="#4F7DA8" fill-opacity="0.9" transform="rotate(45 525 293)"/>
+    <circle cx="188" cy="160" r="4.1" fill="#7A8CA8" fill-opacity="0.78"/>
+    <circle cx="556" cy="286" r="4.2" fill="#7A8CA8" fill-opacity="0.78"/>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#475569">
     <circle cx="126" cy="368" r="5" fill="#C55F39"/>
     <text x="140" y="372">concordant</text>
     <rect x="244" y="363" width="9" height="9" rx="1.6" fill="#4F7DA8" transform="rotate(45 248.5 367.5)"/>

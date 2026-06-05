@@ -76,7 +76,7 @@ export default function ReleaseLogSection({
                         justifyContent="space-between"
                     >
                         <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 850, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+                            <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 850, letterSpacing: '0.16em', textTransform: 'none' }}>
                                 {eyebrow}
                             </Typography>
                             <Typography
@@ -141,7 +141,7 @@ export default function ReleaseLogSection({
                                     <Typography sx={{ color: '#111827', fontSize: '0.88rem', fontWeight: 800, letterSpacing: '0.04em' }}>
                                         {entry.date}
                                     </Typography>
-                                    <Typography sx={{ mt: 0.45, color: entry.color, fontSize: '0.73rem', fontWeight: 850, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+                                    <Typography sx={{ mt: 0.45, color: entry.color, fontSize: '0.73rem', fontWeight: 850, letterSpacing: '0.14em', textTransform: 'none' }}>
                                         {entry.label}
                                     </Typography>
                                 </Box>

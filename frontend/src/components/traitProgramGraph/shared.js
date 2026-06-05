@@ -33,14 +33,14 @@ export const SIDE_META = {
 };
 
 export const EFFECT_COLORS = {
-    positive: '#C2410C',
-    negative: '#3B5BDB',
+    positive: '#e7653d',
+    negative: '#2f80ed',
     neutral: '#6b7280',
 };
 
 export const EFFECT_COLOR_RGB = {
-    positive: '194, 65, 12',
-    negative: '59, 91, 219',
+    positive: '231, 101, 61',
+    negative: '47, 128, 237',
     neutral: '107, 114, 128',
 };
 
@@ -55,33 +55,38 @@ export const GRAPH_LAYOUTS = {
         mode: GRAPH_VIEW_MODES.compact,
         defaultMaxGenes: 6,
         traitCenterX: 560,
-        traitNodeW: 260,
-        traitNodeMinH: 134,
-        traitExtraLineH: 24,
-        traitTextLineStep: 25,
+        traitNodeW: 280,
+        traitNodeMinH: 142,
+        traitExtraLineH: 26,
+        traitTextLineStep: 27,
         leftProgramX: 24,
         leftProgramW: 350,
-        rightProgramX: 760,
-        rightProgramW: 218,
+        rightProgramX: 730,
+        rightProgramW: 212,
         rightProgramH: 56,
-        rightRegulatorX: 1060,
-        rightRegulatorW: 580,
+        rightRegulatorX: 1120,
+        rightRegulatorW: 520,
+        rightRegulatorMinW: 430,
         geneRowH: 22,
         geneFontSize: 19,
         geneHeaderH: 48,
         geneHeaderHTall: 70,
         geneDividerTopInset: 38,
         geneDividerBottomInset: 14,
-        moduleGap: 22,
+        geneColumnGap: 18,
+        geneSubcolumnGap: 20,
+        geneSidePadding: 18,
+        oneSidedDividerRatio: 0.84,
+        moduleGap: 20,
         regulatorGroupGap: 12,
         regulatorEdgeTargetSpacing: 24,
-        graphTopPadding: 108,
-        graphBottomPadding: 58,
-        minContentHeight: 460,
-        minSvgHeight: 780,
+        graphTopPadding: 86,
+        graphBottomPadding: 48,
+        minContentHeight: 400,
+        minSvgHeight: 680,
         geneSubcolumnThreshold: Number.POSITIVE_INFINITY,
         regulatorGroupLayout: 'vertical',
-        regulatorGeneLayout: 'single',
+        regulatorGeneLayout: 'effectColumns',
         regulatorGroupTitleSuffix: '',
         leftProgramTitleFontSize: 24,
         rightProgramTitleFontSize: 21,
@@ -100,18 +105,23 @@ export const GRAPH_LAYOUTS = {
         traitExtraLineH: 22,
         traitTextLineStep: 22,
         leftProgramX: 24,
-        leftProgramW: 266,
-        rightProgramX: 820,
-        rightProgramW: 266,
+        leftProgramW: 340,
+        rightProgramX: 790,
+        rightProgramW: 250,
         rightProgramH: 62,
-        rightRegulatorX: 1234,
-        rightRegulatorW: 310,
-        geneRowH: 25,
-        geneFontSize: 22,
-        geneHeaderH: 52,
-        geneHeaderHTall: 78,
+        rightRegulatorX: 1180,
+        rightRegulatorW: 460,
+        rightRegulatorMinW: 430,
+        geneRowH: 31,
+        geneFontSize: 18,
+        geneHeaderH: 56,
+        geneHeaderHTall: 84,
         geneDividerTopInset: 42,
         geneDividerBottomInset: 18,
+        geneColumnGap: 20,
+        geneSubcolumnGap: 22,
+        geneSidePadding: 20,
+        oneSidedDividerRatio: 0.84,
         moduleGap: 42,
         regulatorGroupGap: 18,
         regulatorEdgeTargetSpacing: 28,
@@ -127,9 +137,9 @@ export const GRAPH_LAYOUTS = {
         rightProgramTitleFontSize: 25,
         leftProgramTitleStep: 25,
         rightProgramTitleStep: 24,
-        leftProgramLabelChars: 19,
+        leftProgramLabelChars: 24,
         rightProgramLabelChars: 19,
-        showSectionNotes: true,
+        showSectionNotes: false,
     },
 };
 
@@ -380,17 +390,53 @@ export function regulatorGeneBoxHeight(genes, layout = DEFAULT_GRAPH_LAYOUT) {
     return geneBoxHeight(splitGenesByEffect(genes), 1, layout);
 }
 
-function geneDisplayColumnCount(genes, layout = DEFAULT_GRAPH_LAYOUT) {
+function maxDisplayLabelLength(genes) {
+    return genes.reduce((maxLength, gene) => Math.max(maxLength, displayGeneLabel(gene).length), 0);
+}
+
+export function regulatorGeneBoxWidth(genes, layout = DEFAULT_GRAPH_LAYOUT) {
+    const minWidth = layout.rightRegulatorMinW || layout.rightRegulatorW;
+    const maxWidth = layout.rightRegulatorW;
+    const charWidth = layout.geneFontSize * 0.62;
+    const titleWidth = (`Negative${layout.regulatorGroupTitleSuffix || ''}`.length * 21) * 0.62 + 56;
+
+    if (layout.regulatorGeneLayout === 'single') {
+        const contentWidth = maxDisplayLabelLength(genes) * charWidth + 56;
+        return Math.min(maxWidth, Math.max(minWidth, Math.ceil(contentWidth), Math.ceil(titleWidth)));
+    }
+
+    const columns = splitGenesByEffect(genes);
+    const oneSided = isOneSidedGeneBox(columns);
+    const contentWidth = (Math.max(
+        maxDisplayLabelLength(columns.left),
+        maxDisplayLabelLength(columns.right),
+        6,
+    ) * charWidth * 2) + 58;
+    const adjustedContentWidth = oneSided
+        ? contentWidth / (layout.oneSidedDividerRatio || 0.72)
+        : contentWidth;
+
+    return Math.min(maxWidth, Math.max(minWidth, Math.ceil(adjustedContentWidth), Math.ceil(titleWidth)));
+}
+
+function isOneSidedGeneBox(columns) {
+    return (columns.left.length > 0 && columns.right.length === 0)
+        || (columns.right.length > 0 && columns.left.length === 0);
+}
+
+function geneDisplayColumnCount(genes, layout = DEFAULT_GRAPH_LAYOUT, forceSplit = false) {
+    if (forceSplit && genes.length > 1) return 2;
     return genes.length > layout.geneSubcolumnThreshold ? 2 : 1;
 }
 
 export function geneVisualRowCount(columns, layout = DEFAULT_GRAPH_LAYOUT) {
-    const rowCountForSide = (genes) => Math.max(1, Math.ceil(genes.length / geneDisplayColumnCount(genes, layout)));
+    const forceSplit = isOneSidedGeneBox(columns);
+    const rowCountForSide = (genes) => Math.max(1, Math.ceil(genes.length / geneDisplayColumnCount(genes, layout, forceSplit)));
     return Math.max(rowCountForSide(columns.left), rowCountForSide(columns.right), 1);
 }
 
-export function splitGeneDisplayColumns(genes, layout = DEFAULT_GRAPH_LAYOUT) {
-    const columnCount = geneDisplayColumnCount(genes, layout);
+export function splitGeneDisplayColumns(genes, layout = DEFAULT_GRAPH_LAYOUT, options = {}) {
+    const columnCount = geneDisplayColumnCount(genes, layout, Boolean(options.forceSplit));
     const rowCount = Math.ceil(genes.length / columnCount);
 
     return Array.from({ length: columnCount }, (_item, index) => (

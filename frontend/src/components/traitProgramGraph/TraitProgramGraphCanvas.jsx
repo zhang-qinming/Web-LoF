@@ -25,10 +25,10 @@ import {
     programFillOpacity,
     programStripeOpacity,
     sanitizeFileNamePart,
-    SIDE_META,
     splitGeneDisplayColumns,
     splitGenesByEffect,
     regulatorGeneBoxHeight,
+    regulatorGeneBoxWidth,
     SVG_WIDTH,
     toFiniteNumber,
     traitPortY,
@@ -321,10 +321,20 @@ export default function TraitProgramGraphCanvas({
         selectedProgramName,
         titleRows = 1,
     }) => {
-        const columnGap = 12;
-        const dividerX = x + (width / 2);
-        const rowStartY = y + (titleRows > 1 ? layout.geneHeaderHTall : layout.geneHeaderH) + (layout.geneRowH / 2);
-        const sidePadding = 14;
+        const columnGap = layout.geneColumnGap || 16;
+        const subcolumnGap = layout.geneSubcolumnGap || 18;
+        const sidePadding = layout.geneSidePadding || 16;
+        const headerHeight = titleRows > 1 ? layout.geneHeaderHTall : layout.geneHeaderH;
+        const leftHasGenes = columns.left.length > 0;
+        const rightHasGenes = columns.right.length > 0;
+        const oneSided = leftHasGenes !== rightHasGenes;
+        const dividerRatio = layout.oneSidedDividerRatio || 0.72;
+        const dividerX = oneSided
+            ? x + (width * (leftHasGenes ? dividerRatio : 1 - dividerRatio))
+            : x + (width / 2);
+        const rowStartY = y + headerHeight + (layout.geneRowH / 2);
+        const dividerTop = y + headerHeight + 6;
+        const dividerBottom = y + height - 10;
         const sideAreas = {
             left: {
                 start: x + sidePadding,
@@ -342,10 +352,11 @@ export default function TraitProgramGraphCanvas({
             const geneMuted = (Boolean(selectedProgram) && !geneProgramSelected) || (Boolean(selectedGeneKey) && !geneMatched);
             const rowY = rowStartY + (rowIndex * layout.geneRowH);
             const area = sideAreas[column];
-            const subcolumnWidth = Math.max(1, (area.end - area.start) / subcolumnCount);
+            const totalGap = Math.max(0, subcolumnCount - 1) * subcolumnGap;
+            const subcolumnWidth = Math.max(1, ((area.end - area.start) - totalGap) / subcolumnCount);
             const textX = textAnchor === 'end'
-                ? area.end - ((subcolumnCount - 1 - subcolumnIndex) * subcolumnWidth)
-                : area.start + (subcolumnIndex * subcolumnWidth);
+                ? area.end - ((subcolumnCount - 1 - subcolumnIndex) * (subcolumnWidth + subcolumnGap))
+                : area.start + (subcolumnIndex * (subcolumnWidth + subcolumnGap));
             const anchor = textAnchor === 'end' ? 'end' : 'start';
 
             return (
@@ -383,19 +394,22 @@ export default function TraitProgramGraphCanvas({
 
         return (
             <g>
-                <line
-                    x1={dividerX}
-                    y1={y + layout.geneDividerTopInset}
-                    x2={dividerX}
-                    y2={y + height - layout.geneDividerBottomInset}
-                    stroke="#555"
-                    strokeWidth="1.5"
-                    strokeDasharray="2 3"
-                />
-                {splitGeneDisplayColumns(columns.left, layout).map((genes, subcolumnIndex, subcolumns) => (
+                {dividerBottom > dividerTop && (
+                    <line
+                        x1={dividerX}
+                        y1={dividerTop}
+                        x2={dividerX}
+                        y2={dividerBottom}
+                        stroke="#94a3b8"
+                        strokeWidth="1.35"
+                        strokeDasharray="5 5"
+                        strokeLinecap="round"
+                    />
+                )}
+                {splitGeneDisplayColumns(columns.left, layout, { forceSplit: oneSided && leftHasGenes }).map((genes, subcolumnIndex, subcolumns) => (
                     genes.map((gene, rowIndex) => renderGene(gene, 'left', subcolumnIndex, rowIndex, subcolumns.length))
                 ))}
-                {splitGeneDisplayColumns(columns.right, layout).map((genes, subcolumnIndex, subcolumns) => (
+                {splitGeneDisplayColumns(columns.right, layout, { forceSplit: oneSided && rightHasGenes }).map((genes, subcolumnIndex, subcolumns) => (
                     genes.map((gene, rowIndex) => renderGene(gene, 'right', subcolumnIndex, rowIndex, subcolumns.length))
                 ))}
             </g>
@@ -677,10 +691,11 @@ export default function TraitProgramGraphCanvas({
         const groupLayouts = regulatorGroups.map((group, index) => {
             const height = module.regulatorGroupHeights?.[group.key] || regulatorGeneBoxHeight(group.genes, layout);
             if (layout.regulatorGroupLayout === 'vertical') {
+                const width = regulatorGeneBoxWidth(group.genes, layout);
                 const positioned = {
                     ...group,
                     height,
-                    width: layout.rightRegulatorW,
+                    width,
                     x: layout.rightRegulatorX,
                     yTop: cursorY,
                     centerY: cursorY + (height / 2),
@@ -888,20 +903,6 @@ export default function TraitProgramGraphCanvas({
                     >
                         Export PNG
                     </Button>
-                    {visibleSides.has('program') && (
-                        <Chip
-                            label={`${SIDE_META.program.shortLabel} modules ${leftLayout.modules.length}`}
-                            size="small"
-                            sx={{ bgcolor: SIDE_META.program.softBg, color: SIDE_META.program.accent, fontWeight: 700 }}
-                        />
-                    )}
-                    {visibleSides.has('regulator') && (
-                        <Chip
-                            label={`${SIDE_META.regulator.shortLabel} modules ${rightLayout.modules.length}`}
-                            size="small"
-                            sx={{ bgcolor: SIDE_META.regulator.softBg, color: SIDE_META.regulator.accent, fontWeight: 700 }}
-                        />
-                    )}
                 </Stack>
 
                 <Box

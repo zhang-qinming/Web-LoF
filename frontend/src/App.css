@@ -16,7 +16,9 @@
     --text: #0f1724;
     --accent: #2563eb;
     --radius: 6px;
-    --max-width: 1600px;
+    --max-width: 1440px;
+    --page-pad-x: clamp(12px, 1.4vw, 20px);
+    --page-pad-y: clamp(10px, 1vw, 14px);
     --transition: background 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s, opacity 0.2s;
     --focus: rgba(37, 99, 235, 0.14);
 }
@@ -43,8 +45,8 @@ body {
 .main {
     width: 100%;
     max-width: var(--max-width);
-    padding: 12px 20px 16px;
-    margin: 12px auto;
+    padding: var(--page-pad-y) var(--page-pad-x) 16px;
+    margin: var(--page-pad-y) auto;
     display: flex;
     flex-direction: column;
     gap: 18px;
@@ -181,7 +183,7 @@ pre, code {
         font-size: 13px;
     }
 
-    .main { padding: 14px 14px 96px; }
+    .main { padding: 12px 12px 96px; }
     .hidden-mobile { display: none !important; }
 }
 

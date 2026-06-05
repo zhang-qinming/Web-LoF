@@ -402,7 +402,7 @@ export function groupedTableHeaderCellSx(theme, tone, overrides = {}) {
         color: tone.headerColor,
         fontWeight: 750,
         fontSize: '0.64rem',
-        textTransform: 'uppercase',
+        textTransform: 'none',
         letterSpacing: '0.06em',
         boxShadow: `inset 0 -1px 0 ${tone.headerBorder}, 0 1px 0 ${tone.headerBorder}`,
         backgroundClip: 'border-box',

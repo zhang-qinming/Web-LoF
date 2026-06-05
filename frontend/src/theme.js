@@ -77,7 +77,7 @@ const theme = createTheme({
     spacing: 8,
     custom: {
         appShell: {
-            maxWidth: 1600,
+            maxWidth: 1440,
             background: 'linear-gradient(180deg, #f6f9fd 0%, #eef4fb 100%)',
         },
         surface: {

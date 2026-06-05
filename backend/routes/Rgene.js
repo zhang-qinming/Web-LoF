@@ -35,7 +35,11 @@ router.get('/api/genes/:geneId/programs', asyncRoute(async (req, res) => {
     const geneId = normalizeIdentifier(req.params.geneId, 120);
     if (!geneId) return res.status(400).json({ error: 'Invalid geneId' });
 
-    const result = await geneProgramModel.getGenePrograms(geneId);
+    const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
+    const limit = parsePositiveInt(req.query.limit, 50, 250);
+    const sortBy = normalizeIdentifier(req.query.sortBy || 'absGamma', 50) || 'absGamma';
+    const order = String(req.query.order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const result = await geneProgramModel.getGenePrograms(geneId, { page, limit, sortBy, order });
     res.json(result);
 }));
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useDeferredValue, useMemo, useRef } from 'react';
 import useSWR from 'swr';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { fetcher } from '../api/gwas';
 import {
     Table,
@@ -20,7 +20,6 @@ import {
     TableSortLabel,
     Link,
     TextField,
-    Chip,
     Card,
     CardContent,
     Alert,
@@ -30,12 +29,12 @@ import {
 } from '@mui/material';
 import { Clear, Search } from '@mui/icons-material';
 import {
+    captionSx,
     panelSx,
     sectionTitleSx,
     stickyTableContainerSx,
     stickyTableHeaderCellSx,
     stickyTableSx,
-    summaryChipSx,
     tableRowRevealSx,
     tableSkeletonCellSx,
     toolbarSx,
@@ -167,9 +166,79 @@ function headerLayoutSx(column = {}) {
     };
 }
 
+const GWAS_TABLE_TITLE_HEADER_HEIGHT = 54;
+const GWAS_TABLE_MAX_VISIBLE_ROWS = 20;
+const GWAS_TABLE_ROW_HEIGHT = 48;
+const GWAS_TABLE_COLUMN_HEADER_HEIGHT = 46;
+
 function buildTraitHref(row, figureTab) {
     const path = `/trait/${encodeURIComponent(row.file_id)}`;
     return figureTab ? `${path}?tab=${encodeURIComponent(figureTab)}` : path;
+}
+
+function metricValueTone(theme, tone) {
+    if (tone === 'primary') {
+        return {
+            color: theme.palette.primary.dark,
+            backgroundColor: alpha(theme.palette.primary.main, 0.055),
+            borderColor: alpha(theme.palette.primary.main, 0.16),
+        };
+    }
+    if (tone === 'cyan') {
+        return {
+            color: '#245089',
+            backgroundColor: alpha('#0e7490', 0.055),
+            borderColor: alpha('#0e7490', 0.16),
+        };
+    }
+    if (tone === 'warning') {
+        return {
+            color: '#7c4d12',
+            backgroundColor: alpha('#d97706', 0.07),
+            borderColor: alpha('#d97706', 0.18),
+        };
+    }
+    if (tone === 'success') {
+        return {
+            color: '#166534',
+            backgroundColor: alpha('#15803d', 0.07),
+            borderColor: alpha('#15803d', 0.18),
+        };
+    }
+    return {
+        color: '#92400e',
+        backgroundColor: alpha('#b45309', 0.07),
+        borderColor: alpha('#b45309', 0.18),
+    };
+}
+
+function MetricValue({ value, tone, theme }) {
+    const colors = metricValueTone(theme, tone);
+    return (
+        <Box
+            component="span"
+            sx={{
+                display: 'inline-flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                minWidth: 72,
+                maxWidth: '100%',
+                px: 0.7,
+                py: 0.2,
+                borderRadius: 0.75,
+                border: `1px solid ${colors.borderColor}`,
+                bgcolor: colors.backgroundColor,
+                color: colors.color,
+                fontFamily: 'monospace',
+                fontSize: '0.76rem',
+                fontWeight: 750,
+                lineHeight: 1.25,
+                whiteSpace: 'nowrap',
+            }}
+        >
+            {value}
+        </Box>
+    );
 }
 
 function TraitRow({ row, index, columns, theme, figureTab }) {
@@ -207,36 +276,13 @@ function TraitRow({ row, index, columns, theme, figureTab }) {
                             {String(row[col.id] || '').replace(/^["']+|["']+$/g, '')}
                         </Link>
                     ) : (col.id === 'sample_size' || col.id === 'Sample Size') ? (
-                        <Chip
-                            label={formatCellValue(row, col.id)}
-                            size="small"
-                            variant="outlined"
-                            sx={summaryChipSx(theme, { color: theme.palette.primary.dark, backgroundColor: 'rgba(37, 99, 235, 0.05)' })}
-                        />
+                        <MetricValue value={formatCellValue(row, col.id)} tone="primary" theme={theme} />
                     ) : (col.id === 'n_variants' || col.id === 'Variants') ? (
-                        <Chip
-                            label={formatCellValue(row, col.id)}
-                            size="small"
-                            variant="outlined"
-                            sx={summaryChipSx(theme, { color: '#245089', backgroundColor: 'rgba(14, 116, 144, 0.06)' })}
-                        />
+                        <MetricValue value={formatCellValue(row, col.id)} tone="cyan" theme={theme} />
                     ) : (col.id === 'n_sig' || col.id === 'Significant Loci') ? (
-                        <Chip
-                            label={formatCellValue(row, col.id)}
-                            size="small"
-                            variant="outlined"
-                            sx={summaryChipSx(theme, { color: '#7c4d12', backgroundColor: 'rgba(217, 119, 6, 0.08)' })}
-                        />
+                        <MetricValue value={formatCellValue(row, col.id)} tone="warning" theme={theme} />
                     ) : (col.id === 'qc_score' || col.id === 'QC') ? (
-                        <Chip
-                            label={formatCellValue(row, col.id)}
-                            size="small"
-                            variant="outlined"
-                            sx={summaryChipSx(theme, {
-                                color: Number(row.qc_score) >= 100 ? '#166534' : '#92400e',
-                                backgroundColor: Number(row.qc_score) >= 100 ? 'rgba(21, 128, 61, 0.08)' : 'rgba(180, 83, 9, 0.08)',
-                            })}
-                        />
+                        <MetricValue value={formatCellValue(row, col.id)} tone={Number(row.qc_score) >= 100 ? 'success' : 'caution'} theme={theme} />
                     ) : (
                         formatCellValue(row, col.id)
                     )}
@@ -270,6 +316,7 @@ function LoadingSkeleton({ rows = 10, columns, theme }) {
 
 export default function GwasDataList({
     title = 'GWAS Data',
+    subtitle = '',
     columns = [],
     traitName = null,
     defaultSortBy = 'Trait',
@@ -359,26 +406,24 @@ export default function GwasDataList({
         );
     }
 
+    const resultLabel = normalizedSearch ? `${totalCount.toLocaleString()} matches` : `${totalCount.toLocaleString()} records`;
+
     return (
         <Box ref={rootRef} sx={{ position: 'relative' }}>
-            {title && (
-                <Typography variant="h5" sx={sectionTitleSx(theme, { mb: 2 })}>
-                    {title}
-                </Typography>
-            )}
             <Card elevation={0} sx={{ ...panelSx(theme, { borderRadius: 3 }), overflow: 'hidden' }}>
                 <Box
                     sx={toolbarSx(theme, {
-                        px: 2,
-                        py: 1.5,
+                        px: { xs: 1.5, md: 2 },
+                        py: 1.2,
                         borderRadius: 0,
                         border: 0,
                         borderBottom: `1px solid ${theme.custom.border.soft}`,
+                        background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.custom.surface.subtle})`,
                     })}
                 >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            Per page
+                            Rows
                         </Typography>
                         <FormControl size="small" sx={{ minWidth: 70 }}>
                             <Select value={limit} onChange={handleChangeLimit} sx={{ fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.6 } }}>
@@ -390,14 +435,8 @@ export default function GwasDataList({
                     </Box>
 
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                        {normalizedSearch ? `${totalCount.toLocaleString()} matches` : `${totalCount.toLocaleString()} records`}
+                        {resultLabel}
                     </Typography>
-
-                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-                        <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
-                    </Box>
-
-                    <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
 
                     {!traitName && (
                         <TextField
@@ -437,7 +476,17 @@ export default function GwasDataList({
 
                 <CardContent sx={{ p: 0 }}>
                     <Box sx={{ position: 'relative' }}>
-                        <TableContainer component={Paper} elevation={0} sx={stickyTableContainerSx(theme, { border: 0, borderRadius: 0, maxHeight: 600, overflow: 'auto', boxShadow: 'none' })}>
+                        <TableContainer
+                            component={Paper}
+                            elevation={0}
+                            sx={stickyTableContainerSx(theme, {
+                                border: 0,
+                                borderRadius: 0,
+                                maxHeight: GWAS_TABLE_TITLE_HEADER_HEIGHT + GWAS_TABLE_COLUMN_HEADER_HEIGHT + (GWAS_TABLE_MAX_VISIBLE_ROWS * GWAS_TABLE_ROW_HEIGHT),
+                                overflow: 'auto',
+                                boxShadow: 'none',
+                            })}
+                        >
                             <Table
                                 stickyHeader
                                 sx={stickyTableSx(theme, {
@@ -457,6 +506,43 @@ export default function GwasDataList({
                                     ))}
                                 </colgroup>
                                 <TableHead>
+                                    {title && (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={Math.max(columns.length, 1)}
+                                                sx={stickyTableHeaderCellSx(theme, {
+                                                    headerBg: theme.custom.surface.base,
+                                                    headerBorder: theme.custom.border.soft,
+                                                    headerColor: theme.palette.text.primary,
+                                                }, 'left', {
+                                                    top: 0,
+                                                    zIndex: '45 !important',
+                                                    height: GWAS_TABLE_TITLE_HEADER_HEIGHT,
+                                                    py: 1,
+                                                    px: 1.5,
+                                                    whiteSpace: 'normal',
+                                                    overflow: 'visible',
+                                                    textOverflow: 'clip',
+                                                })}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                                                    <Box sx={{ minWidth: 0 }}>
+                                                        <Typography sx={sectionTitleSx(theme, { fontSize: '0.92rem', lineHeight: 1.2 })}>
+                                                            {title}
+                                                        </Typography>
+                                                        {subtitle && (
+                                                            <Typography sx={captionSx(theme, { mt: 0.2, fontSize: '0.7rem', lineHeight: 1.35 })}>
+                                                                {subtitle}
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                    <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, fontWeight: 700 }}>
+                                                        {resultLabel}
+                                                    </Typography>
+                                                </Box>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
                                     <TableRow>
                                         {columns.map((column) => (
                                             <TableCell
@@ -470,8 +556,9 @@ export default function GwasDataList({
                                                     fontSize: '0.8rem',
                                                     fontWeight: 700,
                                                     letterSpacing: '0.03em',
-                                                    textTransform: 'uppercase',
+                                                    textTransform: 'none',
                                                     py: 1.2,
+                                                    top: title ? GWAS_TABLE_TITLE_HEADER_HEIGHT : 0,
                                                     ...columnLayoutSx(column),
                                                     ...headerLayoutSx(column),
                                                 })}
@@ -505,7 +592,7 @@ export default function GwasDataList({
 
                                 <TableBody>
                                     {isLoading ? (
-                                        <LoadingSkeleton columns={columns} rows={Math.min(limit, 10)} theme={theme} />
+                                        <LoadingSkeleton columns={columns} rows={Math.min(limit, GWAS_TABLE_MAX_VISIBLE_ROWS)} theme={theme} />
                                     ) : (
                                         <>
                                             {rows.map((row, index) => (
@@ -530,21 +617,24 @@ export default function GwasDataList({
                     {rows.length > 0 && (
                         <Box
                             sx={{
-                                p: 2,
-                                display: 'flex',
-                                justifyContent: 'space-between',
+                                px: { xs: 1.5, md: 2 },
+                                py: 1.35,
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
                                 alignItems: 'center',
-                                flexWrap: 'wrap',
-                                gap: 2,
-                                background: theme.custom.surface.subtle,
+                                gap: 1.5,
+                                background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.custom.surface.subtle})`,
                                 borderTop: `1px solid ${theme.custom.border.soft}`,
                             }}
                         >
-                            <Typography variant="body2" color="text.secondary">
-                                {totalCount === 0 ? 'No items' : `Showing ${Math.min(((page - 1) * limit) + 1, totalCount)} - ${Math.min(page * limit, totalCount)} of ${totalCount} records`}
+                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
+                                {totalCount === 0 ? 'No items' : `${Math.min(((page - 1) * limit) + 1, totalCount).toLocaleString()}-${Math.min(page * limit, totalCount).toLocaleString()} / ${totalCount.toLocaleString()} records`}
                             </Typography>
 
-                            <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flexWrap: 'wrap' }}>
+                                <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
+                                <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
+                            </Box>
                         </Box>
                     )}
                 </CardContent>

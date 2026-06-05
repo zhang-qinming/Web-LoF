@@ -1,75 +1,57 @@
 <svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">QQ plot</text>
-  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="13">Observed vs expected P-value quantiles</text>
+  <text x="62" y="82" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Gene-level QQ</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="13">Signed observed versus expected gene-level signal</text>
 
-  <!-- axes -->
-  <line x1="110" y1="330" x2="580" y2="330" stroke="#CBD5E1" stroke-width="1.5"/>
-  <line x1="110" y1="330" x2="110" y2="118" stroke="#CBD5E1" stroke-width="1.5"/>
-  <!-- diagonal reference -->
-  <line x1="110" y1="330" x2="500" y2="118" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="6 5"/>
-  <!-- labels -->
-  <text x="340" y="366" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Expected -log₁₀(P)</text>
-  <text transform="rotate(-90 72 210)" x="72" y="210" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Observed -log₁₀(P)</text>
+  <rect x="108" y="118" width="504" height="216" rx="8" fill="#FBFEFF" stroke="#E5E7EB"/>
+  <line x1="108" y1="224" x2="612" y2="224" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="360" y1="118" x2="360" y2="334" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="126" y1="302" x2="594" y2="146" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <path d="M126 314 C238 268 286 250 360 224 C434 198 486 176 594 134 L594 160 C486 188 434 210 360 236 C286 262 238 286 126 326 Z" fill="#DBEAFE" fill-opacity="0.22"/>
 
-  <!-- y-axis ticks -->
-  <text x="100" y="334" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">0</text>
-  <text x="100" y="277" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">4</text>
-  <text x="100" y="224" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">8</text>
-  <text x="100" y="171" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">12</text>
-  <text x="100" y="122" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">16</text>
-  <!-- x-axis ticks -->
-  <text x="110" y="346" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">0</text>
-  <text x="208" y="346" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">2</text>
-  <text x="306" y="346" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">4</text>
-  <text x="404" y="346" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">6</text>
+  <text x="360" y="356" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Expected signed -log10(P)</text>
+  <text transform="rotate(-90 74 224)" x="74" y="224" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Observed signed -log10(P)</text>
 
-  <!-- confidence band (shaded area around diagonal) -->
-  <path d="M110 330 L480 106 L500 90 L520 90 L500 106 L130 330 Z" fill="#DBEAFE" fill-opacity="0.25"/>
+  <text x="360" y="240" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">0</text>
+  <text x="180" y="240" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">-4</text>
+  <text x="540" y="240" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">4</text>
+  <text x="350" y="308" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">-4</text>
+  <text x="350" y="154" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">4</text>
 
-  <!-- QQ points: follow diagonal at low values, then deviate upward = genomic inflation -->
-  <!-- Dense cluster on diagonal (low P, well-calibrated) -->
-  <circle cx="118" cy="324" r="3" fill="#93C5FD" fill-opacity="0.55"/>
-  <circle cx="124" cy="320" r="3" fill="#93C5FD" fill-opacity="0.55"/>
-  <circle cx="130" cy="316" r="3" fill="#93C5FD" fill-opacity="0.55"/>
-  <circle cx="136" cy="312" r="3" fill="#93C5FD" fill-opacity="0.58"/>
-  <circle cx="142" cy="308" r="3" fill="#93C5FD" fill-opacity="0.58"/>
-  <circle cx="148" cy="304" r="3" fill="#93C5FD" fill-opacity="0.6"/>
-  <circle cx="154" cy="300" r="3" fill="#93C5FD" fill-opacity="0.6"/>
-  <circle cx="160" cy="296" r="3" fill="#93C5FD" fill-opacity="0.6"/>
-  <circle cx="166" cy="292" r="3" fill="#93C5FD" fill-opacity="0.62"/>
-  <circle cx="172" cy="288" r="3" fill="#93C5FD" fill-opacity="0.62"/>
-  <circle cx="178" cy="284" r="3" fill="#60A5FA" fill-opacity="0.65"/>
-  <circle cx="184" cy="280" r="3" fill="#60A5FA" fill-opacity="0.65"/>
-  <circle cx="190" cy="276" r="3" fill="#60A5FA" fill-opacity="0.65"/>
-  <circle cx="196" cy="272" r="3" fill="#60A5FA" fill-opacity="0.68"/>
-  <circle cx="202" cy="268" r="3" fill="#60A5FA" fill-opacity="0.68"/>
-  <circle cx="208" cy="264" r="3" fill="#60A5FA" fill-opacity="0.7"/>
-  <circle cx="214" cy="260" r="3" fill="#60A5FA" fill-opacity="0.7"/>
-  <circle cx="220" cy="256" r="3" fill="#60A5FA" fill-opacity="0.72"/>
+  <g fill="#60A5FA" fill-opacity="0.74">
+    <rect x="142" y="288" width="6" height="6" rx="1.2" transform="rotate(45 145 291)"/>
+    <rect x="158" y="282" width="6" height="6" rx="1.2" transform="rotate(45 161 285)"/>
+    <rect x="176" y="274" width="6" height="6" rx="1.2" transform="rotate(45 179 277)"/>
+    <rect x="194" y="268" width="6" height="6" rx="1.2" transform="rotate(45 197 271)"/>
+    <rect x="214" y="260" width="6" height="6" rx="1.2" transform="rotate(45 217 263)"/>
+    <rect x="236" y="254" width="6" height="6" rx="1.2" transform="rotate(45 239 257)"/>
+    <rect x="258" y="248" width="6" height="6" rx="1.2" transform="rotate(45 261 251)"/>
+    <rect x="282" y="240" width="6" height="6" rx="1.2" transform="rotate(45 285 243)"/>
+    <rect x="306" y="234" width="6" height="6" rx="1.2" transform="rotate(45 309 237)"/>
+    <rect x="330" y="228" width="6" height="6" rx="1.2" transform="rotate(45 333 231)"/>
+  </g>
 
-  <!-- Start deviating upward from diagonal (inflation begins) -->
-  <circle cx="226" cy="250" r="3" fill="#3B82F6" fill-opacity="0.72"/>
-  <circle cx="232" cy="244" r="3" fill="#3B82F6" fill-opacity="0.72"/>
-  <circle cx="238" cy="236" r="3" fill="#3B82F6" fill-opacity="0.75"/>
-  <circle cx="244" cy="228" r="3" fill="#3B82F6" fill-opacity="0.75"/>
-  <circle cx="250" cy="220" r="3" fill="#3B82F6" fill-opacity="0.78"/>
-  <circle cx="256" cy="210" r="3" fill="#3B82F6" fill-opacity="0.78"/>
-  <circle cx="262" cy="202" r="3" fill="#3B82F6" fill-opacity="0.8"/>
-  <circle cx="268" cy="192" r="3" fill="#2563EB" fill-opacity="0.82"/>
-  <circle cx="274" cy="184" r="3" fill="#2563EB" fill-opacity="0.82"/>
+  <g fill="#F97316" fill-opacity="0.76">
+    <circle cx="382" cy="216" r="3"/>
+    <circle cx="406" cy="210" r="3"/>
+    <circle cx="430" cy="204" r="3"/>
+    <circle cx="454" cy="196" r="3"/>
+    <circle cx="478" cy="188" r="3"/>
+    <circle cx="500" cy="180" r="3"/>
+    <circle cx="520" cy="172" r="3"/>
+    <circle cx="540" cy="164" r="3"/>
+    <circle cx="560" cy="154" r="3.2"/>
+    <circle cx="580" cy="142" r="3.4"/>
+  </g>
 
-  <!-- Strong deviation (true signal) -->
-  <circle cx="280" cy="174" r="3" fill="#2563EB" fill-opacity="0.85"/>
-  <circle cx="286" cy="162" r="3" fill="#2563EB" fill-opacity="0.85"/>
-  <circle cx="292" cy="150" r="3" fill="#2563EB" fill-opacity="0.88"/>
-  <circle cx="298" cy="140" r="3.5" fill="#1D4ED8" fill-opacity="0.9"/>
-  <circle cx="306" cy="128" r="3.5" fill="#1D4ED8" fill-opacity="0.9"/>
-  <circle cx="316" cy="116" r="3.5" fill="#1D4ED8" fill-opacity="0.92"/>
-  <circle cx="330" cy="104" r="3.5" fill="#1D4ED8" fill-opacity="0.92"/>
+  <rect x="118" y="300" width="7" height="7" rx="1.3" fill="#2563EB" transform="rotate(45 121.5 303.5)"/>
+  <rect x="132" y="294" width="7" height="7" rx="1.3" fill="#2563EB" transform="rotate(45 135.5 297.5)"/>
+  <circle cx="594" cy="134" r="4" fill="#EA580C"/>
+  <circle cx="606" cy="126" r="4" fill="#EA580C"/>
 
-  <!-- lambda label -->
-  <text x="440" y="296" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">λ = 1.08</text>
-  <text x="440" y="314" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11">slight inflation</text>
+  <circle cx="438" cy="360" r="4" fill="#F97316"/>
+  <text x="448" y="364" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">positive tail</text>
+  <rect x="526" y="356" width="8" height="8" rx="1.4" fill="#2563EB" transform="rotate(45 530 360)"/>
+  <text x="542" y="364" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="10">negative tail</text>
 </svg>

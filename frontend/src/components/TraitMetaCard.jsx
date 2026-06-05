@@ -60,7 +60,7 @@ function SummaryStat({ label, value, theme }) {
                     fontSize: '0.66rem',
                     fontWeight: 700,
                     letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
+                    textTransform: 'none',
                 }}
             >
                 {label}
@@ -151,7 +151,7 @@ function Field({ icon: Icon, label, value, mono, href, theme, tone }) {
                         fontSize: '0.66rem',
                         fontWeight: 700,
                         letterSpacing: '0.04em',
-                        textTransform: 'uppercase',
+                        textTransform: 'none',
                     }}
                 >
                     {label}
@@ -192,7 +192,7 @@ function InfoSection({ title, children, theme, tone, columns, fullWidth = false 
                         fontSize: '0.72rem',
                         fontWeight: 700,
                         letterSpacing: '0.04em',
-                        textTransform: 'uppercase',
+                        textTransform: 'none',
                     }}
                 >
                     {title}

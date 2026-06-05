@@ -2,67 +2,47 @@
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
   <text x="62" y="82" fill="#EA580C" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Burden volcano</text>
-  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">GCST90081631 LoF burden distribution</text>
+  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">GCST90081631 LoF burden effect distribution</text>
   <line x1="104" y1="318" x2="620" y2="318" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="104" y1="318" x2="104" y2="118" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="360" y1="318" x2="360" y2="118" stroke="#CBD5E1" stroke-width="1.6" stroke-dasharray="7 7"/>
   <line x1="104" y1="276" x2="620" y2="276" stroke="#FDBA74" stroke-width="1.7" stroke-dasharray="8 7"/>
   <text x="360" y="356" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="13">Effect size (beta)</text>
-  <text transform="rotate(-90 76 236)" x="76" y="236" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="13">-log10(P)</text>
-  <g fill="#94A3B8" fill-opacity="0.34">
-    <circle cx="404" cy="270" r="2.4"/>
-    <circle cx="366" cy="314" r="2.0"/>
-    <circle cx="367" cy="315" r="2.0"/>
-    <circle cx="335" cy="304" r="2.2"/>
-    <circle cx="330" cy="302" r="2.2"/>
-    <circle cx="323" cy="308" r="2.0"/>
-    <circle cx="330" cy="304" r="2.1"/>
-    <circle cx="339" cy="312" r="2.0"/>
-    <circle cx="371" cy="315" r="2.0"/>
-    <circle cx="347" cy="312" r="2.0"/>
-    <circle cx="404" cy="298" r="2.3"/>
-    <circle cx="392" cy="307" r="2.0"/>
-    <circle cx="332" cy="312" r="2.0"/>
-    <circle cx="315" cy="299" r="2.2"/>
-    <circle cx="428" cy="286" r="2.5"/>
-    <circle cx="454" cy="280" r="2.6"/>
-    <circle cx="324" cy="306" r="2.0"/>
-    <circle cx="345" cy="307" r="2.0"/>
-    <circle cx="314" cy="312" r="2.0"/>
-    <circle cx="372" cy="313" r="2.0"/>
-    <circle cx="373" cy="314" r="2.0"/>
-    <circle cx="316" cy="293" r="2.4"/>
-    <circle cx="502" cy="267" r="2.8"/>
-    <circle cx="345" cy="315" r="2.0"/>
-    <circle cx="396" cy="313" r="2.0"/>
-    <circle cx="220" cy="294" r="2.4"/>
-    <circle cx="394" cy="293" r="2.4"/>
-    <circle cx="408" cy="284" r="2.5"/>
-    <circle cx="316" cy="299" r="2.2"/>
-    <circle cx="448" cy="309" r="2.0"/>
-    <circle cx="515" cy="274" r="2.7"/>
-    <circle cx="285" cy="296" r="2.3"/>
-    <circle cx="475" cy="286" r="2.5"/>
-    <circle cx="410" cy="303" r="2.1"/>
-    <circle cx="304" cy="294" r="2.4"/>
-    <circle cx="337" cy="290" r="2.4"/>
-    <circle cx="416" cy="297" r="2.4"/>
-    <circle cx="369" cy="316" r="2.0"/>
-    <circle cx="438" cy="302" r="2.1"/>
-    <circle cx="310" cy="300" r="2.2"/>
+  <text transform="rotate(-90 76 236)" x="76" y="236" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="13">-log10(P)</text>
+
+  <g fill="#FED7AA" fill-opacity="0.68">
+    <circle cx="352" cy="315" r="2.0"/><circle cx="366" cy="314" r="2.0"/><circle cx="382" cy="316" r="2.0"/>
+    <circle cx="334" cy="310" r="2.1"/><circle cx="400" cy="310" r="2.1"/><circle cx="316" cy="306" r="2.2"/>
+    <circle cx="418" cy="306" r="2.2"/><circle cx="300" cy="314" r="2.0"/><circle cx="436" cy="314" r="2.0"/>
+    <circle cx="282" cy="308" r="2.0"/><circle cx="454" cy="308" r="2.0"/><circle cx="264" cy="314" r="2.0"/>
+    <circle cx="474" cy="316" r="2.0"/><circle cx="246" cy="306" r="2.1"/><circle cx="494" cy="308" r="2.1"/>
+    <circle cx="226" cy="312" r="2.0"/><circle cx="516" cy="312" r="2.0"/><circle cx="206" cy="302" r="2.2"/>
+    <circle cx="540" cy="302" r="2.2"/><circle cx="560" cy="310" r="2.0"/><circle cx="324" cy="296" r="2.4"/>
+    <circle cx="346" cy="292" r="2.4"/><circle cx="370" cy="298" r="2.3"/><circle cx="396" cy="294" r="2.3"/>
+    <circle cx="424" cy="296" r="2.3"/><circle cx="302" cy="288" r="2.3"/><circle cx="450" cy="286" r="2.4"/>
+    <circle cx="278" cy="292" r="2.3"/><circle cx="480" cy="290" r="2.3"/><circle cx="252" cy="284" r="2.4"/>
+    <circle cx="506" cy="284" r="2.4"/><circle cx="228" cy="294" r="2.2"/><circle cx="532" cy="292" r="2.2"/>
+    <circle cx="200" cy="286" r="2.2"/><circle cx="558" cy="286" r="2.2"/><circle cx="342" cy="278" r="2.5"/>
+    <circle cx="374" cy="280" r="2.5"/><circle cx="408" cy="278" r="2.5"/><circle cx="438" cy="276" r="2.5"/>
+    <circle cx="306" cy="274" r="2.4"/><circle cx="478" cy="274" r="2.4"/><circle cx="270" cy="272" r="2.4"/>
+    <circle cx="512" cy="270" r="2.4"/><circle cx="236" cy="278" r="2.3"/><circle cx="548" cy="276" r="2.3"/>
+    <circle cx="198" cy="270" r="2.3"/><circle cx="578" cy="272" r="2.3"/><circle cx="320" cy="264" r="2.4"/>
+    <circle cx="394" cy="262" r="2.4"/><circle cx="462" cy="266" r="2.4"/><circle cx="288" cy="260" r="2.3"/>
+    <circle cx="520" cy="258" r="2.3"/><circle cx="244" cy="262" r="2.2"/><circle cx="552" cy="252" r="2.2"/>
+    <circle cx="214" cy="256" r="2.2"/><circle cx="588" cy="262" r="2.2"/>
   </g>
-  <g stroke="#FFFFFF" stroke-width="1">
-    <circle cx="485.9" cy="181.0" r="3.9" fill="#EA580C" fill-opacity="0.9"><title>ROBO1: beta=0.719, -log10P=5.98</title></circle>
-    <circle cx="584.1" cy="136.8" r="4.4" fill="#EA580C" fill-opacity="0.9"><title>PKD2: beta=1.280, -log10P=7.91</title></circle>
-    <circle cx="482.1" cy="188.3" r="3.8" fill="#EA580C" fill-opacity="0.9"><title>GUCY1A1: beta=0.698, -log10P=5.66</title></circle>
-    <circle cx="482.1" cy="138.9" r="4.3" fill="#EA580C" fill-opacity="0.9"><title>NOS3: beta=0.697, -log10P=7.82</title></circle>
-    <circle cx="458.4" cy="217.4" r="3.5" fill="#EA580C" fill-opacity="0.9"><title>ZMYM5: beta=0.562, -log10P=4.39</title></circle>
-    <circle cx="455.3" cy="197.8" r="3.7" fill="#EA580C" fill-opacity="0.9"><title>SMAD6: beta=0.545, -log10P=5.25</title></circle>
-    <circle cx="214.8" cy="219.2" r="3.5" fill="#0284C7" fill-opacity="0.9"><title>CYP11A1: beta=-0.830, -log10P=4.31</title></circle>
-    <circle cx="560.7" cy="132.8" r="4.4" fill="#EA580C" fill-opacity="0.9"><title>FES: beta=1.146, -log10P=8.08</title></circle>
-    <circle cx="460.8" cy="208.3" r="3.6" fill="#EA580C" fill-opacity="0.9"><title>PKD1: beta=0.576, -log10P=4.79</title></circle>
+
+  <g>
+    <circle cx="486" cy="182" r="4.0" fill="#EA580C" fill-opacity="0.92"><title>ROBO1: beta=0.72</title></circle>
+    <circle cx="584" cy="138" r="4.6" fill="#EA580C" fill-opacity="0.96"><title>PKD2: beta=1.28</title></circle>
+    <circle cx="482" cy="142" r="4.4" fill="#EA580C" fill-opacity="0.94"><title>NOS3: beta=0.70</title></circle>
+    <circle cx="458" cy="206" r="3.7" fill="#EA580C" fill-opacity="0.9"><title>SMAD6: beta=0.55</title></circle>
+    <circle cx="562" cy="134" r="4.5" fill="#EA580C" fill-opacity="0.94"><title>FES: beta=1.15</title></circle>
+    <circle cx="214" cy="220" r="3.7" fill="#0284C7" fill-opacity="0.9"><title>CYP11A1: beta=-0.83</title></circle>
+    <circle cx="224" cy="244" r="3.3" fill="#0284C7" fill-opacity="0.84"><title>negative burden hit</title></circle>
   </g>
-  <rect x="438" y="64" width="170" height="58" rx="14" fill="#FFF7ED" stroke="#FED7AA"/>
-  <text x="458" y="88" fill="#C2410C" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">9 significant genes</text>
+
+  <rect x="438" y="64" width="172" height="58" rx="14" fill="#FFF7ED" stroke="#FED7AA"/>
+  <text x="458" y="88" fill="#C2410C" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">top burden hits</text>
   <text x="458" y="107" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="12">18,545 full rows</text>
 </svg>

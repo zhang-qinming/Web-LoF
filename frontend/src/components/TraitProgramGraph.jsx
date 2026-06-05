@@ -32,7 +32,19 @@ import {
 
 function normalizeGeneQueryValue(value) {
     const text = String(value || '').trim();
-    return text.replace(/^\((.+)\)$/, '$1').trim();
+    const wrapped = text.match(/^\(([^()]+)\)$/);
+    return wrapped ? wrapped[1].trim() : text;
+}
+
+function geneQueryCandidates(gene) {
+    return [
+        gene?.ensg,
+        gene?.highlightKey,
+        gene?.gene,
+        gene?.geneLabel,
+    ]
+        .map(normalizeGeneQueryValue)
+        .filter(Boolean);
 }
 
 export default function TraitProgramGraph({ fileId, traitLabel }) {
@@ -209,7 +221,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
     }, [navigate]);
 
     const openGene = useCallback((gene) => {
-        const label = normalizeGeneQueryValue(gene?.gene || gene?.ensg || gene?.highlightKey || gene?.geneLabel);
+        const [label] = geneQueryCandidates(gene);
         if (!label) return;
         navigate(`/genes?query=${encodeURIComponent(label)}`);
     }, [navigate]);

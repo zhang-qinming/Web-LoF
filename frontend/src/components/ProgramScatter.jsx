@@ -210,7 +210,7 @@ export default function ProgramScatter({ fileId }) {
     const captionLabelSx = useMemo(() => ({
         color: theme.palette.text.secondary,
         fontSize: '0.72rem',
-        textTransform: 'uppercase',
+        textTransform: 'none',
         letterSpacing: '0.08em',
         fontWeight: 700,
     }), [theme.palette.text.secondary]);

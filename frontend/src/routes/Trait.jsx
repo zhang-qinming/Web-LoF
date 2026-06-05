@@ -142,13 +142,14 @@ export default function Trait() {
     if (!fileId) {
         return (
             <PageFrame
-                title="Browse Traits"
-                subtitle="Select a trait to explore its GWAS and LoF analysis results."
+                title={null}
+                subtitle={null}
                 maxWidth={1500}
                 compact
             >
                 <GwasDataList
-                    title=""
+                    title="Browse Traits"
+                    subtitle="Select a trait to explore its GWAS and LoF analysis results."
                     columns={[
                         { id: 'file_id', label: 'LoF ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
                         { id: 'trait_name', label: 'Trait', width: '34%', minWidth: 360 },
