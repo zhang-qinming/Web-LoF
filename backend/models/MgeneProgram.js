@@ -4,7 +4,7 @@ const TABLE_MISSING_CODES = new Set(['ER_NO_SUCH_TABLE', 'ER_BAD_TABLE_ERROR']);
 const GENE_INFO_TABLE = 'gene_info_hg37_matched';
 const EXTERNAL_GENE_INFO_TTL_MS = 24 * 60 * 60 * 1000;
 const EXTERNAL_FETCH_TIMEOUT_MS = 4500;
-const GENE_SUMMARY_CACHE_TTL_MS = 10 * 60 * 1000;
+const GENE_SUMMARY_CACHE_TTL_MS = 60 * 60 * 1000;
 const ENSEMBL_REST_BASES = ['https://grch37.rest.ensembl.org', 'https://rest.ensembl.org'];
 const externalGeneInfoCache = new Map();
 let geneInfoTableAvailablePromise = null;
@@ -1066,24 +1066,17 @@ async function getProgramTraits(programId) {
         const [rows] = await pool.query(
             `SELECT
                 tpe.*,
-                fm.gwas_id,
-                fm.trait_name,
+                COALESCE(fm_trait.file_id, fm_gwas.file_id, fm_file.file_id, tpe.file_id) AS joined_file_id,
+                COALESCE(fm_trait.gwas_id, fm_gwas.gwas_id, fm_file.gwas_id, '') AS gwas_id,
+                COALESCE(fm_trait.trait_name, fm_gwas.trait_name, fm_file.trait_name, '') AS trait_name,
                 pi.curated_annotation
              FROM trait_program_edge tpe
-             LEFT JOIN file_metadata fm
-                ON fm.id = (
-                    SELECT fm2.id
-                    FROM file_metadata fm2
-                    WHERE BINARY fm2.file_id = BINARY tpe.trait_id
-                        OR BINARY fm2.gwas_id = BINARY tpe.trait_id
-                        OR BINARY fm2.file_id = BINARY tpe.file_id
-                    ORDER BY
-                        (BINARY fm2.file_id = BINARY tpe.trait_id) DESC,
-                        (BINARY fm2.gwas_id = BINARY tpe.trait_id) DESC,
-                        (BINARY fm2.file_id = BINARY tpe.file_id) DESC,
-                        fm2.id ASC
-                    LIMIT 1
-                )
+             LEFT JOIN file_metadata fm_trait
+                ON BINARY fm_trait.file_id = BINARY tpe.trait_id
+             LEFT JOIN file_metadata fm_gwas
+                ON BINARY fm_gwas.gwas_id = BINARY tpe.trait_id
+             LEFT JOIN file_metadata fm_file
+                ON BINARY fm_file.file_id = BINARY tpe.file_id
              LEFT JOIN program_info pi
                 ON BINARY pi.program = BINARY tpe.program
              WHERE tpe.program = ?
@@ -1097,12 +1090,24 @@ async function getProgramTraits(programId) {
             ? await pool.query(
                 `SELECT
                     trait_id,
-                    COALESCE(NULLIF(gene_symbol, ''), ensg_id) AS gene_label,
-                    MAX(GREATEST(COALESCE(abs_gamma, 0), ABS(COALESCE(membership_score, 0)))) AS score
-                 FROM gene_program_trait_edge
-                 WHERE program = ?
-                 GROUP BY trait_id, COALESCE(NULLIF(gene_symbol, ''), ensg_id)
-                 ORDER BY trait_id ASC, score DESC`,
+                    gene_label,
+                    score
+                 FROM (
+                    SELECT
+                        ranked.*,
+                        ROW_NUMBER() OVER (PARTITION BY ranked.trait_id ORDER BY ranked.score DESC, ranked.gene_label ASC) AS row_num
+                    FROM (
+                        SELECT
+                            trait_id,
+                            COALESCE(NULLIF(gene_symbol, ''), ensg_id) AS gene_label,
+                            MAX(GREATEST(COALESCE(abs_gamma, 0), ABS(COALESCE(membership_score, 0)))) AS score
+                         FROM gene_program_trait_edge
+                         WHERE program = ?
+                         GROUP BY trait_id, COALESCE(NULLIF(gene_symbol, ''), ensg_id)
+                    ) ranked
+                 ) top_ranked
+                 WHERE row_num <= 8
+                 ORDER BY trait_id ASC, row_num ASC`,
                 [program],
             )
             : [[]];
@@ -1117,7 +1122,7 @@ async function getProgramTraits(programId) {
         const traits = rows.map((row) => ({
             traitId: row.trait_id,
             traitName: row.trait_name || row.trait_id,
-            fileId: row.file_id,
+            fileId: row.joined_file_id || row.file_id,
             gwasId: row.gwas_id || '',
             program: row.program,
             programAnnotation: row.program_annotation || row.curated_annotation || '',

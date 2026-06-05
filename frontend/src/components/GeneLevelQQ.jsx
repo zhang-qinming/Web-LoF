@@ -348,7 +348,11 @@ function buildEnvelope(rows) {
             name: `${TAIL_META[tailSide].label} envelope`,
             x,
             y: upper,
-            line: { color: 'rgba(100, 116, 139, 0)', width: 0 },
+            line: {
+                color: alpha(TAIL_META[tailSide].color, 0.28),
+                width: 1,
+                dash: 'dot',
+            },
             hoverinfo: 'skip',
             showlegend: false,
         });
@@ -359,8 +363,12 @@ function buildEnvelope(rows) {
             x,
             y: lower,
             fill: 'tonexty',
-            fillcolor: 'rgba(148, 163, 184, 0.16)',
-            line: { color: 'rgba(100, 116, 139, 0)', width: 0 },
+            fillcolor: alpha(TAIL_META[tailSide].color, 0.1),
+            line: {
+                color: alpha(TAIL_META[tailSide].color, 0.28),
+                width: 1,
+                dash: 'dot',
+            },
             hoverinfo: 'skip',
             showlegend: false,
         });
@@ -667,7 +675,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     tailSide: row.tailSide,
                     x: [],
                     y: [],
-                    text: [],
+                    hovertext: [],
                     customdata: [],
                     sizes: [],
                     colors: [],
@@ -682,7 +690,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             const pointColor = useTailColors ? TAIL_META[row.tailSide].color : traitColor;
             group.x.push(row.expected);
             group.y.push(row.observed);
-            group.text.push(buildHoverText(row));
+            group.hovertext.push(buildHoverText(row));
             group.customdata.push([row.rowKey]);
             group.sizes.push(pointSize + deviationScale);
             group.colors.push(mixColors(BASE_POINT_COLOR, pointColor, 0.86 + (intensity * 0.1), 0.92 + (intensity * 0.06)));
@@ -700,9 +708,9 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 name: `${group.traitName} · ${TAIL_META[group.tailSide].label}`,
                 x: group.x,
                 y: group.y,
-                text: group.text,
+                hovertext: group.hovertext,
                 customdata: group.customdata,
-                hovertemplate: '%{text}<extra></extra>',
+                hovertemplate: '%{hovertext}<extra></extra>',
                 hoverlabel: buildPlotHoverTone(theme, traceColor, {
                     bgAlpha: 0.16,
                     borderAlpha: 0.36,
@@ -1154,7 +1162,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     <FormControlLabel control={<Checkbox checked={showExpectedLine} onChange={(event) => setShowExpectedLine(event.target.checked)} size="small" />} label="Expected line" />
                     <FormControlLabel control={<Checkbox checked={showFdrLine} onChange={(event) => setShowFdrLine(event.target.checked)} size="small" />} label="FDR guide" />
                     <FormControlLabel control={<Checkbox checked={showNominalLine} onChange={(event) => setShowNominalLine(event.target.checked)} size="small" />} label="P=0.05" />
-                    <FormControlLabel control={<Checkbox checked={showEnvelope} onChange={(event) => setShowEnvelope(event.target.checked)} size="small" />} label="Envelope" />
+                    <FormControlLabel control={<Checkbox checked={showEnvelope} onChange={(event) => setShowEnvelope(event.target.checked)} size="small" />} label="95% envelope" />
                     <FormControlLabel control={<Checkbox checked={showTopLabels} onChange={(event) => setShowTopLabels(event.target.checked)} size="small" />} label="Top labels" />
                     <FormControlLabel control={<Checkbox checked={showTraitStamp} onChange={(event) => setShowTraitStamp(event.target.checked)} size="small" />} label="Trait stamp" />
                 </Stack>

@@ -1,45 +1,49 @@
 <svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
+  <defs>
+    <marker id="workflow-arrowhead" markerWidth="18" markerHeight="18" refX="13" refY="9" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1 L17 9 L1 17 L6 9 Z" fill="#5B8DEF"/>
+    </marker>
+  </defs>
+
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#2563EB" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Analysis workflow</text>
-  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">Search, inspect figures, connect programs, then export results</text>
+  <text x="62" y="82" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Analysis workflow</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">GWAS to traits, LoF to GeneBayes, Perturb-seq to limma/cNMF, then association and web display</text>
 
-  <path d="M116 224 C152 180 206 160 266 174 C316 188 342 258 384 276 C424 292 474 176 516 158 C552 144 588 174 620 192" stroke="#CBD5E1" stroke-width="15" stroke-linecap="round"/>
-  <path d="M116 224 C152 180 206 160 266 174 C316 188 342 258 384 276 C424 292 474 176 516 158 C552 144 588 174 620 192" stroke="#5B8DEF" stroke-opacity="0.9" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="612,178 638,193 612,209" fill="#5B8DEF"/>
+  <path d="M104 224 C142 214 186 178 232 172 C282 166 318 272 360 272 C406 272 438 176 486 160 C530 146 580 164 608 184 C626 196 640 200 654 202" stroke="#CBD5E1" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M104 224 C142 214 186 178 232 172 C282 166 318 272 360 272 C406 272 438 176 486 160 C530 146 580 164 608 184 C626 196 640 200 654 202" stroke="#5B8DEF" stroke-opacity="0.92" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#workflow-arrowhead)"/>
 
-  <circle cx="116" cy="224" r="32" fill="#2563EB" fill-opacity="0.12" stroke="#93C5FD" stroke-width="3"/>
-  <circle cx="116" cy="224" r="12" fill="#2563EB"/>
-  <text x="116" y="229" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">1</text>
-  <rect x="76" y="286" width="116" height="54" rx="15" fill="#F8FAFC" stroke="#BFDBFE" stroke-width="2"/>
-  <text x="134" y="310" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">Search trait</text>
-  <text x="134" y="329" text-anchor="middle" fill="#2563EB" font-family="Arial, Helvetica, sans-serif" font-size="10">GWAS / LoF ID</text>
+  <circle cx="104" cy="224" r="31" fill="#2563EB" fill-opacity="0.12" stroke="#93C5FD" stroke-width="3"/>
+  <circle cx="104" cy="224" r="12" fill="#2563EB"/>
+  <text x="104" y="229" text-anchor="middle" fill="white" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">1</text>
+  <rect x="58" y="286" width="118" height="54" rx="15" fill="#F8FAFC" stroke="#BFDBFE" stroke-width="2"/>
+  <text x="117" y="310" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700">Find trait</text>
+  <text x="117" y="329" text-anchor="middle" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">from GWAS</text>
 
-  <circle cx="266" cy="174" r="32" fill="#EA580C" fill-opacity="0.12" stroke="#FDBA74" stroke-width="3"/>
-  <circle cx="266" cy="174" r="12" fill="#B45309"/>
-  <text x="266" y="179" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">2</text>
-  <rect x="204" y="228" width="124" height="58" rx="15" fill="#FFF7ED" stroke="#FED7AA" stroke-width="2"/>
-  <text x="266" y="252" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Load evidence</text>
-  <text x="266" y="271" text-anchor="middle" fill="#B45309" font-family="Arial, Helvetica, sans-serif" font-size="10">GWAS + GeneBayes</text>
+  <circle cx="232" cy="172" r="31" fill="#EA580C" fill-opacity="0.12" stroke="#FDBA74" stroke-width="3"/>
+  <circle cx="232" cy="172" r="12" fill="#B45309"/>
+  <text x="232" y="177" text-anchor="middle" fill="white" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">2</text>
+  <rect x="170" y="228" width="124" height="58" rx="15" fill="#FFF7ED" stroke="#FED7AA" stroke-width="2"/>
+  <text x="232" y="252" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">LoF analysis</text>
+  <text x="232" y="271" text-anchor="middle" fill="#B45309" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">Run GeneBayes</text>
 
-  <circle cx="384" cy="276" r="32" fill="#7C3AED" fill-opacity="0.12" stroke="#DDD6FE" stroke-width="3"/>
-  <circle cx="384" cy="276" r="12" fill="#7C3AED"/>
-  <text x="384" y="281" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">3</text>
-  <rect x="322" y="318" width="124" height="58" rx="15" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="2"/>
-  <text x="384" y="342" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Draw figures</text>
-  <text x="384" y="361" text-anchor="middle" fill="#6D28D9" font-family="Arial, Helvetica, sans-serif" font-size="10">Manhattan / volcano / QQ</text>
+  <circle cx="360" cy="272" r="31" fill="#7C3AED" fill-opacity="0.12" stroke="#DDD6FE" stroke-width="3"/>
+  <circle cx="360" cy="272" r="12" fill="#7C3AED"/>
+  <text x="360" y="277" text-anchor="middle" fill="white" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">3</text>
+  <rect x="298" y="318" width="124" height="58" rx="15" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="2"/>
+  <text x="360" y="342" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Perturb-seq</text>
+  <text x="360" y="361" text-anchor="middle" fill="#6D28D9" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">limma + cNMF</text>
 
-  <circle cx="516" cy="158" r="32" fill="#0F766E" fill-opacity="0.12" stroke="#99F6E4" stroke-width="3"/>
-  <circle cx="516" cy="158" r="12" fill="#0F766E"/>
-  <text x="516" y="163" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">4</text>
-  <rect x="454" y="218" width="124" height="58" rx="15" fill="#F0FDFA" stroke="#CCFBF1" stroke-width="2"/>
-  <text x="516" y="242" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Program view</text>
-  <text x="516" y="261" text-anchor="middle" fill="#0F766E" font-family="Arial, Helvetica, sans-serif" font-size="10">scatter + graph</text>
+  <circle cx="486" cy="160" r="31" fill="#0F766E" fill-opacity="0.12" stroke="#99F6E4" stroke-width="3"/>
+  <circle cx="486" cy="160" r="12" fill="#0F766E"/>
+  <text x="486" y="165" text-anchor="middle" fill="white" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">4</text>
+  <rect x="424" y="218" width="124" height="58" rx="15" fill="#F0FDFA" stroke="#CCFBF1" stroke-width="2"/>
+  <text x="486" y="242" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Association</text>
+  <text x="486" y="261" text-anchor="middle" fill="#0F766E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">LoF + Perturb-seq</text>
 
-  <circle cx="620" cy="192" r="32" fill="#475569" fill-opacity="0.12" stroke="#CBD5E1" stroke-width="3"/>
-  <circle cx="620" cy="192" r="12" fill="#334155"/>
-  <text x="620" y="197" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">5</text>
-  <rect x="558" y="286" width="124" height="58" rx="15" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
-  <text x="620" y="310" text-anchor="middle" fill="#0F172A" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Export results</text>
-  <text x="620" y="329" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="10">TSV + figures</text>
+  <circle cx="608" cy="184" r="31" fill="#475569" fill-opacity="0.12" stroke="#CBD5E1" stroke-width="3"/>
+  <circle cx="608" cy="184" r="12" fill="#334155"/>
+  <text x="608" y="189" text-anchor="middle" fill="white" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">5</text>
+  <rect x="546" y="286" width="124" height="58" rx="15" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="608" y="310" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Web display</text>
+  <text x="608" y="329" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">plots + browser</text>
 </svg>

@@ -1,11 +1,11 @@
-<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+﻿<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#0F766E" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Trait-program graph</text>
-  <text x="62" y="108" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="14">Programs converge into one trait</text>
+  <text x="62" y="82" fill="#0F766E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Trait-program graph</text>
+  <text x="62" y="108" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14">Programs converge into one trait</text>
 
   <rect x="300" y="166" width="120" height="86" rx="18" fill="#7B8798"/>
-  <text x="360" y="214" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Trait</text>
+  <text x="360" y="214" text-anchor="middle" fill="white" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Trait</text>
 
   <rect x="86" y="132" width="132" height="54" rx="16" fill="#FDE7CC" stroke="#F2994A" stroke-width="2"/>
   <rect x="86" y="236" width="132" height="54" rx="16" fill="#D8E7F8" stroke="#4F8CC9" stroke-width="2"/>
@@ -13,11 +13,11 @@
   <rect x="502" y="198" width="132" height="50" rx="16" fill="#FDE7CC" stroke="#F2994A" stroke-width="2"/>
   <rect x="502" y="272" width="132" height="50" rx="16" fill="#D8E7F8" stroke="#4F8CC9" stroke-width="2"/>
 
-  <text x="152" y="164" text-anchor="middle" fill="#8A5416" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program A</text>
-  <text x="152" y="268" text-anchor="middle" fill="#1D4E89" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program B</text>
-  <text x="568" y="154" text-anchor="middle" fill="#166534" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program C</text>
-  <text x="568" y="228" text-anchor="middle" fill="#8A5416" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program D</text>
-  <text x="568" y="302" text-anchor="middle" fill="#1D4E89" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program E</text>
+  <text x="152" y="164" text-anchor="middle" fill="#8A5416" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program A</text>
+  <text x="152" y="268" text-anchor="middle" fill="#1D4E89" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program B</text>
+  <text x="568" y="154" text-anchor="middle" fill="#166534" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program C</text>
+  <text x="568" y="228" text-anchor="middle" fill="#8A5416" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program D</text>
+  <text x="568" y="302" text-anchor="middle" fill="#1D4E89" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Program E</text>
 
   <path d="M218 159C248 159 270 176 300 194" stroke="#EF4E2F" stroke-width="5" stroke-linecap="round"/>
   <path d="M218 263C250 263 272 246 300 224" stroke="#347DCC" stroke-width="5" stroke-linecap="round"/>
@@ -31,3 +31,5 @@
   <polygon points="424,204 416,210 424,216" fill="#F2994A"/>
   <polygon points="424,220 416,226 424,232" fill="#4F8CC9"/>
 </svg>
+
+

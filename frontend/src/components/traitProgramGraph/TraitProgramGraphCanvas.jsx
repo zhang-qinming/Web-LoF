@@ -978,7 +978,7 @@ export default function TraitProgramGraphCanvas({
                 >
                     <defs>
                         <style>
-                            {'.trait-program-template text{font-family:Arial, Helvetica, sans-serif;letter-spacing:0}.trait-program-template .section-title{font-size:26px;font-weight:900;fill:#111}.trait-program-template .section-note{font-size:21px;font-weight:900;fill:#111}'}
+                            {'.trait-program-template text{font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;letter-spacing:0}.trait-program-template .section-title{font-size:26px;font-weight:900;fill:#111}.trait-program-template .section-note{font-size:21px;font-weight:900;fill:#111}'}
                         </style>
                     </defs>
 

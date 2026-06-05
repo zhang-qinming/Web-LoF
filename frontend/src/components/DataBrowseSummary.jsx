@@ -45,7 +45,6 @@ export default function DataBrowseSummary({
                 <Typography
                     title={currentLabel}
                     sx={{
-                        fontFamily: 'monospace',
                         fontSize: '0.78rem',
                         color: theme.palette.text.secondary,
                         overflowWrap: 'anywhere',
@@ -123,7 +122,7 @@ export default function DataBrowseSummary({
                                 }}
                             >
                                 <InsertDriveFile sx={{ fontSize: 16, color: theme.palette.primary.main, flexShrink: 0 }} />
-                                <Typography noWrap title={path} sx={{ fontFamily: 'monospace', fontSize: '0.76rem', color: theme.palette.text.primary }}>
+                                <Typography noWrap title={path} sx={{ fontSize: '0.76rem', color: theme.palette.text.primary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                     {path}
                                 </Typography>
                             </Box>

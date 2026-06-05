@@ -37,7 +37,6 @@ import {
     stickyTableSx,
     tableRowRevealSx,
     tableSkeletonCellSx,
-    toolbarSx,
 } from '../themeUtils';
 
 function PaginationControl({ totalPages, page, onChange }) {
@@ -166,7 +165,7 @@ function headerLayoutSx(column = {}) {
     };
 }
 
-const GWAS_TABLE_TITLE_HEADER_HEIGHT = 54;
+const GWAS_TABLE_TITLE_HEADER_HEIGHT = 76;
 const GWAS_TABLE_MAX_VISIBLE_ROWS = 20;
 const GWAS_TABLE_ROW_HEIGHT = 48;
 const GWAS_TABLE_COLUMN_HEADER_HEIGHT = 46;
@@ -229,7 +228,8 @@ function MetricValue({ value, tone, theme }) {
                 border: `1px solid ${colors.borderColor}`,
                 bgcolor: colors.backgroundColor,
                 color: colors.color,
-                fontFamily: 'monospace',
+                fontVariantNumeric: 'tabular-nums',
+                fontFeatureSettings: '"tnum" 1',
                 fontSize: '0.76rem',
                 fontWeight: 750,
                 lineHeight: 1.25,
@@ -411,69 +411,6 @@ export default function GwasDataList({
     return (
         <Box ref={rootRef} sx={{ position: 'relative' }}>
             <Card elevation={0} sx={{ ...panelSx(theme, { borderRadius: 3 }), overflow: 'hidden' }}>
-                <Box
-                    sx={toolbarSx(theme, {
-                        px: { xs: 1.5, md: 2 },
-                        py: 1.2,
-                        borderRadius: 0,
-                        border: 0,
-                        borderBottom: `1px solid ${theme.custom.border.soft}`,
-                        background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.custom.surface.subtle})`,
-                    })}
-                >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            Rows
-                        </Typography>
-                        <FormControl size="small" sx={{ minWidth: 70 }}>
-                            <Select value={limit} onChange={handleChangeLimit} sx={{ fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.6 } }}>
-                                {[20, 50, 100, 200].map((v) => (
-                                    <MenuItem key={v} value={v} dense>{v}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    </Box>
-
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                        {resultLabel}
-                    </Typography>
-
-                    {!traitName && (
-                        <TextField
-                            size="small"
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search trait, LoF ID, MeSH term, population"
-                            sx={{
-                                width: { xs: '100%', sm: 280, md: 330 },
-                                ml: { xs: 0, md: 1 },
-                                '& .MuiOutlinedInput-root': {
-                                    bgcolor: theme.palette.background.paper,
-                                },
-                            }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
-                                    </InputAdornment>
-                                ),
-                                endAdornment: search ? (
-                                    <InputAdornment position="end">
-                                        <IconButton
-                                            size="small"
-                                            aria-label="Clear trait search"
-                                            onClick={() => setSearch('')}
-                                            edge="end"
-                                        >
-                                            <Clear fontSize="small" />
-                                        </IconButton>
-                                    </InputAdornment>
-                                ) : null,
-                            }}
-                        />
-                    )}
-                </Box>
-
                 <CardContent sx={{ p: 0 }}>
                     <Box sx={{ position: 'relative' }}>
                         <TableContainer
@@ -525,20 +462,108 @@ export default function GwasDataList({
                                                     textOverflow: 'clip',
                                                 })}
                                             >
-                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                                                <Box
+                                                    sx={{
+                                                        display: 'grid',
+                                                        gridTemplateColumns: 'minmax(260px, 1fr) auto',
+                                                        alignItems: 'center',
+                                                        gap: 1,
+                                                    }}
+                                                >
                                                     <Box sx={{ minWidth: 0 }}>
                                                         <Typography sx={sectionTitleSx(theme, { fontSize: '0.92rem', lineHeight: 1.2 })}>
                                                             {title}
                                                         </Typography>
                                                         {subtitle && (
-                                                            <Typography sx={captionSx(theme, { mt: 0.2, fontSize: '0.7rem', lineHeight: 1.35 })}>
+                                                            <Typography sx={captionSx(theme, { mt: 0.2, fontSize: '0.7rem', lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })}>
                                                                 {subtitle}
                                                             </Typography>
                                                         )}
                                                     </Box>
-                                                    <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, fontWeight: 700 }}>
-                                                        {resultLabel}
-                                                    </Typography>
+                                                    <Box
+                                                        sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'flex-end',
+                                                            gap: 0.85,
+                                                            flexWrap: 'nowrap',
+                                                            minWidth: 0,
+                                                        }}
+                                                    >
+                                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.7, flexShrink: 0 }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
+                                                                Rows
+                                                            </Typography>
+                                                            <FormControl size="small" sx={{ minWidth: 70 }}>
+                                                                <Select
+                                                                    value={limit}
+                                                                    onChange={handleChangeLimit}
+                                                                    sx={{
+                                                                        bgcolor: theme.palette.background.paper,
+                                                                        fontSize: '0.78rem',
+                                                                        fontWeight: 750,
+                                                                        '& .MuiSelect-select': { py: 0.48 },
+                                                                    }}
+                                                                >
+                                                                    {[20, 50, 100, 200].map((v) => (
+                                                                        <MenuItem key={v} value={v} dense>{v}</MenuItem>
+                                                                    ))}
+                                                                </Select>
+                                                            </FormControl>
+                                                        </Box>
+                                                        <Typography
+                                                            sx={{
+                                                                px: 0.85,
+                                                                py: 0.35,
+                                                                borderRadius: 1,
+                                                                border: `1px solid ${theme.custom.border.soft}`,
+                                                                bgcolor: alpha(theme.palette.primary.main, 0.045),
+                                                                color: theme.palette.text.secondary,
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 800,
+                                                                whiteSpace: 'nowrap',
+                                                            }}
+                                                        >
+                                                            {resultLabel}
+                                                        </Typography>
+                                                        {!traitName && (
+                                                            <TextField
+                                                                size="small"
+                                                                value={search}
+                                                                onChange={(event) => setSearch(event.target.value)}
+                                                                placeholder="Search trait, LoF ID, MeSH term, population"
+                                                                sx={{
+                                                                    width: { xs: 300, md: 330 },
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        bgcolor: theme.palette.background.paper,
+                                                                    },
+                                                                    '& .MuiInputBase-input': {
+                                                                        py: 0.68,
+                                                                        fontSize: '0.78rem',
+                                                                    },
+                                                                }}
+                                                                InputProps={{
+                                                                    startAdornment: (
+                                                                        <InputAdornment position="start">
+                                                                            <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
+                                                                        </InputAdornment>
+                                                                    ),
+                                                                    endAdornment: search ? (
+                                                                        <InputAdornment position="end">
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                aria-label="Clear trait search"
+                                                                                onClick={() => setSearch('')}
+                                                                                edge="end"
+                                                                            >
+                                                                                <Clear fontSize="small" />
+                                                                            </IconButton>
+                                                                        </InputAdornment>
+                                                                    ) : null,
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </Box>
                                                 </Box>
                                             </TableCell>
                                         </TableRow>

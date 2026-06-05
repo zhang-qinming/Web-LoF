@@ -29,8 +29,6 @@ import {
     captionSx,
     compactToggleGroupSx,
     groupedTableColumnHeaderCellSx,
-    groupedTableHeaderMetrics,
-    groupedTableHeaderCellSx,
     metricChipTone,
     panelSx,
     sectionTitleSx,
@@ -55,19 +53,13 @@ function colorTone(theme, color) {
 
 const PROGRAM_TRAIT_COLUMNS = [
     { key: 'traitName', label: 'Trait', align: 'left', tone: 'trait', width: 310 },
-    { key: 'selection', label: 'Selection', align: 'left', tone: 'selection', width: 185 },
+    { key: 'selection', label: 'Selection', align: 'center', tone: 'selection', width: 185 },
     { key: 'programScore', label: 'Program Score', align: 'right', tone: 'score', width: 132 },
     { key: 'regulatorScore', label: 'Regulator Score', align: 'right', tone: 'score', width: 142 },
     { key: 'totalGenes', label: 'Genes', align: 'right', tone: 'genes', width: 150 },
     { key: 'topGenes', label: 'Top Genes', align: 'left', tone: 'genes', width: 390 },
 ];
 
-const PROGRAM_TRAIT_GROUPS = [
-    { label: 'Trait', span: 1, tone: 'trait' },
-    { label: 'Selection', span: 1, tone: 'selection' },
-    { label: 'Scores', span: 2, tone: 'score' },
-    { label: 'Gene Evidence', span: 2, tone: 'genes' },
-];
 const PROGRAM_TRAIT_TITLE_HEADER_HEIGHT = 56;
 
 const programTraitSortLabelSx = {
@@ -155,6 +147,8 @@ function buildProgramTraitCsv(rows) {
 }
 
 function programTraitCellSx(theme, tone, align = 'left', overrides = {}) {
+    const useDataFont = overrides.fontFamily === 'monospace';
+    const { fontFamily, ...restOverrides } = overrides;
     return {
         py: 0.72,
         px: 1,
@@ -167,7 +161,10 @@ function programTraitCellSx(theme, tone, align = 'left', overrides = {}) {
         verticalAlign: 'middle',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        ...overrides,
+        fontFamily: useDataFont ? 'inherit' : fontFamily,
+        fontVariantNumeric: useDataFont ? 'tabular-nums' : undefined,
+        fontFeatureSettings: useDataFont ? '"tnum" 1' : undefined,
+        ...restOverrides,
     };
 }
 
@@ -186,19 +183,18 @@ function programTraitTitleCellSx(theme) {
     };
 }
 
-function programTraitGroupHeaderSx(theme, tone) {
-    return groupedTableHeaderCellSx(theme, tone, {
+function programTraitColumnHeaderSx(theme, tone, align) {
+    return groupedTableColumnHeaderCellSx(theme, tone, align, {
         top: PROGRAM_TRAIT_TITLE_HEADER_HEIGHT,
     });
 }
 
-function programTraitColumnHeaderSx(theme, tone, align) {
-    return groupedTableColumnHeaderCellSx(theme, tone, align, {
-        top: PROGRAM_TRAIT_TITLE_HEADER_HEIGHT + groupedTableHeaderMetrics.groupHeight,
-    });
-}
-
-export default function ProgramAssociatedTraits({ programId, showAll = false, noInternalScroll = false }) {
+export default function ProgramAssociatedTraits({
+    programId,
+    showAll = false,
+    noInternalScroll = false,
+    maxHeight = 520,
+}) {
     const theme = useTheme();
     const tones = {
         trait: tableTone(theme, 'neutral'),
@@ -207,7 +203,7 @@ export default function ProgramAssociatedTraits({ programId, showAll = false, no
         genes: tableTone(theme, 'success'),
     };
     const [page, setPage] = React.useState(0);
-    const [rowsPerPage, setRowsPerPage] = React.useState(50);
+    const [rowsPerPage, setRowsPerPage] = React.useState(20);
     const [filter, setFilter] = React.useState('all');
     const [sortBy, setSortBy] = React.useState('programScore');
     const [sortDir, setSortDir] = React.useState('desc');
@@ -284,7 +280,7 @@ export default function ProgramAssociatedTraits({ programId, showAll = false, no
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
             <TableContainer sx={stickyTableContainerSx(theme, noInternalScroll
                 ? { overflowX: 'auto', overflowY: 'visible' }
-                : { maxHeight: 520, overflowX: 'auto', overflowY: 'auto' })}
+                : { maxHeight, overflowX: 'auto', overflowY: 'auto' })}
             >
                 <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1309 })}>
                     <colgroup>
@@ -331,17 +327,6 @@ export default function ProgramAssociatedTraits({ programId, showAll = false, no
                                     </Stack>
                                 </Stack>
                             </TableCell>
-                        </TableRow>
-                        <TableRow>
-                            {PROGRAM_TRAIT_GROUPS.map((group) => (
-                                <TableCell
-                                    key={group.label}
-                                    colSpan={group.span}
-                                    sx={programTraitGroupHeaderSx(theme, tones[group.tone])}
-                                >
-                                    {group.label}
-                                </TableCell>
-                            ))}
                         </TableRow>
                         <TableRow>
                             {PROGRAM_TRAIT_COLUMNS.map((column) => (
@@ -393,13 +378,13 @@ export default function ProgramAssociatedTraits({ programId, showAll = false, no
                                     >
                                         {row.traitName || row.traitId}
                                     </Button>
-                                    <Typography sx={{ mt: 0.25, fontSize: '0.66rem', color: theme.palette.text.secondary, fontFamily: 'monospace' }} noWrap>
+                                    <Typography sx={{ mt: 0.25, fontSize: '0.66rem', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }} noWrap>
                                         {row.traitId}
                                     </Typography>
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.selection)}>
-                                    <Stack spacing={0.35} alignItems="flex-start">
-                                        <Stack direction="row" spacing={0.45} sx={{ flexWrap: 'wrap' }}>
+                                <TableCell sx={programTraitCellSx(theme, tones.selection, 'center')}>
+                                    <Stack spacing={0.35} alignItems="center">
+                                        <Stack direction="row" spacing={0.45} justifyContent="center" sx={{ flexWrap: 'wrap' }}>
                                             {row.selectedByProgram && <Chip label="program" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'primary')), height: 20, fontSize: '0.62rem' }} />}
                                             {row.selectedByRegulator && <Chip label="regulator" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'accent')), height: 20, fontSize: '0.62rem' }} />}
                                             {!row.selectedByProgram && !row.selectedByRegulator && <Chip label="other" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'subtle')), height: 20, fontSize: '0.62rem' }} />}
@@ -422,7 +407,7 @@ export default function ProgramAssociatedTraits({ programId, showAll = false, no
                                     {formatScore(row.regulatorScore)}
                                 </TableCell>
                                 <TableCell sx={programTraitCellSx(theme, tones.genes, 'right', { bgcolor: tones.genes.cellStrong })}>
-                                    <Typography sx={{ fontSize: '0.74rem', fontWeight: 800, fontFamily: 'monospace' }}>
+                                    <Typography sx={{ fontSize: '0.74rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                         {Number(row.totalGenes || 0).toLocaleString()} visible
                                     </Typography>
                                     <Typography sx={{ fontSize: '0.62rem', color: theme.palette.text.secondary }}>
@@ -482,7 +467,7 @@ export default function ProgramAssociatedTraits({ programId, showAll = false, no
                     page={currentPage}
                     onPageChange={(event, nextPage) => setPage(nextPage)}
                     rowsPerPage={rowsPerPage}
-                    rowsPerPageOptions={[25, 50, 100, 250]}
+                    rowsPerPageOptions={[20, 50, 100, 250]}
                     onRowsPerPageChange={(event) => {
                         setRowsPerPage(Number(event.target.value));
                         setPage(0);

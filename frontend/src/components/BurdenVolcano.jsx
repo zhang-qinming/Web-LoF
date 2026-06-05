@@ -492,10 +492,10 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         title: {
             text: `${traitLabel || fileId} - ${title}`,
             x: 0.01,
-            font: { size: 18, family: 'system-ui, -apple-system, sans-serif', color: theme.palette.text.primary },
+            font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
         },
         xaxis: {
-            title: { text: effectAxisLabel, font: { size: 14, color: chartTokens.axisColor, family: 'system-ui, -apple-system, sans-serif' } },
+            title: { text: effectAxisLabel, font: { size: 14, color: chartTokens.axisColor, family: theme.typography.fontFamily } },
             zeroline: true,
             zerolinewidth: 1.2,
             zerolinecolor: chartTokens.axisSoft,
@@ -510,7 +510,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             range: xAxisRange,
         },
         yaxis: {
-            title: { text: '-log<sub>10</sub>(P)', font: { size: 14, color: chartTokens.axisColor, family: 'system-ui, -apple-system, sans-serif' } },
+            title: { text: '-log<sub>10</sub>(P)', font: { size: 14, color: chartTokens.axisColor, family: theme.typography.fontFamily } },
             zeroline: false,
             showgrid: true,
             gridwidth: 0.5,
@@ -552,7 +552,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 yanchor: 'bottom',
                 showarrow: false,
                 text: '<b>FDR/P guide</b>',
-                font: { size: 11, color: chartTokens.threshold, family: 'system-ui, -apple-system, sans-serif' },
+                font: { size: 11, color: chartTokens.threshold, family: theme.typography.fontFamily },
             },
         ],
     }), [chartTokens, effectAxisLabel, fileId, theme, title, traitLabel, volcanoType, xAxisRange]);
@@ -903,7 +903,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             />
 
             <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary, fontFamily: 'Inter, system-ui, sans-serif' }}>Export Plot</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary, fontFamily: theme.typography.fontFamily }}>Export Plot</DialogTitle>
                 <DialogContent sx={{ pt: 1 }}>
                     <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
                         <TextField label="Width" type="number" size="small" value={exportWidth} onChange={(event) => setExportWidth(event.target.value)} sx={controlFieldSx(theme)} />

@@ -106,7 +106,8 @@ function Field({ icon: Icon, label, value, mono, href, theme, tone }) {
                 fontSize: '0.86rem',
                 fontWeight: 600,
                 color: theme.palette.text.primary,
-                fontFamily: mono ? '"SF Mono", "Cascadia Code", monospace' : undefined,
+                fontVariantNumeric: mono ? 'tabular-nums' : undefined,
+                fontFeatureSettings: mono ? '"tnum" 1' : undefined,
                 overflowWrap: 'anywhere',
             }}
         >
@@ -333,7 +334,8 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                                 fontSize: '0.76rem',
                                 fontWeight: 700,
                                 color: '#245089',
-                                fontFamily: '"SF Mono", "Cascadia Code", monospace',
+                                fontVariantNumeric: 'tabular-nums',
+                                fontFeatureSettings: '"tnum" 1',
                             },
                         }}
                     />

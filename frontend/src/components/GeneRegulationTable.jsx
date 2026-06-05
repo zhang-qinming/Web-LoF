@@ -192,7 +192,8 @@ export default function GeneRegulationTable({
                                                 key={column.key}
                                                 sx={{
                                                     fontSize: '0.78rem',
-                                                    fontFamily: 'monospace',
+                                                    fontVariantNumeric: 'tabular-nums',
+                                                    fontFeatureSettings: '"tnum" 1',
                                                     fontWeight: column.key === 'gene' ? 600 : 400,
                                                     py: 0.58,
                                                     px: 1.5,

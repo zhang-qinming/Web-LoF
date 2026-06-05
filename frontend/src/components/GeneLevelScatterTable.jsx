@@ -69,13 +69,16 @@ function headerCellSx(theme, align, tone) {
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
+    const useDataFont = fontFamily === 'monospace';
     return {
         px: 1,
         py: 0.62,
         textAlign: align,
         whiteSpace,
         fontSize: '0.71rem',
-        fontFamily,
+        fontFamily: useDataFont ? 'inherit' : fontFamily,
+        fontVariantNumeric: useDataFont ? 'tabular-nums' : undefined,
+        fontFeatureSettings: useDataFont ? '"tnum" 1' : undefined,
         fontWeight,
         color: '#334155',
         bgcolor: tone.cellSoft,

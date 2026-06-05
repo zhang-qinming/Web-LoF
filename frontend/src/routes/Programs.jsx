@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
 import {
     Box, Button, ButtonBase, Chip, InputAdornment, Paper, Popover, Skeleton, Stack, Table, TableBody, TableCell, TableContainer,
+    TablePagination,
     TableHead, TableRow, TableSortLabel, TextField, Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -34,19 +35,19 @@ function numSort(a, b) {
 const GO_ACCESSION_PATTERN = /GO[:_]\d+/i;
 
 const PROGRAM_TABLE_COLUMNS = [
-    { key: 'program', label: 'Program', align: 'left', tone: 'identity', width: 100 },
+    { key: 'program', label: 'Program', align: 'center', tone: 'identity', width: 100 },
     { key: 'curated_annotation', label: 'Annotation', align: 'left', tone: 'annotation', width: 360 },
     { key: 'go_term', label: 'GO Term', align: 'left', tone: 'annotation', width: 320 },
-    { key: 'go_accession', label: 'Accession', align: 'left', tone: 'annotation', width: 132 },
-    { key: 'go_ontology', label: 'Ontology', align: 'left', tone: 'annotation', width: 116 },
-    { key: 'go_enrichment_p', label: 'P-value', align: 'right', tone: 'metric', width: 112 },
+    { key: 'go_accession', label: 'Accession', align: 'center', tone: 'metric', width: 140 },
+    { key: 'go_ontology', label: 'Ontology', align: 'center', tone: 'metric', width: 190 },
+    { key: 'go_enrichment_p', label: 'P-value', align: 'right', tone: 'metric', width: 132 },
     { key: 'top10_genes', label: 'Top10 Gene', align: 'left', tone: 'genes', width: 380 },
 ];
 
 const PROGRAM_TABLE_GROUPS = [
     { label: 'Program', span: 1, tone: 'identity' },
-    { label: 'Functional Annotation', span: 4, tone: 'annotation' },
-    { label: 'GO Evidence', span: 1, tone: 'metric' },
+    { label: 'Functional Annotation', span: 2, tone: 'annotation' },
+    { label: 'GO Evidence', span: 3, tone: 'metric' },
     { label: 'Gene Preview', span: 1, tone: 'genes' },
 ];
 const PROGRAM_TABLE_TITLE_HEADER_HEIGHT = 64;
@@ -196,6 +197,8 @@ function formatProgramGeneValue(value) {
 }
 
 function programTableCellSx(theme, tone, align = 'left', overrides = {}) {
+    const useDataFont = overrides.fontFamily === 'monospace';
+    const { fontFamily, ...restOverrides } = overrides;
     return {
         py: 0.72,
         px: 1,
@@ -208,7 +211,10 @@ function programTableCellSx(theme, tone, align = 'left', overrides = {}) {
         verticalAlign: 'middle',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        ...overrides,
+        fontFamily: useDataFont ? 'inherit' : fontFamily,
+        fontVariantNumeric: useDataFont ? 'tabular-nums' : undefined,
+        fontFeatureSettings: useDataFont ? '"tnum" 1' : undefined,
+        ...restOverrides,
     };
 }
 
@@ -247,6 +253,8 @@ function detailTableFooterSx(theme) {
 }
 
 function detailTableCellSx(theme, tone, align = 'left', overrides = {}) {
+    const useDataFont = overrides.fontFamily === 'monospace';
+    const { fontFamily, ...restOverrides } = overrides;
     return {
         py: 0.78,
         px: 1,
@@ -259,7 +267,10 @@ function detailTableCellSx(theme, tone, align = 'left', overrides = {}) {
         verticalAlign: 'middle',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        ...overrides,
+        fontFamily: useDataFont ? 'inherit' : fontFamily,
+        fontVariantNumeric: useDataFont ? 'tabular-nums' : undefined,
+        fontFeatureSettings: useDataFont ? '"tnum" 1' : undefined,
+        ...restOverrides,
     };
 }
 
@@ -326,7 +337,7 @@ function ProgramSummaryChips({ summary }) {
                     >
                         <Stack direction="row" spacing={0.55} alignItems="center">
                             {React.cloneElement(item.icon, { sx: { fontSize: 15, flexShrink: 0 } })}
-                            <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 850, fontFamily: 'monospace' }}>
+                            <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 850, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                 {(Number(item.value) || 0).toLocaleString()}
                             </Typography>
                         </Stack>
@@ -506,7 +517,7 @@ function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
     );
 }
 
-function ProgramInfoTable({ row, loading }) {
+function ProgramInfoTable({ row, loading, loadingCounts = false }) {
     const theme = useTheme();
     const tones = {
         identity: tableTone(theme, 'neutral'),
@@ -567,7 +578,7 @@ function ProgramInfoTable({ row, loading }) {
                                     </Box>
                                     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
                                         <Chip
-                                            label={`${Number(row?.associatedGenes || 0).toLocaleString()} genes`}
+                                            label={row?.associatedGenes == null ? 'genes loading' : `${Number(row.associatedGenes || 0).toLocaleString()} genes`}
                                             size="small"
                                             sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))}
                                         />
@@ -627,10 +638,10 @@ function ProgramInfoTable({ row, loading }) {
                                     {item.goOntology || '-'}
                                 </TableCell>
                                 <TableCell sx={detailTableCellSx(theme, tones.genes, 'right', { fontFamily: 'monospace', fontWeight: 800, bgcolor: tones.genes.cellStrong })}>
-                                    {Number(item.associatedGenes || 0).toLocaleString()}
+                                    {loadingCounts && item.associatedGenes == null ? <Skeleton width={48} sx={{ ml: 'auto' }} /> : Number(item.associatedGenes || 0).toLocaleString()}
                                 </TableCell>
                                 <TableCell sx={detailTableCellSx(theme, tones.metric, 'right', { fontFamily: 'monospace', fontWeight: 800, bgcolor: tones.metric.cellStrong })}>
-                                    {Number(item.associatedTraits || 0).toLocaleString()}
+                                    {loadingCounts && item.associatedTraits == null ? <Skeleton width={48} sx={{ ml: 'auto' }} /> : Number(item.associatedTraits || 0).toLocaleString()}
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -651,7 +662,7 @@ function ProgramInfoTable({ row, loading }) {
     );
 }
 
-function ProgramGenesTable({ programId }) {
+function ProgramGenesTable({ programId, maxHeight = 640 }) {
     const theme = useTheme();
     const tones = {
         identity: tableTone(theme, 'neutral'),
@@ -661,6 +672,8 @@ function ProgramGenesTable({ programId }) {
     };
     const [sortBy, setSortBy] = useState('value');
     const [sortDir, setSortDir] = useState('desc');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(20);
     const { data, error, isLoading } = useSWR(
         programId ? ['program-genes', programId] : null,
         ([, id]) => getProgramGenes(id),
@@ -671,6 +684,14 @@ function ProgramGenesTable({ programId }) {
         const source = data?.genes || [];
         return [...source].sort((a, b) => compareProgramGeneRows(a, b, sortBy, sortDir));
     }, [data?.genes, sortBy, sortDir]);
+    const pageCount = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+    const currentPage = Math.min(page, pageCount - 1);
+    const start = currentPage * rowsPerPage;
+    const visibleRows = rows.slice(start, start + rowsPerPage);
+
+    useEffect(() => {
+        setPage(0);
+    }, [programId, sortBy, sortDir]);
 
     const handleSort = useCallback((key) => {
         if (sortBy === key) {
@@ -713,7 +734,7 @@ function ProgramGenesTable({ programId }) {
 
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
-            <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
+            <TableContainer sx={stickyTableContainerSx(theme, { maxHeight, overflowX: 'auto', overflowY: 'auto' })}>
                 <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1080 })}>
                     <colgroup>
                         {PROGRAM_GENE_COLUMNS.map((column) => (
@@ -729,7 +750,7 @@ function ProgramGenesTable({ programId }) {
                                             Program Genes
                                         </Typography>
                                         <Typography sx={captionSx(theme, { fontSize: '0.7rem', lineHeight: 1.35 })}>
-                                            Genes associated with {programId}, with genomic annotation and direction in the program.
+                                            Showing {rows.length ? (start + 1).toLocaleString() : 0}-{Math.min(start + rowsPerPage, rows.length).toLocaleString()} of {rows.length.toLocaleString()} genes.
                                         </Typography>
                                     </Box>
                                     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
@@ -768,7 +789,7 @@ function ProgramGenesTable({ programId }) {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {isLoading ? skeletonRows : rows.map((item, index) => (
+                        {isLoading ? skeletonRows : visibleRows.map((item, index) => (
                             <TableRow
                                 key={`${item.ensgId || item.geneSymbol}-${index}`}
                                 hover
@@ -810,16 +831,26 @@ function ProgramGenesTable({ programId }) {
                     </TableBody>
                 </Table>
             </TableContainer>
-            <Box sx={detailTableFooterSx(theme)}>
-                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                    {isLoading ? 'Loading program genes' : `Showing all ${rows.length.toLocaleString()} genes`}
-                </Typography>
-                <Chip
-                    label={sortDescription(PROGRAM_GENE_COLUMNS, sortBy, sortDir)}
-                    size="small"
-                    sx={summaryChipSx(theme, { height: 22, color: theme.palette.text.secondary, bgcolor: alpha(theme.palette.text.primary, 0.045) })}
-                />
-            </Box>
+            <TablePagination
+                component="div"
+                count={rows.length}
+                page={currentPage}
+                onPageChange={(event, nextPage) => setPage(nextPage)}
+                rowsPerPage={rowsPerPage}
+                rowsPerPageOptions={[20, 50, 100, 250]}
+                onRowsPerPageChange={(event) => {
+                    setRowsPerPage(Number(event.target.value));
+                    setPage(0);
+                }}
+                sx={{
+                    borderTop: `1px solid ${theme.custom.border.soft}`,
+                    '& .MuiTablePagination-toolbar': { minHeight: 44 },
+                    '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                        fontSize: '0.74rem',
+                        color: theme.palette.text.secondary,
+                    },
+                }}
+            />
         </Paper>
     );
 }
@@ -846,7 +877,7 @@ export default function Programs() {
         : null;
     const programNumber = normalizedProgramId ? normalizedProgramId.replace(/^P/i, '') : '';
     const { data: traitData, error: traitError, isLoading: traitLoading } = useSWR(
-        normalizedProgramId ? ['program-traits-page', normalizedProgramId] : null,
+        normalizedProgramId ? ['program-traits', normalizedProgramId] : null,
         ([, id]) => getProgramTraits(id),
         { keepPreviousData: true, revalidateOnFocus: false },
     );
@@ -894,8 +925,8 @@ export default function Programs() {
         goTerm: selectedProgramInfo?.go_term || selectedProgramInfo?.representative_go || geneData?.program?.representativeGo || '',
         goAccession: selectedProgramInfo?.go_accession || extractGoAccession(selectedProgramInfo?.go_term || selectedProgramInfo?.representative_go || geneData?.program?.representativeGo),
         goOntology: selectedProgramInfo?.go_ontology || '',
-        associatedGenes: geneData?.genes?.length || 0,
-        associatedTraits: traitData?.summary?.totalTraits || 0,
+        associatedGenes: geneData?.genes?.length ?? null,
+        associatedTraits: traitData?.summary?.totalTraits ?? null,
     } : null;
     const programOptions = useMemo(() => {
         const seen = new Set();
@@ -968,13 +999,13 @@ export default function Programs() {
                 <Stack spacing={1.5}>
                     <ProgramInfoTable
                         row={detailInfoRow}
-                        loading={loading || traitLoading || geneLoading}
+                        loading={loading}
+                        loadingCounts={traitLoading || geneLoading}
                     />
-                    <ProgramGenesTable programId={normalizedProgramId} />
+                    <ProgramGenesTable programId={normalizedProgramId} maxHeight={640} />
                     <ProgramAssociatedTraits
                         programId={normalizedProgramId}
-                        showAll
-                        noInternalScroll
+                        maxHeight={640}
                     />
                 </Stack>
             </Box>
@@ -1002,7 +1033,7 @@ export default function Programs() {
                 overflow: 'hidden',
             })}>
                 <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1520 })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1622 })}>
                         <colgroup>
                             {PROGRAM_TABLE_COLUMNS.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />
@@ -1106,7 +1137,7 @@ export default function Programs() {
                                             backgroundColor: alpha(theme.palette.primary.main, 0.035),
                                         },
                                     }}>
-                                    <TableCell sx={programTableCellSx(theme, programTableTones.identity, 'left', { bgcolor: programTableTones.identity.cellStrong })}>
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.identity, 'center', { bgcolor: programTableTones.identity.cellStrong })}>
                                         <Button
                                             component={RouterLink}
                                             to={`/programs/${r.program}`}
@@ -1117,7 +1148,8 @@ export default function Programs() {
                                                 minHeight: 0,
                                                 justifyContent: 'flex-start',
                                                 color: theme.palette.primary.dark,
-                                                fontFamily: 'monospace',
+                                                fontVariantNumeric: 'tabular-nums',
+                                                fontFeatureSettings: '"tnum" 1',
                                                 fontWeight: 800,
                                                 fontSize: '0.76rem',
                                             }}
@@ -1154,10 +1186,10 @@ export default function Programs() {
                                             </Button>
                                         ) : '-'}
                                     </TableCell>
-                                    <TableCell sx={programTableCellSx(theme, programTableTones.annotation, 'left', { fontFamily: 'monospace', fontSize: '0.7rem' })}>
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.metric, 'center', { fontFamily: 'monospace', fontSize: '0.7rem' })}>
                                         {r.go_accession || '-'}
                                     </TableCell>
-                                    <TableCell sx={programTableCellSx(theme, programTableTones.annotation, 'left')}>
+                                    <TableCell sx={programTableCellSx(theme, programTableTones.metric, 'center', { whiteSpace: 'normal', overflowWrap: 'anywhere' })}>
                                         {r.go_ontology || '-'}
                                     </TableCell>
                                     <TableCell sx={programTableCellSx(theme, programTableTones.metric, 'right', { bgcolor: programTableTones.metric.cellStrong, fontFamily: 'monospace', fontWeight: 750 })}>

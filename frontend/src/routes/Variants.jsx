@@ -492,7 +492,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                                     sx={{
                                                         display: 'flex', alignItems: 'center', gap: 0.7, width: '100%',
                                                         border: 'none', bgcolor: 'transparent', cursor: 'pointer',
-                                                        fontFamily: 'monospace', fontSize: '0.79rem', fontWeight: 500,
+                                                        fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', fontSize: '0.79rem', fontWeight: 500,
                                                         color: theme.palette.primary.main, textAlign: 'left', px: 0, py: 0.2,
                                                         transition: `color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
                                                         '&:hover': { color: theme.palette.primary.dark, transform: 'translateX(2px)' },
@@ -510,7 +510,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.7 }}>
                                                     <InsertDriveFile sx={{ fontSize: 15, color: theme.custom.chart.axisSoft, flexShrink: 0 }} />
                                                     <Box component="span" title={f.name}
-                                                        sx={{ minWidth: 0, fontFamily: 'monospace', fontSize: '0.79rem', ...multilineNameSx }}>
+                                                        sx={{ minWidth: 0, fontSize: '0.79rem', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', ...multilineNameSx }}>
                                                         {f.name}
                                                     </Box>
                                                 </Box>
@@ -575,7 +575,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                             <Typography noWrap variant="caption" sx={{ display: 'block', color: theme.palette.text.primary, fontWeight: 700 }}>
                                 {hoveredItem.name}
                             </Typography>
-                            <Typography noWrap variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontFamily: 'monospace' }}>
+                            <Typography noWrap variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                 {hoveredItem.path}
                             </Typography>
                         </Box>
@@ -968,7 +968,8 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                                     border: 'none',
                                                                     bgcolor: 'transparent',
                                                                     cursor: 'pointer',
-                                                                    fontFamily: 'monospace',
+                                                                    fontVariantNumeric: 'tabular-nums',
+                                                                    fontFeatureSettings: '"tnum" 1',
                                                                     fontSize: '0.79rem',
                                                                     fontWeight: 500,
                                                                     color: theme.palette.primary.main,
@@ -988,14 +989,14 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                         ) : (
                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.7 }}>
                                                                 <InsertDriveFile sx={{ fontSize: 15, color: theme.custom.chart.axisSoft, flexShrink: 0 }} />
-                                                                <Box component="span" title={item.name} sx={{ minWidth: 0, fontFamily: 'monospace', fontSize: '0.79rem', ...multilineNameSx }}>
+                                                                <Box component="span" title={item.name} sx={{ minWidth: 0, fontSize: '0.79rem', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', ...multilineNameSx }}>
                                                                     {item.name}
                                                                 </Box>
                                                             </Box>
                                                         )}
                                                     </TableCell>
                                                     <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, width: { xs: 220, sm: 'auto' } }}>
-                                                        <Box title={item.path} sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        <Box title={item.path} sx={{ fontSize: '0.75rem', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                             {item.path}
                                                         </Box>
                                                     </TableCell>
@@ -1065,7 +1066,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                         <Typography noWrap variant="caption" sx={{ display: 'block', color: theme.palette.text.primary, fontWeight: 700 }}>
                                             {hoveredItem.name}
                                         </Typography>
-                                        <Typography noWrap variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontFamily: 'monospace' }}>
+                                        <Typography noWrap variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                             {hoveredItem.path}
                                         </Typography>
                                     </Box>

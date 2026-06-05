@@ -1,8 +1,8 @@
-<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+﻿<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#7A4B35" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Posterior vs regulation</text>
-  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">GeneBayes posterior effect against perturb-seq support</text>
+  <text x="62" y="82" fill="#7A4B35" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Posterior vs regulation</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">GeneBayes posterior effect against perturb-seq support</text>
 
   <rect x="96" y="118" width="528" height="214" rx="6" fill="#FBFEFF" stroke="#E5E7EB"/>
   <g stroke="#E2E8F0" stroke-width="1">
@@ -20,10 +20,10 @@
   <line x1="96" y1="332" x2="624" y2="332" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="96" y1="332" x2="96" y2="118" stroke="#CBD5E1" stroke-width="2"/>
 
-  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">GeneBayes posterior effect</text>
-  <text transform="rotate(-90 73 236)" x="73" y="236" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">Perturb-seq signed signal</text>
-  <text x="550" y="158" fill="#92400E" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">FDR 0.05</text>
-  <text x="544" y="291" fill="#92400E" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">-FDR 0.05</text>
+  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">GeneBayes posterior effect</text>
+  <text transform="rotate(-90 73 236)" x="73" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">Perturb-seq signed signal</text>
+  <text x="550" y="158" fill="#92400E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">FDR 0.05</text>
+  <text x="544" y="291" fill="#92400E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">-FDR 0.05</text>
 
   <g fill="#B6C0CF" fill-opacity="0.72">
     <circle cx="158" cy="218" r="2.4"/><circle cx="174" cy="232" r="2.2"/><circle cx="188" cy="206" r="2.4"/>
@@ -50,7 +50,7 @@
     <circle cx="556" cy="286" r="4.2" fill="#7A8CA8" fill-opacity="0.78"/>
   </g>
 
-  <g font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#475569">
+  <g font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" fill="#475569">
     <circle cx="126" cy="368" r="5" fill="#C55F39"/>
     <text x="140" y="372">concordant</text>
     <rect x="244" y="363" width="9" height="9" rx="1.6" fill="#4F7DA8" transform="rotate(45 248.5 367.5)"/>
@@ -61,3 +61,5 @@
     <text x="514" y="372">background</text>
   </g>
 </svg>
+
+

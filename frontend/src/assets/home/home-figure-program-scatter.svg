@@ -1,8 +1,8 @@
-<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+﻿<svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#0F766E" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Program x Regulator</text>
-  <text x="62" y="106" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="13">Most programs remain below score gates; selected programs are highlighted</text>
+  <text x="62" y="82" fill="#0F766E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Program x Regulator</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">Most programs remain below score gates; selected programs are highlighted</text>
 
   <rect x="96" y="118" width="528" height="214" rx="6" fill="#FBFEFF" stroke="#E5E7EB"/>
   <rect x="248" y="160" width="224" height="112" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.4" stroke-dasharray="6 5"/>
@@ -23,10 +23,10 @@
   <line x1="96" y1="332" x2="624" y2="332" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="96" y1="332" x2="96" y2="118" stroke="#CBD5E1" stroke-width="2"/>
 
-  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">Program burden score</text>
-  <text transform="rotate(-90 73 236)" x="73" y="236" text-anchor="middle" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">Regulator burden score</text>
-  <text x="500" y="308" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="10">|program| high</text>
-  <text x="104" y="144" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="10">|regulator| high</text>
+  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">Program burden score</text>
+  <text transform="rotate(-90 73 236)" x="73" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">Regulator burden score</text>
+  <text x="500" y="308" fill="#94A3B8" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">|program| high</text>
+  <text x="104" y="144" fill="#94A3B8" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">|regulator| high</text>
 
   <g fill="#B8C0CC" fill-opacity="0.78">
     <circle cx="268" cy="204" r="2.8"/><circle cx="284" cy="224" r="2.7"/><circle cx="300" cy="196" r="2.9"/>
@@ -55,7 +55,7 @@
     <circle cx="388" cy="150" r="3.9" fill="#0072B2" fill-opacity="0.84"/>
   </g>
 
-  <g font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#475569">
+  <g font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" fill="#475569">
     <circle cx="126" cy="368" r="5" fill="#009E73"/>
     <text x="140" y="372">both gates</text>
     <circle cx="222" cy="368" r="5" fill="#E69F00"/>
@@ -66,3 +66,5 @@
     <text x="514" y="372">below gate</text>
   </g>
 </svg>
+
+

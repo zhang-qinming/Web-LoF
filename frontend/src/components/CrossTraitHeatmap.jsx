@@ -272,7 +272,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         title: {
             text: `${traitLabel || fileId} - Cross-trait Heatmap`,
             x: 0.01,
-            font: { size: 18, family: 'system-ui, -apple-system, sans-serif', color: theme.palette.text.primary },
+            font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
         },
         margin: { l: 110, r: 60, t: 64, b: 120 },
         paper_bgcolor: chartTokens.paperBg,
@@ -292,7 +292,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             zeroline: false,
         },
         hovermode: 'closest',
-    }), [chartTokens.paperBg, chartTokens.plotBg, fileId, theme.palette.text.primary, theme.palette.text.secondary, traitLabel]);
+    }), [chartTokens.paperBg, chartTokens.plotBg, fileId, theme.palette.text.primary, theme.palette.text.secondary, theme.typography.fontFamily, traitLabel]);
 
     const plotHeight = useMemo(() => {
         const geneRows = matrixPayload?.genes?.length || topGeneCount;

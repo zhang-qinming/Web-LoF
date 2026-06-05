@@ -49,6 +49,8 @@ import homeFigureQqPlot from '../assets/home/home-figure-qq-plot.svg';
 import homeFigureTraitProgramNetwork from '../assets/home/home-figure-trait-program-network.svg';
 import homeFigureBrowserWorkflow from '../assets/home/home-figure-browser-workflow.svg';
 import homeFigureDataBrowser from '../assets/home/home-figure-data-browser.svg';
+import homeFigureProgramVolcano from '../assets/home/home-figure-program-volcano.svg';
+import homeFigureTraitCorrelation from '../assets/home/home-figure-trait-correlation.svg';
 import homeFigureVariantDetail from '../assets/home/home-figure-variant-detail.svg';
 
 const accent = '#ff6b4a';
@@ -122,27 +124,12 @@ const workflowSteps = [
         color: '#0f766e',
     },
     {
-        label: 'Result files',
-        detail: 'Browse and download TSVs.',
-        action: 'Open files',
+        label: 'Download data',
+        detail: 'Browse indexed outputs.',
+        action: 'Open data',
         to: '/data',
         icon: FileDownload,
         color: '#b45309',
-    },
-];
-
-const heroPreviewItems = [
-    {
-        title: 'Program context',
-        description: 'Program x regulator',
-        image: homeFigureProgramScatter,
-        color: '#0f766e',
-    },
-    {
-        title: 'Variant detail',
-        description: 'Locus evidence',
-        image: homeFigureVariantDetail,
-        color: '#2563eb',
     },
 ];
 
@@ -232,11 +219,35 @@ const traitFigureCards = [
         color: '#c2410c',
     },
     {
-        title: 'Result Files',
-        description: 'Data browser',
+        title: 'Program Volcano',
+        description: 'Program-trait effects',
+        image: homeFigureProgramVolcano,
+        to: traitTabPath('program-scatter'),
+        icon: Hub,
+        color: '#7c3aed',
+    },
+    {
+        title: 'Trait Correlation',
+        description: 'Pairwise genetic correlation',
+        image: homeFigureTraitCorrelation,
+        to: traitTabPath('cross-trait-heatmap'),
+        icon: QueryStats,
+        color: '#2563eb',
+    },
+    {
+        title: 'Trait Detail',
+        description: 'Trait metadata and modules',
+        image: homeFigureVariantDetail,
+        to: '/trait',
+        icon: Biotech,
+        color: '#d97706',
+    },
+    {
+        title: 'Data Browser',
+        description: 'File retrieval and export',
         image: homeFigureDataBrowser,
         to: '/data',
-        icon: InsertDriveFile,
+        icon: FileDownload,
         color: '#b45309',
     },
 ];
@@ -338,7 +349,7 @@ function SectionHeading({ eyebrow, title, description, theme, align = 'center' }
                 component="h2"
                 sx={{
                     color: '#111827',
-                    fontFamily: 'Georgia, Cambria, serif',
+                    fontFamily: theme.typography.fontFamily,
                     fontSize: { xs: '1.85rem', md: '2.35rem' },
                     fontWeight: 850,
                     lineHeight: 1.08,
@@ -795,7 +806,7 @@ function HomeSearch({ stats, statsError, statsLoading, theme }) {
                 <Stack spacing={{ xs: 1.5, md: 1.8 }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
                         <Box>
-                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'none', color: theme.palette.secondary.dark }}>
+                            <Typography sx={{ fontSize: '0.84rem', fontWeight: 850, letterSpacing: 0, textTransform: 'none', color: '#111827' }}>
                                 Search files
                             </Typography>
                             <Typography sx={{ mt: 0.45, color: '#4b5563', fontSize: '0.82rem', lineHeight: 1.5 }}>
@@ -807,10 +818,10 @@ function HomeSearch({ stats, statsError, statsLoading, theme }) {
                             variant="text"
                             endIcon={<ArrowForward sx={{ fontSize: 15 }} />}
                             component={RouterLink}
-                            to="/trait"
-                            sx={{ whiteSpace: 'nowrap', px: 0 }}
+                            to="/data"
+                            sx={{ whiteSpace: 'nowrap', px: 0, color: theme.palette.warning.dark }}
                         >
-                            Trait lookup
+                            Data browser
                         </Button>
                     </Stack>
                     <ClickAwayListener onClickAway={() => setOpen(false)}>
@@ -924,7 +935,7 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
             color: '#7c3aed',
         },
         {
-            label: 'Result files',
+            label: 'Data outputs',
             value: stats?.dataOutputs,
             icon: InsertDriveFile,
             color: '#b45309',
@@ -1013,144 +1024,6 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
     );
 }
 
-function HeroVisual({ theme }) {
-    return (
-        <Box
-            sx={{
-                position: 'relative',
-                minWidth: 0,
-                px: { xs: 1, sm: 1.4 },
-                pt: { xs: 1, sm: 1.4 },
-                pb: { xs: 1.2, sm: 1.5 },
-                borderRadius: 1,
-                background: [
-                    'linear-gradient(145deg, rgba(255,255,255,0.92), rgba(240,249,255,0.7))',
-                    'radial-gradient(circle at 14% 10%, rgba(37,99,235,0.14), transparent 32%)',
-                    'radial-gradient(circle at 92% 92%, rgba(255,107,74,0.13), transparent 35%)',
-                ].join(', '),
-                border: `1px solid ${alpha('#2563eb', 0.12)}`,
-                boxShadow: '0 28px 70px rgba(15,23,42,0.12)',
-                overflow: 'hidden',
-                '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundImage: 'linear-gradient(rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.1) 1px, transparent 1px)',
-                    backgroundSize: '34px 34px',
-                    maskImage: 'linear-gradient(135deg, rgba(0,0,0,0.9), transparent 78%)',
-                    pointerEvents: 'none',
-                },
-            }}
-        >
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-                <Box
-                    sx={{
-                        display: 'block',
-                        borderRadius: 1,
-                        overflow: 'hidden',
-                        border: `1px solid ${theme.custom.border.soft}`,
-                        bgcolor: '#fff',
-                        boxShadow: '0 18px 40px rgba(15,23,42,0.08)',
-                    }}
-                >
-                    <Box
-                        component="img"
-                        src={homeFigureGwasManhattan}
-                        alt="Trait Manhattan plot preview"
-                        sx={{
-                            width: '100%',
-                            aspectRatio: '720 / 420',
-                            objectFit: 'cover',
-                            display: 'block',
-                            bgcolor: '#f8fafc',
-                        }}
-                    />
-                    <Box
-                        sx={{
-                            px: { xs: 1.3, sm: 1.6 },
-                            py: { xs: 1.1, sm: 1.25 },
-                            display: 'flex',
-                            alignItems: { xs: 'flex-start', sm: 'center' },
-                            justifyContent: 'space-between',
-                            gap: 1,
-                            flexDirection: { xs: 'column', sm: 'row' },
-                            borderTop: `1px solid ${theme.custom.border.soft}`,
-                        }}
-                    >
-                        <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ color: '#111827', fontSize: { xs: '0.94rem', md: '1rem' }, fontWeight: 850, lineHeight: 1.2 }}>
-                                Featured result preview
-                            </Typography>
-                            <Typography sx={captionSx(theme, { mt: 0.35, fontSize: '0.76rem', lineHeight: 1.35 })}>
-                                {FEATURED_TRAIT.name}
-                            </Typography>
-                        </Box>
-                        <Chip
-                            label={FEATURED_TRAIT.fileId}
-                            size="small"
-                            sx={summaryChipSx(theme, {
-                                flexShrink: 0,
-                                color: '#1d4ed8',
-                                bgcolor: alpha('#2563eb', 0.08),
-                                border: `1px solid ${alpha('#2563eb', 0.18)}`,
-                            })}
-                        />
-                    </Box>
-                </Box>
-
-                <Box
-                    sx={{
-                        mt: 1,
-                        display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-                        gap: 1,
-                    }}
-                >
-                    {heroPreviewItems.map((item) => (
-                        <Box
-                            key={item.title}
-                            sx={{
-                                minWidth: 0,
-                                display: 'grid',
-                                gridTemplateColumns: '96px minmax(0, 1fr)',
-                                gap: 0.9,
-                                alignItems: 'center',
-                                p: 0.8,
-                                borderRadius: 1,
-                                bgcolor: 'rgba(255,255,255,0.86)',
-                                border: `1px solid ${alpha(item.color, 0.14)}`,
-                            }}
-                        >
-                            <Box
-                                component="img"
-                                src={item.image}
-                                alt=""
-                                aria-hidden="true"
-                                sx={{
-                                    width: '100%',
-                                    aspectRatio: '720 / 420',
-                                    objectFit: 'cover',
-                                    display: 'block',
-                                    borderRadius: 1,
-                                    bgcolor: alpha(item.color, 0.04),
-                                }}
-                            />
-                            <Box sx={{ minWidth: 0 }}>
-                                <Typography component="h3" sx={{ color: '#111827', fontSize: '0.84rem', fontWeight: 850, lineHeight: 1.2 }}>
-                                    {item.title}
-                                </Typography>
-                                <Typography sx={captionSx(theme, { mt: 0.25, fontSize: '0.72rem', lineHeight: 1.35 })}>
-                                    {item.description}
-                                </Typography>
-                            </Box>
-                        </Box>
-                    ))}
-                </Box>
-            </Box>
-        </Box>
-    );
-}
-
 function WorkflowSection() {
     const theme = useTheme();
 
@@ -1161,123 +1034,107 @@ function WorkflowSection() {
                 maxWidth: 1180,
                 mx: 'auto',
                 px: { xs: 2, sm: 3, lg: 4 },
-                pb: { xs: 5.6, md: 7.2 },
+                pb: { xs: 5, md: 6.4 },
+                position: 'relative',
+                zIndex: 2,
             }}
         >
             <SectionHeading
-                eyebrow="Research shortcuts"
-                title="Choose the task you need next"
+                eyebrow="Analysis Workflow"
+                title="Search, inspect, compare, download"
+                description="A compact path from a trait query to GWAS signal, gene evidence, program context, and indexed data outputs."
                 theme={theme}
-                align="left"
             />
+
+            {/* workflow SVG illustration */}
+            <Box
+                sx={panelSx(theme, {
+                    overflow: 'hidden',
+                    p: 0,
+                    mb: { xs: 2.5, md: 3.2 },
+                    bgcolor: '#fff',
+                })}
+            >
+                <Box
+                    component="img"
+                    src={homeFigureBrowserWorkflow}
+                    alt="Analysis workflow: search trait, load evidence, draw figures, program view, export results"
+                    loading="lazy"
+                    sx={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block',
+                    }}
+                />
+            </Box>
+
+            {/* step cards */}
             <Box
                 sx={{
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: 'minmax(320px, 0.88fr) minmax(0, 1.12fr)' },
-                    gap: { xs: 2.2, md: 3.4 },
-                    alignItems: 'center',
-                    minWidth: 0,
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' },
+                    gap: { xs: 1.2, md: 1.4 },
                 }}
             >
-                <Box
-                    sx={panelSx(theme, {
-                        p: { xs: 1.2, md: 1.5 },
-                        bgcolor: 'rgba(255,255,255,0.9)',
-                        overflow: 'hidden',
-                    })}
-                >
-                    <Box
-                        component="img"
-                        src={homeFigureBrowserWorkflow}
-                        alt="TraitVista research workflow overview"
-                        loading="lazy"
-                        sx={{
-                            width: '100%',
-                            display: 'block',
-                            aspectRatio: '720 / 420',
-                            objectFit: 'cover',
-                            borderRadius: 1,
-                            bgcolor: '#f8fafc',
-                        }}
-                    />
-                </Box>
+                {workflowSteps.map((step) => {
+                    const Icon = step.icon;
 
-                <Box
-                    sx={{
-                        minWidth: 0,
-                        display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-                        gap: { xs: 1.3, md: 1.5 },
-                    }}
-                >
-                    {workflowSteps.map((step, index) => {
-                        const Icon = step.icon;
-
-                        return (
+                    return (
+                        <Box
+                            key={step.label}
+                            component={RouterLink}
+                            to={step.to}
+                            aria-label={step.action}
+                            sx={panelSx(theme, {
+                                minHeight: { xs: 78, md: 84 },
+                                display: 'grid',
+                                gridTemplateColumns: '30px minmax(0, 1fr)',
+                                gap: 0.85,
+                                alignItems: 'start',
+                                p: { xs: 1, md: 1.2 },
+                                bgcolor: '#fff',
+                                color: 'inherit',
+                                textDecoration: 'none',
+                                border: `1px solid ${alpha(step.color, 0.14)}`,
+                                transition: 'transform 170ms ease, box-shadow 170ms ease, border-color 170ms ease',
+                                '&:hover': {
+                                    transform: 'translateY(-2px)',
+                                    borderColor: alpha(step.color, 0.3),
+                                    boxShadow: `0 14px 30px ${alpha(step.color, 0.12)}`,
+                                },
+                                '&:focus-visible': {
+                                    outline: `3px solid ${alpha(step.color, 0.22)}`,
+                                    outlineOffset: 3,
+                                },
+                            })}
+                        >
                             <Box
-                                key={step.label}
-                                component={RouterLink}
-                                to={step.to}
-                                aria-label={step.action}
                                 sx={{
-                                    minHeight: { xs: 126, md: 134 },
-                                    gridColumn: { sm: index === workflowSteps.length - 1 ? 'span 2' : 'auto', md: 'auto' },
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 1,
-                                    p: { xs: 1.45, md: 1.6 },
+                                    width: 30,
+                                    height: 30,
                                     borderRadius: 1,
+                                    display: 'grid',
+                                    placeItems: 'center',
+                                    color: step.color,
+                                    bgcolor: alpha(step.color, 0.08),
                                     border: `1px solid ${alpha(step.color, 0.14)}`,
-                                    bgcolor: '#fff',
-                                    boxShadow: '0 12px 30px rgba(15,23,42,0.045)',
-                                    color: 'inherit',
-                                    textDecoration: 'none',
-                                    transition: 'transform 170ms ease, box-shadow 170ms ease, border-color 170ms ease',
-                                    '&:hover': {
-                                        transform: 'translateY(-4px)',
-                                        borderColor: alpha(step.color, 0.3),
-                                        boxShadow: `0 18px 42px ${alpha(step.color, 0.13)}`,
-                                    },
-                                    '&:focus-visible': {
-                                        outline: `3px solid ${alpha(step.color, 0.22)}`,
-                                        outlineOffset: 3,
-                                    },
+                                    flex: '0 0 auto',
                                 }}
+                                aria-hidden="true"
                             >
-                                <Stack direction="row" spacing={0.9} alignItems="center" sx={{ minWidth: 0 }}>
-                                    <Box
-                                        sx={{
-                                            width: 36,
-                                            height: 36,
-                                            borderRadius: 1,
-                                            display: 'grid',
-                                            placeItems: 'center',
-                                            color: step.color,
-                                            bgcolor: alpha(step.color, 0.08),
-                                            border: `1px solid ${alpha(step.color, 0.14)}`,
-                                            flex: '0 0 auto',
-                                        }}
-                                        aria-hidden="true"
-                                    >
-                                        <Icon sx={{ fontSize: 19 }} />
-                                    </Box>
-                                    <Typography component="h3" sx={{ color: '#111827', fontSize: '0.98rem', fontWeight: 850, lineHeight: 1.2 }}>
-                                        {step.label}
-                                    </Typography>
-                                </Stack>
-                                <Typography sx={captionSx(theme, { fontSize: '0.8rem', lineHeight: 1.42 })}>
+                                <Icon sx={{ fontSize: 17 }} />
+                            </Box>
+                            <Box sx={{ minWidth: 0 }}>
+                                <Typography component="h3" sx={{ color: '#111827', fontSize: '0.86rem', fontWeight: 850, lineHeight: 1.2 }}>
+                                    {step.label}
+                                </Typography>
+                                <Typography sx={captionSx(theme, { mt: 0.25, fontSize: '0.72rem', lineHeight: 1.32 })}>
                                     {step.detail}
                                 </Typography>
-                                <Stack direction="row" spacing={0.55} alignItems="center" sx={{ mt: 'auto', color: step.color }}>
-                                    <Typography component="span" sx={{ color: 'inherit', fontSize: '0.76rem', fontWeight: 850 }}>
-                                        {step.action}
-                                    </Typography>
-                                    <ArrowForward sx={{ fontSize: 14 }} />
-                                </Stack>
                             </Box>
-                        );
-                    })}
-                </Box>
+                        </Box>
+                    );
+                })}
             </Box>
         </Box>
     );
@@ -1412,6 +1269,158 @@ function FigureGateway({ items }) {
     );
 }
 
+/* ─── Light-theme hero section ─── */
+function HeroSection({ stats, statsLoading, theme }) {
+    return (
+        <Box
+            component="section"
+            sx={{
+                maxWidth: 1180,
+                mx: 'auto',
+                px: { xs: 2, sm: 3, lg: 4 },
+                pt: { xs: 3.4, md: 4.6, lg: 5.4 },
+                pb: { xs: 4.4, md: 5.4 },
+            }}
+        >
+            <Box sx={{ maxWidth: 820, mx: 'auto', textAlign: 'center' }}>
+                <Typography
+                    sx={{
+                        color: accent,
+                        fontSize: '0.76rem',
+                        fontWeight: 850,
+                        letterSpacing: '0.16em',
+                        textTransform: 'none',
+                        mb: 1,
+                    }}
+                >
+                    Genome-Wide Association Study Browser
+                </Typography>
+                <Typography
+                    component="h1"
+                    sx={{
+                        color: '#111827',
+                        fontFamily: theme.typography.fontFamily,
+                        fontSize: 'clamp(2.85rem, 5.7vw, 5.15rem)',
+                        fontWeight: 850,
+                        lineHeight: 0.94,
+                        letterSpacing: 0,
+                    }}
+                >
+                    {siteName}
+                </Typography>
+                <Typography
+                    sx={{
+                        maxWidth: 680,
+                        mx: 'auto',
+                        mt: { xs: 2, md: 2.4 },
+                        color: '#4b5563',
+                        fontFamily: theme.typography.fontFamily,
+                        fontSize: 'clamp(1rem, 1.05vw, 1.1rem)',
+                        lineHeight: 1.72,
+                    }}
+                >
+                    Navigate from trait metadata to Manhattan peaks, gene-level evidence, cellular program context, and downloadable data outputs — all in one place.
+                </Typography>
+
+                {/* Stats ribbon */}
+                <DataCoveragePanel
+                    error={false}
+                    loading={statsLoading}
+                    stats={stats}
+                    theme={theme}
+                />
+
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1} justifyContent="center" sx={{ mt: { xs: 2.4, md: 3 } }}>
+                    <Button
+                        variant="contained"
+                        size="large"
+                        endIcon={<ArrowForward />}
+                        component={RouterLink}
+                        to="/trait"
+                        sx={{
+                            px: 3.2,
+                            py: 1.15,
+                            borderRadius: 999,
+                            bgcolor: accent,
+                            '&:hover': { bgcolor: '#e8593a' },
+                            boxShadow: '0 8px 24px rgba(255,107,74,0.25)',
+                        }}
+                    >
+                        Browse Traits
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        size="large"
+                        endIcon={<Storage sx={{ fontSize: 18 }} />}
+                        component={RouterLink}
+                        to="/data"
+                        sx={{
+                            px: 3.2,
+                            py: 1.15,
+                            borderRadius: 999,
+                        }}
+                    >
+                        Explore Data
+                    </Button>
+                </Stack>
+            </Box>
+
+            {/* Decorative SVG preview strip */}
+            <Box
+                sx={{
+                    mt: { xs: 4, md: 5 },
+                    display: 'grid',
+                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' },
+                    gap: { xs: 1, md: 1.4 },
+                }}
+            >
+                {[
+                    { src: homeFigureGwasManhattan, label: 'Manhattan', color: '#2563eb' },
+                    { src: homeFigureTraitCorrelation, label: 'Correlation', color: '#c2410c' },
+                    { src: homeFigureProgramScatter, label: 'Programs', color: '#0284c7' },
+                    { src: homeFigureBurdenVolcano, label: 'Burden', color: '#ea580c' },
+                    { src: homeFigureVariantDetail, label: 'Trait Detail', color: '#d97706' },
+                ].map((item) => (
+                    <Box
+                        key={item.label}
+                        sx={panelSx(theme, {
+                            overflow: 'hidden',
+                            p: 0,
+                            transition: 'transform 200ms ease, box-shadow 200ms ease',
+                            '&:hover': {
+                                transform: 'translateY(-3px)',
+                                boxShadow: theme.custom.shadow.float,
+                            },
+                        })}
+                    >
+                        <Box
+                            component="img"
+                            src={item.src}
+                            alt={item.label}
+                            loading="lazy"
+                            sx={{ width: '100%', height: 'auto', display: 'block' }}
+                        />
+                        <Box sx={{ px: 1, py: 0.6, borderTop: `1px solid ${theme.custom.border.soft}` }}>
+                            <Typography
+                                sx={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 750,
+                                    color: item.color,
+                                    textAlign: 'center',
+                                    lineHeight: 1,
+                                }}
+                            >
+                                {item.label}
+                            </Typography>
+                        </Box>
+                    </Box>
+                ))}
+            </Box>
+        </Box>
+    );
+}
+
+
 function Home() {
     const theme = useTheme();
     const [homeStats, setHomeStats] = useState(() => readHomeStatsCache({ allowStale: true })?.stats || null);
@@ -1447,103 +1456,9 @@ function Home() {
 
     return (
         <Box sx={{ width: '100%', minHeight: '100%', color: '#1f2933', bgcolor: '#f7fafc', mx: 'auto' }}>
-            <Box
-                component="section"
-                sx={{
-                    maxWidth: 1180,
-                    mx: 'auto',
-                    px: { xs: 2, sm: 3, lg: 4 },
-                    pt: { xs: 3.4, md: 4.6, lg: 5.4 },
-                    pb: { xs: 4.4, md: 5.4 },
-                }}
-            >
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 0.82fr) minmax(420px, 1fr)' },
-                        gap: { xs: 3, md: 4.2, lg: 5 },
-                        alignItems: 'center',
-                    }}
-                >
-                    <Box sx={{ minWidth: 0, textAlign: { xs: 'center', md: 'left' } }}>
-                        <Typography sx={{ color: accent, fontFamily: 'Georgia, Cambria, serif', fontSize: 'clamp(1rem, 1.15vw, 1.22rem)', fontWeight: 850, lineHeight: 1.1, mb: 0.8 }}>
-                            Welcome to
-                        </Typography>
-                        <Typography
-                            component="h1"
-                            sx={{
-                                color: '#2a2d33',
-                                fontFamily: 'Georgia, Cambria, serif',
-                                fontSize: 'clamp(2.85rem, 5.7vw, 5.15rem)',
-                                fontWeight: 850,
-                                lineHeight: 0.94,
-                                letterSpacing: 0,
-                            }}
-                        >
-                            {siteName}
-                        </Typography>
-                        <Typography
-                            sx={{
-                                maxWidth: 620,
-                                mx: { xs: 'auto', md: 0 },
-                                mt: { xs: 2, md: 2.4 },
-                                color: '#4b5563',
-                                fontFamily: 'Georgia, Cambria, serif',
-                                fontSize: 'clamp(1rem, 1.05vw, 1.1rem)',
-                                lineHeight: 1.72,
-                            }}
-                        >
-                            A GWAS trait browser for moving from trait metadata to Manhattan peaks, gene evidence, program context, and downloadable result files.
-                        </Typography>
-                        <Stack
-                            direction={{ xs: 'column', sm: 'row' }}
-                            spacing={1.1}
-                            justifyContent={{ xs: 'center', md: 'flex-start' }}
-                            sx={{ mt: { xs: 2.4, md: 3 } }}
-                        >
-                            <Button
-                                variant="contained"
-                                size="large"
-                                endIcon={<ArrowForward />}
-                                component={RouterLink}
-                                to="/trait"
-                                sx={{
-                                    px: 3.2,
-                                    py: 1.15,
-                                    borderRadius: 999,
-                                    bgcolor: '#1f2933',
-                                    '&:hover': { bgcolor: '#111827' },
-                                }}
-                            >
-                                Browse Traits
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                size="large"
-                                endIcon={<InsertDriveFile />}
-                                component={RouterLink}
-                                to="/data"
-                                sx={{
-                                    px: 2.8,
-                                    py: 1.05,
-                                    borderRadius: 999,
-                                    color: '#1f2933',
-                                    borderColor: 'rgba(31,41,51,0.22)',
-                                    bgcolor: 'rgba(255,255,255,0.72)',
-                                    '&:hover': {
-                                        borderColor: 'rgba(31,41,51,0.36)',
-                                        bgcolor: '#fff',
-                                    },
-                                }}
-                            >
-                                Result Files
-                            </Button>
-                        </Stack>
-                    </Box>
+            <HeroSection stats={homeStats} statsLoading={homeStatsLoading} theme={theme} />
 
-                    <HeroVisual theme={theme} />
-                </Box>
-            </Box>
+            <WorkflowSection />
 
             <HomeSearch
                 stats={homeStats}
@@ -1551,8 +1466,6 @@ function Home() {
                 statsLoading={homeStatsLoading}
                 theme={theme}
             />
-
-            <WorkflowSection />
 
             <FigureGateway items={traitFigureCards} />
 

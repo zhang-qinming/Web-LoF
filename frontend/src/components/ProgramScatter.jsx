@@ -173,7 +173,9 @@ const thSx = (align) => ({
 const tdSx = (align, fontFamily, fontWeight, bgcolor) => ({
     fontSize: '0.73rem', py: 0.55, px: 1.3,
     textAlign: align, whiteSpace: 'nowrap',
-    fontFamily: fontFamily || 'inherit',
+    fontFamily: fontFamily === 'monospace' ? 'inherit' : (fontFamily || 'inherit'),
+    fontVariantNumeric: fontFamily === 'monospace' ? 'tabular-nums' : undefined,
+    fontFeatureSettings: fontFamily === 'monospace' ? '"tnum" 1' : undefined,
     fontWeight: fontWeight || 400,
     bgcolor: bgcolor || 'transparent',
     color: '#444',

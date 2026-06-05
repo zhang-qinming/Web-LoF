@@ -92,20 +92,20 @@ function GenePaginationControl({ totalPages, page, onChange }) {
 }
 
 const GENE_TABLE_COLUMNS = [
-    { key: 'geneSymbol', label: 'Gene Symbol', align: 'left', width: 150 },
-    { key: 'ensgId', label: 'Ensembl ID', align: 'left', width: 190 },
-    { key: 'location', label: 'Location', align: 'center', width: 230 },
-    { key: 'geneType', label: 'Gene Type', align: 'center', width: 170 },
-    { key: 'totalPrograms', label: 'Number of Associated Programs', align: 'right', width: 205, headerWrap: true },
-    { key: 'totalTraits', label: 'Number of Associated Traits', align: 'right', width: 190, headerWrap: true },
+    { key: 'geneSymbol', label: 'Gene Symbol', align: 'left', width: 128 },
+    { key: 'ensgId', label: 'Ensembl ID', align: 'left', width: 162 },
+    { key: 'location', label: 'Location', align: 'center', width: 184 },
+    { key: 'geneType', label: 'Gene Type', align: 'center', width: 136 },
+    { key: 'totalPrograms', label: 'Associated Programs', align: 'right', width: 146, headerWrap: true },
+    { key: 'totalTraits', label: 'Associated Traits', align: 'right', width: 146, headerWrap: true },
 ];
 const GENE_PROGRAM_COLUMNS = [
-    { key: 'geneLabel', label: 'Gene', align: 'center', width: 110, tone: 'identity' },
-    { key: 'program', label: 'Program', align: 'center', width: 100, tone: 'identity' },
-    { key: 'programAnnotation', label: 'Function', align: 'left', width: 210, tone: 'annotation' },
-    { key: 'programGoLabel', label: 'GO Function', align: 'left', width: 210, tone: 'annotation' },
-    { key: 'geneDirection', label: 'Direction', align: 'center', width: 120, tone: 'evidence' },
-    { key: 'programGeneCountSort', label: 'Gene Count', align: 'center', width: 90, tone: 'evidence' },
+    { key: 'geneLabel', label: 'Gene', align: 'center', width: 92, tone: 'identity' },
+    { key: 'program', label: 'Program', align: 'center', width: 84, tone: 'identity' },
+    { key: 'programAnnotation', label: 'Function', align: 'left', width: 176, tone: 'annotation' },
+    { key: 'programGoLabel', label: 'GO Term', align: 'left', width: 146, tone: 'annotation' },
+    { key: 'geneDirection', label: 'Direction', align: 'center', width: 96, tone: 'evidence' },
+    { key: 'programGeneCountSort', label: 'Genes', align: 'center', width: 76, tone: 'evidence' },
 ];
 const GENE_PROGRAM_GROUPS = [
     { label: 'Identity', span: 2, tone: 'identity' },
@@ -113,15 +113,15 @@ const GENE_PROGRAM_GROUPS = [
     { label: 'Evidence', span: 2, tone: 'evidence' },
 ];
 const GENE_TRAIT_COLUMNS = [
-    { key: 'traitName', label: 'Trait', align: 'left', width: 220, tone: 'trait' },
-    { key: 'program', label: 'Program', align: 'center', width: 86, tone: 'trait' },
-    { key: 'programAnnotation', label: 'Function', align: 'left', width: 170, tone: 'trait' },
-    { key: 'role', label: 'Role', align: 'center', width: 88, tone: 'mapping' },
-    { key: 'direction', label: 'Direction', align: 'center', width: 110, tone: 'mapping' },
-    { key: 'postMean', label: 'post_mean', align: 'center', width: 86, tone: 'metric' },
-    { key: 'absGamma', label: 'abs_gamma', align: 'center', width: 86, tone: 'metric' },
-    { key: 'membershipScore', label: 'membership', align: 'center', width: 86, tone: 'metric' },
-    { key: 'concordance', label: 'Concordance', align: 'center', width: 120, tone: 'metric' },
+    { key: 'traitName', label: 'Trait', align: 'left', width: 198, tone: 'trait' },
+    { key: 'program', label: 'Program', align: 'center', width: 82, tone: 'trait' },
+    { key: 'programAnnotation', label: 'Function', align: 'left', width: 156, tone: 'trait' },
+    { key: 'role', label: 'Role', align: 'center', width: 82, tone: 'mapping' },
+    { key: 'direction', label: 'Direction', align: 'center', width: 92, tone: 'mapping' },
+    { key: 'postMean', label: 'Post Mean', align: 'center', width: 76, tone: 'metric' },
+    { key: 'absGamma', label: 'Abs Gamma', align: 'center', width: 78, tone: 'metric' },
+    { key: 'membershipScore', label: 'Membership', align: 'center', width: 82, tone: 'metric' },
+    { key: 'concordance', label: 'Concordance', align: 'center', width: 108, tone: 'metric' },
 ];
 const GENE_TRAIT_GROUPS = [
     { label: 'Trait / Program', span: 3, tone: 'trait' },
@@ -152,14 +152,17 @@ function geneTableCellSx(theme, {
     fontWeight = 500,
     whiteSpace = 'nowrap',
 } = {}) {
+    const useDataFont = fontFamily === 'monospace';
     return {
-        px: 1.45,
-        py: 1.35,
+        px: 1.1,
+        py: 1.05,
         textAlign: align,
         whiteSpace,
-        fontSize: '0.875rem',
-        lineHeight: 1.35,
-        fontFamily,
+        fontSize: '0.8rem',
+        lineHeight: 1.3,
+        fontFamily: useDataFont ? 'inherit' : fontFamily,
+        fontVariantNumeric: useDataFont ? 'tabular-nums' : undefined,
+        fontFeatureSettings: useDataFont ? '"tnum" 1' : undefined,
         fontWeight,
         color: '#334155',
         borderBottom: `1px solid ${theme.custom.border.soft}`,
@@ -170,13 +173,16 @@ function geneTableCellSx(theme, {
 }
 
 function geneBodyCellSx({ align = 'left', tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
+    const useDataFont = fontFamily === 'monospace';
     return {
-        px: 1,
-        py: 0.62,
+        px: 0.85,
+        py: 0.56,
         textAlign: align,
         whiteSpace,
-        fontSize: '0.71rem',
-        fontFamily,
+        fontSize: '0.68rem',
+        fontFamily: useDataFont ? 'inherit' : fontFamily,
+        fontVariantNumeric: useDataFont ? 'tabular-nums' : undefined,
+        fontFeatureSettings: useDataFont ? '"tnum" 1' : undefined,
         fontWeight,
         color: '#334155',
         bgcolor: tone?.cellSoft,
@@ -726,7 +732,7 @@ function GeneSuggestionList({ suggestions, isLoading, onSelect }) {
                                     {label}
                                 </Typography>
                                 {gene.ensgId && (
-                                    <Typography sx={{ mt: 0.25, fontSize: '0.66rem', fontFamily: 'monospace', color: theme.palette.text.secondary }} noWrap>
+                                    <Typography sx={{ mt: 0.25, fontSize: '0.66rem', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }} noWrap>
                                         {gene.ensgId}
                                     </Typography>
                                 )}
@@ -752,12 +758,13 @@ function GeneLocationCell({ gene }) {
             sx={{
                 width: '100%',
                 minWidth: 0,
-                px: 0.85,
-                py: 0.35,
+                px: 0.65,
+                py: 0.28,
                 borderRadius: 0.75,
-                fontFamily: 'monospace',
-                fontSize: '0.78rem',
-                fontWeight: 800,
+                fontVariantNumeric: 'tabular-nums',
+                fontFeatureSettings: '"tnum" 1',
+                fontSize: '0.72rem',
+                fontWeight: 750,
                 color: '#315d57',
                 bgcolor: alpha('#2f6a49', 0.06),
                 border: `1px solid ${alpha('#2f6a49', 0.14)}`,
@@ -781,16 +788,17 @@ function GeneTypeBadge({ value }) {
             sx={{
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 maxWidth: '100%',
-                px: 0.85,
-                py: 0.3,
+                px: 0.72,
+                py: 0.24,
                 borderRadius: 1,
                 color: tone.color,
                 bgcolor: tone.backgroundColor,
                 border: `1px solid ${tone.borderColor}`,
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                lineHeight: 1.15,
+                fontSize: '0.68rem',
+                fontWeight: 750,
+                lineHeight: 1.12,
                 whiteSpace: 'normal',
                 wordBreak: 'break-word',
             }}
@@ -800,19 +808,20 @@ function GeneTypeBadge({ value }) {
     );
 }
 
-function GeneAssociationMeter({ value, maxValue, tone = 'primary', compact = false }) {
+function GeneAssociationMeter({ value, maxValue, tone = 'primary', compact = true }) {
     const count = Number(value) || 0;
     const width = evidenceWidth(count, maxValue);
     const color = tone === 'accent' ? '#5d3f8c' : '#245089';
     const softColor = tone === 'accent' ? alpha('#5d3f8c', 0.13) : alpha('#245089', 0.13);
 
     return (
-        <Box sx={{ display: 'grid', gap: 0.55, justifyItems: 'end', minWidth: compact ? 78 : 118 }}>
+        <Box sx={{ display: 'grid', gap: 0.45, justifyItems: 'end', minWidth: compact ? 86 : 108 }}>
             <Typography
                 sx={{
-                    fontFamily: 'monospace',
-                    fontSize: compact ? '0.78rem' : '0.9rem',
-                    fontWeight: 900,
+                    fontVariantNumeric: 'tabular-nums',
+                    fontFeatureSettings: '"tnum" 1',
+                    fontSize: compact ? '0.76rem' : '0.86rem',
+                    fontWeight: 850,
                     lineHeight: 1,
                     color,
                 }}
@@ -821,7 +830,7 @@ function GeneAssociationMeter({ value, maxValue, tone = 'primary', compact = fal
             </Typography>
             <Box
                 sx={{
-                    width: compact ? 72 : 104,
+                    width: compact ? 80 : 96,
                     height: compact ? 4 : 5,
                     borderRadius: 999,
                     bgcolor: softColor,
@@ -1094,7 +1103,7 @@ function GeneHomeTable({
             )}
 
             <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: GENE_INDEX_TABLE_MAX_HEIGHT, overflowX: 'auto', overflowY: 'auto' })}>
-                <Table size="small" stickyHeader sx={stickyTableSx(theme, { minWidth: 1115, tableLayout: 'fixed' })}>
+                <Table size="small" stickyHeader sx={stickyTableSx(theme, { minWidth: 902, tableLayout: 'fixed' })}>
                     <colgroup>
                         {GENE_TABLE_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -1106,11 +1115,11 @@ function GeneHomeTable({
                                 <TableCell
                                     key={column.key}
                                     sx={stickyTableHeaderCellSx(theme, geneTone, column.align, {
-                                        fontSize: '0.8rem',
-                                        fontWeight: 800,
-                                        letterSpacing: '0.04em',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 780,
+                                        letterSpacing: '0.03em',
                                         textTransform: 'none',
-                                        py: column.headerWrap ? 0.9 : 1.2,
+                                        py: column.headerWrap ? 0.8 : 1,
                                         width: column.width,
                                         whiteSpace: column.headerWrap ? 'normal' : 'nowrap',
                                         overflow: column.headerWrap ? 'visible' : 'hidden',
@@ -1196,11 +1205,11 @@ function GeneHomeTable({
                                         if (column.key === 'geneSymbol') {
                                             content = (
                                                 <Box sx={{ minWidth: 0 }}>
-                                                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 900, lineHeight: 1.1, color: '#173b35' }} noWrap>
+                                                    <Typography sx={{ fontSize: '0.87rem', fontWeight: 850, lineHeight: 1.08, color: '#173b35' }} noWrap>
                                                         {gene.geneSymbol || gene.geneLabel || '-'}
                                                     </Typography>
                                                     {gene.geneName && (
-                                                        <Typography sx={{ mt: 0.25, fontSize: '0.66rem', color: theme.palette.text.secondary }} noWrap>
+                                                        <Typography sx={{ mt: 0.18, fontSize: '0.63rem', color: theme.palette.text.secondary }} noWrap>
                                                             {gene.geneName}
                                                         </Typography>
                                                     )}
@@ -1209,7 +1218,7 @@ function GeneHomeTable({
                                         }
                                         if (column.key === 'ensgId') {
                                             content = (
-                                                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 700, color: theme.palette.text.secondary }} noWrap>
+                                                <Typography sx={{ fontSize: '0.73rem', fontWeight: 650, color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }} noWrap>
                                                     {gene.ensgId || '-'}
                                                 </Typography>
                                             );
@@ -1371,7 +1380,7 @@ function GeneDiscoveryPanel({ recommended, onSelect }) {
                                                 {label}
                                             </Typography>
                                             {gene.ensgId && (
-                                                <Typography sx={{ mt: 0.25, fontSize: '0.65rem', fontFamily: 'monospace', color: theme.palette.text.secondary }} noWrap>
+                                                <Typography sx={{ mt: 0.25, fontSize: '0.65rem', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }} noWrap>
                                                     {gene.ensgId}
                                                 </Typography>
                                             )}
@@ -1383,7 +1392,7 @@ function GeneDiscoveryPanel({ recommended, onSelect }) {
                                             <Box>
                                                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
                                                     <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary, fontWeight: 800 }}>Traits</Typography>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: '#5d3f8c', fontFamily: 'monospace', fontWeight: 900 }}>{traitCount.toLocaleString()}</Typography>
+                                                    <Typography sx={{ fontSize: '0.66rem', color: '#5d3f8c', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>{traitCount.toLocaleString()}</Typography>
                                                 </Stack>
                                                 <Box sx={{ height: 4, borderRadius: 999, bgcolor: alpha('#5d3f8c', 0.12), overflow: 'hidden' }}>
                                                     <Box sx={{ height: '100%', width: `${evidenceWidth(traitCount, maxTraits)}%`, bgcolor: '#5d3f8c' }} />
@@ -1392,7 +1401,7 @@ function GeneDiscoveryPanel({ recommended, onSelect }) {
                                             <Box>
                                                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
                                                     <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary, fontWeight: 800 }}>Programs</Typography>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: '#245089', fontFamily: 'monospace', fontWeight: 900 }}>{programCount.toLocaleString()}</Typography>
+                                                    <Typography sx={{ fontSize: '0.66rem', color: '#245089', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>{programCount.toLocaleString()}</Typography>
                                                 </Stack>
                                                 <Box sx={{ height: 4, borderRadius: 999, bgcolor: alpha('#245089', 0.12), overflow: 'hidden' }}>
                                                     <Box sx={{ height: '100%', width: `${evidenceWidth(programCount, maxPrograms)}%`, bgcolor: '#245089' }} />
@@ -1478,7 +1487,7 @@ function GeneSwitcher({ gene, query, onSelect }) {
                     <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.55rem', md: '1.85rem' }, lineHeight: 1.12 })}>
                         {currentLabel}
                     </Typography>
-                    <Typography sx={captionSx(theme, { mt: 0.35, fontSize: '0.82rem', fontFamily: gene?.ensgId ? 'monospace' : undefined })}>
+                    <Typography sx={captionSx(theme, { mt: 0.35, fontSize: '0.82rem', fontVariantNumeric: gene?.ensgId ? 'tabular-nums' : undefined, fontFeatureSettings: gene?.ensgId ? '"tnum" 1' : undefined })}>
                         {currentDescription}
                     </Typography>
                 </Box>
@@ -1575,7 +1584,7 @@ function GeneSwitcher({ gene, query, onSelect }) {
                                     <Typography sx={{ fontSize: '0.86rem', fontWeight: 800, color: theme.palette.text.primary, lineHeight: 1.2 }}>
                                         {label}
                                     </Typography>
-                                    <Typography sx={{ mt: 0.25, fontSize: '0.68rem', fontFamily: 'monospace', color: theme.palette.text.secondary }} noWrap>
+                                    <Typography sx={{ mt: 0.25, fontSize: '0.68rem', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }} noWrap>
                                         {[item.ensgId, getGeneLocation(item), item.geneType].filter(Boolean).join(' | ') || '-'}
                                     </Typography>
                                 </Box>
@@ -1637,7 +1646,7 @@ function GeneDetailHeader({ gene, query, summary, onSelect }) {
                                     color: colors.color,
                                 }}
                             >
-                                <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 850, fontFamily: 'monospace' }}>
+                                <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 850, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                     {(Number(metric.value) || 0).toLocaleString()}
                                 </Typography>
                                 <Typography sx={{ mt: 0.25, fontSize: '0.62rem', fontWeight: 800, textTransform: 'none', letterSpacing: '0.06em' }}>
@@ -1735,6 +1744,7 @@ function GeneInfoTable({ gene, summary }) {
                                 }}
                             >
                                 <TableCell
+                                    align="center"
                                     sx={{
                                         position: 'static',
                                         width: 220,
@@ -1755,19 +1765,22 @@ function GeneInfoTable({ gene, summary }) {
                                     {row.label}
                                 </TableCell>
                                 <TableCell
+                                    align="center"
                                     sx={{
                                         py: 1.05,
                                         px: 1.35,
                                         fontSize: '0.82rem',
                                         lineHeight: 1.42,
-                                        fontFamily: row.mono ? 'monospace' : undefined,
+                                        fontVariantNumeric: row.mono ? 'tabular-nums' : undefined,
+                                        fontFeatureSettings: row.mono ? '"tnum" 1' : undefined,
                                         fontWeight: row.tone === 'link' ? 750 : 500,
                                         color: row.tone === 'link' ? '#245089' : theme.palette.text.primary,
                                         bgcolor: theme.palette.background.paper,
                                         borderBottom: `1px solid ${theme.custom.border.soft}`,
-                                        textAlign: row.align || 'left',
+                                        textAlign: 'center',
                                         whiteSpace: row.wrap ? 'normal' : 'nowrap',
                                         wordBreak: row.wrap ? 'break-word' : 'normal',
+                                        verticalAlign: 'middle',
                                     }}
                                 >
                                     {row.links ? (
@@ -1866,7 +1879,7 @@ function GeneProgramTable({ gene, records, programRows }) {
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
             <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 540, overflowX: 'auto', overflowY: 'auto' })}>
-                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 840 })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 670 })}>
                     <colgroup>
                         {GENE_PROGRAM_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -2097,7 +2110,7 @@ function GeneProgramTraitTable({
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
             <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 620, overflowX: 'auto', overflowY: 'auto' })}>
-                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1052 })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 954 })}>
                     <colgroup>
                         {GENE_TRAIT_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -2317,7 +2330,7 @@ export default function Genes() {
             sortBy: sortKey,
             order: direction,
         }),
-        { keepPreviousData: false, revalidateOnFocus: false },
+        { keepPreviousData: true, revalidateOnFocus: false },
     );
 
     const runSearch = React.useCallback((value = input) => {

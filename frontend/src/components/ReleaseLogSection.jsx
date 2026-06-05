@@ -85,7 +85,7 @@ export default function ReleaseLogSection({
                                 sx={{
                                     mt: 0.3,
                                     color: '#111827',
-                                    fontFamily: 'Georgia, Cambria, serif',
+                                    fontFamily: theme.typography.fontFamily,
                                     fontSize: { xs: '1.85rem', md: '2.3rem' },
                                     fontWeight: 850,
                                     lineHeight: 1.08,
@@ -191,7 +191,7 @@ export default function ReleaseLogSection({
                                                 component="h3"
                                                 sx={{
                                                     color: '#111827',
-                                                    fontFamily: 'Georgia, Cambria, serif',
+                                                    fontFamily: theme.typography.fontFamily,
                                                     fontSize: { xs: '1.12rem', md: '1.24rem' },
                                                     fontWeight: 850,
                                                     lineHeight: 1.1,
