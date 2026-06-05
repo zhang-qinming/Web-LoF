@@ -369,7 +369,7 @@ export default function ProgramAssociatedTraits({
                                             justifyContent: 'flex-start',
                                             alignItems: 'flex-start',
                                             color: theme.palette.text.primary,
-                                            fontWeight: 750,
+                                            fontWeight: 680,
                                             fontSize: '0.74rem',
                                             lineHeight: 1.25,
                                             minHeight: 0,
@@ -400,14 +400,14 @@ export default function ProgramAssociatedTraits({
                                         />
                                     </Stack>
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.score, 'right', { fontFamily: 'monospace', fontWeight: 750, bgcolor: tones.score.cellStrong })}>
+                                <TableCell sx={programTraitCellSx(theme, tones.score, 'right', { fontFamily: 'monospace', fontWeight: 680, bgcolor: tones.score.cellStrong })}>
                                     {formatScore(row.programScore)}
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.score, 'right', { fontFamily: 'monospace', fontWeight: 750 })}>
+                                <TableCell sx={programTraitCellSx(theme, tones.score, 'right', { fontFamily: 'monospace', fontWeight: 680 })}>
                                     {formatScore(row.regulatorScore)}
                                 </TableCell>
                                 <TableCell sx={programTraitCellSx(theme, tones.genes, 'right', { bgcolor: tones.genes.cellStrong })}>
-                                    <Typography sx={{ fontSize: '0.74rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
+                                    <Typography sx={{ fontSize: '0.74rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                         {Number(row.totalGenes || 0).toLocaleString()} visible
                                     </Typography>
                                     <Typography sx={{ fontSize: '0.62rem', color: theme.palette.text.secondary }}>

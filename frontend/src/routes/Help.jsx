@@ -1051,7 +1051,7 @@ function MethodCard({ item, index, copy }) {
         >
             <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, mb: 1 }}>
                 <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: theme.palette.text.primary }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
                         {item.name}
                     </Typography>
                     <Typography variant="body2" sx={captionSx(theme, { mt: 0.25 })}>
@@ -1246,7 +1246,7 @@ export default function Help() {
                     <Box sx={{ px: 0.8, py: 0.7 }}>
                         <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.8 }}>
                             <ArticleOutlined sx={{ fontSize: 18, color: theme.palette.primary.main }} />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                                 {copy.contents}
                             </Typography>
                         </Stack>
@@ -1288,7 +1288,7 @@ export default function Help() {
                                     <Chip
                                         label={section.items.length}
                                         size="small"
-                                        sx={{ height: 20, minWidth: 26, fontSize: '0.68rem', fontWeight: 800 }}
+                                        sx={{ height: 20, minWidth: 26, fontSize: '0.68rem', fontWeight: 650 }}
                                     />
                                 </Link>
                             );
@@ -1359,7 +1359,7 @@ export default function Help() {
                                         bgcolor: theme.custom.surface.raised,
                                     }}
                                 >
-                                    <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontWeight: 800, textTransform: 'none', mb: 0.8 }}>
+                                    <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontWeight: 650, textTransform: 'none', mb: 0.8 }}>
                                         {group.group}
                                     </Typography>
                                     <Stack direction="row" spacing={0.6} useFlexGap flexWrap="wrap">

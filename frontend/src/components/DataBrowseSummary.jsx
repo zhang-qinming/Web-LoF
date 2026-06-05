@@ -38,7 +38,7 @@ export default function DataBrowseSummary({
             <Box sx={{ px: 2, py: 1.45, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.8 }}>
                     <FolderOpen sx={{ fontSize: 18, color: theme.palette.primary.light }} />
-                    <Typography variant="subtitle2" sx={{ fontWeight: 750, color: theme.palette.text.primary }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 680, color: theme.palette.text.primary }}>
                         Browse Summary
                     </Typography>
                 </Box>
@@ -59,7 +59,7 @@ export default function DataBrowseSummary({
                     <Typography variant="caption" sx={captionSx(theme, { display: 'block', mb: 0.2 })}>
                         Items
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 760, fontSize: '1.15rem' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.15rem' }}>
                         {visibleItemCount}
                     </Typography>
                 </Box>
@@ -67,7 +67,7 @@ export default function DataBrowseSummary({
                     <Typography variant="caption" sx={captionSx(theme, { display: 'block', mb: 0.2 })}>
                         Selected
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 760, fontSize: '1.15rem' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.15rem' }}>
                         {selectedPaths.length}
                     </Typography>
                 </Box>
@@ -75,7 +75,7 @@ export default function DataBrowseSummary({
                     <Typography variant="caption" sx={captionSx(theme, { display: 'block', mb: 0.2 })}>
                         Columns
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 760, fontSize: '1.15rem' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.15rem' }}>
                         {columnCount}
                     </Typography>
                 </Box>
@@ -92,7 +92,7 @@ export default function DataBrowseSummary({
 
             <Box sx={{ px: 2, py: 1.6, flex: 1, minHeight: 0 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1.2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 740, color: theme.palette.text.primary }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 680, color: theme.palette.text.primary }}>
                         Selection
                     </Typography>
                     {filter && (

@@ -166,7 +166,7 @@ function ZoomToolbar({ scale, zoomIn, zoomOut, resetView }) {
                     height: 26,
                     minWidth: 58,
                     borderRadius: 1,
-                    fontWeight: 900,
+                    fontWeight: 740,
                     color: '#0f172a',
                     bgcolor: 'rgba(15,23,42,0.06)',
                 }}
@@ -228,7 +228,7 @@ function SelectionActions({
                             size="small"
                             sx={{
                                 borderRadius: 1,
-                                fontWeight: 900,
+                                fontWeight: 740,
                                 color: '#334155',
                                 bgcolor: 'rgba(15,23,42,0.07)',
                                 maxWidth: 190,
@@ -239,7 +239,7 @@ function SelectionActions({
                             variant="outlined"
                             startIcon={<OpenInNew />}
                             onClick={() => onOpenProgram?.(selectedProgram)}
-                            sx={{ textTransform: 'none', fontWeight: 800, whiteSpace: 'nowrap' }}
+                            sx={{ textTransform: 'none', fontWeight: 680, whiteSpace: 'nowrap' }}
                         >
                             Open program
                         </Button>
@@ -252,7 +252,7 @@ function SelectionActions({
                             size="small"
                             sx={{
                                 borderRadius: 1,
-                                fontWeight: 900,
+                                fontWeight: 740,
                                 color: EFFECT_COLORS.positive,
                                 bgcolor: `rgba(${EFFECT_COLOR_RGB.positive},0.12)`,
                                 maxWidth: 230,
@@ -263,7 +263,7 @@ function SelectionActions({
                             variant="outlined"
                             startIcon={<OpenInNew />}
                             onClick={() => onOpenGene?.(selectedGene)}
-                            sx={{ textTransform: 'none', fontWeight: 800, whiteSpace: 'nowrap' }}
+                            sx={{ textTransform: 'none', fontWeight: 680, whiteSpace: 'nowrap' }}
                         >
                             Open gene
                         </Button>
@@ -380,7 +380,7 @@ export default function TraitProgramGraphCanvas({
                         textAnchor={anchor}
                         dominantBaseline="middle"
                         fontSize={layout.geneFontSize}
-                        fontWeight={geneMatched ? 900 : 800}
+                        fontWeight={geneMatched ? 800 : 700}
                         fontStyle={gene.isDiscordant ? 'normal' : 'normal'}
                         fill={geneMuted ? '#b5b5b5' : effectColorFromGene(gene)}
                         opacity={geneMuted ? 0.55 : 1}
@@ -448,7 +448,7 @@ export default function TraitProgramGraphCanvas({
                                 textAnchor="start"
                                 dominantBaseline="middle"
                                 fontSize={layout.geneFontSize}
-                                fontWeight={geneMatched ? 900 : 800}
+                                fontWeight={geneMatched ? 800 : 700}
                                 fill={geneMuted ? '#b5b5b5' : effectColorFromGene(gene)}
                                 opacity={geneMuted ? 0.55 : 1}
                             >
@@ -537,7 +537,7 @@ export default function TraitProgramGraphCanvas({
                             textAnchor="middle"
                             dominantBaseline="middle"
                             fontSize={layout.leftProgramTitleFontSize}
-                            fontWeight="900"
+                            fontWeight="800"
                             fill="#111"
                         >
                             {line}
@@ -637,7 +637,7 @@ export default function TraitProgramGraphCanvas({
                     y={yTop + 24}
                     dominantBaseline="middle"
                     fontSize="21"
-                    fontWeight="900"
+                    fontWeight="800"
                     fill={muted ? '#8a8f98' : groupColor}
                 >
                     {group.title}
@@ -794,7 +794,7 @@ export default function TraitProgramGraphCanvas({
                             textAnchor="middle"
                             dominantBaseline="middle"
                             fontSize={layout.rightProgramTitleFontSize}
-                            fontWeight="900"
+                            fontWeight="800"
                             fill="#111"
                         >
                             {line}
@@ -865,7 +865,7 @@ export default function TraitProgramGraphCanvas({
                         onClick={onGraphViewModeToggle}
                         sx={{
                             textTransform: 'none',
-                            fontWeight: 800,
+                            fontWeight: 680,
                             borderRadius: 1,
                             px: 1.25,
                             whiteSpace: 'nowrap',
@@ -880,7 +880,7 @@ export default function TraitProgramGraphCanvas({
                         onClick={() => svgRef.current && exportSvg(svgRef.current, `${exportStem}_trait_program_gene_${exportSuffix}.svg`)}
                         sx={{
                             textTransform: 'none',
-                            fontWeight: 800,
+                            fontWeight: 680,
                             borderRadius: 1,
                             px: 1.25,
                             whiteSpace: 'nowrap',
@@ -895,7 +895,7 @@ export default function TraitProgramGraphCanvas({
                         onClick={() => svgRef.current && exportPng(svgRef.current, `${exportStem}_trait_program_gene_${exportSuffix}.png`)}
                         sx={{
                             textTransform: 'none',
-                            fontWeight: 800,
+                            fontWeight: 680,
                             borderRadius: 1,
                             px: 1.25,
                             whiteSpace: 'nowrap',
@@ -917,12 +917,12 @@ export default function TraitProgramGraphCanvas({
                         borderTop: '1px solid rgba(15,23,42,0.06)',
                     }}
                 >
-                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>
+                    <Typography sx={{ fontWeight: 650, color: '#0f172a', fontSize: 13 }}>
                         Legend
                     </Typography>
                     {INLINE_LEGEND_GROUPS.map((group) => (
                         <Box key={group.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                            <Typography sx={{ fontSize: 12.5, color: '#475467', fontWeight: 700 }}>
+                            <Typography sx={{ fontSize: 12.5, color: '#475467', fontWeight: 650 }}>
                                 {group.label}:
                             </Typography>
                             {group.items.map((item) => (

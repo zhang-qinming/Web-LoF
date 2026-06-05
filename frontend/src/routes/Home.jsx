@@ -341,7 +341,7 @@ function SectionHeading({ eyebrow, title, description, theme, align = 'center' }
     return (
         <Stack spacing={0.65} alignItems={align === 'center' ? 'center' : 'flex-start'} sx={{ mb: { xs: 2.5, md: 3.4 } }}>
             {eyebrow && (
-                <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 850, letterSpacing: '0.16em', textTransform: 'none' }}>
+                <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none' }}>
                     {eyebrow}
                 </Typography>
             )}
@@ -351,7 +351,7 @@ function SectionHeading({ eyebrow, title, description, theme, align = 'center' }
                     color: '#111827',
                     fontFamily: theme.typography.fontFamily,
                     fontSize: { xs: '1.85rem', md: '2.35rem' },
-                    fontWeight: 850,
+                    fontWeight: 760,
                     lineHeight: 1.08,
                     letterSpacing: 0,
                     textAlign: align,
@@ -637,7 +637,14 @@ function SearchResultsPanel({
     );
 }
 
-function HomeSearch({ stats, statsError, statsLoading, theme }) {
+function HomeSearch({
+    embedded = false,
+    showCoverage = true,
+    stats,
+    statsError,
+    statsLoading,
+    theme,
+}) {
     const navigate = useNavigate();
     const [q, setQ] = useState('');
     const [results, setResults] = useState([]);
@@ -801,12 +808,22 @@ function HomeSearch({ stats, statsError, statsLoading, theme }) {
     };
 
     return (
-        <Box component="section" sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, sm: 3, lg: 4 }, pb: { xs: 5, md: 6.8 }, position: 'relative', zIndex: 20 }}>
+        <Box
+            component={embedded ? 'div' : 'section'}
+            sx={{
+                maxWidth: embedded ? '100%' : 1180,
+                mx: 'auto',
+                px: embedded ? 0 : { xs: 2, sm: 3, lg: 4 },
+                pb: embedded ? 0 : { xs: 5, md: 6.8 },
+                position: 'relative',
+                zIndex: 20,
+            }}
+        >
             <Box sx={panelSx(theme, { p: { xs: 1.5, sm: 1.8, md: 2.1 }, width: '100%', overflow: 'visible', backgroundColor: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(14px)' })}>
                 <Stack spacing={{ xs: 1.5, md: 1.8 }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
                         <Box>
-                            <Typography sx={{ fontSize: '0.84rem', fontWeight: 850, letterSpacing: 0, textTransform: 'none', color: '#111827' }}>
+                            <Typography sx={{ fontSize: '0.84rem', fontWeight: 700, letterSpacing: 0, textTransform: 'none', color: '#111827' }}>
                                 Search files
                             </Typography>
                             <Typography sx={{ mt: 0.45, color: '#4b5563', fontSize: '0.82rem', lineHeight: 1.5 }}>
@@ -900,13 +917,15 @@ function HomeSearch({ stats, statsError, statsLoading, theme }) {
                             </Box>
                         </Stack>
                     </ClickAwayListener>
-                    <DataCoveragePanel
-                        embedded
-                        error={statsError}
-                        loading={statsLoading}
-                        stats={stats}
-                        theme={theme}
-                    />
+                    {showCoverage && (
+                        <DataCoveragePanel
+                            embedded
+                            error={statsError}
+                            loading={statsLoading}
+                            stats={stats}
+                            theme={theme}
+                        />
+                    )}
                 </Stack>
             </Box>
         </Box>
@@ -1000,7 +1019,7 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
                                     sx={{
                                         color: '#111827',
                                         fontSize: { xs: '1.04rem', md: '1.12rem' },
-                                        fontWeight: 850,
+                                        fontWeight: 740,
                                         lineHeight: 1,
                                         fontVariantNumeric: 'tabular-nums',
                                     }}
@@ -1125,7 +1144,7 @@ function WorkflowSection() {
                                 <Icon sx={{ fontSize: 17 }} />
                             </Box>
                             <Box sx={{ minWidth: 0 }}>
-                                <Typography component="h3" sx={{ color: '#111827', fontSize: '0.86rem', fontWeight: 850, lineHeight: 1.2 }}>
+                                <Typography component="h3" sx={{ color: '#111827', fontSize: '0.86rem', fontWeight: 720, lineHeight: 1.2 }}>
                                     {step.label}
                                 </Typography>
                                 <Typography sx={captionSx(theme, { mt: 0.25, fontSize: '0.72rem', lineHeight: 1.32 })}>
@@ -1223,12 +1242,12 @@ function FigureCard({ item }) {
             </Box>
             <Stack direction="row" spacing={0.75} alignItems="center" sx={{ px: 1.5, pt: 1.25, minWidth: 0 }}>
                 <Icon sx={{ color: item.color, fontSize: 18, flex: '0 0 auto' }} />
-                <Typography component="h3" sx={{ color: '#111827', fontSize: '1rem', fontWeight: 850, lineHeight: 1.22 }}>
+                <Typography component="h3" sx={{ color: '#111827', fontSize: '1rem', fontWeight: 740, lineHeight: 1.22 }}>
                     {item.title}
                 </Typography>
             </Stack>
             <Stack direction="row" spacing={0.55} alignItems="center" sx={{ mt: 'auto', px: 1.5, pt: 1, pb: 1.25, color: item.color }}>
-                <Typography component="span" sx={{ fontSize: '0.78rem', fontWeight: 800, color: 'inherit' }}>
+                <Typography component="span" sx={{ fontSize: '0.78rem', fontWeight: 680, color: 'inherit' }}>
                     Open
                 </Typography>
                 <ArrowForward sx={{ fontSize: 14 }} />
@@ -1287,8 +1306,8 @@ function HeroSection({ stats, statsLoading, theme }) {
                     sx={{
                         color: accent,
                         fontSize: '0.76rem',
-                        fontWeight: 850,
-                        letterSpacing: '0.16em',
+                        fontWeight: 700,
+                        letterSpacing: '0.14em',
                         textTransform: 'none',
                         mb: 1,
                     }}
@@ -1301,7 +1320,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                         color: '#111827',
                         fontFamily: theme.typography.fontFamily,
                         fontSize: 'clamp(2.85rem, 5.7vw, 5.15rem)',
-                        fontWeight: 850,
+                        fontWeight: 780,
                         lineHeight: 0.94,
                         letterSpacing: 0,
                     }}
@@ -1319,10 +1338,9 @@ function HeroSection({ stats, statsLoading, theme }) {
                         lineHeight: 1.72,
                     }}
                 >
-                    Navigate from trait metadata to Manhattan peaks, gene-level evidence, cellular program context, and downloadable data outputs — all in one place.
+                    Navigate from trait metadata to Manhattan peaks, gene-level evidence, cellular program context, and downloadable data outputs, all in one place.
                 </Typography>
 
-                {/* Stats ribbon */}
                 <DataCoveragePanel
                     error={false}
                     loading={statsLoading}
@@ -1404,7 +1422,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                             <Typography
                                 sx={{
                                     fontSize: '0.7rem',
-                                    fontWeight: 750,
+                                    fontWeight: 680,
                                     color: item.color,
                                     textAlign: 'center',
                                     lineHeight: 1,

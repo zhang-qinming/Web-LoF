@@ -231,7 +231,7 @@ function MetricValue({ value, tone, theme }) {
                 fontVariantNumeric: 'tabular-nums',
                 fontFeatureSettings: '"tnum" 1',
                 fontSize: '0.76rem',
-                fontWeight: 750,
+                fontWeight: 680,
                 lineHeight: 1.25,
                 whiteSpace: 'nowrap',
             }}
@@ -491,7 +491,7 @@ export default function GwasDataList({
                                                         }}
                                                     >
                                                         <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.7, flexShrink: 0 }}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}>
                                                                 Rows
                                                             </Typography>
                                                             <FormControl size="small" sx={{ minWidth: 70 }}>
@@ -501,7 +501,7 @@ export default function GwasDataList({
                                                                     sx={{
                                                                         bgcolor: theme.palette.background.paper,
                                                                         fontSize: '0.78rem',
-                                                                        fontWeight: 750,
+                                                                        fontWeight: 650,
                                                                         '& .MuiSelect-select': { py: 0.48 },
                                                                     }}
                                                                 >
@@ -520,7 +520,7 @@ export default function GwasDataList({
                                                                 bgcolor: alpha(theme.palette.primary.main, 0.045),
                                                                 color: theme.palette.text.secondary,
                                                                 fontSize: '0.72rem',
-                                                                fontWeight: 800,
+                                                                fontWeight: 650,
                                                                 whiteSpace: 'nowrap',
                                                             }}
                                                         >
@@ -579,7 +579,7 @@ export default function GwasDataList({
                                                     headerColor: '#475569',
                                                 }, column.numeric ? 'right' : 'left', {
                                                     fontSize: '0.8rem',
-                                                    fontWeight: 700,
+                                                    fontWeight: 650,
                                                     letterSpacing: '0.03em',
                                                     textTransform: 'none',
                                                     py: 1.2,
@@ -600,7 +600,7 @@ export default function GwasDataList({
                                                         lineHeight: column.headerWrap ? 1.1 : 1.2,
                                                         alignItems: 'center',
                                                         '&:hover': { color: theme.palette.primary.main },
-                                                        '&.Mui-active': { color: theme.palette.primary.main, fontWeight: 700 },
+                                                        '&.Mui-active': { color: theme.palette.primary.main, fontWeight: 650 },
                                                         '& .MuiTableSortLabel-icon': {
                                                             color: `${theme.palette.primary.main} !important`,
                                                             flexShrink: 0,

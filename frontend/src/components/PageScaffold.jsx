@@ -115,7 +115,7 @@ export function StatePanel({
                     </Box>
                 )}
                 {title && (
-                    <Typography variant="subtitle1" sx={{ mt: loading ? 1.4 : 0, fontWeight: 750, color: theme.palette.text.primary }}>
+                    <Typography variant="subtitle1" sx={{ mt: loading ? 1.4 : 0, fontWeight: 680, color: theme.palette.text.primary }}>
                         {title}
                     </Typography>
                 )}

@@ -29,7 +29,7 @@ export function mutedPanelSx(theme, overrides = {}) {
 
 export function sectionTitleSx(theme, overrides = {}) {
     return {
-        fontWeight: 700,
+        fontWeight: 680,
         color: theme.palette.text.primary,
         letterSpacing: 0,
         ...overrides,
@@ -115,7 +115,7 @@ export function summaryChipSx(theme, overrides = {}) {
     return {
         height: 24,
         fontSize: '0.72rem',
-        fontWeight: 700,
+        fontWeight: 650,
         color: '#475569',
         backgroundColor: theme.custom.surface.subtle,
         border: `1px solid ${theme.custom.border.soft}`,
@@ -400,7 +400,7 @@ export function groupedTableHeaderCellSx(theme, tone, overrides = {}) {
         backgroundImage: 'none !important',
         borderBottom: `1px solid ${tone.headerBorder}`,
         color: tone.headerColor,
-        fontWeight: 750,
+        fontWeight: 680,
         fontSize: '0.64rem',
         textTransform: 'none',
         letterSpacing: '0.06em',
@@ -431,7 +431,7 @@ export function groupedTableColumnHeaderCellSx(theme, tone, align = 'left', over
         backgroundImage: 'none !important',
         borderBottom: `2px solid ${tone.headerBorder}`,
         color: tone.headerColor,
-        fontWeight: 650,
+        fontWeight: 620,
         fontSize: '0.67rem',
         boxShadow: `0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${tone.headerBorder}`,
         backgroundClip: 'border-box',

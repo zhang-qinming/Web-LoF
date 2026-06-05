@@ -292,7 +292,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
 
             <Box sx={{ width: '100%' }}>
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: 'rgba(15,23,42,0.10)' }}>
-                    <Typography sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5 }}>
+                    <Typography sx={{ fontWeight: 700, color: '#0f172a', mb: 0.5 }}>
                         Module summary
                     </Typography>
                     <Typography sx={{ fontSize: 13, color: '#667085', mb: 1.5 }}>

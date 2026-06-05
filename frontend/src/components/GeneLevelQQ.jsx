@@ -54,6 +54,7 @@ const DEFAULT_EXPORT_HEIGHT = 820;
 const DEFAULT_POINT_SIZE = 7;
 const DEFAULT_LABEL_LIMIT = 4;
 const MAX_COMPARE_TRAITS = 6;
+const MAX_ENVELOPE_POINTS = 360;
 const NOMINAL_LOGP = -Math.log10(0.05);
 const BASE_POINT_COLOR = '#53677f';
 const TRAIT_PALETTE = ['#155e9f', '#c45121', '#047857', '#6d4cc2', '#9a5b12', '#b42358'];
@@ -203,8 +204,11 @@ function addFdr(rows) {
     return rows.map((row, index) => ({ ...row, fdr: adjusted[index] }));
 }
 
-function computeAxisRange(rows) {
-    const values = rows.flatMap((row) => [row.expected, row.observed]).filter(Number.isFinite);
+function computeAxisRange(rows, extraValues = []) {
+    const values = [
+        ...rows.flatMap((row) => [row.expected, row.observed]),
+        ...extraValues,
+    ].filter(Number.isFinite);
     if (!values.length) return [-1, 1];
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -280,38 +284,99 @@ function mixColors(baseHex, accentHex, ratio, alphaValue) {
     return `rgba(${r}, ${g}, ${b}, ${clamp(alphaValue, 0, 1)})`;
 }
 
-function normalQuantile(p) {
-    // Acklam's inverse-normal approximation; sufficient for drawing a QQ envelope.
-    const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
-    const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
-    const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
-    const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
-    const plow = 0.02425;
-    const phigh = 1 - plow;
-    if (p <= 0) return -Infinity;
-    if (p >= 1) return Infinity;
-    let q;
-    if (p < plow) {
-        q = Math.sqrt(-2 * Math.log(p));
-        return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
-            / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+function logGamma(value) {
+    const coeffs = [
+        676.5203681218851,
+        -1259.1392167224028,
+        771.3234287776531,
+        -176.6150291621406,
+        12.507343278686905,
+        -0.13857109526572012,
+        9.984369578019572e-6,
+        1.5056327351493116e-7,
+    ];
+    if (value < 0.5) {
+        return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * value)) - logGamma(1 - value);
     }
-    if (p <= phigh) {
-        q = p - 0.5;
-        const r = q * q;
-        return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
-            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
-    }
-    q = Math.sqrt(-2 * Math.log(1 - p));
-    return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
-        / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    let x = 0.9999999999998099;
+    const z = value - 1;
+    coeffs.forEach((coeff, index) => {
+        x += coeff / (z + index + 1);
+    });
+    const t = z + coeffs.length - 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
 }
 
-function betaApproxQuantile(alpha, beta, probability) {
-    const mean = alpha / (alpha + beta);
-    const variance = (alpha * beta) / (((alpha + beta) ** 2) * (alpha + beta + 1));
-    const sd = Math.sqrt(Math.max(variance, 0));
-    return clamp(mean + normalQuantile(probability) * sd, Number.MIN_VALUE, 1 - Number.EPSILON);
+function betaContinuedFraction(a, b, x) {
+    const maxIterations = 100;
+    const epsilon = 3e-7;
+    const fpMin = 1e-30;
+    const qab = a + b;
+    const qap = a + 1;
+    const qam = a - 1;
+    let c = 1;
+    let d = 1 - ((qab * x) / qap);
+    if (Math.abs(d) < fpMin) d = fpMin;
+    d = 1 / d;
+    let h = d;
+
+    for (let m = 1; m <= maxIterations; m += 1) {
+        const m2 = 2 * m;
+        let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+        d = 1 + (aa * d);
+        if (Math.abs(d) < fpMin) d = fpMin;
+        c = 1 + (aa / c);
+        if (Math.abs(c) < fpMin) c = fpMin;
+        d = 1 / d;
+        h *= d * c;
+
+        aa = -((a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+        d = 1 + (aa * d);
+        if (Math.abs(d) < fpMin) d = fpMin;
+        c = 1 + (aa / c);
+        if (Math.abs(c) < fpMin) c = fpMin;
+        d = 1 / d;
+        const delta = d * c;
+        h *= delta;
+        if (Math.abs(delta - 1) < epsilon) break;
+    }
+    return h;
+}
+
+function regularizedIncompleteBeta(x, a, b) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    const logBetaTerm = logGamma(a + b) - logGamma(a) - logGamma(b) + (a * Math.log(x)) + (b * Math.log1p(-x));
+    const betaTerm = Math.exp(logBetaTerm);
+    if (x < (a + 1) / (a + b + 2)) {
+        return betaTerm * betaContinuedFraction(a, b, x) / a;
+    }
+    return 1 - ((betaTerm * betaContinuedFraction(b, a, 1 - x)) / b);
+}
+
+function betaQuantile(probability, a, b) {
+    if (probability <= 0) return Number.MIN_VALUE;
+    if (probability >= 1) return 1 - Number.EPSILON;
+    let lower = 0;
+    let upper = 1;
+    for (let i = 0; i < 56; i += 1) {
+        const mid = (lower + upper) / 2;
+        if (regularizedIncompleteBeta(mid, a, b) < probability) lower = mid;
+        else upper = mid;
+    }
+    return clamp((lower + upper) / 2, Number.MIN_VALUE, 1 - Number.EPSILON);
+}
+
+function buildEnvelopeRanks(n) {
+    if (n <= MAX_ENVELOPE_POINTS) {
+        return Array.from({ length: n }, (_, index) => index + 1);
+    }
+    const ranks = new Set([1, n]);
+    for (let i = 0; i < MAX_ENVELOPE_POINTS; i += 1) {
+        const t = i / (MAX_ENVELOPE_POINTS - 1);
+        ranks.add(Math.round(1 + ((t ** 2) * (n - 1))));
+    }
+    return [...ranks].sort((a, b) => a - b);
 }
 
 function buildEnvelope(rows) {
@@ -326,15 +391,17 @@ function buildEnvelope(rows) {
         const sorted = [...tailRows].sort((a, b) => Math.abs(b.expected) - Math.abs(a.expected));
         const n = sorted.length;
         if (n < 10) continue;
+        const ranks = buildEnvelopeRanks(n);
 
         const x = [];
         const upper = [];
         const lower = [];
-        sorted.forEach((row, index) => {
-            const rank = index + 1;
+        ranks.forEach((rank) => {
+            const row = sorted[rank - 1];
+            if (!row) return;
             const sign = tailSide === 'negative' ? -1 : 1;
-            const loP = betaApproxQuantile(rank, n + 1 - rank, 0.025);
-            const hiP = betaApproxQuantile(rank, n + 1 - rank, 0.975);
+            const loP = betaQuantile(0.025, rank, n + 1 - rank);
+            const hiP = betaQuantile(0.975, rank, n + 1 - rank);
             const lo = sign * -Math.log10(hiP);
             const hi = sign * -Math.log10(loP);
             x.push(row.expected);
@@ -628,7 +695,20 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         return -Math.log10(Math.max(...sig.map((row) => row.p)));
     }, [filteredRows]);
 
-    const axisRange = useMemo(() => computeAxisRange(filteredRows), [filteredRows]);
+    const envelopeTraces = useMemo(() => (
+        showEnvelope ? buildEnvelope(filteredRows) : []
+    ), [filteredRows, showEnvelope]);
+
+    const envelopeAxisValues = useMemo(() => (
+        envelopeTraces.flatMap((trace) => [
+            ...(Array.isArray(trace.x) ? trace.x : []),
+            ...(Array.isArray(trace.y) ? trace.y : []),
+        ])
+    ), [envelopeTraces]);
+
+    const axisRange = useMemo(() => (
+        computeAxisRange(filteredRows, envelopeAxisValues)
+    ), [envelopeAxisValues, filteredRows]);
 
     const labelRows = useMemo(() => {
         if (!showTopLabels || labelLimit <= 0) return [];
@@ -651,10 +731,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         tickcolor: alpha(theme.palette.text.secondary, 0.24),
         tickfont: { size: 12, color: alpha(theme.palette.text.primary, 0.72), family: theme.typography.fontFamily },
     }), [theme.palette.text.primary, theme.palette.text.secondary, theme.typography.fontFamily]);
-
-    const envelopeTraces = useMemo(() => (
-        showEnvelope ? buildEnvelope(filteredRows) : []
-    ), [filteredRows, showEnvelope]);
 
     const pointTraces = useMemo(() => {
         const grouped = new Map();

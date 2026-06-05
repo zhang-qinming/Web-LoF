@@ -76,7 +76,7 @@ export default function ReleaseLogSection({
                         justifyContent="space-between"
                     >
                         <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 850, letterSpacing: '0.16em', textTransform: 'none' }}>
+                            <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none' }}>
                                 {eyebrow}
                             </Typography>
                             <Typography
@@ -87,7 +87,7 @@ export default function ReleaseLogSection({
                                     color: '#111827',
                                     fontFamily: theme.typography.fontFamily,
                                     fontSize: { xs: '1.85rem', md: '2.3rem' },
-                                    fontWeight: 850,
+                                    fontWeight: 740,
                                     lineHeight: 1.08,
                                 }}
                             >
@@ -138,10 +138,10 @@ export default function ReleaseLogSection({
                                 }}
                             >
                                 <Box sx={{ pr: { md: 2.4 }, pt: { md: 0.55 } }}>
-                                    <Typography sx={{ color: '#111827', fontSize: '0.88rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                                    <Typography sx={{ color: '#111827', fontSize: '0.88rem', fontWeight: 700, letterSpacing: '0.03em' }}>
                                         {entry.date}
                                     </Typography>
-                                    <Typography sx={{ mt: 0.45, color: entry.color, fontSize: '0.73rem', fontWeight: 850, letterSpacing: '0.14em', textTransform: 'none' }}>
+                                    <Typography sx={{ mt: 0.45, color: entry.color, fontSize: '0.73rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'none' }}>
                                         {entry.label}
                                     </Typography>
                                 </Box>
@@ -193,7 +193,7 @@ export default function ReleaseLogSection({
                                                     color: '#111827',
                                                     fontFamily: theme.typography.fontFamily,
                                                     fontSize: { xs: '1.12rem', md: '1.24rem' },
-                                                    fontWeight: 850,
+                                                    fontWeight: 740,
                                                     lineHeight: 1.1,
                                                 }}
                                             >

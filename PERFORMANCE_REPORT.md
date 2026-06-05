@@ -1,0 +1,327 @@
+# GWAS Browser 前后端与 SQL 性能报告
+
+日期：2026-06-05  
+范围：`frontend/`、`backend/`、运行库 `gwas` 的只读结构与代表查询计划。  
+方法：静态代码审计、`information_schema` 元数据检查、代表 SQL `EXPLAIN`、少量只读聚合计时。
+
+## 结论摘要
+
+当前最大的性能风险不是单个慢索引，而是数据模型与访问路径不一致：
+
+1. 旧 GWAS SQL 接口仍查询 `gwas_data`，但运行库没有 `gwas_data` / `gwas_metadata` / `huge_gwas_data` / `moment_ukbb`。这会让 `/api/trait/*gwas*` 路由不可用；如果将来恢复大表，现有 `SELECT *`、全量接口和 COUNT 也会成为严重瓶颈。
+2. Gene 首页依赖 `gene_program_trait_edge` 全表聚合后放进 Node 进程内缓存。当前 281,492 行规模下，汇总聚合实测约 2.84 秒；数据增长或多进程部署后会放大。
+3. Gene 搜索使用 `OR + %LIKE% + GROUP BY`，无法利用现有 gene/ensg 索引，当前单次搜索实测约 0.41 秒。前端输入无 debounce，会把这个 SQL 成本按键放大。
+4. 多个 join key 的 collation 不一致，代码用 `BINARY` / `COLLATE` 规避报错。功能上可运行，但查询计划退化为 hash scan，阻断正常等值索引 join。
+5. 图表接口大量依赖 TSV 整文件读取和前端全量过滤/排序/渲染；这不是 SQL 慢查询，但会和后端响应体大小、Node 内存、浏览器主线程一起形成性能上限。
+
+建议优先级：先修 schema/接口一致性和 collation；再把 Gene 汇总/搜索改为物化表或可索引查询；最后收敛 TSV 全量响应和冗余索引。
+
+## 运行库现状
+
+当前运行库表规模：
+
+| 表 | 近似/实测行数 | 数据大小 | 索引大小 | 备注 |
+|---|---:|---:|---:|---|
+| `gene_program_trait_edge` | 281,492 | 89.64 MB | 142.52 MB | 最大表，Gene 首页/详情/Program 详情核心来源 |
+| `gwas_meta` | 28,627 | 10.52 MB | 5.86 MB | 仅 2,415 个非空 `file_id`，其余多为旧 metadata |
+| `trait_program_edge` | 18,499 | 3.52 MB | 6.05 MB | Program/Trait 关联 |
+| `gene_info_hg37_matched` | 7,470 | - | - | Gene 注释 |
+| `file_metadata` | 2,415 traits | 0.33 MB | 0.42 MB | Trait 列表主表 |
+| `trait_ldsc` | 2,344 | - | - | Trait meta heritability |
+
+运行库没有这些旧表：`gwas_data`、`gwas_metadata`、`huge_gwas_data`、`moment_ukbb`。
+
+collation 不一致：
+
+| 表组 | collation |
+|---|---|
+| `file_metadata`、`gwas_meta`、`program_info`、`lof_meta`、`file_id_mapping` | `utf8mb4_0900_ai_ci` |
+| `gene_program_trait_edge`、`trait_program_edge`、`gene_info_hg37_matched`、`trait_ldsc` | `utf8mb4_unicode_ci` |
+
+这解释了为什么代码里出现 `BINARY tpe.trait_id = BINARY gpte.trait_id` 和 `COLLATE utf8mb4_unicode_ci`：普通等值 join 会报 collation mismatch。
+
+## 主要问题
+
+### P0. 旧 GWAS SQL 接口与运行库不一致
+
+相关代码：
+
+- `backend/models/MgetGwasByTrait.js`：`SELECT * FROM gwas_data ...`
+- `backend/routes/Rtrait.js`：`/api/trait/:traitName`、`/api/trait/allgwas/:traitName`、`/api/trait/filtergwas/:traitName`
+- `frontend/src/api/gwas.js`：`getTraitData()`、`getFilteredGwasDataByTrait()`
+- `frontend/src/components/GwasDataList.jsx`：传入 `traitName` 时调用 `/api/trait/:traitName`
+
+问题：
+
+- 运行库没有 `gwas_data`，这些接口会失败。
+- `allgwas` 是不分页语义，后端最多返回 `MAX_UNPAGED_GWAS_ROWS`。`.env.example` 里该值是 1,000,000，JSON 响应会非常大。
+- 分页路径每次先 `COUNT(*)`，再 `SELECT * ... LIMIT/OFFSET`。如果将来恢复 SNP 大表，这会在大 offset、无复合索引时非常慢。
+
+建议：
+
+- 如果当前 GWAS 明细已改为 TSV/Manhattan 文件路线，删除或标记废弃旧 SQL 接口，避免前端误调用。
+- 如果必须恢复 SQL 表，改为投影列查询，禁止 `SELECT *`，并建立复合索引：
+
+```sql
+-- 示例，按真实表名调整
+CREATE INDEX idx_gwas_trait_chr_bp ON gwas_data (Trait, CHR, BP);
+CREATE INDEX idx_gwas_trait_p ON gwas_data (Trait, P);
+CREATE INDEX idx_gwas_trait_rsid ON gwas_data (Trait, rsID);
+```
+
+- 大表分页优先用 keyset/cursor，不要在深页长期使用 `OFFSET`。
+
+### P1. Gene 首页全表聚合依赖进程内缓存
+
+相关代码：
+
+- `backend/models/MgeneProgram.js`
+  - `getGeneSummaryCache()` 全表 `GROUP BY gpte.gene_symbol, gpte.ensg_id`
+  - `getGenes()` 从缓存数组排序和分页
+  - `warmGeneSummaryCache()` 在 `app.listen` 后预热
+- `frontend/src/routes/Genes.jsx`
+  - `GeneHomeTable` 用 `getGenes({ page, limit, sortBy, order })`
+  - CSV 下载调用 `getGenes({ limit: 0 })`
+
+证据：
+
+- `EXPLAIN` 显示 `gene_program_trait_edge` 全表扫描 281,492 行，排序后聚合，再按 `gene_info_hg37_matched` 主键逐行 lookup。
+- 实测聚合计时：`SELECT COUNT(*) FROM (gene summary GROUP BY ...)` 返回 7,161 个 gene group，用时约 2.84 秒。
+- 缓存 TTL 为 1 小时，且是 Node 进程内变量；多实例部署时每个进程都会独立预热。
+
+风险：
+
+- 服务启动后预热会吃掉一次完整聚合成本。
+- 缓存过期时第一个请求会阻塞等待聚合。
+- 排序/分页在 JS 内存中完成，无法利用数据库排序索引。
+- `limit=0` 导出虽然复用缓存，但会把所有 gene 一次性组装为响应。
+
+建议：
+
+- 在导入脚本结束后生成物化表，例如 `gene_summary`：
+
+```sql
+CREATE TABLE gene_summary (
+  gene_key VARCHAR(140) NOT NULL PRIMARY KEY,
+  gene_symbol VARCHAR(100),
+  ensg_id VARCHAR(30),
+  chromosome VARCHAR(50),
+  begin_pos BIGINT,
+  end_pos BIGINT,
+  gene_type VARCHAR(100),
+  total_rows BIGINT NOT NULL,
+  total_programs INT NOT NULL,
+  total_traits INT NOT NULL,
+  program_role_rows BIGINT NOT NULL,
+  regulator_role_rows BIGINT NOT NULL,
+  KEY idx_gene_summary_symbol (gene_symbol),
+  KEY idx_gene_summary_ensg (ensg_id),
+  KEY idx_gene_summary_traits (total_traits DESC, total_programs DESC, total_rows DESC),
+  KEY idx_gene_summary_programs (total_programs DESC, total_traits DESC)
+);
+```
+
+- `/api/genes` 改为直接查物化表并在 SQL 里排序分页。
+- CSV 导出改为流式响应或后台生成文件，避免一次性 JSON + 前端拼 CSV。
+
+### P1. Gene 搜索不能有效使用索引
+
+相关代码：
+
+- `backend/models/MgeneProgram.js`：`searchGenes()`
+- `frontend/src/routes/Genes.jsx`：首页 suggestion 和 Gene switcher 都调用 `searchGenes(q, { limit: 12 })`
+
+当前 SQL 条件：
+
+```sql
+WHERE gpte.gene_symbol = ?
+   OR gpte.ensg_id = ?
+   OR gpte.gene_symbol LIKE '%q%'
+   OR gpte.ensg_id LIKE '%q%'
+GROUP BY gene_symbol, ensg_id
+```
+
+证据：
+
+- `EXPLAIN` 对 `FNDC10` 显示全表扫描 `gene_program_trait_edge` 281,492 行，再排序、聚合、limit。
+- 实测 `FNDC10` 搜索聚合约 0.41 秒，只返回 1 个 group。
+- 单独 exact 条件 `gene_symbol = ? OR ensg_id = ?` 可以走 `idx_gpte_gene` / `idx_gpte_ensg`，过滤 40 行。
+
+前端放大点：
+
+- 首页输入 `input.trim().length >= 2` 即请求，没有 debounce。
+- Gene switcher 弹窗搜索同样没有 debounce。
+
+建议：
+
+1. 后端拆成 exact 快路径和模糊搜索慢路径。
+2. exact 查到结果时直接返回，不再跑 `%LIKE%`。
+3. 模糊搜索改为 prefix：`LIKE 'q%'`，或引入 `FULLTEXT` / ngram 搜索表。
+4. 前端加 250-300 ms debounce，并把最小长度提高到 3，保留 exact ID/Symbol 回车即时搜索。
+
+### P1. collation 不一致导致 BINARY/COLLATE join 退化
+
+相关代码：
+
+- `backend/models/MgeneProgram.js`
+  - `getGenePrograms()` 多处 `ON BINARY ... = BINARY ...`
+  - `getProgramTraits()` 多处 `ON BINARY ... = BINARY ...`
+  - `getProgramGenes()` `ON BINARY gi.ensembl = BINARY gpte.ensg_id`
+- `backend/models/Mmeta.js`
+  - `trait_ldsc` join 使用三段 `OR + COLLATE`
+
+证据：
+
+- 去掉 `BINARY` 后，`file_metadata` 与 edge 表普通 join 会报 `Illegal mix of collations`。
+- 用 `CAST(... AS BINARY)` 模拟计划时，`getGenePrograms()` 在 base gene 已用索引过滤到约 41 行后，右侧仍对 `trait_program_edge`、`file_metadata`、`program_info`、`gene_info_hg37_matched` 做 hash scan。
+- `/api/meta/:fileId` 的 `trait_ldsc` join 因为 `OR + COLLATE` 对 `trait_ldsc` 做全表 scan；当前只有 2,344 行，但增长后会恶化。
+
+建议：
+
+- 维护窗口内统一 join key collation。MySQL 8/9 可统一到 `utf8mb4_0900_ai_ci`，也可以统一到 `utf8mb4_unicode_ci`；关键是全库 join key 一致。
+- 统一后删除 SQL 里的 `BINARY` / 多余 `COLLATE`，让现有索引重新参与 join。
+- `trait_ldsc` meta 关联拆成多次 indexed lookup 或 `UNION ALL` 候选表，而不是一个三条件 OR join。
+
+### P2. Program 详情聚合当前可接受，但增长后需要预计算
+
+相关代码：
+
+- `backend/models/MgeneProgram.js`
+  - `getProgramTraits()`
+  - `getProgramGenes()`
+
+证据，以 `P14` 为例：
+
+- `gene_program_trait_edge WHERE program='P14'`：4,248 行。
+- `trait_program_edge WHERE program='P14'`：267 行。
+- top genes 窗口函数聚合返回 2,135 行，实测约 0.12 秒。
+- program genes 聚合返回 730 个 gene group，实测约 0.11 秒。
+
+当前规模下可以接受。若 program 数、trait 数或 gene edge 增长，建议在导入时预计算：
+
+- `program_trait_top_genes(program, trait_id, rank, gene_label, score)`
+- `program_gene_summary(program, gene_key, value, rank_within_side, total_traits, roles, signs)`
+
+### P2. Browse 列表搜索现在能用，但增长后会退化
+
+相关代码：
+
+- `backend/models/Mmeta.js`：`getTraits()`
+- `frontend/src/components/GwasDataList.jsx`：Trait browse table
+
+证据：
+
+- 无搜索时列表查询走 `file_metadata.idx_trait`，再用 `gwas_meta.idx_file` lookup。
+- COUNT 查询当前会 scan `file_metadata`，但表只有 2,415 行。
+- 搜索条件是多列 `%LIKE%`，过滤发生在 join 后；当前数据量很小，用时可接受。
+
+建议：
+
+- 无搜索 COUNT 可直接从 `file_metadata` 计数，不必 join `gwas_meta`。
+- 若 trait metadata 增长到十万级，建立专门搜索表或 FULLTEXT 索引，不要长期依赖多列 `%LIKE%`。
+- 当前 `gwas_meta.file_id` 数据上唯一，可以考虑加唯一约束改善优化器估计：
+
+```sql
+-- MySQL 允许多个 NULL；加约束前先保留一次重复检查
+ALTER TABLE gwas_meta ADD UNIQUE KEY uk_gwas_meta_file_id (file_id);
+```
+
+## 前端触发与渲染风险
+
+### Gene 页面
+
+- Gene 首页每次分页/排序都请求 `/api/genes`，但后端实际从进程内大数组排序分页。
+- 搜索 suggestion 没有 debounce，会把 `searchGenes()` 的 0.4s 级查询按输入次数放大。
+- CSV 下载调用 `limit=0` 拉全量 gene，再在前端构造 CSV。
+
+### Trait 页面
+
+- Trait 详情加载时并发请求：
+  - `/api/programs/list`
+  - `/api/programs/graph-list`
+  - `/api/meta/:fileId`
+- `programs/list`、`graph-list` 是目录扫描，不是 SQL；建议加短 TTL 缓存，避免每个 trait 页面都扫目录。
+- Manhattan、volcano、gene evidence 等图表从后端拿整份 TSV JSON/文本，再在前端 `useMemo` 里过滤、排序、构造 Plotly traces。
+- `.env.example` 给出 `DATA_MAX_TSV_ROWS=1000000`、`MANHATTAN_MAX_FILE_BYTES=1gb`；其中通用 TSV 路由使用 max rows，Manhattan 路由当前没有在 `readDelimitedTsv()` 里实际检查 file size。这对浏览器主线程和 Node 响应内存都偏激进。
+
+建议：
+
+- 图表接口增加 `variant=hits` 默认、小样本摘要、分页 table 数据、server-side filter。
+- 大文件响应启用 gzip/brotli、ETag/Last-Modified、短期内存或文件 stat 缓存。
+- 对 Plotly 大点数使用阈值降采样或只渲染显著点，表格分页不要依赖前端全量排序。
+
+## 后端连接与缓存
+
+- DB pool 默认 `DB_POOL_SIZE=10`。当前慢点主要是 CPU/聚合和文件读取，单纯增大 pool 不会解决问题，反而可能让 MySQL 并发全表扫描更多。
+- `warmGeneSummaryCache()` 是进程内预热。多实例部署时缓存不共享。
+- TSV cache 只在 Manhattan 路由有 `TSV_CACHE`；volcano、gene evidence、QQ 等仍按请求读文件。
+
+建议：
+
+- 添加 route timing middleware，记录 method/path/status/duration/response size。
+- 开启 MySQL slow query log，阈值先设 200ms，优化后收敛到 100ms。
+- 对稳定文件数据使用带 mtime 的 LRU 缓存，限制总内存。
+- 对跨实例部署，用物化表优先于共享缓存；缓存只作为加速层。
+
+## 索引整理建议
+
+当前 `gene_program_trait_edge` 索引大小约为数据大小的 1.59 倍；`trait_program_edge` 为 1.72 倍。
+
+疑似冗余索引：
+
+- `gene_program_trait_edge.idx_gpte_gene` 被 `idx_gpte_gene_program(gene_symbol, program)` 左前缀覆盖。
+- `gene_program_trait_edge.idx_gpte_ensg` 被 `idx_gpte_ensg_program(ensg_id, program)` 左前缀覆盖。
+- `gene_program_trait_edge.idx_gpte_program` 被 `idx_gpte_program_trait(program, trait_id)` 左前缀覆盖。
+- `gene_program_trait_edge.idx_gpte_trait` 被 `idx_gpte_trait_program(trait_id, program)` 左前缀覆盖。
+- `trait_program_edge.idx_tpe_program` / `idx_tpe_trait` 同理被复合索引覆盖。
+- `program_info.idx_program` 与唯一索引 `program` 重复。
+- `file_id_mapping.idx_gwas` 被 `uk_gwas_lof(gwas_id, lof_id)` 左前缀覆盖。
+
+不要立即批量删除。建议在 collation 修复、SQL 重写和 `ANALYZE TABLE` 后，用 `performance_schema.table_io_waits_summary_by_index_usage` 或慢查询计划确认未使用，再分批 drop。
+
+## 推荐实施路线
+
+### 第 1 阶段：正确性与低风险止血
+
+1. 明确废弃或修复 `/api/trait/:traitName`、`/api/trait/allgwas/:traitName`、`/api/trait/filtergwas/:traitName`。
+2. 前端 Gene 搜索加 debounce，避免按键级 SQL 请求。
+3. 后端 Gene 搜索先走 exact lookup，exact 命中后不跑 `%LIKE%`。
+4. 给 `/api/programs/list`、`/api/programs/graph-list` 加短 TTL 缓存。
+5. 增加 route duration 和 response size 日志。
+
+### 第 2 阶段：schema 与查询计划修复
+
+1. 统一 join key collation。
+2. 移除 `BINARY` / `COLLATE` join workaround。
+3. 重写 `trait_ldsc` OR join 为 indexed lookups。
+4. 加 `ANALYZE TABLE` 到导入/迁移流程。
+
+### 第 3 阶段：物化与数据服务重构
+
+1. 建立 `gene_summary` 物化表，替换 Node 内存大聚合。
+2. 建立 `program_gene_summary`、`program_trait_top_genes`，降低 Program 详情聚合成本。
+3. 大型 TSV 图表接口支持 server-side filter、分页、采样和 HTTP 缓存。
+4. CSV 导出改流式或后台生成。
+
+## 验收指标
+
+建议目标：
+
+| 路径 | 当前观察 | 目标 |
+|---|---:|---:|
+| Gene summary 冷聚合 | 约 2.84s | 请求路径不再执行；物化刷新离线完成 |
+| Gene 搜索 exact | 约 0.41s | p95 < 100ms |
+| Program traits / genes | 0.1s 级 | p95 < 200ms，数据增长 5 倍后仍稳定 |
+| Browse 无搜索 | 当前可接受 | p95 < 100ms |
+| Trait meta | 当前小表可接受 | 无全表 `trait_ldsc` scan |
+| 图表 full TSV 加载 | 受文件大小影响 | 首屏只加载 hits/summary，full 数据按需 |
+
+## 附：本次取证要点
+
+- `gene_program_trait_edge`：281,492 行；`P14` 对应 4,248 行；`FNDC10` 对应 40 行。
+- Gene summary 聚合：7,161 个 gene group，约 2.84 秒。
+- Gene search `FNDC10`：1 个 group，约 0.41 秒。
+- Program top genes `P14`：2,135 行，约 0.12 秒。
+- Program genes `P14`：730 个 gene group，约 0.11 秒。
+- `file_metadata` trait 数：2,415。
+- `gwas_meta`：28,627 行，非空 `file_id` 去重 2,415；当前不会放大 Browse join。

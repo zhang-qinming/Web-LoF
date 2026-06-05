@@ -28,12 +28,12 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import {
     AccountTreeOutlined,
-    BiotechOutlined,
     DownloadOutlined,
     ExpandMore,
     ManageSearchOutlined,
     OpenInNew,
     ScienceOutlined,
+    SearchOutlined,
     TableChartOutlined,
 } from '@mui/icons-material';
 import useSWR from 'swr';
@@ -72,7 +72,7 @@ function roleTone(theme, role) {
     return metricChipTone(theme, 'neutral');
 }
 
-function GenePaginationControl({ totalPages, page, onChange }) {
+function GenePaginationControl({ totalPages, page, onChange, size = 'small' }) {
     if (totalPages <= 1) return null;
 
     return (
@@ -83,10 +83,143 @@ function GenePaginationControl({ totalPages, page, onChange }) {
                 onChange={(event, value) => onChange(event, value - 1)}
                 color="primary"
                 shape="rounded"
-                size="medium"
+                size={size}
                 showFirstButton
                 showLastButton
             />
+        </Box>
+    );
+}
+
+function GeneRowsControl({ rowsPerPage, onChange }) {
+    const theme = useTheme();
+
+    return (
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.7, flexShrink: 0 }}>
+            <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, fontWeight: 650, whiteSpace: 'nowrap' }}>
+                Rows
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 72 }}>
+                <Select
+                    value={rowsPerPage}
+                    onChange={(event) => onChange(Number(event.target.value))}
+                    sx={{
+                        bgcolor: theme.palette.background.paper,
+                        fontSize: '0.78rem',
+                        fontWeight: 650,
+                        '& .MuiSelect-select': { py: 0.45 },
+                    }}
+                >
+                    {[20, 50, 100, 200].map((value) => (
+                        <MenuItem key={value} value={value} dense>{value}</MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+        </Box>
+    );
+}
+
+function GenePageJumpControl({ totalPages, page, onChange }) {
+    const theme = useTheme();
+    const [inputPage, setInputPage] = React.useState(page + 1);
+    const pageNumber = Number(inputPage);
+    const canPage = totalPages > 1;
+    const isValid = inputPage !== '' && Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= totalPages;
+
+    React.useEffect(() => {
+        setInputPage(page + 1);
+    }, [page]);
+
+    const submitPage = React.useCallback((event) => {
+        event?.preventDefault?.();
+        if (!canPage) return;
+        if (isValid) {
+            onChange(null, pageNumber - 1);
+            return;
+        }
+        setInputPage(page + 1);
+    }, [canPage, isValid, onChange, page, pageNumber]);
+
+    return (
+        <Box component="form" onSubmit={submitPage} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.45, flexShrink: 0 }}>
+            <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, fontWeight: 650, whiteSpace: 'nowrap' }}>
+                Page
+            </Typography>
+            <TextField
+                size="small"
+                type="number"
+                value={inputPage}
+                disabled={!canPage}
+                onChange={(event) => setInputPage(event.target.value)}
+                onBlur={() => {
+                    if (!isValid) setInputPage(page + 1);
+                }}
+                inputProps={{ min: 1, max: totalPages }}
+                sx={{
+                    width: 58,
+                    '& .MuiOutlinedInput-root': { bgcolor: theme.palette.background.paper },
+                    '& .MuiOutlinedInput-input': {
+                        py: 0.48,
+                        px: 0.7,
+                        textAlign: 'center',
+                        fontSize: '0.78rem',
+                        fontWeight: 650,
+                    },
+                }}
+            />
+            <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                / {totalPages.toLocaleString()}
+            </Typography>
+            <Button
+                type="submit"
+                size="small"
+                variant="outlined"
+                disabled={!canPage || !isValid}
+                sx={{ minWidth: 38, px: 0.9, py: 0.35, textTransform: 'none', fontSize: '0.72rem', fontWeight: 680 }}
+            >
+                Go
+            </Button>
+        </Box>
+    );
+}
+
+function GenePagerTools({
+    totalCount,
+    start,
+    end,
+    pageCount,
+    currentPage,
+    rowsPerPage,
+    onRowsPerPageChange,
+    onPageChange,
+    showRange = false,
+}) {
+    const rangeLabel = totalCount === 0
+        ? 'No genes'
+        : `${Math.min(start + 1, totalCount).toLocaleString()}-${end.toLocaleString()} / ${totalCount.toLocaleString()} genes`;
+
+    return (
+        <Box
+            sx={{
+                width: showRange ? '100%' : 'auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: showRange ? 'space-between' : { xs: 'flex-start', lg: 'flex-end' },
+                gap: 1,
+                flexWrap: 'wrap',
+                minWidth: 0,
+            }}
+        >
+            {showRange && (
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 680, whiteSpace: 'nowrap' }}>
+                    {rangeLabel}
+                </Typography>
+            )}
+            <Stack direction="row" spacing={0.9} alignItems="center" sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', lg: 'flex-end' }, minWidth: 0 }}>
+                <GeneRowsControl rowsPerPage={rowsPerPage} onChange={onRowsPerPageChange} />
+                <GenePageJumpControl totalPages={pageCount} page={currentPage} onChange={onPageChange} />
+                <GenePaginationControl totalPages={pageCount} page={currentPage} onChange={onPageChange} />
+            </Stack>
         </Box>
     );
 }
@@ -311,11 +444,6 @@ function geneTypeTone(theme, geneType) {
         backgroundColor: alpha(theme.palette.text.primary, 0.05),
         borderColor: theme.custom.border.soft,
     };
-}
-
-function sortDescription(sortBy, sortDir) {
-    const column = GENE_TABLE_COLUMNS.find((item) => item.key === sortBy);
-    return `${column?.label || sortBy} ${sortDir === 'desc' ? 'high to low' : 'low to high'}`;
 }
 
 function chromosomeSortRank(value) {
@@ -610,7 +738,7 @@ function SummaryCard({ icon, label, value, tone = 'neutral' }) {
                 <Icon sx={{ fontSize: 19 }} />
             </Box>
             <Box>
-                <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, lineHeight: 1.1 }}>
+                <Typography sx={{ fontSize: '1.25rem', fontWeight: 720, lineHeight: 1.1 }}>
                     {Number(value || 0).toLocaleString()}
                 </Typography>
                 <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, fontWeight: 700, textTransform: 'none', letterSpacing: '0.06em' }}>
@@ -687,7 +815,7 @@ function GeneSuggestionList({ suggestions, isLoading, onSelect }) {
             bgcolor: alpha(theme.palette.primary.main, 0.025),
         }}>
             <Stack direction="row" spacing={0.8} alignItems="center" sx={{ mb: 0.8, flexWrap: 'wrap' }}>
-                <Typography sx={{ fontSize: '0.74rem', fontWeight: 800, color: theme.palette.text.secondary, textTransform: 'none', letterSpacing: '0.06em' }}>
+                <Typography sx={{ fontSize: '0.74rem', fontWeight: 650, color: theme.palette.text.secondary, textTransform: 'none', letterSpacing: '0.05em' }}>
                     Matching genes
                 </Typography>
                 <Chip
@@ -728,7 +856,7 @@ function GeneSuggestionList({ suggestions, isLoading, onSelect }) {
                             }}
                         >
                             <Box sx={{ minWidth: 0, width: '100%' }}>
-                                <Typography sx={{ fontSize: '0.8rem', fontWeight: 850, lineHeight: 1.15 }} noWrap>
+                                <Typography sx={{ fontSize: '0.8rem', fontWeight: 720, lineHeight: 1.15 }} noWrap>
                                     {label}
                                 </Typography>
                                 {gene.ensgId && (
@@ -764,7 +892,7 @@ function GeneLocationCell({ gene }) {
                 fontVariantNumeric: 'tabular-nums',
                 fontFeatureSettings: '"tnum" 1',
                 fontSize: '0.72rem',
-                fontWeight: 750,
+                fontWeight: 680,
                 color: '#315d57',
                 bgcolor: alpha('#2f6a49', 0.06),
                 border: `1px solid ${alpha('#2f6a49', 0.14)}`,
@@ -797,7 +925,7 @@ function GeneTypeBadge({ value }) {
                 bgcolor: tone.backgroundColor,
                 border: `1px solid ${tone.borderColor}`,
                 fontSize: '0.68rem',
-                fontWeight: 750,
+                fontWeight: 680,
                 lineHeight: 1.12,
                 whiteSpace: 'normal',
                 wordBreak: 'break-word',
@@ -821,7 +949,7 @@ function GeneAssociationMeter({ value, maxValue, tone = 'primary', compact = tru
                     fontVariantNumeric: 'tabular-nums',
                     fontFeatureSettings: '"tnum" 1',
                     fontSize: compact ? '0.76rem' : '0.86rem',
-                    fontWeight: 850,
+                    fontWeight: 720,
                     lineHeight: 1,
                     color,
                 }}
@@ -909,6 +1037,13 @@ function GeneHomeTable({
         setSortBy(key);
         setSortDir(key === 'totalPrograms' || key === 'totalTraits' ? 'desc' : 'asc');
     }, [sortBy, sortDir]);
+    const handleRowsPerPageChange = React.useCallback((value) => {
+        setRowsPerPage(value);
+        setPage(0);
+    }, []);
+    const handlePageChange = React.useCallback((event, nextPage) => {
+        setPage(nextPage);
+    }, []);
 
     const handleDownload = React.useCallback(async () => {
         setDownloading(true);
@@ -948,8 +1083,8 @@ function GeneHomeTable({
                     py: { xs: 1.5, md: 1.75 },
                     borderBottom: `1px solid ${theme.custom.border.soft}`,
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) auto' },
-                    gap: 1.5,
+                    gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) minmax(620px, 860px)' },
+                    gap: { xs: 1.35, xl: 1.75 },
                     alignItems: 'center',
                 }}
             >
@@ -976,15 +1111,22 @@ function GeneHomeTable({
 
                 <Box
                     sx={{
-                        width: { xs: '100%', lg: 560 },
-                        p: 1,
-                        borderRadius: 1.25,
-                        bgcolor: alpha(theme.palette.background.paper, 0.86),
-                        border: `1px solid ${alpha('#2f6a49', 0.16)}`,
-                        boxShadow: `0 10px 30px ${alpha('#0f172a', 0.05)}`,
+                        minWidth: 0,
+                        display: 'grid',
+                        gap: 0.85,
+                        justifyItems: { xs: 'stretch', xl: 'end' },
                     }}
                 >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                    <Box
+                        sx={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: { xs: 'flex-start', xl: 'flex-end' },
+                            gap: 0.75,
+                            flexWrap: 'wrap',
+                        }}
+                    >
                         <TextField
                             size="small"
                             value={input}
@@ -994,11 +1136,12 @@ function GeneHomeTable({
                             }}
                             placeholder="Gene symbol or ENSG"
                             sx={{
-                                flex: { xs: '1 1 100%', sm: '1 1 240px' },
-                                maxWidth: { sm: 310 },
+                                flex: { xs: '1 1 100%', sm: '1 1 280px' },
+                                maxWidth: { sm: 360 },
                                 '& .MuiOutlinedInput-root': {
                                     bgcolor: theme.palette.background.paper,
                                     borderRadius: 1,
+                                    borderColor: alpha('#2f6a49', 0.16),
                                 },
                                 '& .MuiOutlinedInput-input': {
                                     py: 0.78,
@@ -1008,7 +1151,7 @@ function GeneHomeTable({
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
-                                        <ManageSearchOutlined fontSize="small" sx={{ color: theme.palette.text.secondary }} />
+                                        <SearchOutlined fontSize="small" sx={{ color: '#2f6a49' }} />
                                     </InputAdornment>
                                 ),
                             }}
@@ -1017,8 +1160,8 @@ function GeneHomeTable({
                             size="small"
                             variant="contained"
                             onClick={() => onSearch(input)}
-                            startIcon={<BiotechOutlined />}
-                            sx={{ textTransform: 'none', px: 1.25, fontWeight: 800, minWidth: 88 }}
+                            startIcon={<SearchOutlined />}
+                            sx={{ textTransform: 'none', px: 1.25, fontWeight: 700, minWidth: 88, boxShadow: 'none' }}
                         >
                             Search
                         </Button>
@@ -1040,42 +1183,29 @@ function GeneHomeTable({
                             sx={{
                                 textTransform: 'none',
                                 fontSize: '0.74rem',
-                                color: theme.palette.text.secondary,
+                                color: '#315d57',
+                                border: `1px solid ${alpha('#2f6a49', 0.18)}`,
+                                bgcolor: alpha('#2f6a49', 0.045),
                                 minWidth: 70,
+                                '&:hover': {
+                                    bgcolor: alpha('#2f6a49', 0.08),
+                                    borderColor: alpha('#2f6a49', 0.28),
+                                },
                             }}
                         >
                             {downloading ? 'Preparing' : 'CSV'}
                         </Button>
                     </Box>
-                    <Stack direction="row" spacing={0.8} alignItems="center" sx={{ mt: 0.85, flexWrap: 'wrap' }}>
-                        <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, fontWeight: 700 }}>
-                            Rows
-                        </Typography>
-                        <FormControl size="small" sx={{ minWidth: 72 }}>
-                            <Select
-                                value={rowsPerPage}
-                                onChange={(event) => {
-                                    setRowsPerPage(Number(event.target.value));
-                                    setPage(0);
-                                }}
-                                sx={{ fontSize: '0.78rem', '& .MuiSelect-select': { py: 0.45 } }}
-                            >
-                                {[20, 50, 100, 200].map((value) => (
-                                    <MenuItem key={value} value={value} dense>{value}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <Chip
-                            label={`Sorted: ${sortDescription(sortBy, sortDir)}`}
-                            size="small"
-                            sx={summaryChipSx(theme, {
-                                height: 22,
-                                maxWidth: { xs: '100%', sm: 260 },
-                                color: theme.palette.text.secondary,
-                                bgcolor: alpha(theme.palette.text.primary, 0.045),
-                            })}
-                        />
-                    </Stack>
+                    <GenePagerTools
+                        totalCount={totalCount}
+                        start={start}
+                        end={end}
+                        pageCount={pageCount}
+                        currentPage={currentPage}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={handleRowsPerPageChange}
+                        onPageChange={handlePageChange}
+                    />
                 </Box>
             </Box>
 
@@ -1116,7 +1246,7 @@ function GeneHomeTable({
                                     key={column.key}
                                     sx={stickyTableHeaderCellSx(theme, geneTone, column.align, {
                                         fontSize: '0.74rem',
-                                        fontWeight: 780,
+                                        fontWeight: 680,
                                         letterSpacing: '0.03em',
                                         textTransform: 'none',
                                         py: column.headerWrap ? 0.8 : 1,
@@ -1141,7 +1271,7 @@ function GeneHomeTable({
                                             alignItems: 'center',
                                             justifyContent: column.align === 'right' ? 'flex-end' : 'flex-start',
                                             '&:hover': { color: '#2f6a49' },
-                                            '&.Mui-active': { color: '#2f6a49', fontWeight: 800 },
+                                            '&.Mui-active': { color: '#2f6a49', fontWeight: 700 },
                                             '& .MuiTableSortLabel-icon': {
                                                 color: '#2f6a49 !important',
                                                 flexShrink: 0,
@@ -1205,7 +1335,7 @@ function GeneHomeTable({
                                         if (column.key === 'geneSymbol') {
                                             content = (
                                                 <Box sx={{ minWidth: 0 }}>
-                                                    <Typography sx={{ fontSize: '0.87rem', fontWeight: 850, lineHeight: 1.08, color: '#173b35' }} noWrap>
+                                                    <Typography sx={{ fontSize: '0.87rem', fontWeight: 740, lineHeight: 1.08, color: '#173b35' }} noWrap>
                                                         {gene.geneSymbol || gene.geneLabel || '-'}
                                                     </Typography>
                                                     {gene.geneName && (
@@ -1239,7 +1369,7 @@ function GeneHomeTable({
                                                     ...geneTableCellSx(theme, {
                                                         align: column.align,
                                                         fontFamily: isMono ? 'monospace' : undefined,
-                                                        fontWeight: column.key === 'geneSymbol' || isNumeric ? 800 : 500,
+                                                        fontWeight: column.key === 'geneSymbol' || isNumeric ? 700 : 500,
                                                         whiteSpace: column.key === 'geneType' ? 'normal' : 'nowrap',
                                                     }),
                                                     ...(isNumeric ? { overflow: 'visible' } : {}),
@@ -1259,32 +1389,26 @@ function GeneHomeTable({
                 sx={{
                     px: { xs: 1.5, md: 2 },
                     py: 1.35,
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+                    display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
                     gap: 1.5,
                     background: `linear-gradient(90deg, ${alpha('#2f6a49', 0.045)}, ${theme.custom.surface.subtle})`,
                     borderTop: `1px solid ${theme.custom.border.soft}`,
                 }}
             >
-                <Stack direction="row" spacing={0.8} alignItems="center" sx={{ flexWrap: 'wrap', minWidth: 0 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                        {totalCount === 0
-                            ? 'No genes'
-                            : `${Math.min(start + 1, totalCount).toLocaleString()}-${end.toLocaleString()} / ${totalCount.toLocaleString()} genes`}
-                    </Typography>
-                    <Chip
-                        label={sortDescription(sortBy, sortDir)}
-                        size="small"
-                        sx={summaryChipSx(theme, {
-                            height: 22,
-                            color: '#315d57',
-                            bgcolor: alpha('#2f6a49', 0.08),
-                            border: `1px solid ${alpha('#2f6a49', 0.14)}`,
-                        })}
-                    />
-                </Stack>
-                <GenePaginationControl totalPages={pageCount} page={currentPage} onChange={(event, nextPage) => setPage(nextPage)} />
+                <GenePagerTools
+                    totalCount={totalCount}
+                    start={start}
+                    end={end}
+                    pageCount={pageCount}
+                    currentPage={currentPage}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={handleRowsPerPageChange}
+                    onPageChange={handlePageChange}
+                    showRange
+                />
             </Box>
         </Paper>
     );
@@ -1329,7 +1453,7 @@ function GeneDiscoveryPanel({ recommended, onSelect }) {
                             border: `1px solid ${theme.custom.border.soft}`,
                         }}
                     >
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'none', color: '#2f6a49' }}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'none', color: '#2f6a49' }}>
                             Gene spotlight
                         </Typography>
                         <Typography sx={sectionTitleSx(theme, { mt: 0.35, fontSize: '0.96rem', color: '#173b35' })}>
@@ -1376,7 +1500,7 @@ function GeneDiscoveryPanel({ recommended, onSelect }) {
                                 >
                                     <Stack direction="row" spacing={0.75} alignItems="flex-start" justifyContent="space-between">
                                         <Box sx={{ minWidth: 0 }}>
-                                            <Typography sx={{ fontSize: '0.88rem', fontWeight: 900, color: '#173b35', lineHeight: 1.12 }} noWrap>
+                                            <Typography sx={{ fontSize: '0.88rem', fontWeight: 740, color: '#173b35', lineHeight: 1.12 }} noWrap>
                                                 {label}
                                             </Typography>
                                             {gene.ensgId && (
@@ -1391,8 +1515,8 @@ function GeneDiscoveryPanel({ recommended, onSelect }) {
                                         <Stack spacing={0.55} sx={{ mt: 0.9 }}>
                                             <Box>
                                                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary, fontWeight: 800 }}>Traits</Typography>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: '#5d3f8c', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>{traitCount.toLocaleString()}</Typography>
+                                                    <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary, fontWeight: 650 }}>Traits</Typography>
+                                                    <Typography sx={{ fontSize: '0.66rem', color: '#5d3f8c', fontWeight: 720, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>{traitCount.toLocaleString()}</Typography>
                                                 </Stack>
                                                 <Box sx={{ height: 4, borderRadius: 999, bgcolor: alpha('#5d3f8c', 0.12), overflow: 'hidden' }}>
                                                     <Box sx={{ height: '100%', width: `${evidenceWidth(traitCount, maxTraits)}%`, bgcolor: '#5d3f8c' }} />
@@ -1400,8 +1524,8 @@ function GeneDiscoveryPanel({ recommended, onSelect }) {
                                             </Box>
                                             <Box>
                                                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary, fontWeight: 800 }}>Programs</Typography>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: '#245089', fontWeight: 900, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>{programCount.toLocaleString()}</Typography>
+                                                    <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary, fontWeight: 650 }}>Programs</Typography>
+                                                    <Typography sx={{ fontSize: '0.66rem', color: '#245089', fontWeight: 720, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>{programCount.toLocaleString()}</Typography>
                                                 </Stack>
                                                 <Box sx={{ height: 4, borderRadius: 999, bgcolor: alpha('#245089', 0.12), overflow: 'hidden' }}>
                                                     <Box sx={{ height: '100%', width: `${evidenceWidth(programCount, maxPrograms)}%`, bgcolor: '#245089' }} />
@@ -1510,7 +1634,7 @@ function GeneSwitcher({ gene, query, onSelect }) {
                 }}
             >
                 <Box sx={sectionPanelHeaderSx(theme, { display: 'block', p: 1.25 })}>
-                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 750, color: theme.palette.text.primary }}>
+                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 680, color: theme.palette.text.primary }}>
                         Search genes
                     </Typography>
                     <Typography sx={{ mt: 0.2, mb: 1, fontSize: '0.76rem', color: theme.palette.text.secondary }}>
@@ -1581,7 +1705,7 @@ function GeneSwitcher({ gene, query, onSelect }) {
                                 }}
                             >
                                 <Box sx={{ minWidth: 0, width: '100%' }}>
-                                    <Typography sx={{ fontSize: '0.86rem', fontWeight: 800, color: theme.palette.text.primary, lineHeight: 1.2 }}>
+                                    <Typography sx={{ fontSize: '0.86rem', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.2 }}>
                                         {label}
                                     </Typography>
                                     <Typography sx={{ mt: 0.25, fontSize: '0.68rem', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }} noWrap>
@@ -1646,10 +1770,10 @@ function GeneDetailHeader({ gene, query, summary, onSelect }) {
                                     color: colors.color,
                                 }}
                             >
-                                <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 850, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
+                                <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 740, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                     {(Number(metric.value) || 0).toLocaleString()}
                                 </Typography>
-                                <Typography sx={{ mt: 0.25, fontSize: '0.62rem', fontWeight: 800, textTransform: 'none', letterSpacing: '0.06em' }}>
+                                <Typography sx={{ mt: 0.25, fontSize: '0.62rem', fontWeight: 650, textTransform: 'none', letterSpacing: '0.05em' }}>
                                     {metric.label}
                                 </Typography>
                             </Box>
@@ -1758,7 +1882,7 @@ function GeneInfoTable({ gene, summary }) {
                                         borderRight: `1px solid ${theme.custom.border.soft}`,
                                         borderBottom: `1px solid ${theme.custom.border.soft}`,
                                         fontSize: '0.76rem',
-                                        fontWeight: 850,
+                                        fontWeight: 720,
                                         letterSpacing: '0.01em',
                                     }}
                                 >
@@ -1801,7 +1925,7 @@ function GeneInfoTable({ gene, summary }) {
                                                         borderRadius: 0.75,
                                                         border: `1px solid ${theme.custom.border.soft}`,
                                                         fontSize: '0.72rem',
-                                                        fontWeight: 800,
+                                                        fontWeight: 700,
                                                         color: '#245089',
                                                         bgcolor: theme.custom.surface.subtle,
                                                         '&:hover': {
@@ -1938,7 +2062,7 @@ function GeneProgramTable({ gene, records, programRows }) {
                                 }}
                             >
                                 <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.identity, fontWeight: 600 })}>
-                                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: theme.palette.primary.dark }} noWrap>
+                                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: theme.palette.primary.dark }} noWrap>
                                         {row.geneLabel}
                                     </Typography>
                                 </TableCell>

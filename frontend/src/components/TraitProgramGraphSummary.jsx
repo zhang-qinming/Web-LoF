@@ -102,18 +102,18 @@ export default function TraitProgramGraphSummary({
                     flexWrap: 'wrap',
                 }}
             >
-                <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: 13.5 }}>
+                <Typography sx={{ fontWeight: 720, color: '#0f172a', fontSize: 13.5 }}>
                     {title}
                 </Typography>
                 <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                    <Chip label={`${modules.length} modules`} size="small" sx={{ height: 22, fontWeight: 800 }} />
+                    <Chip label={`${modules.length} modules`} size="small" sx={{ height: 22, fontWeight: 650 }} />
                     {programCount > 0 && (
                         <Chip
                             label={`program ${programCount}`}
                             size="small"
                             sx={{
                                 height: 22,
-                                fontWeight: 800,
+                                fontWeight: 680,
                                 color: (sideMetaMap?.program || sideMeta).accent,
                                 bgcolor: (sideMetaMap?.program || sideMeta).softBg,
                             }}
@@ -125,7 +125,7 @@ export default function TraitProgramGraphSummary({
                             size="small"
                             sx={{
                                 height: 22,
-                                fontWeight: 800,
+                                fontWeight: 680,
                                 color: (sideMetaMap?.regulator || sideMeta).accent,
                                 bgcolor: (sideMetaMap?.regulator || sideMeta).softBg,
                             }}
@@ -152,14 +152,14 @@ export default function TraitProgramGraphSummary({
                 <Table size="small" stickyHeader sx={stickyTableSx(theme)}>
                     <TableHead>
                         <TableRow>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, width: 112 })}>Side</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, width: 132 })}>Program</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, width: 132 })}>Selected by</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Score</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Genes</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>+ / -</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 800, minWidth: 260 })}>Visible genes</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 800 })}>Shown</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 112 })}>Side</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 132 })}>Program</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 132 })}>Selected by</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Score</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Genes</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>+ / -</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, minWidth: 260 })}>Visible genes</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Shown</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -207,7 +207,7 @@ export default function TraitProgramGraphSummary({
                                                 borderRadius: 1,
                                                 color: rowMeta.accent,
                                                 bgcolor: rowMeta.softBg,
-                                                fontWeight: 900,
+                                                fontWeight: 700,
                                                 textTransform: 'lowercase',
                                             }}
                                         />
@@ -227,7 +227,7 @@ export default function TraitProgramGraphSummary({
                                                         minWidth: 0,
                                                         p: 0,
                                                         color: '#245089',
-                                                        fontWeight: 900,
+                                                        fontWeight: 740,
                                                         lineHeight: 1,
                                                         textTransform: 'none',
                                                     }}
@@ -281,7 +281,7 @@ export default function TraitProgramGraphSummary({
                                     <TableCell align="right">
                                         <Typography
                                             sx={{
-                                                fontWeight: 800,
+                                                fontWeight: 700,
                                                 color: edgeColorFromScore(module[scoreField]),
                                                 fontVariantNumeric: 'tabular-nums',
                                             }}
@@ -293,9 +293,9 @@ export default function TraitProgramGraphSummary({
                                         {module.totalFilteredGenes}/{module[totalField]}
                                     </TableCell>
                                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                        <Box component="span" sx={{ color: effectColors.positive, fontWeight: 800 }}>{positiveCount}</Box>
+                                        <Box component="span" sx={{ color: effectColors.positive, fontWeight: 700 }}>{positiveCount}</Box>
                                         {' / '}
-                                        <Box component="span" sx={{ color: effectColors.negative, fontWeight: 800 }}>{negativeCount}</Box>
+                                        <Box component="span" sx={{ color: effectColors.negative, fontWeight: 700 }}>{negativeCount}</Box>
                                     </TableCell>
                                     <TableCell>
                                         <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
@@ -315,7 +315,7 @@ export default function TraitProgramGraphSummary({
                                                             height: 22,
                                                             borderRadius: 1,
                                                             fontSize: 11,
-                                                            fontWeight: 800,
+                                                            fontWeight: 680,
                                                             color: effectColors[sign] || '#475467',
                                                             bgcolor: sign === 'negative'
                                                                 ? alpha(effectColors.negative, 0.10)
@@ -335,7 +335,7 @@ export default function TraitProgramGraphSummary({
                                                 <Typography sx={{ fontSize: 12, color: '#667085' }}>none</Typography>
                                             )}
                                             {uniqueGenes.length > 10 && (
-                                                <Chip label={`+${uniqueGenes.length - 10}`} size="small" sx={{ height: 22, borderRadius: 1, fontSize: 11, fontWeight: 800 }} />
+                                                <Chip label={`+${uniqueGenes.length - 10}`} size="small" sx={{ height: 22, borderRadius: 1, fontSize: 11, fontWeight: 650 }} />
                                             )}
                                         </Stack>
                                     </TableCell>

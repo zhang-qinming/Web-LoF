@@ -54,23 +54,23 @@ const theme = createTheme({
             'sans-serif',
         ].join(','),
         h4: {
-            fontWeight: 750,
-            letterSpacing: 0,
-        },
-        h5: {
             fontWeight: 720,
             letterSpacing: 0,
         },
+        h5: {
+            fontWeight: 690,
+            letterSpacing: 0,
+        },
         h6: {
-            fontWeight: 680,
+            fontWeight: 650,
             letterSpacing: 0,
         },
         subtitle1: {
-            fontWeight: 650,
+            fontWeight: 620,
         },
         button: {
             textTransform: 'none',
-            fontWeight: 650,
+            fontWeight: 620,
             letterSpacing: 0,
         },
     },
@@ -311,7 +311,7 @@ const theme = createTheme({
                     borderBottomColor: 'rgba(226, 232, 240, 0.88)',
                 },
                 head: {
-                    fontWeight: 700,
+                    fontWeight: 650,
                     color: '#475569',
                     backgroundColor: '#f8fafc',
                 },
