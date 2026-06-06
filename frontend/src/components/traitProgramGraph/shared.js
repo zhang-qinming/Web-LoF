@@ -145,7 +145,6 @@ export const GRAPH_LAYOUTS = {
         rightProgramTitleStep: 24,
         leftProgramLabelChars: 19,
         rightProgramLabelChars: 19,
-        regulatorGroupStyle: 'legacy',
         showSectionNotes: true,
     },
 };

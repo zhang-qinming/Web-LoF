@@ -82,13 +82,16 @@ async function getTraits({ page = 1, limit = 20, sortBy = 'trait_name', order = 
         [...params, l, offset]
     );
 
-    const [[{ total }]] = await pool.query(
-        `SELECT COUNT(*) AS total
-         FROM file_metadata fm
-         LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id
-         ${whereSql}`,
-        params
-    );
+    const countSql = searchText
+        ? `SELECT COUNT(*) AS total
+           FROM file_metadata fm
+           LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id
+           ${whereSql}`
+        : `SELECT COUNT(*) AS total
+           FROM file_metadata fm
+           ${whereSql}`;
+
+    const [[{ total }]] = await pool.query(countSql, params);
 
     return {
         data: rows,

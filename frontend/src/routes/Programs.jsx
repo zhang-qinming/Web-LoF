@@ -50,8 +50,6 @@ const PROGRAM_TABLE_GROUPS = [
     { label: 'GO Evidence', span: 3, tone: 'metric' },
     { label: 'Gene Preview', span: 1, tone: 'genes' },
 ];
-const PROGRAM_TABLE_TITLE_HEADER_HEIGHT = 48;
-
 const PROGRAM_INFO_COLUMNS = [
     { key: 'program', label: 'Program', align: 'center', tone: 'identity', width: 120 },
     { key: 'annotation', label: 'Annotation', align: 'left', tone: 'annotation', width: 360 },
@@ -274,30 +272,15 @@ function detailTableCellSx(theme, tone, align = 'left', overrides = {}) {
     };
 }
 
-function programTableTitleCellSx(theme) {
-    return {
-        position: 'sticky',
-        top: 0,
-        zIndex: '43 !important',
-        height: PROGRAM_TABLE_TITLE_HEADER_HEIGHT,
-        py: 0.75,
-        px: 1.25,
-        bgcolor: theme.custom.surface.raised,
-        backgroundColor: `${theme.custom.surface.raised} !important`,
-        borderBottom: `1px solid ${theme.custom.border.soft}`,
-        color: theme.palette.text.primary,
-    };
-}
-
 function programTableGroupHeaderSx(theme, tone) {
     return groupedTableHeaderCellSx(theme, tone, {
-        top: PROGRAM_TABLE_TITLE_HEADER_HEIGHT,
+        top: 0,
     });
 }
 
 function programTableColumnHeaderSx(theme, tone, align) {
     return groupedTableColumnHeaderCellSx(theme, tone, align, {
-        top: PROGRAM_TABLE_TITLE_HEADER_HEIGHT + groupedTableHeaderMetrics.groupHeight,
+        top: groupedTableHeaderMetrics.groupHeight,
     });
 }
 
@@ -858,10 +841,10 @@ function ProgramGenesTable({ programId, maxHeight = 640 }) {
 export default function Programs() {
     const theme = useTheme();
     const programTableTones = {
-        identity: tableTone(theme, 'neutral'),
-        annotation: tableTone(theme, 'success'),
+        identity: tableTone(theme, 'warning'),
+        annotation: tableTone(theme, 'warning'),
         metric: tableTone(theme, 'primary'),
-        genes: tableTone(theme, 'accent'),
+        genes: tableTone(theme, 'success'),
     };
     const { programId } = useParams();
     const navigate = useNavigate();
@@ -1031,7 +1014,95 @@ export default function Programs() {
         >
             <Paper elevation={0} sx={panelSx(theme, {
                 overflow: 'hidden',
+                borderColor: alpha('#d97706', 0.18),
+                background: `linear-gradient(180deg, ${alpha('#d97706', 0.035)} 0%, ${theme.palette.background.paper} 150px)`,
             })}>
+                <Box
+                    sx={{
+                        px: { xs: 1.5, md: 2 },
+                        py: { xs: 1.05, md: 1.15 },
+                        borderBottom: `1px solid ${theme.custom.border.soft}`,
+                        display: 'grid',
+                        gridTemplateColumns: {
+                            xs: '1fr',
+                            md: 'minmax(220px, 1fr) minmax(260px, 420px) minmax(120px, 1fr)',
+                        },
+                        gap: { xs: 0.75, md: 1.2 },
+                        alignItems: 'center',
+                    }}
+                >
+                    <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#7c4d12', lineHeight: 1.15 })}>
+                        Program Annotations
+                    </Typography>
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: 0.65,
+                            minWidth: 0,
+                            flexWrap: 'wrap',
+                        }}
+                    >
+                        <TextField
+                            size="small"
+                            value={programGeneSearch}
+                            onChange={(event) => setProgramGeneSearch(event.target.value)}
+                            placeholder="Filter by gene"
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search sx={{ fontSize: 16, color: '#7c4d12' }} />
+                                    </InputAdornment>
+                                ),
+                            }}
+                            sx={{
+                                width: { xs: '100%', sm: 220 },
+                                '& .MuiInputBase-root': {
+                                    height: 30,
+                                    fontSize: '0.74rem',
+                                    bgcolor: theme.palette.background.paper,
+                                },
+                            }}
+                        />
+                        <Chip
+                            label={programGeneSearch.trim()
+                                ? `${rows.length.toLocaleString()}/${programCount.toLocaleString()} programs`
+                                : `${rows.length.toLocaleString()} programs`}
+                            size="small"
+                            sx={summaryChipSx(theme, {
+                                height: 22,
+                                color: '#7c4d12',
+                                bgcolor: alpha('#d97706', 0.08),
+                                border: `1px solid ${alpha('#d97706', 0.18)}`,
+                            })}
+                        />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+                        <Button
+                            size="small"
+                            startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
+                            onClick={handleProgramTableDownload}
+                            disabled={!rows.length}
+                            sx={{
+                                textTransform: 'none',
+                                fontSize: '0.74rem',
+                                color: '#7c4d12',
+                                border: `1px solid ${alpha('#d97706', 0.18)}`,
+                                bgcolor: alpha('#d97706', 0.045),
+                                minWidth: 64,
+                                py: 0.38,
+                                flexShrink: 0,
+                                '&:hover': {
+                                    bgcolor: alpha('#d97706', 0.08),
+                                    borderColor: alpha('#d97706', 0.28),
+                                },
+                            }}
+                        >
+                            CSV
+                        </Button>
+                    </Box>
+                </Box>
                 <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
                     <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1622 })}>
                         <colgroup>
@@ -1040,72 +1111,6 @@ export default function Programs() {
                             ))}
                         </colgroup>
                         <TableHead>
-                            <TableRow>
-                                <TableCell colSpan={PROGRAM_TABLE_COLUMNS.length} sx={programTableTitleCellSx(theme)}>
-                                    <Stack
-                                        direction={{ xs: 'column', sm: 'row' }}
-                                        spacing={0.9}
-                                        alignItems={{ xs: 'flex-start', sm: 'center' }}
-                                        justifyContent="flex-start"
-                                        sx={{ minWidth: 0 }}
-                                    >
-                                        <Box sx={{ minWidth: 0, flexShrink: 0 }}>
-                                            <Typography sx={sectionTitleSx(theme, { fontSize: '0.98rem', lineHeight: 1.2 })}>
-                                                Program Annotations
-                                            </Typography>
-                                        </Box>
-                                        <Stack
-                                            direction="row"
-                                            spacing={0.65}
-                                            alignItems="center"
-                                            sx={{ flexWrap: 'wrap', justifyContent: 'flex-start', minWidth: 0 }}
-                                        >
-                                            <TextField
-                                                size="small"
-                                                value={programGeneSearch}
-                                                onChange={(event) => setProgramGeneSearch(event.target.value)}
-                                                placeholder="Filter by gene"
-                                                InputProps={{
-                                                    startAdornment: (
-                                                        <InputAdornment position="start">
-                                                            <Search sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
-                                                        </InputAdornment>
-                                                    ),
-                                                }}
-                                                sx={{
-                                                    width: { xs: '100%', sm: 190 },
-                                                    '& .MuiInputBase-root': {
-                                                        height: 30,
-                                                        fontSize: '0.72rem',
-                                                        bgcolor: theme.palette.background.paper,
-                                                    },
-                                                }}
-                                            />
-                                            <Chip
-                                                label={programGeneSearch.trim()
-                                                    ? `${rows.length.toLocaleString()}/${programCount.toLocaleString()} programs`
-                                                    : `${rows.length.toLocaleString()} programs`}
-                                                size="small"
-                                                sx={summaryChipSx(theme, {
-                                                    height: 22,
-                                                    color: theme.palette.primary.dark,
-                                                    bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                                    border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
-                                                })}
-                                            />
-                                            <Button
-                                                size="small"
-                                                startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
-                                                onClick={handleProgramTableDownload}
-                                                disabled={!rows.length}
-                                                sx={{ textTransform: 'none', fontSize: '0.72rem', color: theme.palette.text.secondary, flexShrink: 0 }}
-                                            >
-                                                CSV
-                                            </Button>
-                                        </Stack>
-                                    </Stack>
-                                </TableCell>
-                            </TableRow>
                             <TableRow>
                                 {PROGRAM_TABLE_GROUPS.map((group) => (
                                     <TableCell
@@ -1154,8 +1159,8 @@ export default function Programs() {
                                                 px: 0,
                                                 py: 0,
                                                 minHeight: 0,
-                                                justifyContent: 'flex-start',
-                                                color: theme.palette.primary.dark,
+                                                justifyContent: 'center',
+                                                color: '#7c4d12',
                                                 fontVariantNumeric: 'tabular-nums',
                                                 fontFeatureSettings: '"tnum" 1',
                                                 fontWeight: 700,

@@ -144,6 +144,9 @@ export default function GeneLevelScatterTable({
 
     if (!rows.length) return null;
 
+    const shouldPaginate = sortedRows.length > 50;
+    const visibleRows = shouldPaginate ? pagedRows : sortedRows;
+
     return (
         <Paper
             ref={tableSectionRef}
@@ -183,7 +186,7 @@ export default function GeneLevelScatterTable({
             </Box>
 
             <Collapse in={tableOpen}>
-                <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 560, overflowX: 'auto', overflowY: 'auto' })}>
+                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
                     <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: 1210 })}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
@@ -222,9 +225,9 @@ export default function GeneLevelScatterTable({
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {pagedRows.map((row, index) => {
+                            {visibleRows.map((row, index) => {
                                 const isHighlighted = highlight.rowKey === row.rowKey;
-                                const absoluteIndex = (tablePage * tableRowsPerPage) + index;
+                                const absoluteIndex = shouldPaginate ? (tablePage * tableRowsPerPage) + index : index;
                                 const even = absoluteIndex % 2 === 0;
 
                                 return (
@@ -278,18 +281,20 @@ export default function GeneLevelScatterTable({
                         </TableBody>
                     </Table>
                 </TableContainer>
-                <TablePagination
-                    component="div"
-                    count={sortedRows.length}
-                    page={tablePage}
-                    onPageChange={(_, nextPage) => setTablePage(nextPage)}
-                    rowsPerPage={tableRowsPerPage}
-                    onRowsPerPageChange={(event) => {
-                        setTableRowsPerPage(Number(event.target.value) || 50);
-                        setTablePage(0);
-                    }}
-                    rowsPerPageOptions={[50, 100, 200]}
-                />
+                {shouldPaginate && (
+                    <TablePagination
+                        component="div"
+                        count={sortedRows.length}
+                        page={tablePage}
+                        onPageChange={(_, nextPage) => setTablePage(nextPage)}
+                        rowsPerPage={tableRowsPerPage}
+                        onRowsPerPageChange={(event) => {
+                            setTableRowsPerPage(Number(event.target.value) || 50);
+                            setTablePage(0);
+                        }}
+                        rowsPerPageOptions={[50, 100, 200]}
+                    />
+                )}
             </Collapse>
         </Paper>
     );

@@ -189,6 +189,8 @@ export default function TraitHitManhattanTable({
     const theme = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchError, setSearchError] = useState('');
+    const shouldPaginate = sortedRows.length > 50;
+    const visibleRows = shouldPaginate ? pagedRows : sortedRows;
     const TONES = {
         neutral: tableTone(theme, 'neutral'),
         locus: tableTone(theme, 'primary'),
@@ -309,9 +311,8 @@ export default function TraitHitManhattanTable({
             <Collapse in={tableOpen}>
                 <TableContainer
                     sx={stickyTableContainerSx(theme, {
-                        maxHeight: 520,
                         overflowX: 'auto',
-                        overflowY: 'auto',
+                        overflowY: 'visible',
                     })}
                 >
                     <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: 930 })}>
@@ -352,9 +353,9 @@ export default function TraitHitManhattanTable({
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {pagedRows.map((row, index) => {
+                            {visibleRows.map((row, index) => {
                                 const isHighlighted = highlight.rowKey === row.rowKey;
-                                const absoluteIndex = (tablePage * tableRowsPerPage) + index;
+                                const absoluteIndex = shouldPaginate ? (tablePage * tableRowsPerPage) + index : index;
                                 const even = absoluteIndex % 2 === 0;
 
                                 return (
@@ -423,18 +424,20 @@ export default function TraitHitManhattanTable({
                         </TableBody>
                     </Table>
                 </TableContainer>
-                <TablePagination
-                    component="div"
-                    count={sortedRows.length}
-                    page={tablePage}
-                    onPageChange={(_, nextPage) => setTablePage(nextPage)}
-                    rowsPerPage={tableRowsPerPage}
-                    onRowsPerPageChange={(event) => {
-                        setTableRowsPerPage(Number(event.target.value) || 50);
-                        setTablePage(0);
-                    }}
-                    rowsPerPageOptions={[50, 100, 200]}
-                />
+                {shouldPaginate && (
+                    <TablePagination
+                        component="div"
+                        count={sortedRows.length}
+                        page={tablePage}
+                        onPageChange={(_, nextPage) => setTablePage(nextPage)}
+                        rowsPerPage={tableRowsPerPage}
+                        onRowsPerPageChange={(event) => {
+                            setTableRowsPerPage(Number(event.target.value) || 50);
+                            setTablePage(0);
+                        }}
+                        rowsPerPageOptions={[50, 100, 200]}
+                    />
+                )}
             </Collapse>
         </Paper>
     );

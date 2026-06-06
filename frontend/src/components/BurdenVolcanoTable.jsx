@@ -180,6 +180,8 @@ export default function BurdenVolcanoTable({
     };
     if (!rows.length) return null;
 
+    const shouldPaginate = sortedRows.length > 50;
+    const visibleRows = shouldPaginate ? pagedRows : sortedRows;
     const columnSpecs = getColumnSpecs({ effectLabel, includePosteriorColumns });
     const columnGroups = getColumnGroups(includePosteriorColumns);
     const tableMinWidth = includePosteriorColumns ? 1320 : 1040;
@@ -231,9 +233,8 @@ export default function BurdenVolcanoTable({
                         width: '100%',
                         maxWidth: '100%',
                         minWidth: 0,
-                        maxHeight: 520,
                         overflowX: 'auto',
-                        overflowY: 'auto',
+                        overflowY: 'visible',
                     })}
                 >
                     <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: tableMinWidth })}>
@@ -274,9 +275,9 @@ export default function BurdenVolcanoTable({
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {pagedRows.map((row, index) => {
+                            {visibleRows.map((row, index) => {
                                 const isHighlighted = highlight.rowKey === row.rowKey;
-                                const absoluteIndex = (tablePage * tableRowsPerPage) + index;
+                                const absoluteIndex = shouldPaginate ? (tablePage * tableRowsPerPage) + index : index;
                                 const even = absoluteIndex % 2 === 0;
 
                                 return (
@@ -332,18 +333,20 @@ export default function BurdenVolcanoTable({
                         </TableBody>
                     </Table>
                 </TableContainer>
-                <TablePagination
-                    component="div"
-                    count={sortedRows.length}
-                    page={tablePage}
-                    onPageChange={(_, nextPage) => setTablePage(nextPage)}
-                    rowsPerPage={tableRowsPerPage}
-                    onRowsPerPageChange={(event) => {
-                        setTableRowsPerPage(Number(event.target.value) || 50);
-                        setTablePage(0);
-                    }}
-                    rowsPerPageOptions={[50, 100, 200]}
-                />
+                {shouldPaginate && (
+                    <TablePagination
+                        component="div"
+                        count={sortedRows.length}
+                        page={tablePage}
+                        onPageChange={(_, nextPage) => setTablePage(nextPage)}
+                        rowsPerPage={tableRowsPerPage}
+                        onRowsPerPageChange={(event) => {
+                            setTableRowsPerPage(Number(event.target.value) || 50);
+                            setTablePage(0);
+                        }}
+                        rowsPerPageOptions={[50, 100, 200]}
+                    />
+                )}
             </Collapse>
         </Paper>
     );

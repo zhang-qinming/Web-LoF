@@ -3,6 +3,7 @@ const pool = require('./db');
 const TABLE_MISSING_CODES = new Set(['ER_NO_SUCH_TABLE', 'ER_BAD_TABLE_ERROR']);
 const GENE_INFO_TABLE = 'gene_info_hg37_matched';
 const GENE_SUMMARY_CACHE_TTL_MS = 60 * 60 * 1000;
+const PREFIX_FALLBACK_BLOCKLIST = new Set(['EN', 'ENS', 'ENSG']);
 let geneInfoTableAvailablePromise = null;
 let geneSummaryCache = null;
 let geneSummaryCachePromise = null;
@@ -432,7 +433,13 @@ function normalizeProgramAggregate(row, fallbackGeneLabel = '') {
     const roles = String(row.roles || '').split(',').filter(Boolean);
     const signs = String(row.signs || '').split(',').filter((value) => value && value !== '-');
     const roleLabel = roles
-        .map((role) => (role === 'program' ? 'loading' : 'regulator'))
+        .map((role) => {
+            const value = String(role || '').trim().toLowerCase();
+            if (value === 'program' || value === 'loading') return 'program';
+            if (value === 'regulator') return 'regulator';
+            return value;
+        })
+        .filter(Boolean)
         .join(' + ') || '-';
     let signLabel = '-';
     if (signs.length === 1) signLabel = signs[0];
@@ -449,7 +456,7 @@ function normalizeProgramAggregate(row, fallbackGeneLabel = '') {
         programGoLabel: row.representative_go || row.top10_pathways || '-',
         goEnrichmentP: row.go_enrichment_p || '',
         geneDirection,
-        programGeneCountLabel: programGeneCountSort ? programGeneCountSort.toLocaleString() : '-',
+        programGeneCountLabel: programGeneCountSort ? `${programGeneCountSort.toLocaleString()} genes` : '-',
         programGeneCountSort,
         totalTraits: Number(row.total_traits) || 0,
     };
@@ -606,11 +613,16 @@ async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 
         const sortedGenes = [...filteredGenes].sort((a, b) => compareGeneSummaryRows(a, b, sortBy, order));
         const genes = exportAll ? sortedGenes : sortedGenes.slice(offset, offset + l);
         const total = sortedGenes.length;
+        const maxTotals = cache.genes.reduce((acc, gene) => ({
+            totalPrograms: Math.max(acc.totalPrograms, Number(gene.totalPrograms) || 0),
+            totalTraits: Math.max(acc.totalTraits, Number(gene.totalTraits) || 0),
+        }), { totalPrograms: 0, totalTraits: 0 });
 
         return {
             genes,
             data: genes,
             totalCount: Number(total) || 0,
+            maxTotals,
             page: p,
             limit: exportAll ? genes.length : l,
             totalPages: exportAll ? 1 : Math.ceil((Number(total) || 0) / l),
@@ -624,6 +636,7 @@ async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 
                 genes: [],
                 data: [],
                 totalCount: 0,
+                maxTotals: { totalPrograms: 0, totalTraits: 0 },
                 page: p,
                 limit: exportAll ? 0 : l,
                 totalPages: 0,
@@ -681,6 +694,15 @@ async function searchGenes(query, limit = 20) {
                 query: q,
                 totalGenes: exactRows.length,
                 genes: exactRows.map((row) => normalizeGeneSummary(row)),
+            };
+        }
+
+        if (PREFIX_FALLBACK_BLOCKLIST.has(q.toUpperCase())) {
+            return {
+                query: q,
+                totalGenes: 0,
+                genes: [],
+                prefixFallbackSkipped: true,
             };
         }
 

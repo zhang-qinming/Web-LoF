@@ -10,6 +10,7 @@ import {
     TableCell,
     TableContainer,
     TableHead,
+    TablePagination,
     TableRow,
     TableSortLabel,
 } from '@mui/material';
@@ -143,6 +144,30 @@ export default function ProgramScatterTable({
 }) {
     const theme = useTheme();
     const infoTone = tableTone(theme, 'neutral');
+    const [tablePage, setTablePage] = React.useState(0);
+    const [rowsPerPage, setRowsPerPage] = React.useState(50);
+    const shouldPaginate = sortedRows.length > 50;
+    const visibleRows = shouldPaginate
+        ? sortedRows.slice(tablePage * rowsPerPage, (tablePage * rowsPerPage) + rowsPerPage)
+        : sortedRows;
+
+    React.useEffect(() => {
+        const maxPage = shouldPaginate ? Math.max(0, Math.ceil(sortedRows.length / rowsPerPage) - 1) : 0;
+        if (tablePage > maxPage) setTablePage(maxPage);
+    }, [rowsPerPage, shouldPaginate, sortedRows.length, tablePage]);
+
+    React.useEffect(() => {
+        setTablePage(0);
+    }, [sortBy, sortDir]);
+
+    React.useEffect(() => {
+        if (!shouldPaginate || !highlight.program) return;
+        const rowIndex = sortedRows.findIndex((row) => row.program === highlight.program);
+        if (rowIndex < 0) return;
+        const nextPage = Math.floor(rowIndex / rowsPerPage);
+        if (nextPage !== tablePage) setTablePage(nextPage);
+    }, [highlight.program, rowsPerPage, shouldPaginate, sortedRows, tablePage]);
+
     if (!rows.length) return null;
 
     return (
@@ -166,7 +191,7 @@ export default function ProgramScatterTable({
                 </Button>
             </Box>
             <Collapse in={tableOpen}>
-                <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 460, overflowX: 'auto', overflowY: 'auto' })}>
+                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
                     <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 980 })}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
@@ -216,9 +241,10 @@ export default function ProgramScatterTable({
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {sortedRows.map((row, idx) => {
+                            {visibleRows.map((row, idx) => {
                                 const isHL = highlight.program === row.program;
-                                const even = idx % 2 === 0;
+                                const absoluteIndex = shouldPaginate ? (tablePage * rowsPerPage) + idx : idx;
+                                const even = absoluteIndex % 2 === 0;
                                 return (
                                     <TableRow
                                         key={row.program}
@@ -241,6 +267,20 @@ export default function ProgramScatterTable({
                         </TableBody>
                     </Table>
                 </TableContainer>
+                {shouldPaginate && (
+                    <TablePagination
+                        component="div"
+                        count={sortedRows.length}
+                        page={tablePage}
+                        onPageChange={(_, nextPage) => setTablePage(nextPage)}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={(event) => {
+                            setRowsPerPage(Number(event.target.value) || 50);
+                            setTablePage(0);
+                        }}
+                        rowsPerPageOptions={[50, 100, 200]}
+                    />
+                )}
             </Collapse>
         </Paper>
     );

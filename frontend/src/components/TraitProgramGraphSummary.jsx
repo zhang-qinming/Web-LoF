@@ -10,6 +10,7 @@ import {
     TableCell,
     TableContainer,
     TableHead,
+    TablePagination,
     TableRow,
     Tooltip,
     Typography,
@@ -38,6 +39,8 @@ export default function TraitProgramGraphSummary({
 }) {
     const theme = useTheme();
     const [filter, setFilter] = React.useState('all');
+    const [tablePage, setTablePage] = React.useState(0);
+    const [rowsPerPage, setRowsPerPage] = React.useState(50);
     const rowRefs = React.useRef(new Map());
     const headerTone = tableTone(theme, 'neutral');
     const programCount = modules.filter((module) => (module.side || side) === 'program').length;
@@ -50,6 +53,10 @@ export default function TraitProgramGraphSummary({
         if (filter === 'gene') return selectedGeneKey && module.filteredGeneKeys?.includes(selectedGeneKey);
         return true;
     }), [filter, modules, selectedGeneKey, selectedProgram, side]);
+    const shouldPaginate = filteredModules.length > 50;
+    const visibleModules = shouldPaginate
+        ? filteredModules.slice(tablePage * rowsPerPage, (tablePage * rowsPerPage) + rowsPerPage)
+        : filteredModules;
 
     React.useEffect(() => {
         if (selectedGeneKey) {
@@ -67,17 +74,44 @@ export default function TraitProgramGraphSummary({
 
     React.useEffect(() => {
         if (!selectedProgram) return;
+        const rowIndex = filteredModules.findIndex((item) => item.program === selectedProgram);
+        if (rowIndex < 0) return;
+        if (shouldPaginate) {
+            const nextPage = Math.floor(rowIndex / rowsPerPage);
+            if (nextPage !== tablePage) {
+                setTablePage(nextPage);
+                return;
+            }
+        }
         const row = rowRefs.current.get(`${selectedProgram}:program`) || rowRefs.current.get(`${selectedProgram}:regulator`);
         row?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-    }, [selectedProgram, filteredModules]);
+    }, [filteredModules, rowsPerPage, selectedProgram, shouldPaginate, tablePage]);
 
     React.useEffect(() => {
         if (!selectedGeneKey) return;
-        const module = filteredModules.find((item) => item.filteredGeneKeys?.includes(selectedGeneKey));
+        const rowIndex = filteredModules.findIndex((item) => item.filteredGeneKeys?.includes(selectedGeneKey));
+        if (rowIndex < 0) return;
+        if (shouldPaginate) {
+            const nextPage = Math.floor(rowIndex / rowsPerPage);
+            if (nextPage !== tablePage) {
+                setTablePage(nextPage);
+                return;
+            }
+        }
+        const module = filteredModules[rowIndex];
         if (!module) return;
         const row = rowRefs.current.get(`${module.program}:${module.side || side}`);
         row?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-    }, [filteredModules, selectedGeneKey, side]);
+    }, [filteredModules, rowsPerPage, selectedGeneKey, shouldPaginate, side, tablePage]);
+
+    React.useEffect(() => {
+        const maxPage = shouldPaginate ? Math.max(0, Math.ceil(filteredModules.length / rowsPerPage) - 1) : 0;
+        if (tablePage > maxPage) setTablePage(maxPage);
+    }, [filteredModules.length, rowsPerPage, shouldPaginate, tablePage]);
+
+    React.useEffect(() => {
+        setTablePage(0);
+    }, [filter, modules.length]);
 
     const filterOptions = [
         { key: 'all', label: 'All', disabled: false },
@@ -148,7 +182,7 @@ export default function TraitProgramGraphSummary({
                 </Stack>
             </Box>
 
-            <TableContainer sx={stickyTableContainerSx(theme, { maxHeight: 430, overflowX: 'auto', overflowY: 'auto' })}>
+            <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
                 <Table size="small" stickyHeader sx={stickyTableSx(theme)}>
                     <TableHead>
                         <TableRow>
@@ -163,7 +197,7 @@ export default function TraitProgramGraphSummary({
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {filteredModules.map((module, index) => {
+                        {visibleModules.map((module, index) => {
                             const rowSide = module.side || side;
                             const rowMeta = sideMetaMap?.[rowSide] || sideMeta;
                             const scoreField = rowSide === 'program' ? 'programScore' : 'regulatorScore';
@@ -371,6 +405,20 @@ export default function TraitProgramGraphSummary({
                     </TableBody>
                 </Table>
             </TableContainer>
+            {shouldPaginate && (
+                <TablePagination
+                    component="div"
+                    count={filteredModules.length}
+                    page={tablePage}
+                    onPageChange={(_, nextPage) => setTablePage(nextPage)}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={(event) => {
+                        setRowsPerPage(Number(event.target.value) || 50);
+                        setTablePage(0);
+                    }}
+                    rowsPerPageOptions={[50, 100, 200]}
+                />
+            )}
         </Paper>
     );
 }

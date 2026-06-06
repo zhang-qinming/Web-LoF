@@ -23,16 +23,27 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
+    AccountTree,
     ArrowForward,
-    Biotech,
+    Article,
+    CompareArrows,
     Close,
     FileDownload,
     Folder,
+    FolderOpen,
+    GraphicEq,
+    GridOn,
     Hub,
+    Insights,
     InsertDriveFile,
     QueryStats,
+    ScatterPlot,
     Search,
+    Science,
+    ShowChart,
+    StackedLineChart,
     Storage,
+    Whatshot,
 } from '@mui/icons-material';
 import axios from 'axios';
 import ReleaseLogSection from '../components/ReleaseLogSection';
@@ -115,7 +126,7 @@ const traitFigureCards = [
         description: 'Program x regulator',
         image: homeFigureProgramScatter,
         to: traitTabPath('program-scatter'),
-        icon: Hub,
+        icon: ScatterPlot,
         color: '#0284c7',
     },
     {
@@ -123,7 +134,7 @@ const traitFigureCards = [
         description: 'Trait-program graph',
         image: homeFigureTraitProgramNetwork,
         to: traitTabPath('trait-program-graph'),
-        icon: Hub,
+        icon: AccountTree,
         color: '#0f766e',
     },
     {
@@ -131,7 +142,7 @@ const traitFigureCards = [
         description: 'GWAS signal view',
         image: homeFigureGwasManhattan,
         to: traitTabPath('manhattan'),
-        icon: QueryStats,
+        icon: ShowChart,
         color: '#2563eb',
     },
     {
@@ -139,7 +150,7 @@ const traitFigureCards = [
         description: 'LoF burden genes',
         image: homeFigureBurdenVolcano,
         to: traitTabPath('burden-volcano'),
-        icon: QueryStats,
+        icon: Whatshot,
         color: '#ea580c',
     },
     {
@@ -147,7 +158,7 @@ const traitFigureCards = [
         description: 'GeneBayes effects',
         image: homeFigurePosteriorVolcano,
         to: traitTabPath('posterior-volcano'),
-        icon: QueryStats,
+        icon: Insights,
         color: '#a21caf',
     },
     {
@@ -155,7 +166,7 @@ const traitFigureCards = [
         description: 'Gene-level evidence',
         image: homeFigureLofGene,
         to: traitTabPath('gene-evidence'),
-        icon: Biotech,
+        icon: Science,
         color: '#7c3aed',
     },
     {
@@ -163,7 +174,7 @@ const traitFigureCards = [
         description: 'Gene-level QQ',
         image: homeFigureQqPlot,
         to: traitTabPath('gene-qq'),
-        icon: Biotech,
+        icon: GraphicEq,
         color: '#1d4ed8',
     },
     {
@@ -171,7 +182,7 @@ const traitFigureCards = [
         description: 'Cross-trait comparison',
         image: homeFigureCrossTraitHeatmap,
         to: traitTabPath('cross-trait-heatmap'),
-        icon: QueryStats,
+        icon: GridOn,
         color: '#c2410c',
     },
     {
@@ -179,7 +190,7 @@ const traitFigureCards = [
         description: 'Program-trait effects',
         image: homeFigureProgramVolcano,
         to: traitTabPath('program-scatter'),
-        icon: Hub,
+        icon: StackedLineChart,
         color: '#7c3aed',
     },
     {
@@ -187,7 +198,7 @@ const traitFigureCards = [
         description: 'Pairwise genetic correlation',
         image: homeFigureTraitCorrelation,
         to: traitTabPath('cross-trait-heatmap'),
-        icon: QueryStats,
+        icon: CompareArrows,
         color: '#2563eb',
     },
     {
@@ -195,7 +206,7 @@ const traitFigureCards = [
         description: 'Trait metadata and modules',
         image: homeFigureVariantDetail,
         to: '/trait',
-        icon: Biotech,
+        icon: Article,
         color: '#d97706',
     },
     {
@@ -203,7 +214,7 @@ const traitFigureCards = [
         description: 'File retrieval and export',
         image: homeFigureDataBrowser,
         to: '/data',
-        icon: FileDownload,
+        icon: FolderOpen,
         color: '#b45309',
     },
 ];
@@ -1206,21 +1217,17 @@ function HeroSection({ stats, statsLoading, theme }) {
                     >
                         Browse Traits
                     </Button>
-                    <Button
-                        variant="outlined"
-                        size="large"
-                        endIcon={<Storage sx={{ fontSize: 18 }} />}
-                        component={RouterLink}
-                        to="/data"
-                        sx={{
-                            px: 3.2,
-                            py: 1.15,
-                            borderRadius: 999,
-                        }}
-                    >
-                        Explore Data
-                    </Button>
                 </Stack>
+            </Box>
+
+            <Box sx={{ mt: { xs: 2.5, md: 3.1 }, maxWidth: 960, mx: 'auto' }}>
+                <HomeSearch
+                    embedded
+                    showCoverage={false}
+                    stats={stats}
+                    statsLoading={statsLoading}
+                    theme={theme}
+                />
             </Box>
 
             {/* Decorative SVG preview strip */}
@@ -1315,14 +1322,6 @@ function Home() {
     return (
         <Box sx={{ width: '100%', minHeight: '100%', color: '#1f2933', bgcolor: '#f7fafc', mx: 'auto' }}>
             <HeroSection stats={homeStats} statsLoading={homeStatsLoading} theme={theme} />
-
-            <HomeSearch
-                stats={homeStats}
-                statsError={homeStatsError}
-                statsLoading={homeStatsLoading}
-                showCoverage={false}
-                theme={theme}
-            />
 
             <FigureGateway items={traitFigureCards} />
 

@@ -114,9 +114,10 @@ export default function ReleaseLogSection({
                             position: 'absolute',
                             top: 24,
                             bottom: 24,
-                            left: { xs: 19, md: 177 },
+                            left: { xs: 24, md: 174 },
                             width: '1px',
                             background: `linear-gradient(180deg, ${alpha(accent, 0.22)}, ${alpha('#94a3b8', 0.18)})`,
+                            zIndex: 0,
                         },
                     }}
                 >
@@ -128,6 +129,7 @@ export default function ReleaseLogSection({
                                 key={`${entry.date}-${entry.title}`}
                                 sx={{
                                     position: 'relative',
+                                    zIndex: 1,
                                     display: 'grid',
                                     gridTemplateColumns: { xs: '1fr', md: '154px minmax(0, 1fr)' },
                                     gap: { xs: 1.2, md: 2.4 },
@@ -156,8 +158,11 @@ export default function ReleaseLogSection({
                                             width: 12,
                                             height: 12,
                                             borderRadius: '50%',
+                                            boxSizing: 'border-box',
                                             bgcolor: entry.color,
+                                            border: '2px solid #fff',
                                             boxShadow: `0 0 0 6px ${alpha(entry.color, 0.12)}`,
+                                            zIndex: 2,
                                         },
                                     }}
                                 >

@@ -3,6 +3,7 @@ import useSWR from 'swr';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
 import { fetcher } from '../api/gwas';
+import { downloadBlob } from '../utils/download';
 import {
     Table,
     TableBody,
@@ -161,6 +162,19 @@ function formatCellValue(row, columnId) {
     return row[columnId] || '-';
 }
 
+function escapeTsvValue(value) {
+    const text = value == null ? '' : String(value);
+    return /[\t\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function buildGwasTableTsv(rows, columns) {
+    const header = columns.map((column) => escapeTsvValue(column.label)).join('\t');
+    const lines = rows.map((row) => columns
+        .map((column) => escapeTsvValue(formatCellValue(row, column.id)))
+        .join('\t'));
+    return `${[header, ...lines].join('\n')}\n`;
+}
+
 function columnLayoutSx(column = {}) {
     const sx = {};
     if (column.width !== undefined) sx.width = column.width;
@@ -182,10 +196,9 @@ function headerLayoutSx(column = {}) {
     };
 }
 
-const GWAS_TABLE_TITLE_HEADER_HEIGHT = 82;
-const GWAS_TABLE_MAX_VISIBLE_ROWS = 20;
-const GWAS_TABLE_ROW_HEIGHT = 48;
+const GWAS_TABLE_TITLE_HEADER_HEIGHT = 94;
 const GWAS_TABLE_COLUMN_HEADER_HEIGHT = 46;
+const TABLE_PAGINATION_THRESHOLD = 50;
 
 function buildTraitHref(row, figureTab) {
     const path = `/trait/${encodeURIComponent(row.file_id)}`;
@@ -342,10 +355,12 @@ export default function GwasDataList({
     const figureTab = searchParams.get('tab') || '';
     const rootRef = useRef(null);
     const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(20);
+    const [limit, setLimit] = useState(TABLE_PAGINATION_THRESHOLD);
     const [sortBy, setSortBy] = useState(defaultSortBy);
     const [order, setOrder] = useState(defaultOrder);
     const [search, setSearch] = useState('');
+    const [downloading, setDownloading] = useState(false);
+    const [downloadError, setDownloadError] = useState('');
     const deferredSearch = useDeferredValue(search);
     const normalizedSearch = deferredSearch.trim();
 
@@ -404,12 +419,47 @@ export default function GwasDataList({
     const rows = data?.data || [];
     const totalPages = data?.totalPages || 1;
     const totalCount = data?.totalCount || 0;
+    const shouldPaginate = totalCount > TABLE_PAGINATION_THRESHOLD;
 
     useEffect(() => {
         if (page > totalPages && totalPages > 0) {
             setPage(totalPages);
         }
     }, [page, totalPages]);
+
+    const handleDownloadTsv = useCallback(async () => {
+        if (!totalCount) return;
+
+        setDownloading(true);
+        setDownloadError('');
+        try {
+            const pageSize = 200;
+            const pagesToFetch = Math.max(1, Math.ceil(totalCount / pageSize));
+            const downloadedRows = [];
+
+            for (let pageIndex = 1; pageIndex <= pagesToFetch; pageIndex += 1) {
+                const params = new URLSearchParams({
+                    page: String(pageIndex),
+                    limit: String(pageSize),
+                    sortBy,
+                    order,
+                });
+                if (normalizedSearch) params.set('search', normalizedSearch);
+                const payload = await fetcher(`/api/browse?${params.toString()}`);
+                downloadedRows.push(...(payload?.data || []));
+            }
+
+            const suffix = normalizedSearch ? `-${normalizedSearch.replace(/[^a-z0-9_-]+/gi, '_')}` : '';
+            downloadBlob(
+                new Blob([buildGwasTableTsv(downloadedRows, columns)], { type: 'text/tab-separated-values;charset=utf-8;' }),
+                `trait-browser${suffix}.tsv`,
+            );
+        } catch (err) {
+            setDownloadError(err?.message || 'Failed to download trait TSV.');
+        } finally {
+            setDownloading(false);
+        }
+    }, [columns, normalizedSearch, order, sortBy, totalCount]);
 
     if (error) {
         return (
@@ -423,8 +473,20 @@ export default function GwasDataList({
 
     return (
         <Box ref={rootRef} sx={{ position: 'relative' }}>
-            <Card elevation={0} sx={{ ...panelSx(theme, { borderRadius: 3 }), overflow: 'hidden' }}>
+            <Card elevation={0} sx={{
+                ...panelSx(theme, {
+                    borderRadius: 3,
+                    borderColor: alpha('#245089', 0.18),
+                    background: `linear-gradient(180deg, ${alpha('#245089', 0.035)} 0%, ${theme.palette.background.paper} 150px)`,
+                }),
+                overflow: 'hidden',
+            }}>
                 <CardContent sx={{ p: 0 }}>
+                    {downloadError && (
+                        <Alert severity="error" sx={{ m: 1.5, borderRadius: 1 }}>
+                            {downloadError}
+                        </Alert>
+                    )}
                     <Box sx={{ position: 'relative' }}>
                         <TableContainer
                             component={Paper}
@@ -432,8 +494,8 @@ export default function GwasDataList({
                             sx={stickyTableContainerSx(theme, {
                                 border: 0,
                                 borderRadius: 0,
-                                maxHeight: GWAS_TABLE_TITLE_HEADER_HEIGHT + GWAS_TABLE_COLUMN_HEADER_HEIGHT + (GWAS_TABLE_MAX_VISIBLE_ROWS * GWAS_TABLE_ROW_HEIGHT),
-                                overflow: 'auto',
+                                overflowX: 'auto',
+                                overflowY: 'visible',
                                 boxShadow: 'none',
                             })}
                         >
@@ -461,9 +523,9 @@ export default function GwasDataList({
                                             <TableCell
                                                 colSpan={Math.max(columns.length, 1)}
                                                 sx={stickyTableHeaderCellSx(theme, {
-                                                    headerBg: theme.custom.surface.base,
-                                                    headerBorder: theme.custom.border.soft,
-                                                    headerColor: theme.palette.text.primary,
+                                                    headerBg: '#f7fbff',
+                                                    headerBorder: alpha('#245089', 0.16),
+                                                    headerColor: '#173b5f',
                                                 }, 'left', {
                                                     top: 0,
                                                     zIndex: '45 !important',
@@ -493,24 +555,8 @@ export default function GwasDataList({
                                                             flexWrap: { xs: 'wrap', md: 'nowrap' },
                                                         }}
                                                     >
-                                                        <Typography sx={sectionTitleSx(theme, { fontSize: '0.92rem', lineHeight: 1.2 })}>
+                                                        <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b5f', lineHeight: 1.15 })}>
                                                             {title}
-                                                        </Typography>
-                                                        <Typography
-                                                            sx={{
-                                                                px: 0.85,
-                                                                py: 0.32,
-                                                                borderRadius: 1,
-                                                                border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
-                                                                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                                                color: theme.palette.primary.dark,
-                                                                fontSize: '0.72rem',
-                                                                fontWeight: 680,
-                                                                whiteSpace: 'nowrap',
-                                                                flexShrink: 0,
-                                                            }}
-                                                        >
-                                                            {resultLabel}
                                                         </Typography>
                                                     </Box>
                                                     <Box
@@ -518,8 +564,7 @@ export default function GwasDataList({
                                                             display: 'grid',
                                                             gridTemplateColumns: {
                                                                 xs: '1fr',
-                                                                md: 'minmax(0, 1fr) auto',
-                                                                lg: 'minmax(0, 1fr) auto auto',
+                                                                lg: 'minmax(0, 1fr) auto minmax(0, 1fr)',
                                                             },
                                                             alignItems: 'center',
                                                             justifyItems: { xs: 'stretch', md: 'start' },
@@ -530,75 +575,116 @@ export default function GwasDataList({
                                                         <Box
                                                             sx={{
                                                                 width: '100%',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'flex-start',
-                                                                gap: 0.55,
-                                                                flexWrap: 'wrap',
+                                                                display: 'grid',
+                                                                gap: 0.35,
                                                                 minWidth: 0,
                                                             }}
                                                         >
-                                                            <TextField
-                                                                size="small"
-                                                                value={search}
-                                                                onChange={(event) => setSearch(event.target.value)}
-                                                                placeholder="Search trait, LoF ID, MeSH term"
-                                                                sx={{
-                                                                    flex: { xs: '1 1 100%', sm: '0 1 260px' },
-                                                                    maxWidth: { sm: 280 },
-                                                                    '& .MuiOutlinedInput-root': {
-                                                                        bgcolor: theme.palette.background.paper,
-                                                                    },
-                                                                    '& .MuiInputBase-input': {
-                                                                        py: 0.55,
-                                                                        fontSize: '0.8rem',
-                                                                    },
-                                                                }}
-                                                                InputProps={{
-                                                                    startAdornment: (
-                                                                        <InputAdornment position="start">
-                                                                            <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
-                                                                        </InputAdornment>
-                                                                    ),
-                                                                    endAdornment: search ? (
-                                                                        <InputAdornment position="end">
-                                                                            <IconButton
-                                                                                size="small"
-                                                                                aria-label="Clear trait search"
-                                                                                onClick={() => setSearch('')}
-                                                                                edge="end"
-                                                                            >
-                                                                                <Clear fontSize="small" />
-                                                                            </IconButton>
-                                                                        </InputAdornment>
-                                                                    ) : null,
-                                                                }}
-                                                            />
-                                                            <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
-                                                        </Box>
-                                                        <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'center' }, justifySelf: { xs: 'start', md: 'center' } }}>
-                                                            <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
-                                                        </Box>
-                                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, justifySelf: { xs: 'start', lg: 'end' }, gap: 0.7, flexShrink: 0 }}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}>
-                                                                Rows
-                                                            </Typography>
-                                                            <FormControl size="small" sx={{ minWidth: 70 }}>
-                                                                <Select
-                                                                    value={limit}
-                                                                    onChange={handleChangeLimit}
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                                                                <Typography
                                                                     sx={{
-                                                                        bgcolor: theme.palette.background.paper,
-                                                                        fontSize: '0.78rem',
-                                                                        fontWeight: 650,
-                                                                        '& .MuiSelect-select': { py: 0.45 },
+                                                                        px: 0.85,
+                                                                        py: 0.32,
+                                                                        borderRadius: 1,
+                                                                        border: `1px solid ${alpha('#245089', 0.18)}`,
+                                                                        bgcolor: alpha('#245089', 0.08),
+                                                                        color: '#245089',
+                                                                        fontSize: '0.72rem',
+                                                                        fontWeight: 680,
+                                                                        whiteSpace: 'nowrap',
+                                                                        flexShrink: 0,
                                                                     }}
                                                                 >
-                                                                    {[20, 50, 100, 200].map((v) => (
-                                                                        <MenuItem key={v} value={v} dense>{v}</MenuItem>
-                                                                    ))}
-                                                                </Select>
-                                                            </FormControl>
+                                                                    {resultLabel}
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 0.55, flexWrap: 'wrap', minWidth: 0 }}>
+                                                                <TextField
+                                                                    size="small"
+                                                                    value={search}
+                                                                    onChange={(event) => setSearch(event.target.value)}
+                                                                    placeholder="Search trait, LoF ID, MeSH term"
+                                                                    sx={{
+                                                                        flex: { xs: '1 1 100%', sm: '0 1 260px' },
+                                                                        maxWidth: { sm: 280 },
+                                                                        '& .MuiOutlinedInput-root': {
+                                                                            bgcolor: theme.palette.background.paper,
+                                                                        },
+                                                                        '& .MuiInputBase-input': {
+                                                                            py: 0.55,
+                                                                            fontSize: '0.8rem',
+                                                                        },
+                                                                    }}
+                                                                    InputProps={{
+                                                                        startAdornment: (
+                                                                            <InputAdornment position="start">
+                                                                                <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
+                                                                            </InputAdornment>
+                                                                        ),
+                                                                        endAdornment: search ? (
+                                                                            <InputAdornment position="end">
+                                                                                <IconButton
+                                                                                    size="small"
+                                                                                    aria-label="Clear trait search"
+                                                                                    onClick={() => setSearch('')}
+                                                                                    edge="end"
+                                                                                >
+                                                                                    <Clear fontSize="small" />
+                                                                                </IconButton>
+                                                                            </InputAdornment>
+                                                                        ) : null,
+                                                                    }}
+                                                                />
+                                                            </Box>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', justifySelf: { xs: 'stretch', lg: 'center' }, gap: 0.75, flexWrap: 'wrap' }}>
+                                                            {shouldPaginate && <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />}
+                                                        </Box>
+                                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, justifySelf: { xs: 'start', lg: 'end' }, gap: 0.7, flexShrink: 0, flexWrap: 'wrap' }}>
+                                                            {shouldPaginate && <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />}
+                                                            {shouldPaginate && (
+                                                                <>
+                                                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}>
+                                                                        Rows
+                                                                    </Typography>
+                                                                    <FormControl size="small" sx={{ minWidth: 70 }}>
+                                                                        <Select
+                                                                            value={limit}
+                                                                            onChange={handleChangeLimit}
+                                                                            sx={{
+                                                                                bgcolor: theme.palette.background.paper,
+                                                                                fontSize: '0.78rem',
+                                                                                fontWeight: 650,
+                                                                                '& .MuiSelect-select': { py: 0.45 },
+                                                                            }}
+                                                                        >
+                                                                            {[50, 100, 200].map((v) => (
+                                                                                <MenuItem key={v} value={v} dense>{v}</MenuItem>
+                                                                            ))}
+                                                                        </Select>
+                                                                    </FormControl>
+                                                                </>
+                                                            )}
+                                                            <Button
+                                                                size="small"
+                                                                onClick={handleDownloadTsv}
+                                                                disabled={!totalCount || downloading}
+                                                                sx={{
+                                                                    textTransform: 'none',
+                                                                    fontSize: '0.74rem',
+                                                                    color: '#245089',
+                                                                    border: `1px solid ${alpha('#245089', 0.18)}`,
+                                                                    bgcolor: alpha('#245089', 0.045),
+                                                                    minWidth: 64,
+                                                                    py: 0.38,
+                                                                    '&:hover': {
+                                                                        bgcolor: alpha('#245089', 0.08),
+                                                                        borderColor: alpha('#245089', 0.28),
+                                                                    },
+                                                                }}
+                                                            >
+                                                                {downloading ? 'Preparing' : 'TSV'}
+                                                            </Button>
                                                         </Box>
                                                     </Box>
                                                 </Box>
@@ -611,9 +697,9 @@ export default function GwasDataList({
                                                 key={column.id}
                                                 align={column.numeric ? 'right' : 'left'}
                                                 sx={stickyTableHeaderCellSx(theme, {
-                                                    headerBg: theme.custom.surface.subtle,
-                                                    headerBorder: theme.custom.border.strong,
-                                                    headerColor: '#475569',
+                                                    headerBg: '#eef7ff',
+                                                    headerBorder: alpha('#245089', 0.22),
+                                                    headerColor: '#245089',
                                                 }, column.numeric ? 'right' : 'left', {
                                                     fontSize: '0.8rem',
                                                     fontWeight: 650,
@@ -636,6 +722,7 @@ export default function GwasDataList({
                                                         whiteSpace: column.headerWrap ? 'normal' : 'nowrap',
                                                         lineHeight: column.headerWrap ? 1.1 : 1.2,
                                                         alignItems: 'center',
+                                                        justifyContent: column.numeric ? 'flex-end' : 'flex-start',
                                                         '&:hover': { color: theme.palette.primary.main },
                                                         '&.Mui-active': { color: theme.palette.primary.main, fontWeight: 650 },
                                                         '& .MuiTableSortLabel-icon': {
@@ -654,7 +741,7 @@ export default function GwasDataList({
 
                                 <TableBody>
                                     {isLoading ? (
-                                        <LoadingSkeleton columns={columns} rows={Math.min(limit, GWAS_TABLE_MAX_VISIBLE_ROWS)} theme={theme} />
+                                        <LoadingSkeleton columns={columns} rows={Math.min(limit, 20)} theme={theme} />
                                     ) : (
                                         <>
                                             {rows.map((row, index) => (
@@ -682,7 +769,7 @@ export default function GwasDataList({
                                 px: { xs: 1.5, md: 2 },
                                 py: 1.35,
                                 display: 'grid',
-                                gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+                                gridTemplateColumns: shouldPaginate ? { xs: '1fr', md: 'minmax(0, 1fr) auto' } : '1fr',
                                 alignItems: 'center',
                                 gap: 1.5,
                                 background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.custom.surface.subtle})`,
@@ -693,10 +780,12 @@ export default function GwasDataList({
                                 {totalCount === 0 ? 'No items' : `${Math.min(((page - 1) * limit) + 1, totalCount).toLocaleString()}-${Math.min(page * limit, totalCount).toLocaleString()} / ${totalCount.toLocaleString()} records`}
                             </Typography>
 
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flexWrap: 'wrap' }}>
-                                <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
-                                <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
-                            </Box>
+                            {shouldPaginate && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flexWrap: 'wrap' }}>
+                                    <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
+                                    <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
+                                </Box>
+                            )}
                         </Box>
                     )}
                 </CardContent>
