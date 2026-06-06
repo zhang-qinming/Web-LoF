@@ -90,7 +90,7 @@ function GenePaginationControl({ totalPages, page, onChange, size = 'small' }) {
     if (totalPages <= 1) return null;
 
     return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: 0 }}>
             <Pagination
                 count={totalPages}
                 page={page + 1}
@@ -100,6 +100,16 @@ function GenePaginationControl({ totalPages, page, onChange, size = 'small' }) {
                 size={size}
                 showFirstButton
                 showLastButton
+                sx={{
+                    '& .MuiPagination-ul': {
+                        flexWrap: 'nowrap',
+                    },
+                    '& .MuiPaginationItem-root': {
+                        minWidth: 28,
+                        height: 28,
+                        fontSize: '0.76rem',
+                    },
+                }}
             />
         </Box>
     );
@@ -231,8 +241,8 @@ function GenePagerTools({
             )}
             <Stack direction="row" spacing={0.9} alignItems="center" sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', lg: 'flex-end' }, minWidth: 0 }}>
                 <GeneRowsControl rowsPerPage={rowsPerPage} onChange={onRowsPerPageChange} />
-                <GenePageJumpControl totalPages={pageCount} page={currentPage} onChange={onPageChange} />
                 <GenePaginationControl totalPages={pageCount} page={currentPage} onChange={onPageChange} />
+                <GenePageJumpControl totalPages={pageCount} page={currentPage} onChange={onPageChange} />
             </Stack>
         </Box>
     );
@@ -830,20 +840,23 @@ function GeneSuggestionList({ suggestions, isLoading, onSelect }) {
         }}>
             <Stack direction="row" spacing={0.8} alignItems="center" sx={{ mb: 0.8, flexWrap: 'wrap' }}>
                 <Typography sx={{ fontSize: '0.74rem', fontWeight: 650, color: theme.palette.text.secondary, textTransform: 'none', letterSpacing: '0.05em' }}>
-                    Matching genes
+                    Quick matches
                 </Typography>
                 <Chip
                     label={rows.length}
                     size="small"
                     sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
                 />
+                <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: theme.palette.text.secondary }}>
+                    Search filters the full table below.
+                </Typography>
             </Stack>
             <Box sx={{
                 display: 'grid',
                 gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
                 gap: 0.75,
             }}>
-                {sortedRows.slice(0, 8).map((gene, index) => {
+                {sortedRows.map((gene, index) => {
                     const label = gene.geneSymbol || gene.ensgId || gene.geneLabel;
                     return (
                         <Button
@@ -997,7 +1010,6 @@ function GeneHomeTable({
     setInput,
     suggestions,
     suggestionsLoading,
-    onSearch,
     onClear,
     onSelect,
 }) {
@@ -1014,15 +1026,19 @@ function GeneHomeTable({
     const [sortDir, setSortDir] = React.useState('desc');
     const [downloading, setDownloading] = React.useState(false);
     const [downloadError, setDownloadError] = React.useState('');
-    const isSearching = input.trim().length >= 2;
+    const [tableSearch, setTableSearch] = React.useState('');
+    const searchInput = input.trim();
+    const activeSearch = tableSearch.trim();
+    const isSearching = searchInput.length >= 2;
 
     const { data, isLoading, error } = useSWR(
-        ['gene-index', page, rowsPerPage, sortBy, sortDir],
-        ([, pageIndex, limit, sortKey, direction]) => getGenes({
+        ['gene-index', page, rowsPerPage, sortBy, sortDir, activeSearch],
+        ([, pageIndex, limit, sortKey, direction, search]) => getGenes({
             page: pageIndex + 1,
             limit,
             sortBy: sortKey,
             order: direction,
+            search,
         }),
         { keepPreviousData: true, revalidateOnFocus: false },
     );
@@ -1058,6 +1074,15 @@ function GeneHomeTable({
     const handlePageChange = React.useCallback((event, nextPage) => {
         setPage(nextPage);
     }, []);
+    const applyTableSearch = React.useCallback((value = input) => {
+        setTableSearch(value.trim());
+        setPage(0);
+    }, [input]);
+    const clearTableSearch = React.useCallback(() => {
+        setTableSearch('');
+        onClear();
+        setPage(0);
+    }, [onClear]);
 
     const handleDownload = React.useCallback(async () => {
         setDownloading(true);
@@ -1068,19 +1093,21 @@ function GeneHomeTable({
                 limit: 0,
                 sortBy,
                 order: sortDir,
+                search: activeSearch,
             });
             if (payload?.unavailable) {
                 setDownloadError(payload.reason || 'Gene SQL index is not available yet.');
                 return;
             }
             const csv = buildGeneTableCsv(payload?.genes || EMPTY_GENE_ROWS);
-            downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), 'gene-index.csv');
+            const suffix = activeSearch ? `-${activeSearch.replace(/[^a-z0-9_-]+/gi, '_')}` : '';
+            downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `gene-index${suffix}.csv`);
         } catch (err) {
             setDownloadError(err?.message || 'Failed to download gene index.');
         } finally {
             setDownloading(false);
         }
-    }, [sortBy, sortDir]);
+    }, [activeSearch, sortBy, sortDir]);
 
     return (
         <Paper
@@ -1094,41 +1121,51 @@ function GeneHomeTable({
             <Box
                 sx={{
                     px: { xs: 1.5, md: 2 },
-                    py: { xs: 1.5, md: 1.75 },
+                    py: { xs: 1.1, md: 1.15 },
                     borderBottom: `1px solid ${theme.custom.border.soft}`,
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) minmax(620px, 860px)' },
-                    gap: { xs: 1.35, xl: 1.75 },
-                    alignItems: 'center',
+                    gridTemplateColumns: '1fr',
+                    gap: 0.65,
                 }}
             >
-                <Box sx={{ minWidth: 0 }}>
-                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.55, flexWrap: 'wrap' }}>
-                        <Chip
-                            label={`${totalCount.toLocaleString()} genes`}
-                            size="small"
-                            sx={summaryChipSx(theme, {
-                                height: 23,
-                                color: '#2f6a49',
-                                bgcolor: alpha('#2f6a49', 0.08),
-                                border: `1px solid ${alpha('#2f6a49', 0.18)}`,
-                            })}
-                        />
-                    </Stack>
-                    <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.18rem', md: '1.35rem' }, color: '#173b35' })}>
+                <Box
+                    sx={{
+                        minWidth: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 1,
+                        flexWrap: { xs: 'wrap', md: 'nowrap' },
+                    }}
+                >
+                    <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b35', lineHeight: 1.15 })}>
                         Gene Explorer
                     </Typography>
-                    <Typography sx={captionSx(theme, { mt: 0.35, maxWidth: 620 })}>
-                        Search symbols or ENSG identifiers, then sort genes by location, type, programs, and traits.
-                    </Typography>
+                    <Chip
+                        label={activeSearch ? `${totalCount.toLocaleString()} matching genes` : `${totalCount.toLocaleString()} genes`}
+                        size="small"
+                        sx={summaryChipSx(theme, {
+                            height: 22,
+                            color: '#2f6a49',
+                            bgcolor: alpha('#2f6a49', 0.08),
+                            border: `1px solid ${alpha('#2f6a49', 0.18)}`,
+                            flexShrink: 0,
+                        })}
+                    />
                 </Box>
 
                 <Box
                     sx={{
                         minWidth: 0,
                         display: 'grid',
-                        gap: 0.85,
-                        justifyItems: { xs: 'stretch', xl: 'end' },
+                        gridTemplateColumns: {
+                            xs: '1fr',
+                            md: 'minmax(0, 1fr) auto',
+                            lg: 'minmax(0, 1fr) auto auto',
+                        },
+                        gap: { xs: 0.7, md: 0.9, lg: 1.1 },
+                        alignItems: 'center',
+                        justifyItems: { xs: 'stretch', md: 'start' },
                     }}
                 >
                     <Box
@@ -1136,9 +1173,10 @@ function GeneHomeTable({
                             width: '100%',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: { xs: 'flex-start', xl: 'flex-end' },
-                            gap: 0.75,
+                            justifyContent: 'flex-start',
+                            gap: 0.55,
                             flexWrap: 'wrap',
+                            minWidth: 0,
                         }}
                     >
                         <TextField
@@ -1146,20 +1184,20 @@ function GeneHomeTable({
                             value={input}
                             onChange={(event) => setInput(event.target.value)}
                             onKeyDown={(event) => {
-                                if (event.key === 'Enter') onSearch(input);
+                                if (event.key === 'Enter') applyTableSearch(input);
                             }}
                             placeholder="Gene symbol or ENSG"
                             sx={{
-                                flex: { xs: '1 1 100%', sm: '1 1 280px' },
-                                maxWidth: { sm: 360 },
+                                flex: { xs: '1 1 100%', sm: '0 1 250px' },
+                                maxWidth: { sm: 260 },
                                 '& .MuiOutlinedInput-root': {
                                     bgcolor: theme.palette.background.paper,
                                     borderRadius: 1,
                                     borderColor: alpha('#2f6a49', 0.16),
                                 },
                                 '& .MuiOutlinedInput-input': {
-                                    py: 0.78,
-                                    fontSize: '0.84rem',
+                                    py: 0.55,
+                                    fontSize: '0.8rem',
                                 },
                             }}
                             InputProps={{
@@ -1173,22 +1211,56 @@ function GeneHomeTable({
                         <Button
                             size="small"
                             variant="contained"
-                            onClick={() => onSearch(input)}
+                            onClick={() => applyTableSearch(input)}
                             startIcon={<SearchOutlined />}
-                            sx={{ textTransform: 'none', px: 1.25, fontWeight: 700, minWidth: 88, boxShadow: 'none' }}
+                            sx={{ textTransform: 'none', px: 1, py: 0.45, fontWeight: 700, minWidth: 76, boxShadow: 'none' }}
                         >
                             Search
                         </Button>
-                        {input.trim() && (
+                        {(searchInput || activeSearch) && (
                             <Button
                                 size="small"
                                 variant="text"
-                                onClick={onClear}
-                                sx={{ textTransform: 'none', color: theme.palette.text.secondary, minWidth: 52 }}
+                                onClick={clearTableSearch}
+                                sx={{ textTransform: 'none', color: theme.palette.text.secondary, minWidth: 48, py: 0.45 }}
                             >
                                 Clear
                             </Button>
                         )}
+                        {activeSearch && (
+                            <Chip
+                                label={`Filter: ${activeSearch}`}
+                                size="small"
+                                onDelete={clearTableSearch}
+                                sx={summaryChipSx(theme, {
+                                    height: 24,
+                                    maxWidth: { xs: '100%', sm: 220 },
+                                    color: '#315d57',
+                                    bgcolor: alpha('#2f6a49', 0.075),
+                                    border: `1px solid ${alpha('#2f6a49', 0.18)}`,
+                                    '& .MuiChip-label': {
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                    },
+                                })}
+                            />
+                        )}
+                        <GenePaginationControl totalPages={pageCount} page={currentPage} onChange={handlePageChange} />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'center' }, justifySelf: { xs: 'start', md: 'center' } }}>
+                        <GenePageJumpControl totalPages={pageCount} page={currentPage} onChange={handlePageChange} />
+                    </Box>
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: { xs: 'flex-start', md: 'flex-end' },
+                            justifySelf: { xs: 'start', xl: 'end' },
+                            gap: 0.65,
+                            flexWrap: 'wrap',
+                        }}
+                    >
+                        <GeneRowsControl rowsPerPage={rowsPerPage} onChange={handleRowsPerPageChange} />
                         <Button
                             size="small"
                             startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
@@ -1200,7 +1272,8 @@ function GeneHomeTable({
                                 color: '#315d57',
                                 border: `1px solid ${alpha('#2f6a49', 0.18)}`,
                                 bgcolor: alpha('#2f6a49', 0.045),
-                                minWidth: 70,
+                                minWidth: 64,
+                                py: 0.38,
                                 '&:hover': {
                                     bgcolor: alpha('#2f6a49', 0.08),
                                     borderColor: alpha('#2f6a49', 0.28),
@@ -1210,16 +1283,6 @@ function GeneHomeTable({
                             {downloading ? 'Preparing' : 'CSV'}
                         </Button>
                     </Box>
-                    <GenePagerTools
-                        totalCount={totalCount}
-                        start={start}
-                        end={end}
-                        pageCount={pageCount}
-                        currentPage={currentPage}
-                        rowsPerPage={rowsPerPage}
-                        onRowsPerPageChange={handleRowsPerPageChange}
-                        onPageChange={handlePageChange}
-                    />
                 </Box>
             </Box>
 
@@ -1310,7 +1373,9 @@ function GeneHomeTable({
                         {!isLoading && !rows.length && !data?.unavailable && !error && (
                             <TableRow>
                                 <TableCell colSpan={GENE_TABLE_COLUMNS.length} sx={{ py: 4, textAlign: 'center', color: theme.palette.text.secondary }}>
-                                    No genes found in the imported gene-program-trait index.
+                                    {activeSearch
+                                        ? `No genes match "${activeSearch}" in the imported gene-program-trait index.`
+                                        : 'No genes found in the imported gene-program-trait index.'}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -2583,7 +2648,6 @@ export default function Genes() {
                             setInput={setInput}
                             suggestions={suggestions}
                             suggestionsLoading={suggestionsLoading || suggestionsPending}
-                            onSearch={(gene) => runSearch(gene)}
                             onClear={clearSearch}
                             onSelect={(gene) => runSearch(gene)}
                         />

@@ -86,6 +86,7 @@ function normalizeGeneSummary(row) {
         geneSymbol: row.gene_symbol || '',
         ensgId: row.ensg_id || '',
         geneLabel: row.gene_symbol || row.ensg_id || '',
+        geneName: row.gene_name || '',
         totalPrograms: Number(row.total_programs) || 0,
         totalTraits: Number(row.total_traits) || 0,
         totalRows: Number(row.total_rows) || 0,
@@ -234,6 +235,17 @@ function compareGeneSummaryRows(a, b, sortBy, order) {
     result = compareText(a?.geneSymbol || a?.ensgId || a?.geneLabel, b?.geneSymbol || b?.ensgId || b?.geneLabel);
     if (result) return result;
     return compareText(a?.ensgId, b?.ensgId);
+}
+
+function geneMatchesSearch(gene, query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return true;
+
+    return [
+        gene?.geneSymbol,
+        gene?.ensgId,
+        gene?.geneLabel,
+    ].some((value) => String(value || '').toLowerCase().includes(q));
 }
 
 function normalizeRecord(row) {
@@ -535,10 +547,12 @@ async function getGeneSummaryCache(includeGeneInfo) {
                 MAX(gi.chromosome) AS chromosome,
                 MAX(gi.begin_pos) AS begin_pos,
                 MAX(gi.end_pos) AS end_pos,
+                MAX(gi.gene_name) AS gene_name,
                 MAX(gi.gene_type) AS gene_type,` : `
                 '' AS chromosome,
                 NULL AS begin_pos,
                 NULL AS end_pos,
+                '' AS gene_name,
                 '' AS gene_type,`;
     const geneInfoJoin = includeGeneInfo ? `LEFT JOIN ${GENE_INFO_TABLE} gi
                 ON gi.ensembl = gpte.ensg_id` : '';
@@ -575,17 +589,21 @@ async function getGeneSummaryCache(includeGeneInfo) {
     return geneSummaryCachePromise;
 }
 
-async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 'DESC' } = {}) {
+async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 'DESC', search = '' } = {}) {
     const p = Math.max(1, Number(page) || 1);
     const requestedLimit = Number(limit);
     const exportAll = requestedLimit === 0;
     const l = exportAll ? 0 : Math.max(1, Math.min(200, requestedLimit || 25));
     const offset = exportAll ? 0 : (p - 1) * l;
     const includeGeneInfo = await hasGeneInfoTable();
+    const searchText = normalizeGeneQuery(search);
 
     try {
         const cache = await getGeneSummaryCache(includeGeneInfo);
-        const sortedGenes = [...cache.genes].sort((a, b) => compareGeneSummaryRows(a, b, sortBy, order));
+        const filteredGenes = searchText
+            ? cache.genes.filter((gene) => geneMatchesSearch(gene, searchText))
+            : cache.genes;
+        const sortedGenes = [...filteredGenes].sort((a, b) => compareGeneSummaryRows(a, b, sortBy, order));
         const genes = exportAll ? sortedGenes : sortedGenes.slice(offset, offset + l);
         const total = sortedGenes.length;
 
@@ -598,6 +616,7 @@ async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 
             totalPages: exportAll ? 1 : Math.ceil((Number(total) || 0) / l),
             sortBy: normalizeGeneListSortBy(sortBy),
             order: normalizeSortDirection(order),
+            search: searchText,
         };
     } catch (err) {
         if (isMissingIndexTableError(err)) {
@@ -608,6 +627,7 @@ async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 
                 page: p,
                 limit: exportAll ? 0 : l,
                 totalPages: 0,
+                search: searchText,
             });
         }
         throw err;
@@ -625,6 +645,7 @@ async function searchGenes(query, limit = 20) {
                 MAX(gi.chromosome) AS chromosome,
                 MAX(gi.begin_pos) AS begin_pos,
                 MAX(gi.end_pos) AS end_pos,
+                MAX(gi.gene_name) AS gene_name,
                 MAX(gi.gene_type) AS gene_type,` : '';
     const geneInfoJoin = includeGeneInfo ? `LEFT JOIN ${GENE_INFO_TABLE} gi
                 ON gi.ensembl = gpte.ensg_id` : '';

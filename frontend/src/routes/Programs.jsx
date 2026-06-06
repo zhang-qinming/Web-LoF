@@ -50,7 +50,7 @@ const PROGRAM_TABLE_GROUPS = [
     { label: 'GO Evidence', span: 3, tone: 'metric' },
     { label: 'Gene Preview', span: 1, tone: 'genes' },
 ];
-const PROGRAM_TABLE_TITLE_HEADER_HEIGHT = 64;
+const PROGRAM_TABLE_TITLE_HEADER_HEIGHT = 48;
 
 const PROGRAM_INFO_COLUMNS = [
     { key: 'program', label: 'Program', align: 'center', tone: 'identity', width: 120 },
@@ -1042,16 +1042,24 @@ export default function Programs() {
                         <TableHead>
                             <TableRow>
                                 <TableCell colSpan={PROGRAM_TABLE_COLUMNS.length} sx={programTableTitleCellSx(theme)}>
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.8} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
-                                        <Box sx={{ minWidth: 0 }}>
+                                    <Stack
+                                        direction={{ xs: 'column', sm: 'row' }}
+                                        spacing={0.9}
+                                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                                        justifyContent="flex-start"
+                                        sx={{ minWidth: 0 }}
+                                    >
+                                        <Box sx={{ minWidth: 0, flexShrink: 0 }}>
                                             <Typography sx={sectionTitleSx(theme, { fontSize: '0.98rem', lineHeight: 1.2 })}>
                                                 Program Annotations
                                             </Typography>
-                                            <Typography sx={captionSx(theme, { mt: 0.2, fontSize: '0.7rem', lineHeight: 1.35 })}>
-                                                Biological annotations and gene sets for cNMF programs.
-                                            </Typography>
                                         </Box>
-                                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                                        <Stack
+                                            direction="row"
+                                            spacing={0.65}
+                                            alignItems="center"
+                                            sx={{ flexWrap: 'wrap', justifyContent: 'flex-start', minWidth: 0 }}
+                                        >
                                             <TextField
                                                 size="small"
                                                 value={programGeneSearch}

@@ -54,19 +54,19 @@ export const GRAPH_LAYOUTS = {
     compact: {
         mode: GRAPH_VIEW_MODES.compact,
         defaultMaxGenes: 6,
-        traitCenterX: 560,
+        traitCenterX: 615,
         traitNodeW: 280,
         traitNodeMinH: 142,
         traitExtraLineH: 26,
         traitTextLineStep: 27,
         leftProgramX: 24,
         leftProgramW: 350,
-        rightProgramX: 730,
+        rightProgramX: 825,
         rightProgramW: 212,
         rightProgramH: 56,
-        rightRegulatorX: 1120,
-        rightRegulatorW: 520,
-        rightRegulatorMinW: 430,
+        rightRegulatorX: 1192,
+        rightRegulatorW: 430,
+        rightRegulatorMinW: 360,
         geneRowH: 22,
         geneFontSize: 19,
         geneHeaderH: 48,
@@ -89,6 +89,7 @@ export const GRAPH_LAYOUTS = {
         geneSubcolumnThreshold: Number.POSITIVE_INFINITY,
         regulatorGroupLayout: 'vertical',
         regulatorGeneLayout: 'effectColumns',
+        regulatorMinGeneBoxH: 104,
         regulatorGroupTitleSuffix: '',
         leftProgramTitleFontSize: 24,
         rightProgramTitleFontSize: 21,
@@ -393,12 +394,14 @@ export function geneBoxHeight(columns, titleRows = 1, layout = DEFAULT_GRAPH_LAY
 
 export function regulatorGeneBoxHeight(genes, layout = DEFAULT_GRAPH_LAYOUT) {
     if (layout.regulatorGeneLayout === 'single') {
-        return layout.geneHeaderH
+        const height = layout.geneHeaderH
             + (Math.max(genes.length, 1) * layout.geneRowH)
             + (layout.geneBottomPadding || 0);
+        return Math.max(height, layout.regulatorMinGeneBoxH || 0);
     }
 
-    return geneBoxHeight(splitGenesByEffect(genes), 1, layout);
+    const height = geneBoxHeight(splitGenesByEffect(genes), 1, layout);
+    return Math.max(height, layout.regulatorMinGeneBoxH || 0);
 }
 
 function maxDisplayLabelLength(genes) {

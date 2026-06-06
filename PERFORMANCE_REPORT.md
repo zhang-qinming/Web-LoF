@@ -1,20 +1,20 @@
 # GWAS Browser 前后端与 SQL 性能报告
 
-日期：2026-06-05  
+日期：2026-06-06  
 范围：`frontend/`、`backend/`、运行库 `gwas` 的只读结构与代表查询计划。  
-方法：静态代码审计、`information_schema` 元数据检查、代表 SQL `EXPLAIN`、少量只读聚合计时。
+方法：静态代码审计、`information_schema` 元数据检查、代表 SQL `EXPLAIN`、少量只读聚合计时。本文已按 2026-06-06 当前代码和运行库复查更新。
 
 ## 结论摘要
 
 当前最大的性能风险不是单个慢索引，而是数据模型与访问路径不一致：
 
 1. 旧 GWAS SQL 接口仍查询 `gwas_data`，但运行库没有 `gwas_data` / `gwas_metadata` / `huge_gwas_data` / `moment_ukbb`。这会让 `/api/trait/*gwas*` 路由不可用；如果将来恢复大表，现有 `SELECT *`、全量接口和 COUNT 也会成为严重瓶颈。
-2. Gene 首页依赖 `gene_program_trait_edge` 全表聚合后放进 Node 进程内缓存。当前 281,492 行规模下，汇总聚合实测约 2.84 秒；数据增长或多进程部署后会放大。
-3. Gene 搜索使用 `OR + %LIKE% + GROUP BY`，无法利用现有 gene/ensg 索引，当前单次搜索实测约 0.41 秒。前端输入无 debounce，会把这个 SQL 成本按键放大。
+2. Gene 首页依赖 `gene_program_trait_edge` 全表聚合后放进 Node 进程内缓存。当前精确行数 297,549；优化器估算扫描 281,492 行，汇总聚合实测约 2.86 秒。数据增长或多进程部署后会放大。
+3. Gene 搜索已经做过一轮优化：后端先 exact lookup，再 prefix search；前端也有 280 ms debounce。`FNDC10` exact 查询现在约 20 ms，但短前缀如 `EN%` 仍会扫大范围数据，实测约 2.78 秒。
 4. 多个 join key 的 collation 不一致，代码用 `BINARY` / `COLLATE` 规避报错。功能上可运行，但查询计划退化为 hash scan，阻断正常等值索引 join。
 5. 图表接口大量依赖 TSV 整文件读取和前端全量过滤/排序/渲染；这不是 SQL 慢查询，但会和后端响应体大小、Node 内存、浏览器主线程一起形成性能上限。
 
-建议优先级：先修 schema/接口一致性和 collation；再把 Gene 汇总/搜索改为物化表或可索引查询；最后收敛 TSV 全量响应和冗余索引。
+建议优先级：先修 schema/接口一致性和 collation；再把 Gene 汇总改为物化表，并给短前缀搜索加保护；最后收敛 TSV 全量响应和冗余索引。
 
 ## 运行库现状
 
@@ -22,10 +22,10 @@
 
 | 表 | 近似/实测行数 | 数据大小 | 索引大小 | 备注 |
 |---|---:|---:|---:|---|
-| `gene_program_trait_edge` | 281,492 | 89.64 MB | 142.52 MB | 最大表，Gene 首页/详情/Program 详情核心来源 |
-| `gwas_meta` | 28,627 | 10.52 MB | 5.86 MB | 仅 2,415 个非空 `file_id`，其余多为旧 metadata |
-| `trait_program_edge` | 18,499 | 3.52 MB | 6.05 MB | Program/Trait 关联 |
-| `gene_info_hg37_matched` | 7,470 | - | - | Gene 注释 |
+| `gene_program_trait_edge` | 297,549 | 89.64 MB | 142.52 MB | 最大表，Gene 首页/详情/Program 详情核心来源；`EXPLAIN` 估算约 281,492 行 |
+| `gwas_meta` | 28,627 | 10.52 MB | 5.86 MB | 仅 2,415 个非空 `file_id`，26,212 行为空或缺失 `file_id` |
+| `trait_program_edge` | 18,664 | 3.52 MB | 6.05 MB | Program/Trait 关联 |
+| `gene_info_hg37_matched` | 7,161 | 3.52 MB | 1.17 MB | Gene 注释 |
 | `file_metadata` | 2,415 traits | 0.33 MB | 0.42 MB | Trait 列表主表 |
 | `trait_ldsc` | 2,344 | - | - | Trait meta heritability |
 
@@ -85,8 +85,8 @@ CREATE INDEX idx_gwas_trait_rsid ON gwas_data (Trait, rsID);
 
 证据：
 
-- `EXPLAIN` 显示 `gene_program_trait_edge` 全表扫描 281,492 行，排序后聚合，再按 `gene_info_hg37_matched` 主键逐行 lookup。
-- 实测聚合计时：`SELECT COUNT(*) FROM (gene summary GROUP BY ...)` 返回 7,161 个 gene group，用时约 2.84 秒。
+- `EXPLAIN` 估算 `gene_program_trait_edge` 扫描 281,492 行；精确表行数是 297,549。查询会排序后聚合，再按 `gene_info_hg37_matched` 主键逐行 lookup。
+- 实测聚合计时：`SELECT COUNT(*) FROM (gene summary GROUP BY ...)` 返回 7,161 个 gene group，用时约 2.86 秒。
 - 缓存 TTL 为 1 小时，且是 Node 进程内变量；多实例部署时每个进程都会独立预热。
 
 风险：
@@ -124,40 +124,41 @@ CREATE TABLE gene_summary (
 - `/api/genes` 改为直接查物化表并在 SQL 里排序分页。
 - CSV 导出改为流式响应或后台生成文件，避免一次性 JSON + 前端拼 CSV。
 
-### P1. Gene 搜索不能有效使用索引
+### P1. Gene 搜索已缓解，但短前缀仍有大范围扫描风险
 
 相关代码：
 
 - `backend/models/MgeneProgram.js`：`searchGenes()`
 - `frontend/src/routes/Genes.jsx`：首页 suggestion 和 Gene switcher 都调用 `searchGenes(q, { limit: 12 })`
 
-当前 SQL 条件：
+当前实现：
 
 ```sql
-WHERE gpte.gene_symbol = ?
-   OR gpte.ensg_id = ?
-   OR gpte.gene_symbol LIKE '%q%'
-   OR gpte.ensg_id LIKE '%q%'
-GROUP BY gene_symbol, ensg_id
+-- 第一步：exact lookup，命中后直接返回
+WHERE gpte.gene_symbol = ? OR gpte.ensg_id = ?
+
+-- 第二步：只有 exact 无结果时才 prefix search
+WHERE gpte.gene_symbol LIKE 'q%' ESCAPE '\\'
+   OR gpte.ensg_id LIKE 'q%' ESCAPE '\\'
 ```
 
 证据：
 
-- `EXPLAIN` 对 `FNDC10` 显示全表扫描 `gene_program_trait_edge` 281,492 行，再排序、聚合、limit。
-- 实测 `FNDC10` 搜索聚合约 0.41 秒，只返回 1 个 group。
-- 单独 exact 条件 `gene_symbol = ? OR ensg_id = ?` 可以走 `idx_gpte_gene` / `idx_gpte_ensg`，过滤 40 行。
+- `FNDC10` exact 查询走 `idx_gpte_gene` / `idx_gpte_ensg`，过滤 40 行，实测约 20 ms。
+- `FNDC%` prefix 查询也走索引 range scan，估算 93 行，实测约 11 ms。
+- 短前缀 `EN%` 会匹配大量 Ensembl ID，计划退回 `gene_program_trait_edge` 大范围扫描，实测约 2.78 秒。
 
-前端放大点：
+前端现状：
 
-- 首页输入 `input.trim().length >= 2` 即请求，没有 debounce。
-- Gene switcher 弹窗搜索同样没有 debounce。
+- `Genes.jsx` 已有 `useDebouncedValue(value, 280)`；首页 suggestion 和 Gene switcher 都使用 debounce 后的查询值。
+- 触发阈值仍是 2 个字符，所以 `EN`、`ENSG` 这类高频前缀仍可能触发慢 prefix fallback。
 
 建议：
 
-1. 后端拆成 exact 快路径和模糊搜索慢路径。
-2. exact 查到结果时直接返回，不再跑 `%LIKE%`。
-3. 模糊搜索改为 prefix：`LIKE 'q%'`，或引入 `FULLTEXT` / ngram 搜索表。
-4. 前端加 250-300 ms debounce，并把最小长度提高到 3，保留 exact ID/Symbol 回车即时搜索。
+1. 保留现有 exact 快路径和 prefix search。
+2. 对 prefix fallback 加保护：普通 gene symbol 至少 3 个字符；`EN` / `ENS` / `ENSG` 等 Ensembl 通用前缀不触发 fallback，除非达到更长长度，例如 6-8 个字符。
+3. 更稳的长期方案是让 `searchGenes()` 查 `gene_summary` 物化表，而不是每次在 edge 表上聚合。
+4. 如果需要真正 substring 搜索，再单独建立 FULLTEXT/ngram 搜索表，不要回到 `%LIKE%`。
 
 ### P1. collation 不一致导致 BINARY/COLLATE join 退化
 
@@ -195,7 +196,7 @@ GROUP BY gene_symbol, ensg_id
 - `gene_program_trait_edge WHERE program='P14'`：4,248 行。
 - `trait_program_edge WHERE program='P14'`：267 行。
 - top genes 窗口函数聚合返回 2,135 行，实测约 0.12 秒。
-- program genes 聚合返回 730 个 gene group，实测约 0.11 秒。
+- program genes 聚合返回 730 个 gene group，本次复查约 0.07 秒。
 
 当前规模下可以接受。若 program 数、trait 数或 gene edge 增长，建议在导入时预计算：
 
@@ -231,7 +232,7 @@ ALTER TABLE gwas_meta ADD UNIQUE KEY uk_gwas_meta_file_id (file_id);
 ### Gene 页面
 
 - Gene 首页每次分页/排序都请求 `/api/genes`，但后端实际从进程内大数组排序分页。
-- 搜索 suggestion 没有 debounce，会把 `searchGenes()` 的 0.4s 级查询按输入次数放大。
+- 搜索 suggestion 和 Gene switcher 已有 280 ms debounce，常规 exact/prefix 查询已明显变快；剩余风险是 2 字符短前缀仍可能触发大范围 prefix fallback。
 - CSV 下载调用 `limit=0` 拉全量 gene，再在前端构造 CSV。
 
 ### Trait 页面
@@ -284,8 +285,8 @@ ALTER TABLE gwas_meta ADD UNIQUE KEY uk_gwas_meta_file_id (file_id);
 ### 第 1 阶段：正确性与低风险止血
 
 1. 明确废弃或修复 `/api/trait/:traitName`、`/api/trait/allgwas/:traitName`、`/api/trait/filtergwas/:traitName`。
-2. 前端 Gene 搜索加 debounce，避免按键级 SQL 请求。
-3. 后端 Gene 搜索先走 exact lookup，exact 命中后不跑 `%LIKE%`。
+2. 保留前端 Gene 搜索 debounce，并把 prefix fallback 的触发条件收紧，避免 `EN%` 这类短前缀慢查询。
+3. 保留后端 Gene 搜索 exact 快路径；为 prefix fallback 增加最小长度和高频前缀黑名单/降级提示。
 4. 给 `/api/programs/list`、`/api/programs/graph-list` 加短 TTL 缓存。
 5. 增加 route duration 和 response size 日志。
 
@@ -309,8 +310,9 @@ ALTER TABLE gwas_meta ADD UNIQUE KEY uk_gwas_meta_file_id (file_id);
 
 | 路径 | 当前观察 | 目标 |
 |---|---:|---:|
-| Gene summary 冷聚合 | 约 2.84s | 请求路径不再执行；物化刷新离线完成 |
-| Gene 搜索 exact | 约 0.41s | p95 < 100ms |
+| Gene summary 冷聚合 | 约 2.86s | 请求路径不再执行；物化刷新离线完成 |
+| Gene 搜索 exact | 约 20 ms | p95 < 100ms |
+| Gene 搜索短前缀 | `EN%` 约 2.78s | 拒绝/延迟高频短前缀，或 p95 < 200ms |
 | Program traits / genes | 0.1s 级 | p95 < 200ms，数据增长 5 倍后仍稳定 |
 | Browse 无搜索 | 当前可接受 | p95 < 100ms |
 | Trait meta | 当前小表可接受 | 无全表 `trait_ldsc` scan |
@@ -318,10 +320,12 @@ ALTER TABLE gwas_meta ADD UNIQUE KEY uk_gwas_meta_file_id (file_id);
 
 ## 附：本次取证要点
 
-- `gene_program_trait_edge`：281,492 行；`P14` 对应 4,248 行；`FNDC10` 对应 40 行。
-- Gene summary 聚合：7,161 个 gene group，约 2.84 秒。
-- Gene search `FNDC10`：1 个 group，约 0.41 秒。
+- `gene_program_trait_edge`：精确 297,549 行；`EXPLAIN` 估算约 281,492 行；`P14` 对应 4,248 行；`FNDC10` 对应 40 行。
+- Gene summary 聚合：7,161 个 gene group，约 2.86 秒。
+- Gene search `FNDC10` exact：1 个 group，约 20 ms；旧式 `%FNDC10%` 写法约 0.40 秒。
+- Gene search `FNDC%` prefix：3 个 group，约 11 ms。
+- Gene search `EN%` prefix：短前缀高匹配，约 2.78 秒。
 - Program top genes `P14`：2,135 行，约 0.12 秒。
-- Program genes `P14`：730 个 gene group，约 0.11 秒。
+- Program genes `P14`：730 个 gene group，约 0.07 秒。
 - `file_metadata` trait 数：2,415。
 - `gwas_meta`：28,627 行，非空 `file_id` 去重 2,415；当前不会放大 Browse join。

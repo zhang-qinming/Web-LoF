@@ -99,9 +99,9 @@ export async function getDataFileText(path) {
     return res.data;
 }
 
-export async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 'desc' } = {}) {
+export async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 'desc', search = '' } = {}) {
     const res = await axios.get(`${API_BASE}/genes`, {
-        params: { page, limit, sortBy, order },
+        params: { page, limit, sortBy, order, search },
     });
     return res.data;
 }

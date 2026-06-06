@@ -386,7 +386,7 @@ const TEXT = {
                 id: 'programs',
                 title: 'Programs',
                 icon: ScienceOutlined,
-                summary: 'Program annotation tables and program-level gene regulation plots.',
+                summary: 'Program annotation table plus the program detail switcher, information, gene, and trait evidence tables.',
                 items: [
                     {
                         name: 'Programs Table',

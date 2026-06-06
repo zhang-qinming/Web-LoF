@@ -11,8 +11,9 @@ router.get('/api/genes', asyncRoute(async (req, res) => {
     const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
     const sortBy = normalizeIdentifier(req.query.sortBy || 'totalTraits', 50) || 'totalTraits';
     const order = String(req.query.order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const search = normalizeIdentifier(req.query.search || req.query.q, 120) || '';
 
-    const result = await geneProgramModel.getGenes({ page, limit, sortBy, order });
+    const result = await geneProgramModel.getGenes({ page, limit, sortBy, order, search });
     res.json(result);
 }));
 

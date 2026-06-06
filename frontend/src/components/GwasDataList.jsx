@@ -29,7 +29,6 @@ import {
 } from '@mui/material';
 import { Clear, Search } from '@mui/icons-material';
 import {
-    captionSx,
     panelSx,
     sectionTitleSx,
     stickyTableContainerSx,
@@ -43,16 +42,26 @@ function PaginationControl({ totalPages, page, onChange }) {
     if (totalPages <= 1) return null;
 
     return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: 0 }}>
             <Pagination
                 count={totalPages}
                 page={page}
                 onChange={onChange}
                 color="primary"
                 shape="rounded"
-                size="medium"
+                size="small"
                 showFirstButton
                 showLastButton
+                sx={{
+                    '& .MuiPagination-ul': {
+                        flexWrap: 'nowrap',
+                    },
+                    '& .MuiPaginationItem-root': {
+                        minWidth: 28,
+                        height: 28,
+                        fontSize: '0.76rem',
+                    },
+                }}
             />
         </Box>
     );
@@ -94,20 +103,28 @@ function JumpToPageControl({ totalPages, page, onChange }) {
     if (totalPages <= 1) return null;
 
     return (
-        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.45, flexShrink: 0 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}>
+                Page
+            </Typography>
             <TextField
                 size="small"
                 value={inputPage}
                 onChange={(e) => setInputPage(e.target.value)}
                 onBlur={handleBlur}
                 type="number"
-                slotProps={{ input: { min: 1, max: totalPages, sx: { textAlign: 'center', width: 52, py: 0.5, fontSize: '0.8rem' } } }}
-                sx={{ '& fieldset': { borderRadius: 1.5 } }}
+                slotProps={{ input: { min: 1, max: totalPages, sx: { textAlign: 'center', width: 52, py: 0.48, px: 0.7, fontSize: '0.78rem', fontWeight: 650 } } }}
+                sx={{
+                    '& .MuiOutlinedInput-root': {
+                        bgcolor: 'background.paper',
+                    },
+                    '& fieldset': { borderRadius: 1 },
+                }}
             />
-            <Typography variant="caption" color="text.secondary" sx={{ mx: 0.3 }}>
-                / {totalPages}
+            <Typography variant="caption" color="text.secondary" sx={{ mx: 0.15, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                / {totalPages.toLocaleString()}
             </Typography>
-            <Button type="submit" size="small" variant="text" disabled={!isValid} sx={{ minWidth: 0, px: 1, fontSize: '0.75rem' }}>
+            <Button type="submit" size="small" variant="outlined" disabled={!isValid} sx={{ minWidth: 38, px: 0.9, py: 0.35, textTransform: 'none', fontSize: '0.72rem', fontWeight: 680 }}>
                 Go
             </Button>
         </Box>
@@ -165,7 +182,7 @@ function headerLayoutSx(column = {}) {
     };
 }
 
-const GWAS_TABLE_TITLE_HEADER_HEIGHT = 76;
+const GWAS_TABLE_TITLE_HEADER_HEIGHT = 82;
 const GWAS_TABLE_MAX_VISIBLE_ROWS = 20;
 const GWAS_TABLE_ROW_HEIGHT = 48;
 const GWAS_TABLE_COLUMN_HEADER_HEIGHT = 46;
@@ -316,7 +333,6 @@ function LoadingSkeleton({ rows = 10, columns, theme }) {
 
 export default function GwasDataList({
     title = 'GWAS Data',
-    subtitle = '',
     columns = [],
     defaultSortBy = 'Trait',
     defaultOrder = 'ASC',
@@ -462,32 +478,108 @@ export default function GwasDataList({
                                                 <Box
                                                     sx={{
                                                         display: 'grid',
-                                                        gridTemplateColumns: 'minmax(260px, 1fr) auto',
+                                                        gridTemplateColumns: '1fr',
                                                         alignItems: 'center',
-                                                        gap: 1,
+                                                        gap: 0.65,
                                                     }}
                                                 >
-                                                    <Box sx={{ minWidth: 0 }}>
+                                                    <Box
+                                                        sx={{
+                                                            minWidth: 0,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            gap: 1,
+                                                            flexWrap: { xs: 'wrap', md: 'nowrap' },
+                                                        }}
+                                                    >
                                                         <Typography sx={sectionTitleSx(theme, { fontSize: '0.92rem', lineHeight: 1.2 })}>
                                                             {title}
                                                         </Typography>
-                                                        {subtitle && (
-                                                            <Typography sx={captionSx(theme, { mt: 0.2, fontSize: '0.7rem', lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })}>
-                                                                {subtitle}
-                                                            </Typography>
-                                                        )}
+                                                        <Typography
+                                                            sx={{
+                                                                px: 0.85,
+                                                                py: 0.32,
+                                                                borderRadius: 1,
+                                                                border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
+                                                                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                                                color: theme.palette.primary.dark,
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 680,
+                                                                whiteSpace: 'nowrap',
+                                                                flexShrink: 0,
+                                                            }}
+                                                        >
+                                                            {resultLabel}
+                                                        </Typography>
                                                     </Box>
                                                     <Box
                                                         sx={{
-                                                            display: 'flex',
+                                                            display: 'grid',
+                                                            gridTemplateColumns: {
+                                                                xs: '1fr',
+                                                                md: 'minmax(0, 1fr) auto',
+                                                                lg: 'minmax(0, 1fr) auto auto',
+                                                            },
                                                             alignItems: 'center',
-                                                            justifyContent: 'flex-end',
-                                                            gap: 0.85,
-                                                            flexWrap: 'nowrap',
+                                                            justifyItems: { xs: 'stretch', md: 'start' },
+                                                            gap: { xs: 0.7, md: 0.9, lg: 1.1 },
                                                             minWidth: 0,
                                                         }}
                                                     >
-                                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.7, flexShrink: 0 }}>
+                                                        <Box
+                                                            sx={{
+                                                                width: '100%',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'flex-start',
+                                                                gap: 0.55,
+                                                                flexWrap: 'wrap',
+                                                                minWidth: 0,
+                                                            }}
+                                                        >
+                                                            <TextField
+                                                                size="small"
+                                                                value={search}
+                                                                onChange={(event) => setSearch(event.target.value)}
+                                                                placeholder="Search trait, LoF ID, MeSH term"
+                                                                sx={{
+                                                                    flex: { xs: '1 1 100%', sm: '0 1 260px' },
+                                                                    maxWidth: { sm: 280 },
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        bgcolor: theme.palette.background.paper,
+                                                                    },
+                                                                    '& .MuiInputBase-input': {
+                                                                        py: 0.55,
+                                                                        fontSize: '0.8rem',
+                                                                    },
+                                                                }}
+                                                                InputProps={{
+                                                                    startAdornment: (
+                                                                        <InputAdornment position="start">
+                                                                            <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
+                                                                        </InputAdornment>
+                                                                    ),
+                                                                    endAdornment: search ? (
+                                                                        <InputAdornment position="end">
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                aria-label="Clear trait search"
+                                                                                onClick={() => setSearch('')}
+                                                                                edge="end"
+                                                                            >
+                                                                                <Clear fontSize="small" />
+                                                                            </IconButton>
+                                                                        </InputAdornment>
+                                                                    ) : null,
+                                                                }}
+                                                            />
+                                                            <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'center' }, justifySelf: { xs: 'start', md: 'center' } }}>
+                                                            <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
+                                                        </Box>
+                                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, justifySelf: { xs: 'start', lg: 'end' }, gap: 0.7, flexShrink: 0 }}>
                                                             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}>
                                                                 Rows
                                                             </Typography>
@@ -499,7 +591,7 @@ export default function GwasDataList({
                                                                         bgcolor: theme.palette.background.paper,
                                                                         fontSize: '0.78rem',
                                                                         fontWeight: 650,
-                                                                        '& .MuiSelect-select': { py: 0.48 },
+                                                                        '& .MuiSelect-select': { py: 0.45 },
                                                                     }}
                                                                 >
                                                                     {[20, 50, 100, 200].map((v) => (
@@ -508,56 +600,6 @@ export default function GwasDataList({
                                                                 </Select>
                                                             </FormControl>
                                                         </Box>
-                                                        <Typography
-                                                            sx={{
-                                                                px: 0.85,
-                                                                py: 0.35,
-                                                                borderRadius: 1,
-                                                                border: `1px solid ${theme.custom.border.soft}`,
-                                                                bgcolor: alpha(theme.palette.primary.main, 0.045),
-                                                                color: theme.palette.text.secondary,
-                                                                fontSize: '0.72rem',
-                                                                fontWeight: 650,
-                                                                whiteSpace: 'nowrap',
-                                                            }}
-                                                        >
-                                                            {resultLabel}
-                                                        </Typography>
-                                                        <TextField
-                                                            size="small"
-                                                            value={search}
-                                                            onChange={(event) => setSearch(event.target.value)}
-                                                            placeholder="Search trait, LoF ID, MeSH term, population"
-                                                            sx={{
-                                                                width: { xs: 300, md: 330 },
-                                                                '& .MuiOutlinedInput-root': {
-                                                                    bgcolor: theme.palette.background.paper,
-                                                                },
-                                                                '& .MuiInputBase-input': {
-                                                                    py: 0.68,
-                                                                    fontSize: '0.78rem',
-                                                                },
-                                                            }}
-                                                            InputProps={{
-                                                                startAdornment: (
-                                                                    <InputAdornment position="start">
-                                                                        <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
-                                                                    </InputAdornment>
-                                                                ),
-                                                                endAdornment: search ? (
-                                                                    <InputAdornment position="end">
-                                                                        <IconButton
-                                                                            size="small"
-                                                                            aria-label="Clear trait search"
-                                                                            onClick={() => setSearch('')}
-                                                                            edge="end"
-                                                                        >
-                                                                            <Clear fontSize="small" />
-                                                                        </IconButton>
-                                                                    </InputAdornment>
-                                                                ) : null,
-                                                            }}
-                                                        />
                                                     </Box>
                                                 </Box>
                                             </TableCell>
