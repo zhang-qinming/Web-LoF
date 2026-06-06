@@ -321,20 +321,28 @@ export default function TraitProgramGraphCanvas({
         selectedProgramName,
         titleRows = 1,
     }) => {
+        const legacyGeneBox = layout.geneBoxStyle === 'legacy';
         const columnGap = layout.geneColumnGap || 16;
         const subcolumnGap = layout.geneSubcolumnGap || 18;
         const sidePadding = layout.geneSidePadding || 16;
         const headerHeight = titleRows > 1 ? layout.geneHeaderHTall : layout.geneHeaderH;
         const leftHasGenes = columns.left.length > 0;
         const rightHasGenes = columns.right.length > 0;
-        const oneSided = leftHasGenes !== rightHasGenes;
-        const dividerRatio = layout.oneSidedDividerRatio || 0.72;
-        const dividerX = oneSided
-            ? x + (width * (leftHasGenes ? dividerRatio : 1 - dividerRatio))
+        const oneSided = !legacyGeneBox && leftHasGenes !== rightHasGenes;
+        const emptySideWidth = Math.min(
+            Math.max(layout.geneEmptySideW || 72, width * 0.12),
+            width * 0.28,
+        );
+        const dividerX = legacyGeneBox
+            ? x + (width / 2)
+            : oneSided
+            ? (leftHasGenes ? x + width - emptySideWidth : x + emptySideWidth)
             : x + (width / 2);
-        const rowStartY = y + headerHeight + (layout.geneRowH / 2);
-        const dividerTop = y + headerHeight + 6;
-        const dividerBottom = y + height - 10;
+        const rowStartY = y + headerHeight + (legacyGeneBox ? 0 : layout.geneRowH / 2);
+        const dividerTop = legacyGeneBox ? y + (layout.geneDividerTopInset || 42) : y + headerHeight + 8;
+        const dividerBottom = legacyGeneBox
+            ? y + height - (layout.geneDividerBottomInset || 18)
+            : y + height - Math.max(12, (layout.geneBottomPadding || 0) * 0.6);
         const sideAreas = {
             left: {
                 start: x + sidePadding,
@@ -378,9 +386,9 @@ export default function TraitProgramGraphCanvas({
                         x={textX}
                         y={rowY}
                         textAnchor={anchor}
-                        dominantBaseline="middle"
+                        dominantBaseline={legacyGeneBox ? undefined : 'middle'}
                         fontSize={layout.geneFontSize}
-                        fontWeight={geneMatched ? 800 : 700}
+                        fontWeight={geneMatched ? (legacyGeneBox ? 900 : 800) : (legacyGeneBox ? 800 : 700)}
                         fontStyle={gene.isDiscordant ? 'normal' : 'normal'}
                         fill={geneMuted ? '#b5b5b5' : effectColorFromGene(gene)}
                         opacity={geneMuted ? 0.55 : 1}
@@ -400,10 +408,10 @@ export default function TraitProgramGraphCanvas({
                         y1={dividerTop}
                         x2={dividerX}
                         y2={dividerBottom}
-                        stroke="#94a3b8"
-                        strokeWidth="1.35"
-                        strokeDasharray="5 5"
-                        strokeLinecap="round"
+                        stroke={legacyGeneBox ? '#555' : '#94a3b8'}
+                        strokeWidth={legacyGeneBox ? '1.5' : '1.35'}
+                        strokeDasharray={legacyGeneBox ? '2 3' : '5 5'}
+                        strokeLinecap={legacyGeneBox ? undefined : 'round'}
                     />
                 )}
                 {splitGeneDisplayColumns(columns.left, layout, { forceSplit: oneSided && leftHasGenes }).map((genes, subcolumnIndex, subcolumns) => (
@@ -527,17 +535,19 @@ export default function TraitProgramGraphCanvas({
                         <text
                             key={line}
                             x={layout.leftProgramX + (layout.leftProgramW / 2)}
-                            y={centeredLineY(
-                                module.yTop,
-                                titleLines.length > 1 ? layout.geneHeaderHTall : layout.geneHeaderH,
-                                titleLines.length,
-                                layout.leftProgramTitleStep,
-                                index,
-                            )}
+                            y={layout.geneBoxStyle === 'legacy'
+                                ? module.yTop + 31 + (index * layout.leftProgramTitleStep)
+                                : centeredLineY(
+                                    module.yTop,
+                                    titleLines.length > 1 ? layout.geneHeaderHTall : layout.geneHeaderH,
+                                    titleLines.length,
+                                    layout.leftProgramTitleStep,
+                                    index,
+                                )}
                             textAnchor="middle"
-                            dominantBaseline="middle"
+                            dominantBaseline={layout.geneBoxStyle === 'legacy' ? undefined : 'middle'}
                             fontSize={layout.leftProgramTitleFontSize}
-                            fontWeight="800"
+                            fontWeight={layout.geneBoxStyle === 'legacy' ? '900' : '800'}
                             fill="#111"
                         >
                             {line}
@@ -546,8 +556,8 @@ export default function TraitProgramGraphCanvas({
                     {module.collapsed ? (
                         <text
                             x={layout.leftProgramX + 16}
-                            y={module.yTop + (boxHeight / 2)}
-                            dominantBaseline="middle"
+                            y={layout.geneBoxStyle === 'legacy' ? module.yTop + 58 : module.yTop + (boxHeight / 2)}
+                            dominantBaseline={layout.geneBoxStyle === 'legacy' ? undefined : 'middle'}
                             fontSize="18"
                             fill="#555"
                         >
@@ -586,6 +596,37 @@ export default function TraitProgramGraphCanvas({
         const moduleGeneMatches = hasGeneSelection && group.genes.some((gene) => gene.highlightKey === selectedGeneKey);
         const muted = (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
         const groupColor = group.sign === 'negative' ? EFFECT_COLORS.negative : EFFECT_COLORS.positive;
+
+        if (layout.regulatorGroupStyle === 'legacy') {
+            return (
+                <g key={`${module.program}:regulator:${group.key}`}>
+                    <rect
+                        x={x}
+                        y={yTop}
+                        width={width}
+                        height={height}
+                        rx="6"
+                        fill="#fff"
+                        fillOpacity={muted ? 0.38 : 1}
+                        stroke={groupColor}
+                        strokeWidth="2.6"
+                    />
+                    <text x={x + 14} y={yTop + 28} fontSize="24" fontWeight="900" fill={groupColor}>
+                        {group.title}
+                    </text>
+                    {group.genes.length ? renderGeneColumns({
+                        columns: splitGenesByEffect(group.genes),
+                        x,
+                        y: yTop,
+                        width,
+                        height,
+                        textAnchor: 'start',
+                        selectedProgramName: module.program,
+                    }) : null}
+                </g>
+            );
+        }
+
         const groupRgb = group.sign === 'negative' ? EFFECT_COLOR_RGB.negative : EFFECT_COLOR_RGB.positive;
         const groupFill = `rgba(${groupRgb},0.10)`;
         const groupHeaderFill = `rgba(${groupRgb},0.16)`;
@@ -784,17 +825,19 @@ export default function TraitProgramGraphCanvas({
                         <text
                             key={line}
                             x={layout.rightProgramX + (layout.rightProgramW / 2)}
-                            y={centeredLineY(
-                                programBoxY,
-                                layout.rightProgramH,
-                                programLines.length,
-                                layout.rightProgramTitleStep,
-                                index,
-                            )}
+                            y={layout.geneBoxStyle === 'legacy'
+                                ? programBoxY + 30 + (index * layout.rightProgramTitleStep)
+                                : centeredLineY(
+                                    programBoxY,
+                                    layout.rightProgramH,
+                                    programLines.length,
+                                    layout.rightProgramTitleStep,
+                                    index,
+                                )}
                             textAnchor="middle"
-                            dominantBaseline="middle"
+                            dominantBaseline={layout.geneBoxStyle === 'legacy' ? undefined : 'middle'}
                             fontSize={layout.rightProgramTitleFontSize}
-                            fontWeight="800"
+                            fontWeight={layout.geneBoxStyle === 'legacy' ? '900' : '800'}
                             fill="#111"
                         >
                             {line}

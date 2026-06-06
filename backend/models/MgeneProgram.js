@@ -2,11 +2,7 @@ const pool = require('./db');
 
 const TABLE_MISSING_CODES = new Set(['ER_NO_SUCH_TABLE', 'ER_BAD_TABLE_ERROR']);
 const GENE_INFO_TABLE = 'gene_info_hg37_matched';
-const EXTERNAL_GENE_INFO_TTL_MS = 24 * 60 * 60 * 1000;
-const EXTERNAL_FETCH_TIMEOUT_MS = 4500;
 const GENE_SUMMARY_CACHE_TTL_MS = 60 * 60 * 1000;
-const ENSEMBL_REST_BASES = ['https://grch37.rest.ensembl.org', 'https://rest.ensembl.org'];
-const externalGeneInfoCache = new Map();
 let geneInfoTableAvailablePromise = null;
 let geneSummaryCache = null;
 let geneSummaryCachePromise = null;
@@ -36,6 +32,10 @@ async function hasGeneInfoTable() {
 function normalizeGeneQuery(value) {
     const text = String(value || '').trim();
     return text ? text.slice(0, 120) : '';
+}
+
+function escapeLike(value) {
+    return String(value).replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
 function normalizeProgramId(value) {
@@ -69,10 +69,6 @@ function normalizeChromosomeLabel(value) {
     return `chr${text}`;
 }
 
-function normalizeGeneType(value) {
-    return String(value || '').trim().replace(/_/g, '-');
-}
-
 function formatLocation(chromosome, beginPos, endPos) {
     const chr = normalizeChromosomeLabel(chromosome);
     const begin = Number.isFinite(beginPos) ? Math.trunc(beginPos) : null;
@@ -81,157 +77,6 @@ function formatLocation(chromosome, beginPos, endPos) {
     if (!chr) return '';
     if (begin == null || end == null) return chr;
     return `${chr}:${begin}-${end}`;
-}
-
-function stripSourceSuffix(value) {
-    return String(value || '').replace(/\s*\[Source:.*?\]\s*$/i, '').trim();
-}
-
-async function fetchJsonWithTimeout(url, timeoutMs = EXTERNAL_FETCH_TIMEOUT_MS) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-        const response = await fetch(url, {
-            signal: controller.signal,
-            headers: {
-                Accept: 'application/json',
-            },
-        });
-        if (!response.ok) return null;
-        return await response.json();
-    } catch {
-        return null;
-    } finally {
-        clearTimeout(timer);
-    }
-}
-
-function normalizeEnsemblPayload(payload) {
-    if (!payload || payload.object_type !== 'Gene') return null;
-    const beginPos = toNullableNumber(payload.start);
-    const endPos = toNullableNumber(payload.end);
-    return {
-        geneSymbol: payload.display_name || '',
-        ensgId: payload.id || '',
-        chromosome: payload.seq_region_name || '',
-        beginPos,
-        endPos,
-        location: formatLocation(payload.seq_region_name, beginPos, endPos),
-        geneType: normalizeGeneType(payload.biotype),
-        geneName: stripSourceSuffix(payload.description),
-        description: stripSourceSuffix(payload.description),
-        externalSources: ['Ensembl'],
-    };
-}
-
-async function fetchEnsemblGeneInfo(query) {
-    const q = normalizeGeneQuery(query);
-    if (!q) return null;
-    const isEnsemblId = /^ENSG\d+/i.test(q);
-
-    for (const baseUrl of ENSEMBL_REST_BASES) {
-        const endpoint = isEnsemblId
-            ? `${baseUrl}/lookup/id/${encodeURIComponent(q)}?content-type=application/json`
-            : `${baseUrl}/lookup/symbol/homo_sapiens/${encodeURIComponent(q)}?content-type=application/json`;
-        const payload = await fetchJsonWithTimeout(endpoint);
-        const normalized = normalizeEnsemblPayload(payload);
-        if (normalized) return normalized;
-    }
-
-    return null;
-}
-
-function normalizeNcbiGeneSummary(summary, uid) {
-    if (!summary) return null;
-    const genomic = Array.isArray(summary.genomicinfo) ? summary.genomicinfo[0] : null;
-    const beginPos = genomic ? toNullableNumber(Math.min(Number(genomic.chrstart), Number(genomic.chrstop))) : null;
-    const endPos = genomic ? toNullableNumber(Math.max(Number(genomic.chrstart), Number(genomic.chrstop))) : null;
-    const chromosome = summary.chromosome || genomic?.chraccver || '';
-
-    return {
-        geneSymbol: summary.nomenclaturesymbol || summary.name || '',
-        geneName: summary.description || '',
-        geneId: String(summary.uid || uid || ''),
-        chromosome,
-        beginPos,
-        endPos,
-        location: chromosome ? formatLocation(chromosome, beginPos, endPos) : (summary.maplocation || ''),
-        synonyms: summary.otheraliases || '',
-        description: summary.summary || summary.description || '',
-        externalSources: ['NCBI'],
-    };
-}
-
-async function fetchNcbiGeneInfo(query) {
-    const q = normalizeGeneQuery(query);
-    if (!q) return null;
-    const term = /^ENSG\d+/i.test(q)
-        ? `${q}[All Fields] AND Homo sapiens[orgn]`
-        : `${q}[sym] AND Homo sapiens[orgn]`;
-    const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gene&retmode=json&retmax=1&sort=relevance&term=${encodeURIComponent(term)}`;
-    const searchPayload = await fetchJsonWithTimeout(searchUrl);
-    const uid = searchPayload?.esearchresult?.idlist?.[0];
-    if (!uid) return null;
-
-    const summaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=gene&retmode=json&id=${encodeURIComponent(uid)}`;
-    const summaryPayload = await fetchJsonWithTimeout(summaryUrl);
-    return normalizeNcbiGeneSummary(summaryPayload?.result?.[uid], uid);
-}
-
-function mergeGeneInfo(baseGene, externalInfo) {
-    if (!externalInfo) return baseGene;
-    const sources = [
-        ...(Array.isArray(baseGene.externalSources) ? baseGene.externalSources : []),
-        ...(Array.isArray(externalInfo.externalSources) ? externalInfo.externalSources : []),
-    ];
-
-    return {
-        ...baseGene,
-        geneSymbol: baseGene.geneSymbol || externalInfo.geneSymbol || '',
-        ensgId: baseGene.ensgId || externalInfo.ensgId || '',
-        chromosome: baseGene.chromosome || externalInfo.chromosome || '',
-        beginPos: baseGene.beginPos == null ? externalInfo.beginPos ?? null : baseGene.beginPos,
-        endPos: baseGene.endPos == null ? externalInfo.endPos ?? null : baseGene.endPos,
-        location: baseGene.location || externalInfo.location || '',
-        geneType: baseGene.geneType || externalInfo.geneType || '',
-        geneName: baseGene.geneName || externalInfo.geneName || '',
-        geneId: baseGene.geneId || externalInfo.geneId || '',
-        hgnc: baseGene.hgnc || externalInfo.hgnc || '',
-        synonyms: baseGene.synonyms || externalInfo.synonyms || '',
-        description: baseGene.description || externalInfo.description || '',
-        externalSources: [...new Set(sources)],
-    };
-}
-
-function needsExternalGeneInfo(gene) {
-    return !gene.ensgId || !gene.geneName || !gene.location || !gene.geneType || !gene.description;
-}
-
-async function getExternalGeneInfo(query) {
-    const q = normalizeGeneQuery(query);
-    if (!q) return null;
-
-    const key = q.toUpperCase();
-    const cached = externalGeneInfoCache.get(key);
-    if (cached && Date.now() - cached.createdAt < EXTERNAL_GENE_INFO_TTL_MS) {
-        return cached.value;
-    }
-
-    const [ensemblResult, ncbiResult] = await Promise.allSettled([
-        fetchEnsemblGeneInfo(q),
-        fetchNcbiGeneInfo(q),
-    ]);
-    const ensemblInfo = ensemblResult.status === 'fulfilled' ? ensemblResult.value : null;
-    let ncbiInfo = ncbiResult.status === 'fulfilled' ? ncbiResult.value : null;
-
-    if (!ncbiInfo && ensemblInfo?.geneSymbol && ensemblInfo.geneSymbol.toUpperCase() !== key) {
-        ncbiInfo = await fetchNcbiGeneInfo(ensemblInfo.geneSymbol);
-    }
-
-    const merged = mergeGeneInfo(mergeGeneInfo({}, ensemblInfo), ncbiInfo);
-    const value = Object.keys(merged).length ? merged : null;
-    externalGeneInfoCache.set(key, { createdAt: Date.now(), value });
-    return value;
 }
 
 function normalizeGeneSummary(row) {
@@ -774,31 +619,31 @@ async function searchGenes(query, limit = 20) {
     if (!q) return { query: q, totalGenes: 0, genes: [] };
 
     const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
-    const like = `%${q}%`;
+    const prefixLike = `${escapeLike(q)}%`;
     const includeGeneInfo = await hasGeneInfoTable();
-
-    try {
-        const [rows] = await pool.query(
-            `SELECT
-                gpte.gene_symbol,
-                gpte.ensg_id,
-                ${includeGeneInfo ? `
+    const geneInfoSelect = includeGeneInfo ? `
                 MAX(gi.chromosome) AS chromosome,
                 MAX(gi.begin_pos) AS begin_pos,
                 MAX(gi.end_pos) AS end_pos,
-                MAX(gi.gene_type) AS gene_type,` : ''}
+                MAX(gi.gene_type) AS gene_type,` : '';
+    const geneInfoJoin = includeGeneInfo ? `LEFT JOIN ${GENE_INFO_TABLE} gi
+                ON gi.ensembl = gpte.ensg_id` : '';
+
+    try {
+        const [exactRows] = await pool.query(
+            `SELECT
+                gpte.gene_symbol,
+                gpte.ensg_id,
+                ${geneInfoSelect}
                 COUNT(*) AS total_rows,
                 COUNT(DISTINCT program) AS total_programs,
                 COUNT(DISTINCT trait_id) AS total_traits,
                 SUM(role = 'program') AS program_role_rows,
                 SUM(role = 'regulator') AS regulator_role_rows
              FROM gene_program_trait_edge gpte
-             ${includeGeneInfo ? `LEFT JOIN ${GENE_INFO_TABLE} gi
-                ON gi.ensembl = gpte.ensg_id` : ''}
+             ${geneInfoJoin}
              WHERE gpte.gene_symbol = ?
                 OR gpte.ensg_id = ?
-                OR gpte.gene_symbol LIKE ?
-                OR gpte.ensg_id LIKE ?
              GROUP BY gene_symbol, ensg_id
              ORDER BY
                 (gpte.gene_symbol = ?) DESC,
@@ -807,13 +652,44 @@ async function searchGenes(query, limit = 20) {
                 total_programs DESC,
                 gpte.gene_symbol ASC
              LIMIT ?`,
-            [q, q, like, like, q, q, safeLimit],
+            [q, q, q, q, safeLimit],
+        );
+
+        if (exactRows.length) {
+            return {
+                query: q,
+                totalGenes: exactRows.length,
+                genes: exactRows.map((row) => normalizeGeneSummary(row)),
+            };
+        }
+
+        const [prefixRows] = await pool.query(
+            `SELECT
+                gpte.gene_symbol,
+                gpte.ensg_id,
+                ${geneInfoSelect}
+                COUNT(*) AS total_rows,
+                COUNT(DISTINCT program) AS total_programs,
+                COUNT(DISTINCT trait_id) AS total_traits,
+                SUM(role = 'program') AS program_role_rows,
+                SUM(role = 'regulator') AS regulator_role_rows
+             FROM gene_program_trait_edge gpte
+             ${geneInfoJoin}
+             WHERE gpte.gene_symbol LIKE ? ESCAPE '\\\\'
+                OR gpte.ensg_id LIKE ? ESCAPE '\\\\'
+             GROUP BY gene_symbol, ensg_id
+             ORDER BY
+                total_traits DESC,
+                total_programs DESC,
+                gpte.gene_symbol ASC
+             LIMIT ?`,
+            [prefixLike, prefixLike, safeLimit],
         );
 
         return {
             query: q,
-            totalGenes: rows.length,
-            genes: rows.map((row) => normalizeGeneSummary(row)),
+            totalGenes: prefixRows.length,
+            genes: prefixRows.map((row) => normalizeGeneSummary(row)),
         };
     } catch (err) {
         if (isMissingIndexTableError(err)) return emptyUnavailable({ query: q, totalGenes: 0, genes: [] });
@@ -1004,23 +880,18 @@ async function getGenePrograms(geneId, {
         const summary = normalizeSummaryRow(summaryRow);
         const programs = programRows.map((row) => normalizeProgramAggregate(row, gene.geneSymbol || gene.ensgId || q));
 
-        let enrichedGene = gene;
-        if (needsExternalGeneInfo(gene)) {
-            enrichedGene = mergeGeneInfo(gene, await getExternalGeneInfo(q));
-        }
-
         return {
-            gene: enrichedGene,
+            gene,
             summary,
-            genes: enrichedGene?.geneSymbol || enrichedGene?.ensgId ? [{
-                geneSymbol: enrichedGene.geneSymbol || '',
-                ensgId: enrichedGene.ensgId || '',
-                geneLabel: enrichedGene.geneSymbol || enrichedGene.ensgId || q,
-                chromosome: enrichedGene.chromosome || '',
-                beginPos: enrichedGene.beginPos == null ? null : enrichedGene.beginPos,
-                endPos: enrichedGene.endPos == null ? null : enrichedGene.endPos,
-                location: enrichedGene.location || formatLocation(enrichedGene.chromosome, enrichedGene.beginPos, enrichedGene.endPos),
-                geneType: enrichedGene.geneType || '',
+            genes: gene?.geneSymbol || gene?.ensgId ? [{
+                geneSymbol: gene.geneSymbol || '',
+                ensgId: gene.ensgId || '',
+                geneLabel: gene.geneSymbol || gene.ensgId || q,
+                chromosome: gene.chromosome || '',
+                beginPos: gene.beginPos == null ? null : gene.beginPos,
+                endPos: gene.endPos == null ? null : gene.endPos,
+                location: gene.location || formatLocation(gene.chromosome, gene.beginPos, gene.endPos),
+                geneType: gene.geneType || '',
                 totalPrograms: summary.totalPrograms,
                 totalTraits: summary.totalTraits,
                 roles: {

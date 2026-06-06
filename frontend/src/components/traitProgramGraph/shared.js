@@ -76,12 +76,14 @@ export const GRAPH_LAYOUTS = {
         geneColumnGap: 18,
         geneSubcolumnGap: 20,
         geneSidePadding: 18,
+        geneEmptySideW: 78,
+        geneBottomPadding: 8,
         oneSidedDividerRatio: 0.84,
         moduleGap: 20,
         regulatorGroupGap: 12,
         regulatorEdgeTargetSpacing: 24,
-        graphTopPadding: 86,
-        graphBottomPadding: 48,
+        graphTopPadding: 80,
+        graphBottomPadding: 40,
         minContentHeight: 400,
         minSvgHeight: 680,
         geneSubcolumnThreshold: Number.POSITIVE_INFINITY,
@@ -105,26 +107,29 @@ export const GRAPH_LAYOUTS = {
         traitExtraLineH: 22,
         traitTextLineStep: 22,
         leftProgramX: 24,
-        leftProgramW: 340,
-        rightProgramX: 790,
-        rightProgramW: 250,
+        leftProgramW: 266,
+        rightProgramX: 820,
+        rightProgramW: 266,
         rightProgramH: 62,
-        rightRegulatorX: 1180,
-        rightRegulatorW: 460,
-        rightRegulatorMinW: 430,
-        geneRowH: 31,
-        geneFontSize: 18,
-        geneHeaderH: 56,
-        geneHeaderHTall: 84,
+        rightRegulatorX: 1234,
+        rightRegulatorW: 310,
+        rightRegulatorMinW: 310,
+        geneRowH: 25,
+        geneFontSize: 22,
+        geneHeaderH: 52,
+        geneHeaderHTall: 78,
         geneDividerTopInset: 42,
         geneDividerBottomInset: 18,
-        geneColumnGap: 20,
-        geneSubcolumnGap: 22,
-        geneSidePadding: 20,
-        oneSidedDividerRatio: 0.84,
+        geneColumnGap: 12,
+        geneSubcolumnGap: 12,
+        geneSidePadding: 14,
+        geneEmptySideW: 78,
+        geneBottomPadding: 0,
+        oneSidedDividerRatio: 0.5,
+        geneBoxStyle: 'legacy',
         moduleGap: 42,
         regulatorGroupGap: 18,
-        regulatorEdgeTargetSpacing: 28,
+        regulatorEdgeTargetSpacing: 14,
         graphTopPadding: 168,
         graphBottomPadding: 96,
         minContentHeight: 560,
@@ -137,9 +142,10 @@ export const GRAPH_LAYOUTS = {
         rightProgramTitleFontSize: 25,
         leftProgramTitleStep: 25,
         rightProgramTitleStep: 24,
-        leftProgramLabelChars: 24,
+        leftProgramLabelChars: 19,
         rightProgramLabelChars: 19,
-        showSectionNotes: false,
+        regulatorGroupStyle: 'legacy',
+        showSectionNotes: true,
     },
 };
 
@@ -379,12 +385,17 @@ function groupRegulatorGenesByBucket(genes, layout = DEFAULT_GRAPH_LAYOUT) {
 }
 
 export function geneBoxHeight(columns, titleRows = 1, layout = DEFAULT_GRAPH_LAYOUT) {
-    return (titleRows > 1 ? layout.geneHeaderHTall : layout.geneHeaderH) + (geneVisualRowCount(columns, layout) * layout.geneRowH);
+    const headerHeight = titleRows > 1 ? layout.geneHeaderHTall : layout.geneHeaderH;
+    return headerHeight
+        + (geneVisualRowCount(columns, layout) * layout.geneRowH)
+        + (layout.geneBottomPadding || 0);
 }
 
 export function regulatorGeneBoxHeight(genes, layout = DEFAULT_GRAPH_LAYOUT) {
     if (layout.regulatorGeneLayout === 'single') {
-        return layout.geneHeaderH + (Math.max(genes.length, 1) * layout.geneRowH);
+        return layout.geneHeaderH
+            + (Math.max(genes.length, 1) * layout.geneRowH)
+            + (layout.geneBottomPadding || 0);
     }
 
     return geneBoxHeight(splitGenesByEffect(genes), 1, layout);
@@ -406,7 +417,7 @@ export function regulatorGeneBoxWidth(genes, layout = DEFAULT_GRAPH_LAYOUT) {
     }
 
     const columns = splitGenesByEffect(genes);
-    const oneSided = isOneSidedGeneBox(columns);
+    const oneSided = layout.geneBoxStyle !== 'legacy' && isOneSidedGeneBox(columns);
     const contentWidth = (Math.max(
         maxDisplayLabelLength(columns.left),
         maxDisplayLabelLength(columns.right),
@@ -430,7 +441,7 @@ function geneDisplayColumnCount(genes, layout = DEFAULT_GRAPH_LAYOUT, forceSplit
 }
 
 export function geneVisualRowCount(columns, layout = DEFAULT_GRAPH_LAYOUT) {
-    const forceSplit = isOneSidedGeneBox(columns);
+    const forceSplit = layout.geneBoxStyle !== 'legacy' && isOneSidedGeneBox(columns);
     const rowCountForSide = (genes) => Math.max(1, Math.ceil(genes.length / geneDisplayColumnCount(genes, layout, forceSplit)));
     return Math.max(rowCountForSide(columns.left), rowCountForSide(columns.right), 1);
 }

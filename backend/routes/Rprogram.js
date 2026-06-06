@@ -24,6 +24,11 @@ const PROGRAM_COLOR_LABELS = {
     regulator_enriched: 'Regulator enriched',
     both_enriched: 'Both enriched',
 };
+const PROGRAM_LIST_CACHE_TTL_MS = 60 * 1000;
+let programListCache = null;
+let programListCachePromise = null;
+let graphListCache = null;
+let graphListCachePromise = null;
 const GRAPH_SIDE_TO_ROLE = {
     program_loading: 'program',
     regulator: 'regulator',
@@ -84,6 +89,52 @@ async function listAvailableTraitProgramGraphFiles() {
     return [...programFiles]
         .filter((fileId) => geneFiles.has(fileId))
         .sort((a, b) => a.localeCompare(b));
+}
+
+function getFreshListCache(cache) {
+    return cache && (Date.now() - cache.createdAt) < PROGRAM_LIST_CACHE_TTL_MS ? cache.files : null;
+}
+
+async function getProgramListFiles() {
+    const cached = getFreshListCache(programListCache);
+    if (cached) return cached;
+    if (programListCachePromise) return programListCachePromise;
+
+    programListCachePromise = (async () => {
+        const exists = await programStore.exists(programStore.rootPath);
+        const files = exists
+            ? (await programStore.list(programStore.rootPath))
+                .filter((entry) => entry.type === 'file' && entry.name.endsWith('.tsv'))
+                .map((entry) => entry.name.replace(/\.tsv$/i, ''))
+            : [];
+        programListCache = { createdAt: Date.now(), files };
+        programListCachePromise = null;
+        return files;
+    })().catch((err) => {
+        programListCachePromise = null;
+        throw err;
+    });
+
+    return programListCachePromise;
+}
+
+async function getGraphListFiles() {
+    const cached = getFreshListCache(graphListCache);
+    if (cached) return cached;
+    if (graphListCachePromise) return graphListCachePromise;
+
+    graphListCachePromise = listAvailableTraitProgramGraphFiles()
+        .then((files) => {
+            graphListCache = { createdAt: Date.now(), files };
+            graphListCachePromise = null;
+            return files;
+        })
+        .catch((err) => {
+            graphListCachePromise = null;
+            throw err;
+        });
+
+    return graphListCachePromise;
 }
 
 async function getTsvVariant(store, fileIds, variant, suffix, { readRows = true } = {}) {
@@ -410,18 +461,12 @@ router.get('/api/programs/info', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/programs/list', asyncRoute(async (req, res) => {
-    const exists = await programStore.exists(programStore.rootPath);
-    if (!exists) return res.json({ files: [] });
-
-    const files = (await programStore.list(programStore.rootPath))
-        .filter((entry) => entry.type === 'file' && entry.name.endsWith('.tsv'))
-        .map((entry) => entry.name.replace(/\.tsv$/i, ''));
-
+    const files = await getProgramListFiles();
     res.json({ files });
 }));
 
 router.get('/api/programs/graph-list', asyncRoute(async (req, res) => {
-    const files = await listAvailableTraitProgramGraphFiles();
+    const files = await getGraphListFiles();
     res.json({ files });
 }));
 

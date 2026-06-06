@@ -44,9 +44,9 @@ function SummaryStat({ label, value, theme }) {
         <Box
             sx={{
                 minWidth: 0,
-                px: 1.2,
-                py: 1.05,
-                borderRadius: 1.5,
+                px: 1.1,
+                py: 0.9,
+                borderRadius: 1.35,
                 border: `1px solid ${theme.custom.border.soft}`,
                 backgroundColor: alpha(theme.palette.primary.main, 0.035),
             }}
@@ -55,7 +55,7 @@ function SummaryStat({ label, value, theme }) {
                 variant="caption"
                 sx={{
                     display: 'block',
-                    mb: 0.25,
+                    mb: 0.18,
                     color: '#245089',
                     fontSize: '0.66rem',
                     fontWeight: 700,
@@ -68,7 +68,7 @@ function SummaryStat({ label, value, theme }) {
             <Typography
                 sx={{
                     color: theme.palette.text.primary,
-                    fontSize: '0.92rem',
+                    fontSize: '0.9rem',
                     fontWeight: 700,
                     lineHeight: 1.2,
                     overflowWrap: 'anywhere',
@@ -120,16 +120,16 @@ function Field({ icon: Icon, label, value, mono, href, theme, tone }) {
             sx={{
                 minWidth: 0,
                 display: 'grid',
-                gridTemplateColumns: '30px minmax(0, 1fr)',
-                gap: 0.85,
+                gridTemplateColumns: '28px minmax(0, 1fr)',
+                gap: 0.75,
                 alignItems: 'start',
             }}
         >
             <Box
                 sx={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 1.3,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 1.15,
                     border: `1px solid ${tone.border}`,
                     backgroundColor: tone.bg,
                     color: tone.color,
@@ -139,7 +139,7 @@ function Field({ icon: Icon, label, value, mono, href, theme, tone }) {
                     flexShrink: 0,
                 }}
             >
-                {Icon && <Icon sx={{ fontSize: 16 }} />}
+                {Icon && <Icon sx={{ fontSize: 15 }} />}
             </Box>
 
             <Box sx={{ minWidth: 0 }}>
@@ -147,7 +147,7 @@ function Field({ icon: Icon, label, value, mono, href, theme, tone }) {
                     variant="caption"
                     sx={{
                         display: 'block',
-                        mb: 0.22,
+                        mb: 0.16,
                         color: theme.palette.text.secondary,
                         fontSize: '0.66rem',
                         fontWeight: 700,
@@ -168,14 +168,14 @@ function InfoSection({ title, children, theme, tone, columns, fullWidth = false 
         <Box
             sx={{
                 minWidth: 0,
-                p: 1.45,
-                borderRadius: 2,
+                p: { xs: 1.2, md: 1.3 },
+                borderRadius: 1.8,
                 border: `1px solid ${theme.custom.border.soft}`,
                 backgroundColor: alpha(theme.palette.background.paper, 0.96),
-                gridColumn: fullWidth ? { xl: '1 / -1' } : undefined,
+                gridColumn: fullWidth ? { lg: '1 / -1' } : undefined,
             }}
         >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1.1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.9 }}>
                 <Box
                     sx={{
                         width: 7,
@@ -204,7 +204,7 @@ function InfoSection({ title, children, theme, tone, columns, fullWidth = false 
                 sx={{
                     display: 'grid',
                     gridTemplateColumns: columns || { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-                    gap: 1.15,
+                    gap: 0.9,
                 }}
             >
                 {children}
@@ -271,7 +271,7 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
         return (
             <Card elevation={0} sx={{ ...panelSx(theme, { borderRadius: 3 }), mb: 3, overflow: 'hidden' }}>
                 <Box sx={{ height: 2, backgroundColor: alpha(theme.palette.primary.main, 0.2) }} />
-                <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <CardContent sx={{ p: { xs: 1.85, md: 2.2 } }}>
                     <MetaSkeleton />
                 </CardContent>
             </Card>
@@ -292,13 +292,13 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
         <Card elevation={0} sx={{ ...panelSx(theme, { borderRadius: 3 }), mb: 3, overflow: 'hidden' }}>
             <Box sx={{ height: 2, backgroundColor: alpha(theme.palette.primary.main, 0.2) }} />
 
-            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+            <CardContent sx={{ p: { xs: 1.85, md: 2.2 } }}>
                 <Box
                     sx={{
                         display: 'flex',
                         alignItems: { xs: 'flex-start', md: 'center' },
                         justifyContent: 'space-between',
-                        gap: 1.25,
+                        gap: 1,
                         flexWrap: 'wrap',
                     }}
                 >
@@ -343,10 +343,10 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
 
                 <Box
                     sx={{
-                        mt: 1.65,
+                        mt: 1.35,
                         display: 'grid',
                         gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' },
-                        gap: 1,
+                        gap: 0.85,
                     }}
                 >
                     {stats.map((item) => (
@@ -354,13 +354,13 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                     ))}
                 </Box>
 
-                <Divider sx={{ my: 1.9 }} />
+                <Divider sx={{ my: 1.55 }} />
 
                 <Box
                     sx={{
                         display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', xl: 'repeat(2, minmax(0, 1fr))' },
-                        gap: 1.25,
+                        gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
+                        gap: 1,
                     }}
                 >
                     <InfoSection title="Study details" theme={theme} tone={tones.study}>
@@ -401,7 +401,7 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                         title="GWAS summary"
                         theme={theme}
                         tone={tones.gwas}
-                        columns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' }}
+                        columns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' }}
                     >
                         <Field
                             icon={GroupOutlined}
@@ -431,7 +431,7 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                         theme={theme}
                         tone={tones.analysis}
                         fullWidth
-                        columns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(4, minmax(0, 1fr))' }}
+                        columns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }}
                     >
                         <Field
                             icon={ScatterPlotOutlined}

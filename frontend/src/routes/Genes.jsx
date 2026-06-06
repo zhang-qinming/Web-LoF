@@ -72,6 +72,20 @@ function roleTone(theme, role) {
     return metricChipTone(theme, 'neutral');
 }
 
+function useDebouncedValue(value, delayMs = 280) {
+    const [debouncedValue, setDebouncedValue] = React.useState(value);
+
+    React.useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            setDebouncedValue(value);
+        }, delayMs);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [delayMs, value]);
+
+    return debouncedValue;
+}
+
 function GenePaginationControl({ totalPages, page, onChange, size = 'small' }) {
     if (totalPages <= 1) return null;
 
@@ -1559,9 +1573,11 @@ function GeneSwitcher({ gene, query, onSelect }) {
         gene?.geneType,
     ].filter(Boolean).join(' | ') || 'Search another gene';
     const searchTerm = search.trim();
+    const debouncedSearchTerm = useDebouncedValue(searchTerm);
+    const searchPending = open && searchTerm.length >= 2 && debouncedSearchTerm !== searchTerm;
 
     const { data, isLoading } = useSWR(
-        open && searchTerm.length >= 2 ? ['gene-switcher-search', searchTerm] : null,
+        open && debouncedSearchTerm.length >= 2 ? ['gene-switcher-search', debouncedSearchTerm] : null,
         ([, q]) => searchGenes(q, { limit: 12 }),
         { keepPreviousData: true, revalidateOnFocus: false },
     );
@@ -1660,22 +1676,22 @@ function GeneSwitcher({ gene, query, onSelect }) {
                     />
                 </Box>
                 <Box sx={{ maxHeight: 420, overflowY: 'auto', p: 1 }}>
-                    {isLoading && (
+                    {(isLoading || searchPending) && (
                         <Typography sx={{ px: 1, py: 2, fontSize: '0.8rem', color: theme.palette.text.secondary, textAlign: 'center' }}>
                             Searching genes...
                         </Typography>
                     )}
-                    {!isLoading && searchTerm.length < 2 && (
+                    {!isLoading && !searchPending && searchTerm.length < 2 && (
                         <Typography sx={{ px: 1, py: 2, fontSize: '0.8rem', color: theme.palette.text.secondary, textAlign: 'center' }}>
                             Type at least two characters.
                         </Typography>
                     )}
-                    {!isLoading && searchTerm.length >= 2 && rows.length === 0 && (
+                    {!isLoading && !searchPending && debouncedSearchTerm.length >= 2 && rows.length === 0 && (
                         <Typography sx={{ px: 1, py: 2, fontSize: '0.8rem', color: theme.palette.text.secondary, textAlign: 'center' }}>
                             No matching genes. Press Enter to search this exact value.
                         </Typography>
                     )}
-                    {!isLoading && rows.map((item, index) => {
+                    {!isLoading && !searchPending && rows.map((item, index) => {
                         const label = item.geneSymbol || item.ensgId || item.geneLabel;
                         const selected = label === currentLabel || item.ensgId === gene?.ensgId;
                         return (
@@ -2423,6 +2439,9 @@ export default function Genes() {
     const [traitSortBy, setTraitSortBy] = React.useState('absGamma');
     const [traitSortDir, setTraitSortDir] = React.useState('desc');
     const query = queryParam.trim();
+    const debouncedInput = useDebouncedValue(input.trim());
+    const suggestionQuery = !query ? debouncedInput : '';
+    const suggestionsPending = !query && input.trim().length >= 2 && suggestionQuery !== input.trim();
 
     React.useEffect(() => {
         setInput(queryParam);
@@ -2435,7 +2454,7 @@ export default function Genes() {
     }, [query]);
 
     const { data: suggestions, isLoading: suggestionsLoading } = useSWR(
-        !query && input.trim().length >= 2 ? ['gene-search', input.trim()] : null,
+        suggestionQuery.length >= 2 ? ['gene-search', suggestionQuery] : null,
         ([, q]) => searchGenes(q, { limit: 12 }),
         { keepPreviousData: true, revalidateOnFocus: false },
     );
@@ -2563,7 +2582,7 @@ export default function Genes() {
                             input={input}
                             setInput={setInput}
                             suggestions={suggestions}
-                            suggestionsLoading={suggestionsLoading}
+                            suggestionsLoading={suggestionsLoading || suggestionsPending}
                             onSearch={(gene) => runSearch(gene)}
                             onClear={clearSearch}
                             onSelect={(gene) => runSearch(gene)}

@@ -8,30 +8,6 @@ export async function fetcher(url, params) {
     return res.data;
 }
 
-export async function getFilteredGwasDataByTrait(traitName, { page, limit, sortBy, order } = {}, filters = {}) {
-    try {
-        const params = { page, limit, sortBy, order, ...filters };
-        const res = await axios.get(`${API_BASE}/trait/filtergwas/${encodeURIComponent(traitName)}`, {
-            params,
-            paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'brackets' }),
-        });
-        return res.data;
-    } catch (err) {
-        console.error(`Failed to fetch filtered GWAS data for trait "${traitName}":`, err);
-        return { data: [], totalCount: 0, page: 1, totalPages: 1 };
-    }
-}
-
-export async function getTraitData(traitName) {
-    try {
-        const res = await axios.get(`${API_BASE}/trait/allgwas/${traitName}`);
-        return res.data;
-    } catch (err) {
-        console.error(`Failed to fetch trait "${traitName}":`, err);
-        return { data: [] };
-    }
-}
-
 export async function getTraitManhattanHits(traitName, { variant = 'hits', aliasId } = {}) {
     try {
         const res = await axios.get(`${API_BASE}/trait/manhattan/${encodeURIComponent(traitName)}`, {

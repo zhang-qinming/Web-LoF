@@ -1,9 +1,8 @@
 const express = require('express');
-const gwasModel = require('../models/MgetGwasByTrait');
 const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
-const { normalizeSafeBaseNameList, parsePageOptions } = require('../lib/request');
+const { normalizeSafeBaseNameList } = require('../lib/request');
 const { parseTsvStream } = require('../lib/tsv');
 const { findVariantFile } = require('../lib/variantFiles');
 
@@ -15,11 +14,6 @@ const TSV_CACHE = new Map();
 function normalizeTraitFileId(traitName) {
     const cleaned = String(traitName || '').trim();
     return /^[A-Za-z0-9._-]+$/.test(cleaned) ? cleaned : null;
-}
-
-function normalizeTraitName(traitName) {
-    const cleaned = String(traitName || '').trim();
-    return cleaned && cleaned.length <= 500 ? cleaned : null;
 }
 
 function parseOptionalNumber(value) {
@@ -181,53 +175,6 @@ function buildManhattanSummary(rows) {
         topGenesets,
     };
 }
-
-function parseOptions(query) {
-    const rawLimit = Number(query.limit);
-    if (Number.isFinite(rawLimit) && rawLimit < 1) {
-        return {
-            page: 1,
-            limit: -1,
-            sortBy: query.sortBy || 'CHR',
-            order: query.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
-        };
-    }
-
-    return parsePageOptions(query, {
-        defaultLimit: 50,
-        maxLimit: config.query.maxGwasPageLimit,
-        defaultSortBy: 'CHR',
-    });
-}
-
-router.get('/api/trait/:traitName', asyncRoute(async (req, res) => {
-    const traitName = normalizeTraitName(req.params.traitName);
-    if (!traitName) return res.status(400).json({ error: 'Invalid traitName' });
-
-    const result = await gwasModel.getGwasDataByTrait(traitName, parseOptions(req.query));
-    res.json(result);
-}));
-
-router.get('/api/trait/allgwas/:traitName', asyncRoute(async (req, res) => {
-    const traitName = normalizeTraitName(req.params.traitName);
-    if (!traitName) return res.status(400).json({ error: 'Invalid traitName' });
-
-    const result = await gwasModel.getGwasDataByTrait(traitName);
-    res.json(result);
-}));
-
-router.get('/api/trait/filtergwas/:traitName', asyncRoute(async (req, res) => {
-    const traitName = normalizeTraitName(req.params.traitName);
-    if (!traitName) return res.status(400).json({ error: 'Invalid traitName' });
-
-    const { 'CHR[]': CHR, CHR: CHRValue, BP_start, BP_end, P_min, P_max, rsID } = req.query;
-    const result = await gwasModel.getFilteredGwasDataByTrait(
-        traitName,
-        { CHR: CHR || CHRValue, BP_start, BP_end, P_min, P_max, rsID },
-        parseOptions(req.query)
-    );
-    res.json(result);
-}));
 
 router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
     const fileId = normalizeTraitFileId(req.params.traitName);

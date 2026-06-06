@@ -38,6 +38,8 @@ import {
     summaryChipSx,
     tableRowRevealSx,
 } from '../themeUtils';
+import homeFigureBrowserWorkflow from '../assets/home/home-figure-browser-workflow.svg';
+import docsFigureBrowserSurfaces from '../assets/docs/docs-figure-browser-surfaces.svg';
 
 const TEXT = {
     en: {
@@ -48,7 +50,21 @@ const TEXT = {
         sectionsAndMethods: (sectionCount, methodCount) => `${sectionCount} sections / ${methodCount} topics`,
         components: (count) => `${count} components`,
         recommendedWorkflow: 'Recommended workflow',
-        workflowText: 'Start from Home or Trait to locate a trait, then inspect Manhattan, program enrichment, graph, gene-level, and cross-trait views inside the Trait page. Use Data Browser for raw file browsing and batch downloads.',
+        workflowText: 'Start from Home, Trait, or Genes depending on whether the question begins with a file, a trait, or a gene. Use Trait for figure-centric interpretation, Programs for annotation review, and Data Browser for raw file browsing and batch downloads.',
+        workflowFigures: [
+            {
+                title: 'Analysis Workflow',
+                body: 'This figure shows the project analysis path that feeds the browser: GWAS and LoF evidence connect to perturb-seq programs, association, and then web display.',
+                image: homeFigureBrowserWorkflow,
+                alt: 'Analysis workflow from GWAS and LoF to web display',
+            },
+            {
+                title: 'Route Map',
+                body: 'This figure shows the browser-side route split: search in Home, drill down in Trait, Genes, or Programs, then export from Data or read page-level guidance here.',
+                image: docsFigureBrowserSurfaces,
+                alt: 'Browser route map showing Home, Trait, Genes, Programs, Data, Guide, and About',
+            },
+        ],
         componentCoverageTitle: 'Component Coverage Index',
         componentCoverageBody: 'Visible routes and user-facing components are mapped to the guide entries below. Pure helpers, formatters, and loading skeletons stay grouped under their parent component.',
         mapped: (count) => `${count} mapped`,
@@ -57,6 +73,7 @@ const TEXT = {
         chinese: '中文',
         quickLinks: [
             { label: 'Trait List', to: '/trait', icon: <TableChartOutlined sx={{ fontSize: 17 }} /> },
+            { label: 'Genes', to: '/genes', icon: <BiotechOutlined sx={{ fontSize: 17 }} /> },
             { label: 'Programs', to: '/programs', icon: <ScienceOutlined sx={{ fontSize: 17 }} /> },
             { label: 'Data Browser', to: '/data', icon: <DataObjectOutlined sx={{ fontSize: 17 }} /> },
         ],
@@ -313,6 +330,59 @@ const TEXT = {
                 ],
             },
             {
+                id: 'genes',
+                title: 'Genes',
+                icon: BiotechOutlined,
+                summary: 'Gene search, recommended entries, gene metadata, and linked program-trait evidence tables.',
+                items: [
+                    {
+                        name: 'Gene Search',
+                        route: '/genes',
+                        role: 'Primary lookup entry for gene-centric browsing.',
+                        usage: [
+                            'Search by gene symbol to open direct evidence rows, or start from the recommended list if you want a quick sample of populated genes.',
+                            'Use this page when the question begins with a specific gene and you need to trace its linked programs and traits without starting from a trait page first.',
+                        ],
+                    },
+                    {
+                        name: 'Genes Overview Table',
+                        route: '/genes',
+                        role: 'Landing table summarizing searchable genes and linked counts.',
+                        usage: [
+                            'Review Gene Symbol, Ensembl ID, gene type, genomic location, and associated program or trait counts.',
+                            'Open a gene row to move from the index view into its full evidence detail page.',
+                        ],
+                    },
+                    {
+                        name: 'Gene Information',
+                        route: '/genes',
+                        role: 'Gene metadata card and external-reference panel.',
+                        usage: [
+                            'Check the gene description, Ensembl ID, genomic location, gene type, NCBI summary, and external links such as Ensembl, GeneCards, and NCBI.',
+                            'Use this block first when you need to confirm that the selected gene symbol matches the expected locus and annotation context.',
+                        ],
+                    },
+                    {
+                        name: 'Gene Program Relationships',
+                        route: '/genes',
+                        role: 'Program-level table showing how the current gene connects to cNMF programs.',
+                        usage: [
+                            'Review Program, Function, GO Term, direction, and program gene counts to see whether the gene participates in coherent functional modules.',
+                            'This table is best for answering which programs carry the gene and whether the regulator direction is consistent across modules.',
+                        ],
+                    },
+                    {
+                        name: 'Gene Program Trait Evidence',
+                        route: '/genes',
+                        role: 'Full evidence table linking the selected gene to programs and traits.',
+                        usage: [
+                            'Inspect Trait, Program, role, direction, posterior mean, gamma, membership, and concordance fields together.',
+                            'Use this table to judge whether the same gene-program relationship stays concordant or discordant across multiple traits.',
+                        ],
+                    },
+                ],
+            },
+            {
                 id: 'programs',
                 title: 'Programs',
                 icon: ScienceOutlined,
@@ -328,23 +398,48 @@ const TEXT = {
                         ],
                     },
                     {
-                        name: 'GeneRegulation',
+                        name: 'Program Switcher',
                         route: '/programs/P1',
-                        role: 'Perturb-seq gene-level regulation plot for a single program.',
+                        role: 'Program detail header and searchable program picker.',
                         usage: [
-                            'Each point is a gene measured within one program context. The x axis is effect size and the y axis is -log10(P-value), so the plot reads like a program-specific volcano view.',
-                            'Genes far to the right are positive regulators; genes far to the left are negative regulators; higher points carry stronger statistical support.',
-                            'Color separates background genes from positive and negative hit classes, which makes it easy to see whether a program is dominated by one regulatory direction or has balanced control.',
-                            'Use the program picker to compare programs quickly, then click points or rows to move between the visual ranking and the exact gene-level table.',
+                            'Use the header to confirm the current Program ID and curated annotation before reading downstream tables.',
+                            'Open the picker to search by program id or annotation and jump directly between detail pages without returning to the main table.',
                         ],
                     },
                     {
-                        name: 'GeneRegulationTable',
+                        name: 'Program Summary Chips',
                         route: '/programs/P1',
-                        role: 'Gene-level regulation table for a selected program.',
+                        role: 'Compact trait, program, regulator, and gene count summary strip.',
                         usage: [
-                            'Expand or collapse the table and export the current program rows as CSV.',
-                            'Sort columns and use the pager to change page size or jump between result pages.',
+                            'Use these counts to see whether the current program is selected by program signal, regulator signal, both, and how many genes are in the linked SQL index.',
+                            'This strip is a quick orientation layer before drilling into Program Information, Program Genes, or Associated Traits.',
+                        ],
+                    },
+                    {
+                        name: 'Program Information',
+                        route: '/programs/P1',
+                        role: 'Single-row detail table for the selected program annotation context.',
+                        usage: [
+                            'Review Program, Annotation, GO Term, GO Ontology, Associated Genes, and Associated Traits in one place.',
+                            'Use this table to confirm the representative GO function and counts before interpreting the gene-level or trait-level detail tables.',
+                        ],
+                    },
+                    {
+                        name: 'Program Genes',
+                        route: '/programs/P1',
+                        role: 'Gene-level table for one selected cNMF program.',
+                        usage: [
+                            'Inspect Symbol, Ensembl ID, location, gene type, direction in program, and value across the sorted gene list.',
+                            'Sort the table, page through long result sets, export CSV, or open a gene symbol to continue in the Genes page.',
+                        ],
+                    },
+                    {
+                        name: 'Associated Traits',
+                        route: '/programs/P1',
+                        role: 'Trait-level table linking the current program back to enriched traits.',
+                        usage: [
+                            'Review trait name, selection class, program score, regulator score, visible gene counts, and top genes together.',
+                            'Use the selection filter and CSV export to separate program-selected, regulator-selected, and jointly selected traits.',
                         ],
                     },
                 ],
@@ -400,22 +495,14 @@ const TEXT = {
                 id: 'support-pages',
                 title: 'Other Pages',
                 icon: InfoOutlined,
-                summary: 'Genes, About, Contact, and shared floating legends.',
+                summary: 'About, Contact, and shared floating legends.',
                 items: [
-                    {
-                        name: 'Genes',
-                        route: '/genes',
-                        role: 'Placeholder page for future gene lookup workflows.',
-                        usage: [
-                            'The production gene endpoint is not connected yet, so use Trait or Programs for current gene-level exploration.',
-                        ],
-                    },
                     {
                         name: 'About',
                         route: '/about',
-                        role: 'Project overview page.',
+                        role: 'Project overview page with workflow figures and route positioning.',
                         usage: [
-                            'Use this page for a concise summary of trait browsing, program enrichment, and downloadable outputs.',
+                            'Use this page for a concise summary of the browser surfaces, the analysis workflow, and where each major route fits.',
                         ],
                     },
                     {
@@ -481,8 +568,8 @@ const TEXT = {
                     { name: 'App / Router', target: 'Top Navigation' },
                     { name: 'Home', target: 'Home File Search' },
                     { name: 'Trait', target: 'Trait Figure Tabs' },
+                    { name: 'Genes', target: 'Gene Search' },
                     { name: 'Programs', target: 'Programs Table' },
-                    { name: 'Genes', target: 'Genes' },
                     { name: 'Variants / DataBrowser', target: 'DataBrowser' },
                     { name: 'Guide', target: 'Guide' },
                     { name: 'Contact', target: 'Contact' },
@@ -521,10 +608,18 @@ const TEXT = {
                 ],
             },
             {
-                group: 'Program & Data',
+                group: 'Gene, Program & Data',
                 components: [
-                    { name: 'GeneRegulation', target: 'GeneRegulation' },
-                    { name: 'GeneRegulationTable', target: 'GeneRegulationTable' },
+                    { name: 'Gene Search', target: 'Gene Search' },
+                    { name: 'Genes Overview Table', target: 'Genes Overview Table' },
+                    { name: 'Gene Information', target: 'Gene Information' },
+                    { name: 'Gene Program Relationships', target: 'Gene Program Relationships' },
+                    { name: 'Gene Program Trait Evidence', target: 'Gene Program Trait Evidence' },
+                    { name: 'Program Switcher', target: 'Program Switcher' },
+                    { name: 'Program Summary Chips', target: 'Program Summary Chips' },
+                    { name: 'Program Information', target: 'Program Information' },
+                    { name: 'Program Genes', target: 'Program Genes' },
+                    { name: 'Associated Traits', target: 'Associated Traits' },
                     { name: 'DataBrowseSummary', target: 'DataBrowseSummary' },
                     { name: 'DirColumn / DirectoryPanel', target: 'DirectoryPanel' },
                     { name: 'GlobalSearchResults', target: 'GlobalSearchResults' },
@@ -541,7 +636,21 @@ const TEXT = {
         sectionsAndMethods: (sectionCount, methodCount) => `${sectionCount} 个章节 / ${methodCount} 个主题`,
         components: (count) => `${count} 个组件`,
         recommendedWorkflow: '推荐使用路径',
-        workflowText: '建议先在 Home 或 Trait 定位 trait，再在 Trait 页面查看 Manhattan、program enrichment、graph、gene-level 和 cross-trait 结果；原始文件浏览和批量下载统一使用 Data Browser。',
+        workflowText: '如果问题先从文件、trait 或 gene 开始，分别从 Home、Trait 或 Genes 进入。Trait 负责图表解释，Programs 负责注释核查，Data Browser 负责原始文件浏览和批量下载。',
+        workflowFigures: [
+            {
+                title: '分析工作流',
+                body: '这张图展示项目结果如何进入浏览器：GWAS 和 LoF 证据连接到 perturb-seq programs、association，最后进入网页展示。',
+                image: homeFigureBrowserWorkflow,
+                alt: '从 GWAS 和 LoF 到网页展示的分析工作流',
+            },
+            {
+                title: '页面路由图',
+                body: '这张图展示前端页面分工：先在 Home 搜索，再进入 Trait、Genes 或 Programs 深入查看，最后在 Data 导出结果或回到本页看说明。',
+                image: docsFigureBrowserSurfaces,
+                alt: '展示 Home、Trait、Genes、Programs、Data、Guide 和 About 的页面关系图',
+            },
+        ],
         componentCoverageTitle: '组件覆盖索引',
         componentCoverageBody: '源码中的页面和可见组件都映射到下方说明条目；纯 helper、格式化函数和 loading skeleton 归入父组件。',
         mapped: (count) => `${count} 个映射`,
@@ -550,6 +659,7 @@ const TEXT = {
         chinese: '中文',
         quickLinks: [
             { label: 'Trait 列表', to: '/trait', icon: <TableChartOutlined sx={{ fontSize: 17 }} /> },
+            { label: 'Genes', to: '/genes', icon: <BiotechOutlined sx={{ fontSize: 17 }} /> },
             { label: 'Programs', to: '/programs', icon: <ScienceOutlined sx={{ fontSize: 17 }} /> },
             { label: '数据浏览器', to: '/data', icon: <DataObjectOutlined sx={{ fontSize: 17 }} /> },
         ],
@@ -806,10 +916,63 @@ const TEXT = {
                 ],
             },
             {
+                id: 'genes',
+                title: 'Genes',
+                icon: BiotechOutlined,
+                summary: 'Gene 搜索、推荐条目、gene 元信息和 program-trait 证据表。',
+                items: [
+                    {
+                        name: 'Gene Search',
+                        route: '/genes',
+                        role: '面向 gene 视角浏览的主入口。',
+                        usage: [
+                            '按 gene symbol 搜索可以直接进入证据行，也可以先从推荐列表挑一个已有数据的 gene 开始。',
+                            '如果问题是从某个特定 gene 出发，想追踪它关联的 programs 和 traits，这个页面比先从 Trait 进入更直接。',
+                        ],
+                    },
+                    {
+                        name: 'Genes Overview Table',
+                        route: '/genes',
+                        role: 'Genes 首页的总览表，汇总可检索 gene 及其关联数量。',
+                        usage: [
+                            '查看 Gene Symbol、Ensembl ID、gene type、基因组位置以及关联的 program/trait 数量。',
+                            '点击某一行可以从索引视图进入该 gene 的完整证据详情页。',
+                        ],
+                    },
+                    {
+                        name: 'Gene Information',
+                        route: '/genes',
+                        role: 'gene 元信息卡片和外部参考链接区。',
+                        usage: [
+                            '检查 gene description、Ensembl ID、位置、gene type、NCBI summary 以及 Ensembl、GeneCards、NCBI 等外链。',
+                            '当你需要先确认当前 gene symbol 是否就是目标 locus 或注释上下文时，先看这一块最合适。',
+                        ],
+                    },
+                    {
+                        name: 'Gene Program Relationships',
+                        route: '/genes',
+                        role: '展示当前 gene 与 cNMF programs 关系的 program-level 表格。',
+                        usage: [
+                            '查看 Program、Function、GO Term、direction 和 program gene count，判断该 gene 是否落在一致的功能模块里。',
+                            '这一表更适合回答 gene 属于哪些 programs，以及 regulator direction 在不同模块中是否一致。',
+                        ],
+                    },
+                    {
+                        name: 'Gene Program Trait Evidence',
+                        route: '/genes',
+                        role: '把 gene、program 和 trait 连接起来的完整证据表。',
+                        usage: [
+                            '联合查看 Trait、Program、role、direction、posterior mean、gamma、membership 和 concordance 等字段。',
+                            '用这张表判断同一个 gene-program 关系在多个 traits 里是保持 concordant 还是出现 discordant。',
+                        ],
+                    },
+                ],
+            },
+            {
                 id: 'programs',
                 title: 'Programs',
                 icon: ScienceOutlined,
-                summary: 'Program 注释表和 program 级 gene regulation 图。',
+                summary: 'Program 注释总表，以及 program 详情页里的切换器、信息表、基因表和 trait 关联表。',
                 items: [
                     {
                         name: 'Programs Table',
@@ -821,23 +984,48 @@ const TEXT = {
                         ],
                     },
                     {
-                        name: 'GeneRegulation',
+                        name: 'Program Switcher',
                         route: '/programs/P1',
-                        role: '单个 program 的 Perturb-seq gene-level regulation 图。',
+                        role: 'program 详情页顶部的当前 program 标题和可搜索切换器。',
                         usage: [
-                            '每个点代表一个 gene，放在单个 program 的上下文里看。x 轴是 effect size，y 轴是 -log10(P-value)，本质上可以把它理解成 program 专属的 volcano 图。',
-                            '越靠右表示正向调控越强，越靠左表示负向调控越强；点越高则统计支持越强。',
-                            '颜色区分背景基因、正向 hit 和负向 hit，因此可以快速判断某个 program 是被单一方向主导，还是存在更平衡的调控结构。',
-                            '用 program picker 快速切换 program，再通过点击点位或表格行在可视排序和精确数值之间来回核查。',
+                            '先在这里确认当前 Program ID 和 curated annotation，再继续看下方表格。',
+                            '打开 picker 后可以按 program id 或 annotation 搜索，直接在详情页之间切换，不必回到总表。',
                         ],
                     },
                     {
-                        name: 'GeneRegulationTable',
+                        name: 'Program Summary Chips',
                         route: '/programs/P1',
-                        role: '选中 program 的 gene-level regulation 表。',
+                        role: '紧凑的 trait / program / regulator / gene 数量摘要条。',
                         usage: [
-                            '可展开或收起表格，并导出当前 program 的 CSV。',
-                            '支持按列排序，并通过分页控件调整每页数量或切换页面。',
+                            '用这些数量先判断当前 program 是由 program signal、regulator signal、两者同时还是更偏弱地被选中。',
+                            '这层摘要适合在进入 Program Information、Program Genes 和 Associated Traits 之前先快速定向。',
+                        ],
+                    },
+                    {
+                        name: 'Program Information',
+                        route: '/programs/P1',
+                        role: '展示当前 program 注释上下文的单行信息表。',
+                        usage: [
+                            '集中查看 Program、Annotation、GO Term、GO Ontology、Associated Genes 和 Associated Traits。',
+                            '在解释 gene-level 或 trait-level 明细之前，先用这张表确认代表性 GO 功能和关联数量。',
+                        ],
+                    },
+                    {
+                        name: 'Program Genes',
+                        route: '/programs/P1',
+                        role: '单个 cNMF program 的 gene-level 明细表。',
+                        usage: [
+                            '查看 Symbol、Ensembl ID、location、gene type、direction in program 和 value 等字段。',
+                            '支持排序、分页、CSV 导出，也可以点击 gene symbol 继续跳到 Genes 页面。',
+                        ],
+                    },
+                    {
+                        name: 'Associated Traits',
+                        route: '/programs/P1',
+                        role: '把当前 program 反向连接到 traits 的 trait-level 表。',
+                        usage: [
+                            '联合查看 trait name、selection class、program score、regulator score、visible gene counts 和 top genes。',
+                            '配合 selection filter 和 CSV 导出，可以拆开看 program-selected、regulator-selected 和 jointly selected 的 traits。',
                         ],
                     },
                 ],
@@ -893,22 +1081,14 @@ const TEXT = {
                 id: 'support-pages',
                 title: '其他页面',
                 icon: InfoOutlined,
-                summary: 'Genes、About、Contact 以及共享浮动图例。',
+                summary: 'About、Contact 以及共享浮动图例。',
                 items: [
-                    {
-                        name: 'Genes',
-                        route: '/genes',
-                        role: '后续 gene lookup 流程的占位页。',
-                        usage: [
-                            '当前 production 的 gene endpoint 尚未接入，现阶段请从 Trait 或 Programs 页面查看 gene-level 信息。',
-                        ],
-                    },
                     {
                         name: 'About',
                         route: '/about',
-                        role: '项目简介页面。',
+                        role: '带有 workflow 图和页面定位说明的项目简介页。',
                         usage: [
-                            '用于快速了解 trait browsing、program enrichment 和可下载输出的覆盖范围。',
+                            '用于快速了解浏览器各页面分工、分析工作流以及各主路由的使用定位。',
                         ],
                     },
                     {
@@ -974,8 +1154,8 @@ const TEXT = {
                     { name: 'App / Router', target: 'Top Navigation' },
                     { name: 'Home', target: 'Home File Search' },
                     { name: 'Trait', target: 'Trait Figure Tabs' },
+                    { name: 'Genes', target: 'Gene Search' },
                     { name: 'Programs', target: 'Programs Table' },
-                    { name: 'Genes', target: 'Genes' },
                     { name: 'Variants / DataBrowser', target: 'DataBrowser' },
                     { name: 'Guide', target: 'Guide' },
                     { name: 'Contact', target: 'Contact' },
@@ -1014,10 +1194,18 @@ const TEXT = {
                 ],
             },
             {
-                group: 'Program & Data',
+                group: 'Gene、Program 与 Data',
                 components: [
-                    { name: 'GeneRegulation', target: 'GeneRegulation' },
-                    { name: 'GeneRegulationTable', target: 'GeneRegulationTable' },
+                    { name: 'Gene Search', target: 'Gene Search' },
+                    { name: 'Genes Overview Table', target: 'Genes Overview Table' },
+                    { name: 'Gene Information', target: 'Gene Information' },
+                    { name: 'Gene Program Relationships', target: 'Gene Program Relationships' },
+                    { name: 'Gene Program Trait Evidence', target: 'Gene Program Trait Evidence' },
+                    { name: 'Program Switcher', target: 'Program Switcher' },
+                    { name: 'Program Summary Chips', target: 'Program Summary Chips' },
+                    { name: 'Program Information', target: 'Program Information' },
+                    { name: 'Program Genes', target: 'Program Genes' },
+                    { name: 'Associated Traits', target: 'Associated Traits' },
                     { name: 'DataBrowseSummary', target: 'DataBrowseSummary' },
                     { name: 'DirColumn / DirectoryPanel', target: 'DirectoryPanel' },
                     { name: 'GlobalSearchResults', target: 'GlobalSearchResults' },
@@ -1090,6 +1278,43 @@ function MethodCard({ item, index, copy }) {
                     </Box>
                 ))}
             </Stack>
+        </Paper>
+    );
+}
+
+function WorkflowFigureCard({ figure, index }) {
+    const theme = useTheme();
+
+    return (
+        <Paper
+            elevation={0}
+            sx={panelSx(theme, {
+                p: 0,
+                overflow: 'hidden',
+                backgroundColor: index % 2 === 0 ? theme.palette.background.paper : theme.custom.surface.raised,
+            })}
+        >
+            <Box
+                component="img"
+                src={figure.image}
+                alt={figure.alt}
+                loading="lazy"
+                sx={{
+                    width: '100%',
+                    height: 'auto',
+                    display: 'block',
+                    borderBottom: `1px solid ${theme.custom.border.soft}`,
+                    bgcolor: alpha(theme.palette.primary.main, 0.03),
+                }}
+            />
+            <Box sx={{ p: { xs: 1.3, md: 1.6 } }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: theme.palette.text.primary, mb: 0.35 }}>
+                    {figure.title}
+                </Typography>
+                <Typography variant="body2" sx={captionSx(theme, { mb: 0, color: theme.palette.text.primary })}>
+                    {figure.body}
+                </Typography>
+            </Box>
         </Paper>
     );
 }
@@ -1316,6 +1541,19 @@ export default function Help() {
                             </Typography>
                         </Stack>
                     </Paper>
+
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', xl: 'repeat(2, minmax(0, 1fr))' },
+                            gap: 1.5,
+                            mb: 2,
+                        }}
+                    >
+                        {copy.workflowFigures.map((figure, index) => (
+                            <WorkflowFigureCard key={figure.title} figure={figure} index={index} />
+                        ))}
+                    </Box>
 
                     <Paper
                         elevation={0}

@@ -47,7 +47,6 @@ import homeFigurePosteriorVolcano from '../assets/home/home-figure-posterior-vol
 import homeFigureProgramScatter from '../assets/home/home-figure-program-scatter.svg';
 import homeFigureQqPlot from '../assets/home/home-figure-qq-plot.svg';
 import homeFigureTraitProgramNetwork from '../assets/home/home-figure-trait-program-network.svg';
-import homeFigureBrowserWorkflow from '../assets/home/home-figure-browser-workflow.svg';
 import homeFigureDataBrowser from '../assets/home/home-figure-data-browser.svg';
 import homeFigureProgramVolcano from '../assets/home/home-figure-program-volcano.svg';
 import homeFigureTraitCorrelation from '../assets/home/home-figure-trait-correlation.svg';
@@ -89,49 +88,6 @@ const loadingBarSx = {
         background: 'linear-gradient(90deg, #2563eb, #0f766e)',
     },
 };
-
-const workflowSteps = [
-    {
-        label: 'Locate a trait',
-        detail: 'Trait, LoF ID, or GWAS ID.',
-        action: 'Open table',
-        to: '/trait',
-        icon: Search,
-        color: '#2563eb',
-    },
-    {
-        label: 'GWAS peaks',
-        detail: 'Manhattan signal view.',
-        action: 'View plot',
-        to: traitTabPath('manhattan'),
-        icon: QueryStats,
-        color: '#0284c7',
-    },
-    {
-        label: 'Gene evidence',
-        detail: 'Burden, posterior, QQ.',
-        action: 'Review genes',
-        to: traitTabPath('gene-evidence'),
-        icon: Biotech,
-        color: '#7c3aed',
-    },
-    {
-        label: 'Programs',
-        detail: 'Scatter and graph context.',
-        action: 'Open programs',
-        to: traitTabPath('program-scatter'),
-        icon: Hub,
-        color: '#0f766e',
-    },
-    {
-        label: 'Download data',
-        detail: 'Browse indexed outputs.',
-        action: 'Open data',
-        to: '/data',
-        icon: FileDownload,
-        color: '#b45309',
-    },
-];
 
 const shimmerSx = {
     position: 'relative',
@@ -811,10 +767,10 @@ function HomeSearch({
         <Box
             component={embedded ? 'div' : 'section'}
             sx={{
-                maxWidth: embedded ? '100%' : 1180,
+                maxWidth: embedded ? '100%' : 1040,
                 mx: 'auto',
                 px: embedded ? 0 : { xs: 2, sm: 3, lg: 4 },
-                pb: embedded ? 0 : { xs: 5, md: 6.8 },
+                pb: embedded ? 0 : { xs: 5, md: 6.2 },
                 position: 'relative',
                 zIndex: 20,
             }}
@@ -1043,122 +999,6 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
     );
 }
 
-function WorkflowSection() {
-    const theme = useTheme();
-
-    return (
-        <Box
-            component="section"
-            sx={{
-                maxWidth: 1180,
-                mx: 'auto',
-                px: { xs: 2, sm: 3, lg: 4 },
-                pb: { xs: 5, md: 6.4 },
-                position: 'relative',
-                zIndex: 2,
-            }}
-        >
-            <SectionHeading
-                eyebrow="Analysis Workflow"
-                title="Search, inspect, compare, download"
-                description="A compact path from a trait query to GWAS signal, gene evidence, program context, and indexed data outputs."
-                theme={theme}
-            />
-
-            {/* workflow SVG illustration */}
-            <Box
-                sx={panelSx(theme, {
-                    overflow: 'hidden',
-                    p: 0,
-                    mb: { xs: 2.5, md: 3.2 },
-                    bgcolor: '#fff',
-                })}
-            >
-                <Box
-                    component="img"
-                    src={homeFigureBrowserWorkflow}
-                    alt="Analysis workflow: search trait, load evidence, draw figures, program view, export results"
-                    loading="lazy"
-                    sx={{
-                        width: '100%',
-                        height: 'auto',
-                        display: 'block',
-                    }}
-                />
-            </Box>
-
-            {/* step cards */}
-            <Box
-                sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' },
-                    gap: { xs: 1.2, md: 1.4 },
-                }}
-            >
-                {workflowSteps.map((step) => {
-                    const Icon = step.icon;
-
-                    return (
-                        <Box
-                            key={step.label}
-                            component={RouterLink}
-                            to={step.to}
-                            aria-label={step.action}
-                            sx={panelSx(theme, {
-                                minHeight: { xs: 78, md: 84 },
-                                display: 'grid',
-                                gridTemplateColumns: '30px minmax(0, 1fr)',
-                                gap: 0.85,
-                                alignItems: 'start',
-                                p: { xs: 1, md: 1.2 },
-                                bgcolor: '#fff',
-                                color: 'inherit',
-                                textDecoration: 'none',
-                                border: `1px solid ${alpha(step.color, 0.14)}`,
-                                transition: 'transform 170ms ease, box-shadow 170ms ease, border-color 170ms ease',
-                                '&:hover': {
-                                    transform: 'translateY(-2px)',
-                                    borderColor: alpha(step.color, 0.3),
-                                    boxShadow: `0 14px 30px ${alpha(step.color, 0.12)}`,
-                                },
-                                '&:focus-visible': {
-                                    outline: `3px solid ${alpha(step.color, 0.22)}`,
-                                    outlineOffset: 3,
-                                },
-                            })}
-                        >
-                            <Box
-                                sx={{
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: 1,
-                                    display: 'grid',
-                                    placeItems: 'center',
-                                    color: step.color,
-                                    bgcolor: alpha(step.color, 0.08),
-                                    border: `1px solid ${alpha(step.color, 0.14)}`,
-                                    flex: '0 0 auto',
-                                }}
-                                aria-hidden="true"
-                            >
-                                <Icon sx={{ fontSize: 17 }} />
-                            </Box>
-                            <Box sx={{ minWidth: 0 }}>
-                                <Typography component="h3" sx={{ color: '#111827', fontSize: '0.86rem', fontWeight: 720, lineHeight: 1.2 }}>
-                                    {step.label}
-                                </Typography>
-                                <Typography sx={captionSx(theme, { mt: 0.25, fontSize: '0.72rem', lineHeight: 1.32 })}>
-                                    {step.detail}
-                                </Typography>
-                            </Box>
-                        </Box>
-                    );
-                })}
-            </Box>
-        </Box>
-    );
-}
-
 function FigureCard({ item }) {
     const Icon = item.icon;
 
@@ -1298,7 +1138,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                 mx: 'auto',
                 px: { xs: 2, sm: 3, lg: 4 },
                 pt: { xs: 3.4, md: 4.6, lg: 5.4 },
-                pb: { xs: 4.4, md: 5.4 },
+                pb: { xs: 3.2, md: 4.2 },
             }}
         >
             <Box sx={{ maxWidth: 820, mx: 'auto', textAlign: 'center' }}>
@@ -1476,12 +1316,11 @@ function Home() {
         <Box sx={{ width: '100%', minHeight: '100%', color: '#1f2933', bgcolor: '#f7fafc', mx: 'auto' }}>
             <HeroSection stats={homeStats} statsLoading={homeStatsLoading} theme={theme} />
 
-            <WorkflowSection />
-
             <HomeSearch
                 stats={homeStats}
                 statsError={homeStatsError}
                 statsLoading={homeStatsLoading}
+                showCoverage={false}
                 theme={theme}
             />
 

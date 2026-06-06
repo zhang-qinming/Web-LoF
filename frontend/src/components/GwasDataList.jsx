@@ -318,7 +318,6 @@ export default function GwasDataList({
     title = 'GWAS Data',
     subtitle = '',
     columns = [],
-    traitName = null,
     defaultSortBy = 'Trait',
     defaultOrder = 'ASC',
 }) {
@@ -341,12 +340,10 @@ export default function GwasDataList({
             sortBy,
             order,
         });
-        if (!traitName && normalizedSearch) params.set('search', normalizedSearch);
+        if (normalizedSearch) params.set('search', normalizedSearch);
 
-        return traitName
-            ? `/api/trait/${encodeURIComponent(traitName)}?${params.toString()}`
-            : `/api/browse?${params.toString()}`;
-    }, [limit, normalizedSearch, order, page, sortBy, traitName]);
+        return `/api/browse?${params.toString()}`;
+    }, [limit, normalizedSearch, order, page, sortBy]);
 
     const { data, error, isLoading } = useSWR(apiUrl, fetcher, {
         keepPreviousData: true,
@@ -377,7 +374,7 @@ export default function GwasDataList({
     }, [normalizedSearch]);
 
     useEffect(() => {
-        if (traitName || !normalizedSearch) return undefined;
+        if (!normalizedSearch) return undefined;
         const timeoutId = window.setTimeout(() => {
             const node = rootRef.current;
             if (!node) return;
@@ -386,7 +383,7 @@ export default function GwasDataList({
         }, 120);
 
         return () => window.clearTimeout(timeoutId);
-    }, [normalizedSearch, traitName]);
+    }, [normalizedSearch]);
 
     const rows = data?.data || [];
     const totalPages = data?.totalPages || 1;
@@ -526,43 +523,41 @@ export default function GwasDataList({
                                                         >
                                                             {resultLabel}
                                                         </Typography>
-                                                        {!traitName && (
-                                                            <TextField
-                                                                size="small"
-                                                                value={search}
-                                                                onChange={(event) => setSearch(event.target.value)}
-                                                                placeholder="Search trait, LoF ID, MeSH term, population"
-                                                                sx={{
-                                                                    width: { xs: 300, md: 330 },
-                                                                    '& .MuiOutlinedInput-root': {
-                                                                        bgcolor: theme.palette.background.paper,
-                                                                    },
-                                                                    '& .MuiInputBase-input': {
-                                                                        py: 0.68,
-                                                                        fontSize: '0.78rem',
-                                                                    },
-                                                                }}
-                                                                InputProps={{
-                                                                    startAdornment: (
-                                                                        <InputAdornment position="start">
-                                                                            <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
-                                                                        </InputAdornment>
-                                                                    ),
-                                                                    endAdornment: search ? (
-                                                                        <InputAdornment position="end">
-                                                                            <IconButton
-                                                                                size="small"
-                                                                                aria-label="Clear trait search"
-                                                                                onClick={() => setSearch('')}
-                                                                                edge="end"
-                                                                            >
-                                                                                <Clear fontSize="small" />
-                                                                            </IconButton>
-                                                                        </InputAdornment>
-                                                                    ) : null,
-                                                                }}
-                                                            />
-                                                        )}
+                                                        <TextField
+                                                            size="small"
+                                                            value={search}
+                                                            onChange={(event) => setSearch(event.target.value)}
+                                                            placeholder="Search trait, LoF ID, MeSH term, population"
+                                                            sx={{
+                                                                width: { xs: 300, md: 330 },
+                                                                '& .MuiOutlinedInput-root': {
+                                                                    bgcolor: theme.palette.background.paper,
+                                                                },
+                                                                '& .MuiInputBase-input': {
+                                                                    py: 0.68,
+                                                                    fontSize: '0.78rem',
+                                                                },
+                                                            }}
+                                                            InputProps={{
+                                                                startAdornment: (
+                                                                    <InputAdornment position="start">
+                                                                        <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
+                                                                    </InputAdornment>
+                                                                ),
+                                                                endAdornment: search ? (
+                                                                    <InputAdornment position="end">
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            aria-label="Clear trait search"
+                                                                            onClick={() => setSearch('')}
+                                                                            edge="end"
+                                                                        >
+                                                                            <Clear fontSize="small" />
+                                                                        </IconButton>
+                                                                    </InputAdornment>
+                                                                ) : null,
+                                                            }}
+                                                        />
                                                     </Box>
                                                 </Box>
                                             </TableCell>
