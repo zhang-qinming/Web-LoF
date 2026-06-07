@@ -21,6 +21,7 @@ import {
     compactToggleGroupSx,
     metricChipTone,
     plotFrameSx,
+    RESPONSIVE_TALL_PLOT_HEIGHT,
     summaryChipSx,
     tableTone,
     toolbarSx,
@@ -543,6 +544,7 @@ export default function ProgramScatter({ fileId }) {
             : (mode === MODES.RANK_PROG ? 'Program Rank' : 'Regulator Rank');
 
         return {
+            autosize: true,
             title: {
                 text: `${titleText} - ${fileId || ''}`,
                 font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
@@ -750,7 +752,7 @@ export default function ProgramScatter({ fileId }) {
                     variant="outlined"
                     sx={plotFrameSx(theme, {
                         position: 'relative',
-                        minHeight: isLoading || hasVisiblePoints ? 620 : undefined,
+                        minHeight: isLoading || hasVisiblePoints ? RESPONSIVE_TALL_PLOT_HEIGHT : undefined,
                     })}
                 >
                     {isLoading && (
@@ -793,7 +795,7 @@ export default function ProgramScatter({ fileId }) {
                                 config={plotConfig}
                                 revision={plotRevision}
                                 useResizeHandler
-                                style={{ width: '100%', height: 620 }}
+                                style={{ width: '100%', height: RESPONSIVE_TALL_PLOT_HEIGHT }}
                             />
                             <FloatingLegend
                                 items={legendItems}

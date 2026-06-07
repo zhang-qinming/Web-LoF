@@ -472,7 +472,7 @@ export default function GwasDataList({
     const resultLabel = normalizedSearch ? `${totalCount.toLocaleString()} matches` : `${totalCount.toLocaleString()} records`;
 
     return (
-        <Box ref={rootRef} sx={{ position: 'relative' }}>
+        <Box ref={rootRef} sx={{ position: 'relative', width: '100%', minWidth: 0 }}>
             <Card elevation={0} sx={{
                 ...panelSx(theme, {
                     borderRadius: 3,
@@ -480,6 +480,8 @@ export default function GwasDataList({
                     background: `linear-gradient(180deg, ${alpha('#245089', 0.035)} 0%, ${theme.palette.background.paper} 150px)`,
                 }),
                 overflow: 'hidden',
+                width: '100%',
+                minWidth: 0,
             }}>
                 <CardContent sx={{ p: 0 }}>
                     {downloadError && (
@@ -502,6 +504,7 @@ export default function GwasDataList({
                             <Table
                                 stickyHeader
                                 sx={stickyTableSx(theme, {
+                                    width: '100%',
                                     tableLayout: columns.some((column) => column.width || column.minWidth || column.maxWidth) ? 'fixed' : 'auto',
                                 })}
                             >

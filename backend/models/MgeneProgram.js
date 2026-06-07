@@ -445,7 +445,7 @@ function normalizeProgramAggregate(row, fallbackGeneLabel = '') {
     if (signs.length === 1) signLabel = signs[0];
     if (signs.length > 1) signLabel = 'mixed';
     const geneDirection = roleLabel === '-' ? signLabel : (signLabel === '-' ? roleLabel : `${roleLabel} / ${signLabel}`);
-    const programGeneCountSort = (Number(row.loading_gene_count) || 0) + (Number(row.regulator_gene_count) || 0);
+    const programGeneCountSort = Number(row.program_gene_count) || 0;
 
     return {
         geneLabel: row.gene_label || fallbackGeneLabel || row.gene_symbol || row.ensg_id || '',
@@ -849,20 +849,24 @@ async function getGenePrograms(geneId, {
                 MAX(pi.top10_pathways) AS top10_pathways,
                 GROUP_CONCAT(DISTINCT gpte.role SEPARATOR ',') AS roles,
                 GROUP_CONCAT(DISTINCT COALESCE(NULLIF(gpte.predicted_sign, ''), NULLIF(gpte.gamma_sign, ''), NULLIF(gpte.post_mean_sign, ''), '-') SEPARATOR ',') AS signs,
-                MAX(COALESCE(tpe.loading_gene_count, 0)) AS loading_gene_count,
-                MAX(COALESCE(tpe.regulator_gene_count, 0)) AS regulator_gene_count,
+                MAX(COALESCE(pgc.program_gene_count, 0)) AS program_gene_count,
                 COUNT(DISTINCT gpte.trait_id) AS total_traits
              FROM gene_program_trait_edge gpte
-             LEFT JOIN trait_program_edge tpe
-                ON BINARY tpe.trait_id = BINARY gpte.trait_id
-                    AND BINARY tpe.program = BINARY gpte.program
              LEFT JOIN program_info pi
                 ON BINARY pi.program = BINARY gpte.program
+             LEFT JOIN (
+                SELECT
+                    program,
+                    COUNT(DISTINCT COALESCE(NULLIF(gene_symbol, ''), NULLIF(ensg_id, ''))) AS program_gene_count
+                FROM gene_program_trait_edge
+                GROUP BY program
+             ) pgc
+                ON BINARY pgc.program = BINARY gpte.program
              ${whereSql}
              GROUP BY gpte.program
              ORDER BY
                 total_traits DESC,
-                (MAX(COALESCE(tpe.loading_gene_count, 0)) + MAX(COALESCE(tpe.regulator_gene_count, 0))) DESC,
+                program_gene_count DESC,
                 gpte.program ASC`,
             whereParams,
         );

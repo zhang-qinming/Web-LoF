@@ -2,6 +2,13 @@ import { alpha } from '@mui/material/styles';
 
 const RECT_RADIUS = 1;
 
+export const APP_SHELL_MAX_WIDTH = 1760;
+export const DATA_PAGE_MAX_WIDTH = 1760;
+export const RESPONSIVE_PLOT_HEIGHT = 'clamp(500px, 64dvh, 820px)';
+export const RESPONSIVE_TALL_PLOT_HEIGHT = 'clamp(520px, 66dvh, 860px)';
+export const RESPONSIVE_COMPACT_PLOT_HEIGHT = 'clamp(420px, 58dvh, 700px)';
+export const RESPONSIVE_EMPTY_PLOT_HEIGHT = 'clamp(300px, 44dvh, 520px)';
+
 function normalizeRectRadius(value) {
     if (value === 0 || value === '0' || value === '0px') {
         return 0;

@@ -40,6 +40,8 @@ import {
     controlFieldSx,
     metricChipTone,
     plotFrameSx,
+    RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_PLOT_HEIGHT,
     sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
@@ -489,6 +491,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     );
 
     const layout = useMemo(() => ({
+        autosize: true,
         title: {
             text: `${traitLabel || fileId} - ${title}`,
             x: 0.01,
@@ -818,7 +821,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {(isLoading || shouldAutoSwitchToFull) && (
-                        <Box sx={{ minHeight: 620, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -829,7 +832,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                     )}
 
                     {!isLoading && !shouldAutoSwitchToFull && rows.length === 0 && (
-                        <Box sx={{ minHeight: 460, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">{emptyMessage}</Typography>
                             </Alert>
@@ -837,7 +840,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                     )}
 
                     {!isLoading && !shouldAutoSwitchToFull && rows.length > 0 && !hasVisiblePoints && (
-                        <Box sx={{ minHeight: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No genes match the current volcano filters.</Typography>
                             </Alert>
@@ -860,7 +863,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                                     setTableOpen(true);
                                 }}
                                 useResizeHandler
-                                style={{ width: '100%', height: '620px' }}
+                                style={{ width: '100%', height: RESPONSIVE_PLOT_HEIGHT }}
                             />
                             <FloatingLegend
                                 items={legendItems}

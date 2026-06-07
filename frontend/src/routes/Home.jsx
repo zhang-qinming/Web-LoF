@@ -49,7 +49,7 @@ import axios from 'axios';
 import ReleaseLogSection from '../components/ReleaseLogSection';
 import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
 import { downloadDataPaths } from '../utils/download';
-import { captionSx, panelSx, summaryChipSx } from '../themeUtils';
+import { APP_SHELL_MAX_WIDTH, captionSx, panelSx, summaryChipSx } from '../themeUtils';
 import homeFigureBurdenVolcano from '../assets/home/home-figure-burden-volcano.svg';
 import homeFigureCrossTraitHeatmap from '../assets/home/home-figure-cross-trait-heatmap.svg';
 import homeFigureGwasManhattan from '../assets/home/home-figure-gwas-manhattan.svg';
@@ -1114,9 +1114,9 @@ function FigureGateway({ items }) {
         <Box
             component="section"
             sx={{
-                maxWidth: 1180,
+                maxWidth: APP_SHELL_MAX_WIDTH,
                 mx: 'auto',
-                px: { xs: 2, sm: 3, lg: 4 },
+                px: { xs: 2, sm: 3, lg: 4, xl: 5 },
                 pb: { xs: 6, md: 8 },
             }}
         >
@@ -1127,7 +1127,12 @@ function FigureGateway({ items }) {
             <Box
                 sx={{
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' },
+                    gridTemplateColumns: {
+                        xs: '1fr',
+                        sm: 'repeat(2, minmax(0, 1fr))',
+                        md: 'repeat(3, minmax(0, 1fr))',
+                        xl: 'repeat(4, minmax(0, 1fr))',
+                    },
                     gap: { xs: 2.2, md: 2.8 },
                 }}
             >
@@ -1145,9 +1150,9 @@ function HeroSection({ stats, statsLoading, theme }) {
         <Box
             component="section"
             sx={{
-                maxWidth: 1180,
+                maxWidth: APP_SHELL_MAX_WIDTH,
                 mx: 'auto',
-                px: { xs: 2, sm: 3, lg: 4 },
+                px: { xs: 2, sm: 3, lg: 4, xl: 5 },
                 pt: { xs: 3.4, md: 4.6, lg: 5.4 },
                 pb: { xs: 3.2, md: 4.2 },
             }}
@@ -1220,7 +1225,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                 </Stack>
             </Box>
 
-            <Box sx={{ mt: { xs: 2.5, md: 3.1 }, maxWidth: 960, mx: 'auto' }}>
+            <Box sx={{ mt: { xs: 2.5, md: 3.1 }, maxWidth: 1120, mx: 'auto' }}>
                 <HomeSearch
                     embedded
                     showCoverage={false}
@@ -1235,7 +1240,11 @@ function HeroSection({ stats, statsLoading, theme }) {
                 sx={{
                     mt: { xs: 4, md: 5 },
                     display: 'grid',
-                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' },
+                    gridTemplateColumns: {
+                        xs: 'repeat(2, 1fr)',
+                        sm: 'repeat(3, 1fr)',
+                        md: 'repeat(5, 1fr)',
+                    },
                     gap: { xs: 1, md: 1.4 },
                 }}
             >
@@ -1331,9 +1340,9 @@ function Home() {
                 limit={3}
                 newestFirst
                 outerSx={{
-                    maxWidth: 1180,
+                    maxWidth: APP_SHELL_MAX_WIDTH,
                     mx: 'auto',
-                    px: { xs: 2, sm: 3, lg: 4 },
+                    px: { xs: 2, sm: 3, lg: 4, xl: 5 },
                     pb: { xs: 7, md: 9 },
                 }}
                 showNotes={false}

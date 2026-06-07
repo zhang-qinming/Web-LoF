@@ -29,6 +29,8 @@ import {
     chartLayoutTokens,
     metricChipTone,
     plotFrameSx,
+    RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_PLOT_HEIGHT,
     sectionTitleSx,
     summaryChipSx,
     toolbarSx,
@@ -269,6 +271,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     }, [fileId, matrixPayload, theme, traitLabel]);
 
     const layout = useMemo(() => ({
+        autosize: true,
         title: {
             text: `${traitLabel || fileId} - Cross-trait Heatmap`,
             x: 0.01,
@@ -296,7 +299,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
 
     const plotHeight = useMemo(() => {
         const geneRows = matrixPayload?.genes?.length || topGeneCount;
-        return Math.min(1120, Math.max(680, 180 + (geneRows * 18)));
+        return Math.min(1120, Math.max(560, 180 + (geneRows * 18)));
     }, [matrixPayload?.genes?.length, topGeneCount]);
 
     const plotConfig = useMemo(() => ({
@@ -313,7 +316,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
 
     if (statusLoading) {
         return (
-            <Box sx={{ minHeight: 460, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CircularProgress size={46} />
             </Box>
         );
@@ -471,7 +474,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {matrixLoading && (
-                        <Box sx={{ minHeight: 620, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -482,7 +485,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     )}
 
                     {!matrixLoading && selectedTargets.length > 0 && plotData.length === 0 && (
-                        <Box sx={{ minHeight: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No heatmap values are available for the current target trait selection.</Typography>
                             </Alert>

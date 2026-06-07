@@ -16,15 +16,21 @@
     --text: #0f1724;
     --accent: #2563eb;
     --radius: 6px;
-    --max-width: 1440px;
-    --page-pad-x: clamp(12px, 1.4vw, 20px);
-    --page-pad-y: clamp(10px, 1vw, 14px);
+    --app-shell-max-width: 1760px;
+    --app-data-max-width: 1760px;
+    --app-text-max-width: 1120px;
+    --max-width: var(--app-shell-max-width);
+    --page-pad-x: clamp(12px, 1.8vw, 36px);
+    --page-pad-y: clamp(8px, 1.2dvh, 18px);
     --transition: background 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s, opacity 0.2s;
     --focus: rgba(37, 99, 235, 0.14);
 }
 
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; }
+html, body, #root {
+    width: 100%;
+    min-height: 100%;
+}
 
 body {
     margin: 0;
@@ -45,8 +51,9 @@ body {
 .main {
     width: 100%;
     max-width: var(--max-width);
-    padding: var(--page-pad-y) var(--page-pad-x) 16px;
-    margin: var(--page-pad-y) auto;
+    min-width: 0;
+    padding: var(--page-pad-y) var(--page-pad-x) clamp(16px, 2dvh, 28px);
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 18px;
@@ -62,7 +69,7 @@ body {
     position: sticky;
     top: 0;
     z-index: 50;
-    padding: 6px 16px;
+    padding: 6px clamp(12px, 1.8vw, 32px);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -72,6 +79,7 @@ body {
 .nav {
     width: 100%;
     max-width: var(--max-width);
+    min-width: 0;
     display: flex;
     gap: 8px;
     align-items: center;

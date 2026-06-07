@@ -14,7 +14,7 @@ import GeneLevelScatter from '../components/GeneLevelScatter';
 import GeneLevelQQ from '../components/GeneLevelQQ';
 import CrossTraitHeatmap from '../components/CrossTraitHeatmap';
 import TraitMetaCard from '../components/TraitMetaCard';
-import { sectionTitleSx } from '../themeUtils';
+import { DATA_PAGE_MAX_WIDTH, sectionTitleSx } from '../themeUtils';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
 
 function findAvailableId(files, candidates) {
@@ -144,7 +144,7 @@ export default function Trait() {
             <PageFrame
                 title={null}
                 subtitle={null}
-                maxWidth={1500}
+                maxWidth={DATA_PAGE_MAX_WIDTH}
                 compact
             >
                 <GwasDataList
@@ -165,8 +165,15 @@ export default function Trait() {
     }
 
     return (
-        <Box sx={{ width: '100%', maxWidth: 1500, minWidth: 0, mx: 'auto', px: { xs: 2, md: 3 }, py: 4 }}>
-            <TraitMetaCard fileId={fileId} scatterListData={scatterListData} graphListData={graphListData} />
+        <Box sx={{
+            width: '100%',
+            maxWidth: DATA_PAGE_MAX_WIDTH,
+            minWidth: 0,
+            mx: 'auto',
+            px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
+            py: { xs: 2, md: 3, xl: 3.5 },
+        }}>
+            <TraitMetaCard fileId={fileId} />
 
             <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 1, mt: 4 })}>
                 Figures

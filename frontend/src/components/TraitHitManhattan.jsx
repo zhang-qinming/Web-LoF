@@ -46,6 +46,8 @@ import {
     compactToggleGroupSx,
     metricChipTone,
     plotFrameSx,
+    RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_PLOT_HEIGHT,
     summaryChipSx,
     toolbarSx,
 } from '../themeUtils';
@@ -616,6 +618,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }, [highlight.rowKey, processedRows, theme.palette.text.primary]);
 
     const layout = useMemo(() => ({
+        autosize: true,
         title: {
             text: `${fileId || gwasId} - Manhattan`,
             x: 0.01,
@@ -1003,7 +1006,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             <Box sx={plotFrameSx(theme, { position: 'relative' })}>
                 <Box sx={{ p: 0, position: 'relative' }}>
                     {(loading || shouldAutoSwitchToFull) && (
-                        <Box sx={{ minHeight: 620, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -1014,7 +1017,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     )}
 
                     {!loading && !shouldAutoSwitchToFull && rows.length === 0 && (
-                        <Box sx={{ minHeight: 460, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No Manhattan rows are currently available for this trait.</Typography>
                             </Alert>
@@ -1022,7 +1025,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     )}
 
                     {!loading && !shouldAutoSwitchToFull && rows.length > 0 && processedRows.length === 0 && (
-                        <Box sx={{ minHeight: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No loci match the current filters.</Typography>
                             </Alert>
@@ -1030,7 +1033,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     )}
 
                     {!loading && !shouldAutoSwitchToFull && processedRows.length > 0 && (
-                        <Box sx={{ position: 'relative' }}>
+                            <Box sx={{ position: 'relative', minHeight: RESPONSIVE_PLOT_HEIGHT }}>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}
                                 layout={layout}
@@ -1050,7 +1053,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                                     setTableOpen((prev) => (prev ? prev : true));
                                 }}
                                 useResizeHandler
-                                style={{ width: '100%', height: '620px' }}
+                                style={{ width: '100%', height: RESPONSIVE_PLOT_HEIGHT }}
                             />
                             <TraitHitManhattanLegend
                                 items={legendItems}

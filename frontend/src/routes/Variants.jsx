@@ -17,6 +17,7 @@ import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDow
 import {
     captionSx,
     controlFieldSx,
+    DATA_PAGE_MAX_WIDTH,
     metricChipTone,
     plotFrameSx,
     sectionPanelHeaderSx,
@@ -1275,12 +1276,13 @@ export default function DataBrowser() {
         <SelectionCtx.Provider value={ctxVal}>
             <Box sx={{
                 width: '100%',
-                maxWidth: 1560,
+                maxWidth: DATA_PAGE_MAX_WIDTH,
                 minWidth: 0,
                 mx: 'auto',
-                px: { xs: 2, md: 3 },
-                py: { xs: 2, md: 2.5 },
-                height: 'calc(100vh - 80px)',
+                px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
+                py: { xs: 1.5, md: 2, xl: 2.5 },
+                height: { xs: 'auto', md: 'calc(100dvh - 96px)' },
+                minHeight: { xs: 'calc(100dvh - 88px)', md: 560 },
                 display: 'flex',
                 flexDirection: 'column',
             }}>

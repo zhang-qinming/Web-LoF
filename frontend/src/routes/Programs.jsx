@@ -14,6 +14,7 @@ import { PageFrame } from '../components/PageScaffold';
 import { downloadBlob } from '../utils/download';
 import {
     captionSx,
+    DATA_PAGE_MAX_WIDTH,
     groupedTableColumnHeaderCellSx,
     groupedTableHeaderMetrics,
     groupedTableHeaderCellSx,
@@ -41,14 +42,14 @@ const PROGRAM_TABLE_COLUMNS = [
     { key: 'go_accession', label: 'Accession', align: 'center', tone: 'metric', width: 140 },
     { key: 'go_ontology', label: 'Ontology', align: 'center', tone: 'metric', width: 190 },
     { key: 'go_enrichment_p', label: 'P-value', align: 'right', tone: 'metric', width: 132 },
-    { key: 'top10_genes', label: 'Top10 Gene', align: 'left', tone: 'genes', width: 380 },
+    { key: 'top10_genes', label: 'Representative Genes', align: 'left', tone: 'genes', width: 380 },
 ];
 
 const PROGRAM_TABLE_GROUPS = [
     { label: 'Program', span: 1, tone: 'identity' },
     { label: 'Functional Annotation', span: 2, tone: 'annotation' },
     { label: 'GO Evidence', span: 3, tone: 'metric' },
-    { label: 'Gene Preview', span: 1, tone: 'genes' },
+    { label: 'Representative Genes', span: 1, tone: 'genes' },
 ];
 const PROGRAM_INFO_COLUMNS = [
     { key: 'program', label: 'Program', align: 'center', tone: 'identity', width: 120 },
@@ -69,6 +70,7 @@ const PROGRAM_GENE_COLUMNS = [
 ];
 
 const DETAIL_TABLE_TITLE_HEADER_HEIGHT = 56;
+const TABLE_PAGINATION_THRESHOLD = 50;
 
 const programSortLabelSx = {
     fontSize: '0.68rem',
@@ -109,7 +111,7 @@ function splitTopGenes(value) {
 }
 
 function buildProgramTableCsv(rows) {
-    const header = ['Program', 'Annotation', 'GO Term', 'Accession', 'Ontology', 'P-value', 'Top10 Gene'];
+    const header = ['Program', 'Annotation', 'GO Term', 'Accession', 'Ontology', 'P-value', 'Representative Genes'];
     const lines = [
         header.map(escapeCsvValue).join(','),
         ...rows.map((row) => [
@@ -645,7 +647,7 @@ function ProgramInfoTable({ row, loading, loadingCounts = false }) {
     );
 }
 
-function ProgramGenesTable({ programId, maxHeight = 640 }) {
+function ProgramGenesTable({ programId }) {
     const theme = useTheme();
     const tones = {
         identity: tableTone(theme, 'neutral'),
@@ -656,7 +658,7 @@ function ProgramGenesTable({ programId, maxHeight = 640 }) {
     const [sortBy, setSortBy] = useState('value');
     const [sortDir, setSortDir] = useState('desc');
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(20);
+    const [rowsPerPage, setRowsPerPage] = useState(TABLE_PAGINATION_THRESHOLD);
     const { data, error, isLoading } = useSWR(
         programId ? ['program-genes', programId] : null,
         ([, id]) => getProgramGenes(id),
@@ -667,10 +669,11 @@ function ProgramGenesTable({ programId, maxHeight = 640 }) {
         const source = data?.genes || [];
         return [...source].sort((a, b) => compareProgramGeneRows(a, b, sortBy, sortDir));
     }, [data?.genes, sortBy, sortDir]);
+    const shouldPaginate = rows.length > TABLE_PAGINATION_THRESHOLD;
     const pageCount = Math.max(1, Math.ceil(rows.length / rowsPerPage));
-    const currentPage = Math.min(page, pageCount - 1);
-    const start = currentPage * rowsPerPage;
-    const visibleRows = rows.slice(start, start + rowsPerPage);
+    const currentPage = shouldPaginate ? Math.min(page, pageCount - 1) : 0;
+    const start = shouldPaginate ? currentPage * rowsPerPage : 0;
+    const visibleRows = shouldPaginate ? rows.slice(start, start + rowsPerPage) : rows;
 
     useEffect(() => {
         setPage(0);
@@ -717,7 +720,7 @@ function ProgramGenesTable({ programId, maxHeight = 640 }) {
 
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
-            <TableContainer sx={stickyTableContainerSx(theme, { maxHeight, overflowX: 'auto', overflowY: 'auto' })}>
+            <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
                 <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1080 })}>
                     <colgroup>
                         {PROGRAM_GENE_COLUMNS.map((column) => (
@@ -733,7 +736,9 @@ function ProgramGenesTable({ programId, maxHeight = 640 }) {
                                             Program Genes
                                         </Typography>
                                         <Typography sx={captionSx(theme, { fontSize: '0.7rem', lineHeight: 1.35 })}>
-                                            Showing {rows.length ? (start + 1).toLocaleString() : 0}-{Math.min(start + rowsPerPage, rows.length).toLocaleString()} of {rows.length.toLocaleString()} genes.
+                                            {shouldPaginate
+                                                ? `Showing ${rows.length ? (start + 1).toLocaleString() : 0}-${Math.min(start + rowsPerPage, rows.length).toLocaleString()} of ${rows.length.toLocaleString()} genes.`
+                                                : `Showing all ${rows.length.toLocaleString()} genes.`}
                                         </Typography>
                                     </Box>
                                     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
@@ -814,26 +819,28 @@ function ProgramGenesTable({ programId, maxHeight = 640 }) {
                     </TableBody>
                 </Table>
             </TableContainer>
-            <TablePagination
-                component="div"
-                count={rows.length}
-                page={currentPage}
-                onPageChange={(event, nextPage) => setPage(nextPage)}
-                rowsPerPage={rowsPerPage}
-                rowsPerPageOptions={[20, 50, 100, 250]}
-                onRowsPerPageChange={(event) => {
-                    setRowsPerPage(Number(event.target.value));
-                    setPage(0);
-                }}
-                sx={{
-                    borderTop: `1px solid ${theme.custom.border.soft}`,
-                    '& .MuiTablePagination-toolbar': { minHeight: 44 },
-                    '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                        fontSize: '0.74rem',
-                        color: theme.palette.text.secondary,
-                    },
-                }}
-            />
+            {shouldPaginate && (
+                <TablePagination
+                    component="div"
+                    count={rows.length}
+                    page={currentPage}
+                    onPageChange={(event, nextPage) => setPage(nextPage)}
+                    rowsPerPage={rowsPerPage}
+                    rowsPerPageOptions={[50, 100, 250]}
+                    onRowsPerPageChange={(event) => {
+                        setRowsPerPage(Number(event.target.value));
+                        setPage(0);
+                    }}
+                    sx={{
+                        borderTop: `1px solid ${theme.custom.border.soft}`,
+                        '& .MuiTablePagination-toolbar': { minHeight: 44 },
+                        '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                            fontSize: '0.74rem',
+                            color: theme.palette.text.secondary,
+                        },
+                    }}
+                />
+            )}
         </Paper>
     );
 }
@@ -957,7 +964,14 @@ export default function Programs() {
 
     if (programId) {
         return (
-            <Box sx={{ width: '100%', maxWidth: 1440, mx: 'auto', px: { xs: 1, sm: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
+            <Box sx={{
+                width: '100%',
+                maxWidth: DATA_PAGE_MAX_WIDTH,
+                minWidth: 0,
+                mx: 'auto',
+                px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
+                py: { xs: 1.5, md: 2.5, xl: 3 },
+            }}>
                 <Paper elevation={0} sx={panelSx(theme, { p: 1.5, mb: 1.5 })}>
                     <Stack direction={{ xs: 'column', xl: 'row' }} spacing={1.25} justifyContent="space-between" alignItems={{ xs: 'stretch', xl: 'flex-start' }}>
                         <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -985,10 +999,9 @@ export default function Programs() {
                         loading={loading}
                         loadingCounts={traitLoading || geneLoading}
                     />
-                    <ProgramGenesTable programId={normalizedProgramId} maxHeight={640} />
+                    <ProgramGenesTable programId={normalizedProgramId} />
                     <ProgramAssociatedTraits
                         programId={normalizedProgramId}
-                        maxHeight={640}
                     />
                 </Stack>
             </Box>
@@ -1009,7 +1022,7 @@ export default function Programs() {
         <PageFrame
             title={null}
             subtitle={null}
-            maxWidth={1500}
+            maxWidth={DATA_PAGE_MAX_WIDTH}
             compact
         >
             <Paper elevation={0} sx={panelSx(theme, {

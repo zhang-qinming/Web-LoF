@@ -20,6 +20,7 @@ import {
     chartLayoutTokens,
     compactToggleGroupSx,
     plotFrameSx,
+    RESPONSIVE_COMPACT_PLOT_HEIGHT,
     sectionPanelHeaderSx,
 } from '../themeUtils';
 
@@ -27,7 +28,7 @@ const TOP_HIT_COUNT = 100;
 const P_VALUE_THRESHOLD = 0.05;
 const EFFECT_SIZE_THRESHOLD = 0.1;
 const MIN_EFFECT_SPAN = 0.65;
-const PLOT_HEIGHT = 520;
+const PLOT_HEIGHT = RESPONSIVE_COMPACT_PLOT_HEIGHT;
 
 const CLASS_STYLE = {
     nodata:      { color: '#d8dde6', size: 4, opacity: 0.26, name: 'No data' },
@@ -193,6 +194,7 @@ export default function GeneRegulation({ programId }) {
             automargin: true,
         };
         const baseLayout = {
+            autosize: true,
             hovermode: 'closest',
             hoverlabel: buildPlotHoverToneNeutral(theme, '#7a8798', {
                 fontSize: 12,
@@ -370,7 +372,7 @@ export default function GeneRegulation({ programId }) {
         return () => window.removeEventListener('keydown', onEsc);
     }, [fullscreen]);
     const [page, setPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [rowsPerPage, setRowsPerPage] = useState(50);
     const [jumpInput, setJumpInput] = useState('');
     const tablePaperRef = useRef(null);
     const tableRowRefs = useRef({});
@@ -390,20 +392,22 @@ export default function GeneRegulation({ programId }) {
         });
     }, [rows, sortBy, sortDir, collator]);
 
-    const totalPages = Math.max(1, Math.ceil(sortedRows.length / rowsPerPage));
+    const shouldPaginateTable = sortedRows.length > 50;
+    const totalPages = shouldPaginateTable ? Math.max(1, Math.ceil(sortedRows.length / rowsPerPage)) : 1;
     useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
 
     const pagedRows = useMemo(() => {
+        if (!shouldPaginateTable) return sortedRows;
         const start = (page - 1) * rowsPerPage;
         return sortedRows.slice(start, start + rowsPerPage);
-    }, [sortedRows, page, rowsPerPage]);
+    }, [page, rowsPerPage, shouldPaginateTable, sortedRows]);
 
     useEffect(() => {
         if (!highlightGene.gene || !tableOpen) return undefined;
         const idx = sortedRows.findIndex((r) => r.gene === highlightGene.gene);
         if (idx >= 0) {
-            const nextPage = Math.floor(idx / rowsPerPage) + 1;
-            if (nextPage !== page) {
+            const nextPage = shouldPaginateTable ? Math.floor(idx / rowsPerPage) + 1 : 1;
+            if (shouldPaginateTable && nextPage !== page) {
                 setPage(nextPage);
                 return undefined;
             }
@@ -417,7 +421,7 @@ export default function GeneRegulation({ programId }) {
             return () => window.clearTimeout(timeoutId);
         }
         return undefined;
-    }, [highlightGene, page, rowsPerPage, sortedRows, tableOpen]);
+    }, [highlightGene, page, rowsPerPage, shouldPaginateTable, sortedRows, tableOpen]);
 
     const handleJumpToPage = useCallback(() => {
         const n = parseInt(jumpInput, 10);
@@ -531,6 +535,7 @@ export default function GeneRegulation({ programId }) {
                                 rowsPerPage={rowsPerPage}
                                 setRowsPerPage={setRowsPerPage}
                                 totalPages={totalPages}
+                                shouldPaginate={shouldPaginateTable}
                                 jumpInput={jumpInput}
                                 setJumpInput={setJumpInput}
                                 handleJumpToPage={handleJumpToPage}

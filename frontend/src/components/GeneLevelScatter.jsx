@@ -38,6 +38,8 @@ import {
     controlFieldSx,
     metricChipTone,
     plotFrameSx,
+    RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_TALL_PLOT_HEIGHT,
     sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
@@ -648,6 +650,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
         }
 
         return {
+            autosize: true,
             title: {
                 text: `${traitLabel || payload.fileId || fileId} gene-level posterior vs perturb-seq regulation`,
                 font: { size: 18, color: theme.palette.text.primary, family: theme.typography.fontFamily },
@@ -900,7 +903,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {isLoading && (
-                        <Box sx={{ minHeight: 640, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: RESPONSIVE_TALL_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -911,7 +914,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     )}
 
                     {!isLoading && rows.length === 0 && (
-                        <Box sx={{ minHeight: 460, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No gene-level scatter rows are available for this trait.</Typography>
                             </Alert>
@@ -919,7 +922,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     )}
 
                     {!isLoading && rows.length > 0 && !hasVisiblePoints && (
-                        <Box sx={{ minHeight: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No genes match the current scatter filters.</Typography>
                             </Alert>
@@ -948,7 +951,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                                     setTableOpen(true);
                                 }}
                                 useResizeHandler
-                                style={{ width: '100%', height: '640px' }}
+                                style={{ width: '100%', height: RESPONSIVE_TALL_PLOT_HEIGHT }}
                             />
                             <FloatingLegend
                                 items={legendItems}

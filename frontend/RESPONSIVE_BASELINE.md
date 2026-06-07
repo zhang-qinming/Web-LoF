@@ -22,9 +22,13 @@ Secondary checks:
 
 Rules for this project:
 
-- Keep page shell content capped at 1440px.
+- Keep page shell and dense data views capped at 1760px.
+- Keep long prose sections narrower than data views; do not stretch paragraph
+  copy just to fill a wide screen.
 - Use internal horizontal scroll for dense scientific tables instead of forcing
   the whole page to overflow.
+- Use viewport-relative chart heights, such as `clamp(...dvh...)`, instead of
+  fixed desktop-only plot heights.
 - Verify Home, Trait, Genes, Programs, Data, and Help at the three primary
-  targets before accepting broad UI changes.
+  targets, plus 1920 x 1080, before accepting broad UI changes.
 - Browser zoom should be 100% during review.

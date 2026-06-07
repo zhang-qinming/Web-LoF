@@ -42,6 +42,7 @@ import { PageFrame, StatePanel } from '../components/PageScaffold';
 import { downloadBlob } from '../utils/download';
 import {
     captionSx,
+    DATA_PAGE_MAX_WIDTH,
     groupedTableColumnHeaderCellSx,
     groupedTableHeaderMetrics,
     groupedTableHeaderCellSx,
@@ -264,13 +265,14 @@ const GENE_PROGRAM_COLUMNS = [
     { key: 'program', label: 'Program', align: 'center', width: 84, tone: 'identity' },
     { key: 'programAnnotation', label: 'Function', align: 'left', width: 240, tone: 'annotation' },
     { key: 'programGoLabel', label: 'GO Term', align: 'left', width: 184, tone: 'annotation' },
-    { key: 'geneDirection', label: 'Role / Sign', align: 'center', width: 132, tone: 'evidence' },
-    { key: 'programGeneCountSort', label: 'Program Genes', align: 'center', width: 112, tone: 'evidence' },
+    { key: 'geneDirection', label: 'Gene Role / Direction', align: 'center', width: 148, tone: 'evidence' },
+    { key: 'totalTraits', label: 'Linked Traits', align: 'center', width: 104, tone: 'evidence' },
+    { key: 'programGeneCountSort', label: 'Program Gene Count', align: 'center', width: 136, tone: 'evidence' },
 ];
 const GENE_PROGRAM_GROUPS = [
     { label: 'Identity', span: 2, tone: 'identity' },
     { label: 'Annotation', span: 2, tone: 'annotation' },
-    { label: 'Role / Program Genes', span: 2, tone: 'evidence' },
+    { label: 'Gene Evidence / Program Size', span: 3, tone: 'evidence' },
 ];
 const GENE_TRAIT_COLUMNS = [
     { key: 'traitName', label: 'Trait', align: 'left', width: 198, tone: 'trait' },
@@ -675,7 +677,7 @@ function buildGeneProgramRows(gene, records) {
         if (signValues.length === 1) signLabel = signValues[0];
         if (signValues.length > 1) signLabel = 'mixed';
         const geneDirection = roleLabel === '-' ? signLabel : (signLabel === '-' ? roleLabel : `${roleLabel} / ${signLabel}`);
-        const programGeneCountSort = item.loadingGeneCount + item.regulatorGeneCount;
+        const programGeneCountSort = Number(item.programGeneCount) || 0;
 
         return {
             geneLabel: item.geneLabel || item.geneSymbol || item.ensgId || '-',
@@ -704,6 +706,7 @@ function buildGeneProgramCsv(rows) {
             row.programAnnotation || '',
             row.programGoLabel || '',
             row.geneDirection || '',
+            row.totalTraits || '',
             row.programGeneCountLabel || '',
         ].map((value) => escapeCsvValue(value)).join(','))),
     ];
@@ -747,6 +750,7 @@ function compareGenePrograms(a, b, sortBy, sortDir) {
     if (sortBy === 'programAnnotation') result = compareText(a?.programAnnotation, b?.programAnnotation);
     if (sortBy === 'programGoLabel') result = compareText(a?.programGoLabel, b?.programGoLabel);
     if (sortBy === 'geneDirection') result = compareText(a?.geneDirection, b?.geneDirection);
+    if (sortBy === 'totalTraits') result = (Number(a?.totalTraits) || 0) - (Number(b?.totalTraits) || 0);
     if (sortBy === 'programGeneCountSort') result = (Number(a?.programGeneCountSort) || 0) - (Number(b?.programGeneCountSort) || 0);
 
     if (!result) result = compareText(a?.program, b?.program);
@@ -2081,7 +2085,7 @@ function GeneProgramTable({ gene, records, programRows }) {
         () => (programRows?.length ? programRows : buildGeneProgramRows(gene, records)),
         [gene, records, programRows],
     );
-    const [sortBy, setSortBy] = React.useState('programGeneCountSort');
+    const [sortBy, setSortBy] = React.useState('totalTraits');
     const [sortDir, setSortDir] = React.useState('desc');
 
     const TONES = {
@@ -2101,7 +2105,7 @@ function GeneProgramTable({ gene, records, programRows }) {
             return;
         }
         setSortBy(key);
-        setSortDir(key === 'programGeneCountSort' ? 'desc' : 'asc');
+        setSortDir(key === 'programGeneCountSort' || key === 'totalTraits' ? 'desc' : 'asc');
     }, [sortBy, sortDir]);
 
     const handleDownload = React.useCallback(() => {
@@ -2115,7 +2119,7 @@ function GeneProgramTable({ gene, records, programRows }) {
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 864 })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1008 })}>
                     <colgroup>
                         {GENE_PROGRAM_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -2268,6 +2272,9 @@ function GeneProgramTable({ gene, records, programRows }) {
                                     <Typography sx={{ fontSize: '0.69rem', fontWeight: 700 }}>
                                         {row.geneDirection}
                                     </Typography>
+                                </TableCell>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.evidence, fontFamily: 'monospace', fontWeight: 600 })}>
+                                    {Number(row.totalTraits || 0).toLocaleString()}
                                 </TableCell>
                                 <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.evidence, fontFamily: 'monospace', fontWeight: 600 })}>
                                     {row.programGeneCountLabel}
@@ -2596,7 +2603,7 @@ export default function Genes() {
         <PageFrame
             title={null}
             subtitle={null}
-            maxWidth={1500}
+            maxWidth={DATA_PAGE_MAX_WIDTH}
             compact
             sx={{ py: { xs: 1.5, md: 2 } }}
         >

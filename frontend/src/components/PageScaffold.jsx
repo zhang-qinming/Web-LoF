@@ -9,20 +9,22 @@ export function PageFrame({
     subtitle,
     actions,
     children,
-    maxWidth = 1200,
+    maxWidth,
     compact = false,
     sx,
 }) {
     const theme = useTheme();
+    const resolvedMaxWidth = maxWidth ?? theme.custom.appShell.maxWidth;
 
     return (
         <Box
             sx={{
                 width: '100%',
-                maxWidth,
+                maxWidth: resolvedMaxWidth,
+                minWidth: 0,
                 mx: 'auto',
-                px: { xs: 2, md: 3 },
-                py: compact ? { xs: 2, md: 3 } : { xs: 3, md: 4 },
+                px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
+                py: compact ? { xs: 1.5, md: 2.5, xl: 3 } : { xs: 2.5, md: 3.5, xl: 4 },
                 ...fadeUpKeyframes(),
                 animation: `appFadeUp ${theme.custom.motion.smooth} both`,
                 ...sx,

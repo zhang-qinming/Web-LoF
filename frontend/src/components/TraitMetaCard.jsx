@@ -9,9 +9,6 @@ import {
     GroupOutlined,
     PolylineOutlined,
     VerifiedOutlined,
-    ScatterPlotOutlined,
-    AccountTreeOutlined,
-    ShowChartOutlined,
     CategoryOutlined,
     FingerprintOutlined,
     EqualizerOutlined,
@@ -230,37 +227,18 @@ function formatMetric(value, digits = 4) {
     return Number.isFinite(num) ? num.toFixed(digits) : String(value);
 }
 
-function formatAvailability(value) {
-    return value ? 'Available' : 'Not available';
-}
-
-export default function TraitMetaCard({ fileId, scatterListData, graphListData }) {
+export default function TraitMetaCard({ fileId }) {
     const theme = useTheme();
     const { data } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
     const info = (data && !data.error) ? data : null;
-    const idCandidates = [fileId, info?.file_id, info?.gwas_id].filter(Boolean);
-    const hasProgramScatter = Array.isArray(scatterListData?.files)
-        && idCandidates.some((id) => scatterListData.files.includes(id));
-    const hasProgramGraph = Array.isArray(graphListData?.files)
-        && idCandidates.some((id) => graphListData.files.includes(id));
-    const hasHeritability = Boolean(
-        info?.heritability_source_file
-        || info?.enrichment != null
-        || info?.coefficient_z_score != null
-    );
 
     const tones = {
-        study: {
-            color: '#245089',
-            bg: '#eaf2ff',
-            border: '#bfd6fb',
-        },
         gwas: {
             color: '#2f6a49',
             bg: '#edf8f1',
             border: '#c5e6d0',
         },
-        analysis: {
+        lof: {
             color: '#8a5b12',
             bg: '#fff2dd',
             border: '#edd1a4',
@@ -280,7 +258,6 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
 
     const traitName = (info.trait_name || fileId).replace(/^["'\s]+|["'\s]+$/g, '');
     const fileIdentifier = info.file_id || fileId || EMPTY_VALUE;
-    const studyTag = info.lof_id || EMPTY_VALUE;
     const stats = [
         { label: 'Year', value: info.year || EMPTY_VALUE },
         { label: 'Population', value: info.population || EMPTY_VALUE },
@@ -322,7 +299,7 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                     </Box>
 
                     <Chip
-                        label={`LoF ID: ${fileIdentifier}`}
+                        label={`File ID: ${fileIdentifier}`}
                         size="small"
                         sx={{
                             height: 28,
@@ -363,13 +340,26 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                         gap: 1,
                     }}
                 >
-                    <InfoSection title="Study details" theme={theme} tone={tones.study}>
+                    <InfoSection
+                        title="GWAS metadata"
+                        theme={theme}
+                        tone={tones.gwas}
+                        columns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' }}
+                    >
+                        <Field
+                            icon={DescriptionOutlined}
+                            label="GWAS ID"
+                            value={info.gwas_id || EMPTY_VALUE}
+                            mono
+                            theme={theme}
+                            tone={tones.gwas}
+                        />
                         <Field
                             icon={PersonOutline}
                             label="Author"
                             value={info.first_author ? `${info.first_author}${info.year ? ` (${info.year})` : ''}` : EMPTY_VALUE}
                             theme={theme}
-                            tone={tones.study}
+                            tone={tones.gwas}
                         />
                         <Field
                             icon={ArticleOutlined}
@@ -377,7 +367,7 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                             value={info.pmid || EMPTY_VALUE}
                             href={info.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${info.pmid}` : undefined}
                             theme={theme}
-                            tone={tones.study}
+                            tone={tones.gwas}
                         />
                         <Field
                             icon={LanguageOutlined}
@@ -385,28 +375,19 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                             value={info.url ? 'Open source' : EMPTY_VALUE}
                             href={info.url || undefined}
                             theme={theme}
-                            tone={tones.study}
+                            tone={tones.gwas}
                         />
-                        <Field
-                            icon={SellOutlined}
-                            label="Study tag"
-                            value={studyTag}
-                            mono
-                            theme={theme}
-                            tone={tones.study}
-                        />
-                    </InfoSection>
-
-                    <InfoSection
-                        title="GWAS summary"
-                        theme={theme}
-                        tone={tones.gwas}
-                        columns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' }}
-                    >
                         <Field
                             icon={GroupOutlined}
                             label="Case / control"
                             value={formatCases(info)}
+                            theme={theme}
+                            tone={tones.gwas}
+                        />
+                        <Field
+                            icon={SellOutlined}
+                            label="Sample size"
+                            value={formatCount(info.sample_size)}
                             theme={theme}
                             tone={tones.gwas}
                         />
@@ -424,42 +405,12 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                             theme={theme}
                             tone={tones.gwas}
                         />
-                    </InfoSection>
-
-                    <InfoSection
-                        title="Analysis and annotation"
-                        theme={theme}
-                        tone={tones.analysis}
-                        fullWidth
-                        columns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }}
-                    >
-                        <Field
-                            icon={ScatterPlotOutlined}
-                            label="Program scatter"
-                            value={formatAvailability(hasProgramScatter)}
-                            theme={theme}
-                            tone={tones.analysis}
-                        />
-                        <Field
-                            icon={AccountTreeOutlined}
-                            label="Trait graph"
-                            value={formatAvailability(hasProgramGraph)}
-                            theme={theme}
-                            tone={tones.analysis}
-                        />
-                        <Field
-                            icon={ShowChartOutlined}
-                            label="LDSC heritability"
-                            value={formatAvailability(hasHeritability)}
-                            theme={theme}
-                            tone={tones.analysis}
-                        />
                         <Field
                             icon={CategoryOutlined}
                             label="MeSH term"
                             value={info.mesh_term || EMPTY_VALUE}
                             theme={theme}
-                            tone={tones.analysis}
+                            tone={tones.gwas}
                         />
                         <Field
                             icon={FingerprintOutlined}
@@ -467,29 +418,53 @@ export default function TraitMetaCard({ fileId, scatterListData, graphListData }
                             value={info.mesh_id || EMPTY_VALUE}
                             mono
                             theme={theme}
-                            tone={tones.analysis}
+                            tone={tones.gwas}
+                        />
+                    </InfoSection>
+
+                    <InfoSection
+                        title="LoF metadata"
+                        theme={theme}
+                        tone={tones.lof}
+                        columns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }}
+                    >
+                        <Field
+                            icon={DescriptionOutlined}
+                            label="File ID"
+                            value={fileIdentifier}
+                            mono
+                            theme={theme}
+                            tone={tones.lof}
+                        />
+                        <Field
+                            icon={FingerprintOutlined}
+                            label="LoF ID"
+                            value={info.lof_id || EMPTY_VALUE}
+                            mono
+                            theme={theme}
+                            tone={tones.lof}
+                        />
+                        <Field
+                            icon={DescriptionOutlined}
+                            label="LDSC source file"
+                            value={info.heritability_source_file || EMPTY_VALUE}
+                            mono
+                            theme={theme}
+                            tone={tones.lof}
                         />
                         <Field
                             icon={EqualizerOutlined}
                             label="LDSC enrichment"
                             value={formatMetric(info.enrichment)}
                             theme={theme}
-                            tone={tones.analysis}
+                            tone={tones.lof}
                         />
                         <Field
                             icon={TimelineOutlined}
                             label="Coefficient z-score"
                             value={formatMetric(info.coefficient_z_score)}
                             theme={theme}
-                            tone={tones.analysis}
-                        />
-                        <Field
-                            icon={DescriptionOutlined}
-                            label="Source file"
-                            value={info.heritability_source_file || EMPTY_VALUE}
-                            mono
-                            theme={theme}
-                            tone={tones.analysis}
+                            tone={tones.lof}
                         />
                     </InfoSection>
                 </Box>

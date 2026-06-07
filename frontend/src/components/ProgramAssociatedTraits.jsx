@@ -56,11 +56,12 @@ const PROGRAM_TRAIT_COLUMNS = [
     { key: 'selection', label: 'Selection', align: 'center', tone: 'selection', width: 185 },
     { key: 'programScore', label: 'Program Score', align: 'right', tone: 'score', width: 132 },
     { key: 'regulatorScore', label: 'Regulator Score', align: 'right', tone: 'score', width: 142 },
-    { key: 'totalGenes', label: 'Genes', align: 'right', tone: 'genes', width: 150 },
-    { key: 'topGenes', label: 'Top Genes', align: 'left', tone: 'genes', width: 390 },
+    { key: 'totalGenes', label: 'Trait Evidence Genes', align: 'right', tone: 'genes', width: 170 },
+    { key: 'topGenes', label: 'Top Evidence Genes', align: 'left', tone: 'genes', width: 370 },
 ];
 
 const PROGRAM_TRAIT_TITLE_HEADER_HEIGHT = 56;
+const TABLE_PAGINATION_THRESHOLD = 50;
 
 const programTraitSortLabelSx = {
     fontSize: '0.68rem',
@@ -123,10 +124,10 @@ function buildProgramTraitCsv(rows) {
         'Class',
         'Program Score',
         'Regulator Score',
-        'Visible Genes',
-        'Program Gene Count',
-        'Regulator Gene Count',
-        'Top Genes',
+        'Trait Evidence Genes',
+        'Program Evidence Gene Count',
+        'Regulator Evidence Gene Count',
+        'Top Evidence Genes',
     ];
     const lines = [
         header.map(escapeCsvValue).join(','),
@@ -192,8 +193,6 @@ function programTraitColumnHeaderSx(theme, tone, align) {
 export default function ProgramAssociatedTraits({
     programId,
     showAll = false,
-    noInternalScroll = false,
-    maxHeight = 520,
 }) {
     const theme = useTheme();
     const tones = {
@@ -203,7 +202,7 @@ export default function ProgramAssociatedTraits({
         genes: tableTone(theme, 'success'),
     };
     const [page, setPage] = React.useState(0);
-    const [rowsPerPage, setRowsPerPage] = React.useState(20);
+    const [rowsPerPage, setRowsPerPage] = React.useState(TABLE_PAGINATION_THRESHOLD);
     const [filter, setFilter] = React.useState('all');
     const [sortBy, setSortBy] = React.useState('programScore');
     const [sortDir, setSortDir] = React.useState('desc');
@@ -271,17 +270,15 @@ export default function ProgramAssociatedTraits({
         );
     }
 
+    const shouldPaginate = !showAll && sortedTraits.length > TABLE_PAGINATION_THRESHOLD;
     const pageCount = Math.max(1, Math.ceil(sortedTraits.length / rowsPerPage));
-    const currentPage = showAll ? 0 : Math.min(page, pageCount - 1);
-    const start = showAll ? 0 : currentPage * rowsPerPage;
-    const visibleTraits = showAll ? sortedTraits : sortedTraits.slice(start, start + rowsPerPage);
+    const currentPage = shouldPaginate ? Math.min(page, pageCount - 1) : 0;
+    const start = shouldPaginate ? currentPage * rowsPerPage : 0;
+    const visibleTraits = shouldPaginate ? sortedTraits.slice(start, start + rowsPerPage) : sortedTraits;
 
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
-            <TableContainer sx={stickyTableContainerSx(theme, noInternalScroll
-                ? { overflowX: 'auto', overflowY: 'visible' }
-                : { maxHeight, overflowX: 'auto', overflowY: 'auto' })}
-            >
+            <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
                 <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1309 })}>
                     <colgroup>
                         {PROGRAM_TRAIT_COLUMNS.map((column) => (
@@ -297,7 +294,7 @@ export default function ProgramAssociatedTraits({
                                             Associated Traits
                                         </Typography>
                                         <Typography sx={captionSx(theme, { fontSize: '0.7rem', lineHeight: 1.35 })}>
-                                            {showAll
+                                            {!shouldPaginate
                                                 ? `Showing all ${sortedTraits.length.toLocaleString()} traits.`
                                                 : `Showing ${sortedTraits.length ? (start + 1).toLocaleString() : 0}-${Math.min(start + rowsPerPage, sortedTraits.length).toLocaleString()} of ${sortedTraits.length.toLocaleString()} traits.`}
                                         </Typography>
@@ -408,7 +405,7 @@ export default function ProgramAssociatedTraits({
                                 </TableCell>
                                 <TableCell sx={programTraitCellSx(theme, tones.genes, 'right', { bgcolor: tones.genes.cellStrong })}>
                                     <Typography sx={{ fontSize: '0.74rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
-                                        {Number(row.totalGenes || 0).toLocaleString()} visible
+                                        {Number(row.totalGenes || 0).toLocaleString()} evidence
                                     </Typography>
                                     <Typography sx={{ fontSize: '0.62rem', color: theme.palette.text.secondary }}>
                                         {row.loadingGeneCount || 0} program / {row.regulatorGeneCount || 0} regulator
@@ -434,7 +431,7 @@ export default function ProgramAssociatedTraits({
                     </TableBody>
                 </Table>
             </TableContainer>
-            {showAll ? (
+            {!shouldPaginate ? (
                 <Box
                     sx={{
                         px: { xs: 1.25, md: 1.6 },
@@ -467,7 +464,7 @@ export default function ProgramAssociatedTraits({
                     page={currentPage}
                     onPageChange={(event, nextPage) => setPage(nextPage)}
                     rowsPerPage={rowsPerPage}
-                    rowsPerPageOptions={[20, 50, 100, 250]}
+                    rowsPerPageOptions={[50, 100, 250]}
                     onRowsPerPageChange={(event) => {
                         setRowsPerPage(Number(event.target.value));
                         setPage(0);
