@@ -372,7 +372,7 @@ export default function GeneRegulation({ programId }) {
         return () => window.removeEventListener('keydown', onEsc);
     }, [fullscreen]);
     const [page, setPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(50);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
     const [jumpInput, setJumpInput] = useState('');
     const tablePaperRef = useRef(null);
     const tableRowRefs = useRef({});

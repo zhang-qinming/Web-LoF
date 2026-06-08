@@ -222,7 +222,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const [colorMode, setColorMode] = useState('program');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
     const [tablePage, setTablePage] = useState(0);
-    const [tableRowsPerPage, setTableRowsPerPage] = useState(50);
+    const [tableRowsPerPage, setTableRowsPerPage] = useState(25);
     const deferredGeneQuery = useDeferredValue(geneQuery);
 
     const onInitialized = useCallback((_figure, graphDiv) => {

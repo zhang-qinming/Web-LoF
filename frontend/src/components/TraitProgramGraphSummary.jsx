@@ -40,7 +40,7 @@ export default function TraitProgramGraphSummary({
     const theme = useTheme();
     const [filter, setFilter] = React.useState('all');
     const [tablePage, setTablePage] = React.useState(0);
-    const [rowsPerPage, setRowsPerPage] = React.useState(50);
+    const [rowsPerPage, setRowsPerPage] = React.useState(25);
     const rowRefs = React.useRef(new Map());
     const headerTone = tableTone(theme, 'neutral');
     const programCount = modules.filter((module) => (module.side || side) === 'program').length;
@@ -413,10 +413,10 @@ export default function TraitProgramGraphSummary({
                     onPageChange={(_, nextPage) => setTablePage(nextPage)}
                     rowsPerPage={rowsPerPage}
                     onRowsPerPageChange={(event) => {
-                        setRowsPerPage(Number(event.target.value) || 50);
+                        setRowsPerPage(Number(event.target.value) || 25);
                         setTablePage(0);
                     }}
-                    rowsPerPageOptions={[50, 100, 200]}
+                    rowsPerPageOptions={[25, 50, 100, 200]}
                 />
             )}
         </Paper>

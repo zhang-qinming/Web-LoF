@@ -239,7 +239,7 @@ export default function GeneRegulationTable({
                                 onChange={(event) => { setRowsPerPage(Number(event.target.value)); setPage(1); }}
                                 sx={{ fontSize: '0.75rem', height: 32 }}
                             >
-                                {[50, 100, 200].map((count) => (
+                                {[25, 50, 100, 200].map((count) => (
                                     <MenuItem key={count} value={count} sx={{ fontSize: '0.75rem' }}>{count} / page</MenuItem>
                                 ))}
                             </Select>

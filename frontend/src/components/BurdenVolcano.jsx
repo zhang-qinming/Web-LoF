@@ -181,7 +181,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const [sortDir, setSortDir] = useState('desc');
     const [highlight, setHighlight] = useState({ rowKey: '', key: 0 });
     const [tablePage, setTablePage] = useState(0);
-    const [tableRowsPerPage, setTableRowsPerPage] = useState(50);
+    const [tableRowsPerPage, setTableRowsPerPage] = useState(25);
     const [exportOpen, setExportOpen] = useState(false);
     const [exportWidth, setExportWidth] = useState(DEFAULT_EXPORT_WIDTH);
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);

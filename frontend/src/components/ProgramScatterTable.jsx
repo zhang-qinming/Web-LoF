@@ -145,7 +145,7 @@ export default function ProgramScatterTable({
     const theme = useTheme();
     const infoTone = tableTone(theme, 'neutral');
     const [tablePage, setTablePage] = React.useState(0);
-    const [rowsPerPage, setRowsPerPage] = React.useState(50);
+    const [rowsPerPage, setRowsPerPage] = React.useState(25);
     const shouldPaginate = sortedRows.length > 50;
     const visibleRows = shouldPaginate
         ? sortedRows.slice(tablePage * rowsPerPage, (tablePage * rowsPerPage) + rowsPerPage)
@@ -275,10 +275,10 @@ export default function ProgramScatterTable({
                         onPageChange={(_, nextPage) => setTablePage(nextPage)}
                         rowsPerPage={rowsPerPage}
                         onRowsPerPageChange={(event) => {
-                            setRowsPerPage(Number(event.target.value) || 50);
+                            setRowsPerPage(Number(event.target.value) || 25);
                             setTablePage(0);
                         }}
-                        rowsPerPageOptions={[50, 100, 200]}
+                        rowsPerPageOptions={[25, 50, 100, 200]}
                     />
                 )}
             </Collapse>

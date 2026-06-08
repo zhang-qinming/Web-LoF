@@ -285,10 +285,10 @@ export default function GeneLevelQQTable({
                         onPageChange={(_, nextPage) => setTablePage(nextPage)}
                         rowsPerPage={tableRowsPerPage}
                         onRowsPerPageChange={(event) => {
-                            setTableRowsPerPage(Number(event.target.value) || 50);
+                            setTableRowsPerPage(Number(event.target.value) || 25);
                             setTablePage(0);
                         }}
-                        rowsPerPageOptions={[50, 100, 200]}
+                        rowsPerPageOptions={[25, 50, 100, 200]}
                     />
                 )}
             </Collapse>

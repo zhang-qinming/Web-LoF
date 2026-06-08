@@ -135,7 +135,7 @@ function GeneRowsControl({ rowsPerPage, onChange }) {
                         '& .MuiSelect-select': { py: 0.45 },
                     }}
                 >
-                    {[50, 100, 200].map((value) => (
+                    {[25, 50, 100, 200].map((value) => (
                         <MenuItem key={value} value={value} dense>{value}</MenuItem>
                     ))}
                 </Select>
@@ -294,6 +294,7 @@ const EMPTY_GENE_ROWS = [];
 const EMPTY_RECORDS = [];
 const GO_TERM_PATTERN = /GO:\d{7}/i;
 const TABLE_PAGINATION_THRESHOLD = 50;
+const DEFAULT_ROWS_PER_PAGE = 25;
 
 function justifyForAlign(align = 'left') {
     if (align === 'right') return 'flex-end';
@@ -1054,7 +1055,7 @@ function GeneHomeTable({
         headerColor: '#315d57',
     };
     const [page, setPage] = React.useState(0);
-    const [rowsPerPage, setRowsPerPage] = React.useState(TABLE_PAGINATION_THRESHOLD);
+    const [rowsPerPage, setRowsPerPage] = React.useState(DEFAULT_ROWS_PER_PAGE);
     const [sortBy, setSortBy] = React.useState('totalTraits');
     const [sortDir, setSortDir] = React.useState('desc');
     const [downloading, setDownloading] = React.useState(false);
@@ -1355,7 +1356,7 @@ function GeneHomeTable({
                 />
             )}
 
-            <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
+            <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'hidden' })}>
                 <Table size="small" stickyHeader sx={stickyTableSx(theme, { minWidth: 960, tableLayout: 'fixed' })}>
                     <colgroup>
                         {GENE_TABLE_COLUMNS.map((column) => (
@@ -2501,7 +2502,7 @@ function GeneProgramTraitTable({
                     page={currentPage}
                     onPageChange={(event, nextPage) => onPageChange?.(nextPage)}
                     rowsPerPage={rowsPerPage}
-                    rowsPerPageOptions={[50, 100, 250]}
+                    rowsPerPageOptions={[25, 50, 100, 250]}
                     onRowsPerPageChange={(event) => {
                         onRowsPerPageChange?.(Number(event.target.value));
                     }}
@@ -2524,7 +2525,7 @@ export default function Genes() {
     const queryParam = params.get('query') || '';
     const [input, setInput] = React.useState(queryParam);
     const [traitPage, setTraitPage] = React.useState(0);
-    const [traitRowsPerPage, setTraitRowsPerPage] = React.useState(50);
+    const [traitRowsPerPage, setTraitRowsPerPage] = React.useState(DEFAULT_ROWS_PER_PAGE);
     const [traitSortBy, setTraitSortBy] = React.useState('absGamma');
     const [traitSortDir, setTraitSortDir] = React.useState('desc');
     const query = queryParam.trim();

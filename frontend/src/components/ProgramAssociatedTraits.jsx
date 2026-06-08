@@ -62,6 +62,7 @@ const PROGRAM_TRAIT_COLUMNS = [
 
 const PROGRAM_TRAIT_TITLE_HEADER_HEIGHT = 56;
 const TABLE_PAGINATION_THRESHOLD = 50;
+const DEFAULT_ROWS_PER_PAGE = 25;
 
 const programTraitSortLabelSx = {
     fontSize: '0.68rem',
@@ -202,7 +203,7 @@ export default function ProgramAssociatedTraits({
         genes: tableTone(theme, 'success'),
     };
     const [page, setPage] = React.useState(0);
-    const [rowsPerPage, setRowsPerPage] = React.useState(TABLE_PAGINATION_THRESHOLD);
+    const [rowsPerPage, setRowsPerPage] = React.useState(DEFAULT_ROWS_PER_PAGE);
     const [filter, setFilter] = React.useState('all');
     const [sortBy, setSortBy] = React.useState('programScore');
     const [sortDir, setSortDir] = React.useState('desc');
@@ -464,7 +465,7 @@ export default function ProgramAssociatedTraits({
                     page={currentPage}
                     onPageChange={(event, nextPage) => setPage(nextPage)}
                     rowsPerPage={rowsPerPage}
-                    rowsPerPageOptions={[50, 100, 250]}
+                    rowsPerPageOptions={[25, 50, 100, 250]}
                     onRowsPerPageChange={(event) => {
                         setRowsPerPage(Number(event.target.value));
                         setPage(0);

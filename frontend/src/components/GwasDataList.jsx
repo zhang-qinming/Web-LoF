@@ -199,10 +199,22 @@ function headerLayoutSx(column = {}) {
 const GWAS_TABLE_TITLE_HEADER_HEIGHT = 94;
 const GWAS_TABLE_COLUMN_HEADER_HEIGHT = 46;
 const TABLE_PAGINATION_THRESHOLD = 50;
+const DEFAULT_ROWS_PER_PAGE = 25;
 
-function buildTraitHref(row, figureTab) {
+function parsePositiveInteger(value, fallback, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed)) return fallback;
+    if (parsed < min || parsed > max) return fallback;
+    return parsed;
+}
+
+function normalizeSortOrder(value, fallback = 'ASC') {
+    return String(value || '').toUpperCase() === 'DESC' ? 'DESC' : fallback;
+}
+
+function buildTraitHref(row) {
     const path = `/trait/${encodeURIComponent(row.file_id)}`;
-    return figureTab ? `${path}?tab=${encodeURIComponent(figureTab)}` : path;
+    return path;
 }
 
 function metricValueTone(theme, tone) {
@@ -271,7 +283,7 @@ function MetricValue({ value, tone, theme }) {
     );
 }
 
-function TraitRow({ row, index, columns, theme, figureTab }) {
+function TraitRow({ row, index, columns, theme }) {
     return (
         <TableRow
             sx={{
@@ -299,7 +311,7 @@ function TraitRow({ row, index, columns, theme, figureTab }) {
                     {col.id === 'trait_name' ? (
                         <Link
                             component={RouterLink}
-                            to={buildTraitHref(row, figureTab)}
+                            to={buildTraitHref(row)}
                             underline="hover"
                             sx={{ color: theme.palette.primary.main, fontWeight: 600, fontSize: '0.85rem' }}
                         >
@@ -351,14 +363,19 @@ export default function GwasDataList({
     defaultOrder = 'ASC',
 }) {
     const theme = useTheme();
-    const [searchParams] = useSearchParams();
-    const figureTab = searchParams.get('tab') || '';
+    const [searchParams, setSearchParams] = useSearchParams();
     const rootRef = useRef(null);
-    const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(TABLE_PAGINATION_THRESHOLD);
-    const [sortBy, setSortBy] = useState(defaultSortBy);
-    const [order, setOrder] = useState(defaultOrder);
-    const [search, setSearch] = useState('');
+    const availableSortColumns = useMemo(() => new Set(columns.map((column) => column.id)), [columns]);
+    const resolvedDefaultSortBy = availableSortColumns.has(defaultSortBy) ? defaultSortBy : (columns[0]?.id || defaultSortBy);
+    const resolvedDefaultOrder = normalizeSortOrder(defaultOrder);
+    const [page, setPage] = useState(() => parsePositiveInteger(searchParams.get('page'), 1));
+    const [limit, setLimit] = useState(() => parsePositiveInteger(searchParams.get('limit'), DEFAULT_ROWS_PER_PAGE, { min: 5, max: 200 }));
+    const [sortBy, setSortBy] = useState(() => {
+        const candidate = searchParams.get('sortBy');
+        return candidate && availableSortColumns.has(candidate) ? candidate : resolvedDefaultSortBy;
+    });
+    const [order, setOrder] = useState(() => normalizeSortOrder(searchParams.get('order'), resolvedDefaultOrder));
+    const [search, setSearch] = useState(() => searchParams.get('search') || '');
     const [downloading, setDownloading] = useState(false);
     const [downloadError, setDownloadError] = useState('');
     const deferredSearch = useDeferredValue(search);
@@ -401,8 +418,30 @@ export default function GwasDataList({
     }, []);
 
     useEffect(() => {
-        setPage(1);
-    }, [normalizedSearch]);
+        const nextParams = new URLSearchParams(searchParams);
+
+        nextParams.delete('tab');
+        if (page > 1) nextParams.set('page', String(page));
+        else nextParams.delete('page');
+
+        if (limit !== DEFAULT_ROWS_PER_PAGE) nextParams.set('limit', String(limit));
+        else nextParams.delete('limit');
+
+        if (sortBy && sortBy !== resolvedDefaultSortBy) nextParams.set('sortBy', sortBy);
+        else nextParams.delete('sortBy');
+
+        if (order !== resolvedDefaultOrder) nextParams.set('order', order);
+        else nextParams.delete('order');
+
+        if (normalizedSearch) nextParams.set('search', normalizedSearch);
+        else nextParams.delete('search');
+
+        const currentParams = searchParams.toString();
+        const updatedParams = nextParams.toString();
+        if (currentParams !== updatedParams) {
+            setSearchParams(nextParams, { replace: true });
+        }
+    }, [limit, normalizedSearch, order, page, resolvedDefaultOrder, resolvedDefaultSortBy, searchParams, setSearchParams, sortBy]);
 
     useEffect(() => {
         if (!normalizedSearch) return undefined;
@@ -497,7 +536,7 @@ export default function GwasDataList({
                                 border: 0,
                                 borderRadius: 0,
                                 overflowX: 'auto',
-                                overflowY: 'visible',
+                                overflowY: 'hidden',
                                 boxShadow: 'none',
                             })}
                         >
@@ -605,7 +644,10 @@ export default function GwasDataList({
                                                                 <TextField
                                                                     size="small"
                                                                     value={search}
-                                                                    onChange={(event) => setSearch(event.target.value)}
+                                                                    onChange={(event) => {
+                                                                        setSearch(event.target.value);
+                                                                        setPage(1);
+                                                                    }}
                                                                     placeholder="Search trait, LoF ID, MeSH term"
                                                                     sx={{
                                                                         flex: { xs: '1 1 100%', sm: '0 1 260px' },
@@ -629,7 +671,10 @@ export default function GwasDataList({
                                                                                 <IconButton
                                                                                     size="small"
                                                                                     aria-label="Clear trait search"
-                                                                                    onClick={() => setSearch('')}
+                                                                                    onClick={() => {
+                                                                                        setSearch('');
+                                                                                        setPage(1);
+                                                                                    }}
                                                                                     edge="end"
                                                                                 >
                                                                                     <Clear fontSize="small" />
@@ -661,7 +706,7 @@ export default function GwasDataList({
                                                                                 '& .MuiSelect-select': { py: 0.45 },
                                                                             }}
                                                                         >
-                                                                            {[50, 100, 200].map((v) => (
+                                                                            {[25, 50, 100, 200].map((v) => (
                                                                                 <MenuItem key={v} value={v} dense>{v}</MenuItem>
                                                                             ))}
                                                                         </Select>
@@ -748,7 +793,7 @@ export default function GwasDataList({
                                     ) : (
                                         <>
                                             {rows.map((row, index) => (
-                                                <TraitRow key={row.id || index} row={row} index={index} columns={columns} theme={theme} figureTab={figureTab} />
+                                                <TraitRow key={row.id || index} row={row} index={index} columns={columns} theme={theme} />
                                             ))}
                                         </>
                                     )}
