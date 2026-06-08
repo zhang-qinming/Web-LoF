@@ -44,13 +44,13 @@ import docsFigureBrowserSurfaces from '../assets/docs/docs-figure-browser-surfac
 const TEXT = {
     en: {
         pageTitle: 'Web Guide',
-        pageSubtitle: 'An English-first usage guide for the browser. Switch languages at any time to view the same content in Chinese.',
+        pageSubtitle: 'A route-by-route guide for using TraitVista to search files, inspect traits, review genes and programs, and export project outputs.',
         open: 'Open',
         contents: 'Contents',
         sectionsAndMethods: (sectionCount, methodCount) => `${sectionCount} sections / ${methodCount} topics`,
         components: (count) => `${count} components`,
         recommendedWorkflow: 'Recommended workflow',
-        workflowText: 'Start from Home, Trait, or Genes depending on whether the question begins with a file, a trait, or a gene. Use Trait for figure-centric interpretation, Programs for annotation review, and Data Browser for raw file browsing and batch downloads.',
+        workflowText: 'Start from Home, Trait, Genes, Programs, or Data depending on the object you already know. Use Trait for figure-centric interpretation, Genes for gene-first evidence, Programs for annotation and regulator review, and Data Browser for raw file browsing, global search, ZIP export, and batch downloads.',
         workflowFigures: [
             {
                 title: 'Analysis Workflow',
@@ -60,13 +60,13 @@ const TEXT = {
             },
             {
                 title: 'Route Map',
-                body: 'This figure shows the browser-side route split: search in Home, drill down in Trait, Genes, or Programs, then export from Data or read page-level guidance here.',
+                body: 'This figure shows the browser-side route split: search in Home, drill down in Trait, Genes, or Programs, then verify and export from Data or read page-level guidance here.',
                 image: docsFigureBrowserSurfaces,
                 alt: 'Browser route map showing Home, Trait, Genes, Programs, Data, Guide, and About',
             },
         ],
         componentCoverageTitle: 'Component Coverage Index',
-        componentCoverageBody: 'Visible routes and user-facing components are mapped to the guide entries below. Pure helpers, formatters, and loading skeletons stay grouped under their parent component.',
+        componentCoverageBody: 'Visible routes and user-facing components are mapped to the guide entries below. Pure helpers, formatters, cache utilities, and loading skeletons stay grouped under their parent component.',
         mapped: (count) => `${count} mapped`,
         languageLabel: 'Language',
         english: 'English',
@@ -76,6 +76,14 @@ const TEXT = {
             { label: 'Genes', to: '/genes', icon: <BiotechOutlined sx={{ fontSize: 17 }} /> },
             { label: 'Programs', to: '/programs', icon: <ScienceOutlined sx={{ fontSize: 17 }} /> },
             { label: 'Data Browser', to: '/data', icon: <DataObjectOutlined sx={{ fontSize: 17 }} /> },
+        ],
+        workflowCardsTitle: 'Choose A Starting Page',
+        workflowCardsBody: 'Pick the first route from the object in hand, then use linked tables and exports to move across the rest of the browser.',
+        workflowCards: [
+            { question: 'I have a trait, GCST, LoF ID, or GWAS ID', route: '/trait', page: 'Trait', action: 'Open the trait row, choose a figure tab, then use the table below the chart for exact values.' },
+            { question: 'I have a gene symbol or Ensembl ID', route: '/genes', page: 'Genes', action: 'Review gene metadata, program relationships, and linked trait evidence before jumping back to Trait.' },
+            { question: 'I have a cNMF program or regulator question', route: '/programs', page: 'Programs', action: 'Check annotation, program genes, and associated traits, then open trait-level graph views for context.' },
+            { question: 'I have a filename, folder, or output keyword', route: '/data', page: 'Data', action: 'Use global search or column browsing, select files, then download individual files, batches, or ZIP archives.' },
         ],
         guideSections: [
             {
@@ -122,9 +130,9 @@ const TEXT = {
                     {
                         name: 'Home File Search',
                         route: '/',
-                        role: 'Fast file and folder discovery across the project outputs.',
+                        role: 'Fast file and folder discovery across TraitVista project outputs.',
                         usage: [
-                            'Enter at least two characters to begin searching by filename, folder name, GCST accession, or program label.',
+                            'Enter at least two characters to begin searching by filename, folder name, GCST accession, program label, or common output keyword such as manhattan, burden, heatmap, or regulator.',
                             'Files in the result list can be selected for batch download or downloaded individually.',
                             'Folder results can be opened in Data Browser or downloaded as ZIP archives.',
                             'Press Enter to carry the current keyword into Data Browser global search.',
@@ -133,11 +141,21 @@ const TEXT = {
                     {
                         name: 'Home Stats Cards',
                         route: '/',
-                        role: 'Shortcut cards into the main browser areas.',
+                        role: 'Cached summary cards and shortcuts into the main browser areas.',
                         usage: [
                             'Select GWAS Traits to open the trait list.',
                             'Select Programs to open the program annotation table.',
                             'Select Data Files to open the data file browser.',
+                            'If live counts cannot load, the page may reuse the cached summary while showing the current status.',
+                        ],
+                    },
+                    {
+                        name: 'Home Figure Gallery',
+                        route: '/',
+                        role: 'Visual shortcut grid for the major result views.',
+                        usage: [
+                            'Use the gallery to jump directly into example Trait figure tabs, including Program Scatter, Trait Program Graph, Manhattan, volcano, Gene Evidence, Gene QQ, and Cross-trait Heatmap.',
+                            'Use the Data Browser card when the question is about retrieving the underlying artifact rather than interpreting a chart.',
                         ],
                     },
                 ],
@@ -500,17 +518,19 @@ const TEXT = {
                     {
                         name: 'About',
                         route: '/about',
-                        role: 'Project overview page with workflow figures and route positioning.',
+                        role: 'TraitVista overview page with workflow figures, scope, route positioning, and the full release log.',
                         usage: [
-                            'Use this page for a concise summary of the browser surfaces, the analysis workflow, and where each major route fits.',
+                            'Use this page for a concise summary of the browser surfaces, the analysis workflow, where each major route fits, and what the browser is not intended to replace.',
+                            'Open the release log on About when you need the longer milestone history referenced from Home.',
                         ],
                     },
                     {
                         name: 'Contact',
                         route: '/contact',
-                        role: 'Project contact information page.',
+                        role: 'Support checklist for data, route, chart, and download issues.',
                         usage: [
-                            'Use the provided contact details when you encounter data, API, or page-level issues.',
+                            'Use it before escalating a missing file, inconsistent identifier, chart-linked table mismatch, download failure, or confusing workflow.',
+                            'Include the exact route, active tab, trait, gene, program, rsID, file path, filter state, screenshot, and approximate time when reporting an issue.',
                         ],
                     },
                     {
@@ -630,13 +650,13 @@ const TEXT = {
     },
     zh: {
         pageTitle: '网页指南',
-        pageSubtitle: '默认展示英文说明，也可以随时切换到中文查看同一套页面和组件说明。',
+        pageSubtitle: '按路由说明如何使用 TraitVista 搜索文件、查看 traits、核查 genes 和 programs，并导出项目结果。',
         open: '打开',
         contents: '目录',
         sectionsAndMethods: (sectionCount, methodCount) => `${sectionCount} 个章节 / ${methodCount} 个主题`,
         components: (count) => `${count} 个组件`,
         recommendedWorkflow: '推荐使用路径',
-        workflowText: '如果问题先从文件、trait 或 gene 开始，分别从 Home、Trait 或 Genes 进入。Trait 负责图表解释，Programs 负责注释核查，Data Browser 负责原始文件浏览和批量下载。',
+        workflowText: '按照你已经知道的对象选择 Home、Trait、Genes、Programs 或 Data 作为入口。Trait 负责图表解释，Genes 负责 gene-first 证据，Programs 负责注释与 regulator 核查，Data Browser 负责原始文件浏览、全局搜索、ZIP 导出和批量下载。',
         workflowFigures: [
             {
                 title: '分析工作流',
@@ -646,13 +666,13 @@ const TEXT = {
             },
             {
                 title: '页面路由图',
-                body: '这张图展示前端页面分工：先在 Home 搜索，再进入 Trait、Genes 或 Programs 深入查看，最后在 Data 导出结果或回到本页看说明。',
+                body: '这张图展示前端页面分工：先在 Home 搜索，再进入 Trait、Genes 或 Programs 深入查看，最后在 Data 复核和导出结果，或回到本页看说明。',
                 image: docsFigureBrowserSurfaces,
                 alt: '展示 Home、Trait、Genes、Programs、Data、Guide 和 About 的页面关系图',
             },
         ],
         componentCoverageTitle: '组件覆盖索引',
-        componentCoverageBody: '源码中的页面和可见组件都映射到下方说明条目；纯 helper、格式化函数和 loading skeleton 归入父组件。',
+        componentCoverageBody: '源码中的页面和可见组件都映射到下方说明条目；纯 helper、格式化函数、缓存工具和 loading skeleton 归入父组件。',
         mapped: (count) => `${count} 个映射`,
         languageLabel: '语言',
         english: 'English',
@@ -662,6 +682,14 @@ const TEXT = {
             { label: 'Genes', to: '/genes', icon: <BiotechOutlined sx={{ fontSize: 17 }} /> },
             { label: 'Programs', to: '/programs', icon: <ScienceOutlined sx={{ fontSize: 17 }} /> },
             { label: '数据浏览器', to: '/data', icon: <DataObjectOutlined sx={{ fontSize: 17 }} /> },
+        ],
+        workflowCardsTitle: '选择起始页面',
+        workflowCardsBody: '先根据手头已有对象选择第一条路由，再通过联动表格和导出功能在其他页面之间切换。',
+        workflowCards: [
+            { question: '我有 trait、GCST、LoF ID 或 GWAS ID', route: '/trait', page: 'Trait', action: '打开 trait 行，选择对应 figure tab，再用图下方表格核对精确数值。' },
+            { question: '我有 gene symbol 或 Ensembl ID', route: '/genes', page: 'Genes', action: '先看 gene metadata、program 关系和关联 trait 证据，再按需要回到 Trait。' },
+            { question: '我有 cNMF program 或 regulator 问题', route: '/programs', page: 'Programs', action: '核查 annotation、program genes 和 associated traits，再打开 trait-level graph 补上下文。' },
+            { question: '我有文件名、文件夹或输出关键词', route: '/data', page: 'Data', action: '使用全局搜索或列式目录浏览，选择文件后下载单文件、批量文件或 ZIP。' },
         ],
         guideSections: [
             {
@@ -708,9 +736,9 @@ const TEXT = {
                     {
                         name: 'Home File Search',
                         route: '/',
-                        role: '跨项目输出的快速文件和目录检索。',
+                        role: '跨 TraitVista 项目输出的快速文件和目录检索。',
                         usage: [
-                            '输入至少 2 个字符后开始搜索，可按文件名、文件夹名、GCST accession 或 program 标签匹配。',
+                            '输入至少 2 个字符后开始搜索，可按文件名、文件夹名、GCST accession、program 标签，或 manhattan、burden、heatmap、regulator 等常用输出关键词匹配。',
                             '结果中的文件可勾选后批量下载，也可单独下载。',
                             '文件夹结果可在 Data Browser 中打开，或直接下载 ZIP。',
                             '按 Enter 会把当前关键词带入 Data Browser 的全局搜索。',
@@ -719,11 +747,21 @@ const TEXT = {
                     {
                         name: 'Home Stats Cards',
                         route: '/',
-                        role: '进入主要功能区的快捷卡片。',
+                        role: '缓存统计摘要和进入主要功能区的快捷卡片。',
                         usage: [
                             '点击 GWAS Traits 打开 trait 列表。',
                             '点击 Programs 打开 program 注释表。',
                             '点击 Data Files 打开数据文件浏览器。',
+                            '如果实时统计加载失败，页面可能复用缓存摘要，并显示当前状态。',
+                        ],
+                    },
+                    {
+                        name: 'Home Figure Gallery',
+                        route: '/',
+                        role: '主要结果视图的可视化快捷入口。',
+                        usage: [
+                            '可直接跳到示例 Trait 的 Program Scatter、Trait Program Graph、Manhattan、volcano、Gene Evidence、Gene QQ 和 Cross-trait Heatmap 等 figure tabs。',
+                            '如果问题是取回底层结果文件而不是解释图表，使用 Data Browser 卡片进入文件浏览。',
                         ],
                     },
                 ],
@@ -1086,17 +1124,19 @@ const TEXT = {
                     {
                         name: 'About',
                         route: '/about',
-                        role: '带有 workflow 图和页面定位说明的项目简介页。',
+                        role: '带有 workflow 图、范围说明、页面定位和完整版本记录的 TraitVista 总览页。',
                         usage: [
-                            '用于快速了解浏览器各页面分工、分析工作流以及各主路由的使用定位。',
+                            '用于快速了解浏览器各页面分工、分析工作流、各主路由的使用定位，以及这个浏览器不打算替代什么。',
+                            '当需要查看 Home 中提到的更完整里程碑历史时，打开 About 的 release log。',
                         ],
                     },
                     {
                         name: 'Contact',
                         route: '/contact',
-                        role: '项目联系信息页面。',
+                        role: '数据、路由、图表和下载问题的支持检查清单。',
                         usage: [
-                            '当遇到数据、API 或页面层问题时，使用该页提供的联系方式。',
+                            '在上报缺失文件、标识符不一致、图表联动表格不匹配、下载失败或流程不清晰之前，先按此页检查。',
+                            '报告问题时附上准确路由、活动 tab、trait、gene、program、rsID、文件路径、筛选状态、截图和大致时间。',
                         ],
                     },
                     {
@@ -1314,6 +1354,70 @@ function WorkflowFigureCard({ figure, index }) {
                 <Typography variant="body2" sx={captionSx(theme, { mb: 0, color: theme.palette.text.primary })}>
                     {figure.body}
                 </Typography>
+            </Box>
+        </Paper>
+    );
+}
+
+function WorkflowCards({ copy }) {
+    const theme = useTheme();
+
+    return (
+        <Paper
+            elevation={0}
+            sx={panelSx(theme, {
+                p: { xs: 1.6, md: 2 },
+                mb: 2,
+                backgroundColor: theme.palette.background.paper,
+            })}
+        >
+            <Box sx={{ mb: 1.3 }}>
+                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
+                    {copy.workflowCardsTitle}
+                </Typography>
+                <Typography variant="body2" sx={captionSx(theme, { mb: 0 })}>
+                    {copy.workflowCardsBody}
+                </Typography>
+            </Box>
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                    gap: 1,
+                }}
+            >
+                {copy.workflowCards.map((card, index) => (
+                    <Paper
+                        key={card.question}
+                        elevation={0}
+                        sx={panelSx(theme, {
+                            p: 1.3,
+                            boxShadow: 'none',
+                            backgroundColor: index % 2 === 0 ? theme.custom.surface.raised : alpha(theme.palette.primary.main, 0.035),
+                        })}
+                    >
+                        <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                            <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 740, color: theme.palette.text.primary, lineHeight: 1.25 }}>
+                                    {card.question}
+                                </Typography>
+                                <Typography variant="body2" sx={captionSx(theme, { mt: 0.6, mb: 0, color: theme.palette.text.primary })}>
+                                    {card.action}
+                                </Typography>
+                            </Box>
+                            <Button
+                                component={RouterLink}
+                                to={card.route}
+                                size="small"
+                                variant="outlined"
+                                endIcon={<ChevronRightRounded sx={{ fontSize: 17 }} />}
+                                sx={{ flexShrink: 0 }}
+                            >
+                                {card.page}
+                            </Button>
+                        </Stack>
+                    </Paper>
+                ))}
             </Box>
         </Paper>
     );
@@ -1541,6 +1645,8 @@ export default function Help() {
                             </Typography>
                         </Stack>
                     </Paper>
+
+                    <WorkflowCards copy={copy} />
 
                     <Box
                         sx={{

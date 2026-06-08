@@ -54,8 +54,8 @@ function colorTone(theme, color) {
 const PROGRAM_TRAIT_COLUMNS = [
     { key: 'traitName', label: 'Trait', align: 'left', tone: 'trait', width: 310 },
     { key: 'selection', label: 'Selection', align: 'center', tone: 'selection', width: 185 },
-    { key: 'programScore', label: 'Program Score', align: 'right', tone: 'score', width: 132 },
-    { key: 'regulatorScore', label: 'Regulator Score', align: 'right', tone: 'score', width: 142 },
+    { key: 'programScore', label: 'Program Score', align: 'center', tone: 'score', width: 132 },
+    { key: 'regulatorScore', label: 'Regulator Score', align: 'center', tone: 'score', width: 142 },
     { key: 'totalGenes', label: 'Trait Evidence Genes', align: 'right', tone: 'genes', width: 170 },
     { key: 'topGenes', label: 'Top Evidence Genes', align: 'left', tone: 'genes', width: 370 },
 ];
@@ -398,10 +398,10 @@ export default function ProgramAssociatedTraits({
                                         />
                                     </Stack>
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.score, 'right', { fontFamily: 'monospace', fontWeight: 680, bgcolor: tones.score.cellStrong })}>
+                                <TableCell sx={programTraitCellSx(theme, tones.score, 'center', { fontFamily: 'monospace', fontWeight: 680, bgcolor: tones.score.cellStrong })}>
                                     {formatScore(row.programScore)}
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.score, 'right', { fontFamily: 'monospace', fontWeight: 680 })}>
+                                <TableCell sx={programTraitCellSx(theme, tones.score, 'center', { fontFamily: 'monospace', fontWeight: 680 })}>
                                     {formatScore(row.regulatorScore)}
                                 </TableCell>
                                 <TableCell sx={programTraitCellSx(theme, tones.genes, 'right', { bgcolor: tones.genes.cellStrong })}>

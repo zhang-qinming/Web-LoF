@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useDeferredValue, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import useSWR from 'swr';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -27,6 +27,7 @@ import {
     Button,
     IconButton,
     InputAdornment,
+    Chip,
 } from '@mui/material';
 import { Clear, Search } from '@mui/icons-material';
 import {
@@ -70,31 +71,21 @@ function PaginationControl({ totalPages, page, onChange }) {
 
 function JumpToPageControl({ totalPages, page, onChange }) {
     const [inputPage, setInputPage] = useState(page);
+    const pageNumber = Number(inputPage);
 
-    const isValid = inputPage !== '' && Number(inputPage) >= 1 && Number(inputPage) <= totalPages;
+    const isValid = inputPage !== '' && Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= totalPages;
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (isValid) {
-            onChange(null, Number(inputPage));
+            onChange(null, pageNumber);
+            return;
         }
+        setInputPage(page);
     };
 
     const handleBlur = () => {
-        const value = inputPage;
-        if (value === '') {
-            setInputPage(page);
-            return;
-        }
-
-        const numValue = Number(value);
-        if (Number.isNaN(numValue)) {
-            setInputPage(page);
-            return;
-        }
-
-        if (numValue < 1) setInputPage(1);
-        else if (numValue > totalPages) setInputPage(totalPages);
+        if (!isValid) setInputPage(page);
     };
 
     useEffect(() => {
@@ -104,7 +95,7 @@ function JumpToPageControl({ totalPages, page, onChange }) {
     if (totalPages <= 1) return null;
 
     return (
-        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.45, flexShrink: 0 }}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.45, flexShrink: 0, minHeight: 32 }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}>
                 Page
             </Typography>
@@ -112,12 +103,24 @@ function JumpToPageControl({ totalPages, page, onChange }) {
                 size="small"
                 value={inputPage}
                 onChange={(e) => setInputPage(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSubmit(e);
+                }}
                 onBlur={handleBlur}
                 type="number"
-                slotProps={{ input: { min: 1, max: totalPages, sx: { textAlign: 'center', width: 52, py: 0.48, px: 0.7, fontSize: '0.78rem', fontWeight: 650 } } }}
+                inputProps={{ min: 1, max: totalPages, step: 1 }}
                 sx={{
                     '& .MuiOutlinedInput-root': {
+                        height: 32,
                         bgcolor: 'background.paper',
+                    },
+                    '& .MuiOutlinedInput-input': {
+                        width: 52,
+                        py: 0.48,
+                        px: 0.7,
+                        textAlign: 'center',
+                        fontSize: '0.78rem',
+                        fontWeight: 650,
                     },
                     '& fieldset': { borderRadius: 1 },
                 }}
@@ -125,7 +128,7 @@ function JumpToPageControl({ totalPages, page, onChange }) {
             <Typography variant="caption" color="text.secondary" sx={{ mx: 0.15, fontWeight: 700, whiteSpace: 'nowrap' }}>
                 / {totalPages.toLocaleString()}
             </Typography>
-            <Button type="submit" size="small" variant="outlined" disabled={!isValid} sx={{ minWidth: 38, px: 0.9, py: 0.35, textTransform: 'none', fontSize: '0.72rem', fontWeight: 680 }}>
+            <Button type="submit" size="small" variant="outlined" disabled={!isValid} sx={{ minWidth: 38, height: 32, px: 0.9, py: 0.35, textTransform: 'none', fontSize: '0.72rem', fontWeight: 680 }}>
                 Go
             </Button>
         </Box>
@@ -175,6 +178,15 @@ function buildGwasTableTsv(rows, columns) {
     return `${[header, ...lines].join('\n')}\n`;
 }
 
+function matchesTraitRow(row, columns, query) {
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    if (!normalizedQuery) return true;
+
+    return columns.some((column) => String(formatCellValue(row, column.id) ?? '')
+        .toLowerCase()
+        .includes(normalizedQuery));
+}
+
 function columnLayoutSx(column = {}) {
     const sx = {};
     if (column.width !== undefined) sx.width = column.width;
@@ -201,11 +213,36 @@ const GWAS_TABLE_COLUMN_HEADER_HEIGHT = 46;
 const TABLE_PAGINATION_THRESHOLD = 50;
 const DEFAULT_ROWS_PER_PAGE = 25;
 
+function useDebouncedValue(value, delayMs = 280) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            setDebouncedValue(value);
+        }, delayMs);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [delayMs, value]);
+
+    return debouncedValue;
+}
+
 function parsePositiveInteger(value, fallback, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) {
     const parsed = Number(value);
     if (!Number.isInteger(parsed)) return fallback;
     if (parsed < min || parsed > max) return fallback;
     return parsed;
+}
+
+function getColumnAlign(column = {}) {
+    if (column.align) return column.align;
+    return 'center';
+}
+
+function justifyForAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
 }
 
 function normalizeSortOrder(value, fallback = 'ASC') {
@@ -253,14 +290,15 @@ function metricValueTone(theme, tone) {
     };
 }
 
-function MetricValue({ value, tone, theme }) {
+function MetricValue({ value, tone, theme, align = 'center' }) {
     const colors = metricValueTone(theme, tone);
+    const justifyContent = align === 'right' ? 'flex-end' : align === 'left' ? 'flex-start' : 'center';
     return (
         <Box
             component="span"
             sx={{
                 display: 'inline-flex',
-                justifyContent: 'flex-end',
+                justifyContent,
                 alignItems: 'center',
                 minWidth: 72,
                 maxWidth: '100%',
@@ -302,11 +340,17 @@ function TraitRow({ row, index, columns, theme }) {
                 },
             }}
         >
-            {columns.map((col) => (
+            {columns.map((col) => {
+                const columnAlign = getColumnAlign(col);
+
+                return (
                 <TableCell
                     key={col.id}
-                    align={col.numeric ? 'right' : 'left'}
-                    sx={columnLayoutSx(col)}
+                    align={columnAlign}
+                    sx={{
+                        ...columnLayoutSx(col),
+                        textAlign: columnAlign,
+                    }}
                 >
                     {col.id === 'trait_name' ? (
                         <Link
@@ -318,18 +362,19 @@ function TraitRow({ row, index, columns, theme }) {
                             {String(row[col.id] || '').replace(/^["']+|["']+$/g, '')}
                         </Link>
                     ) : (col.id === 'sample_size' || col.id === 'Sample Size') ? (
-                        <MetricValue value={formatCellValue(row, col.id)} tone="primary" theme={theme} />
+                        <MetricValue value={formatCellValue(row, col.id)} tone="primary" theme={theme} align={columnAlign} />
                     ) : (col.id === 'n_variants' || col.id === 'Variants') ? (
-                        <MetricValue value={formatCellValue(row, col.id)} tone="cyan" theme={theme} />
+                        <MetricValue value={formatCellValue(row, col.id)} tone="cyan" theme={theme} align={columnAlign} />
                     ) : (col.id === 'n_sig' || col.id === 'Significant Loci') ? (
-                        <MetricValue value={formatCellValue(row, col.id)} tone="warning" theme={theme} />
+                        <MetricValue value={formatCellValue(row, col.id)} tone="warning" theme={theme} align={columnAlign} />
                     ) : (col.id === 'qc_score' || col.id === 'QC') ? (
-                        <MetricValue value={formatCellValue(row, col.id)} tone={Number(row.qc_score) >= 100 ? 'success' : 'caution'} theme={theme} />
+                        <MetricValue value={formatCellValue(row, col.id)} tone={Number(row.qc_score) >= 100 ? 'success' : 'caution'} theme={theme} align={columnAlign} />
                     ) : (
                         formatCellValue(row, col.id)
                     )}
                 </TableCell>
-            ))}
+                );
+            })}
         </TableRow>
     );
 }
@@ -378,8 +423,8 @@ export default function GwasDataList({
     const [search, setSearch] = useState(() => searchParams.get('search') || '');
     const [downloading, setDownloading] = useState(false);
     const [downloadError, setDownloadError] = useState('');
-    const deferredSearch = useDeferredValue(search);
-    const normalizedSearch = deferredSearch.trim();
+    const liveSearch = search.trim();
+    const normalizedSearch = useDebouncedValue(liveSearch);
 
     const apiUrl = useMemo(() => {
         const params = new URLSearchParams({
@@ -455,7 +500,11 @@ export default function GwasDataList({
         return () => window.clearTimeout(timeoutId);
     }, [normalizedSearch]);
 
-    const rows = data?.data || [];
+    const rows = useMemo(() => data?.data || [], [data?.data]);
+    const previewingSearch = Boolean(liveSearch) && (liveSearch !== normalizedSearch || isLoading);
+    const visibleRows = useMemo(() => (
+        previewingSearch ? rows.filter((row) => matchesTraitRow(row, columns, liveSearch)) : rows
+    ), [columns, liveSearch, previewingSearch, rows]);
     const totalPages = data?.totalPages || 1;
     const totalCount = data?.totalCount || 0;
     const shouldPaginate = totalCount > TABLE_PAGINATION_THRESHOLD;
@@ -508,7 +557,11 @@ export default function GwasDataList({
         );
     }
 
-    const resultLabel = normalizedSearch ? `${totalCount.toLocaleString()} matches` : `${totalCount.toLocaleString()} records`;
+    const resultLabel = previewingSearch
+        ? `${visibleRows.length.toLocaleString()} visible; updating`
+        : normalizedSearch
+            ? `${totalCount.toLocaleString()} matches`
+            : `${totalCount.toLocaleString()} records`;
 
     return (
         <Box ref={rootRef} sx={{ position: 'relative', width: '100%', minWidth: 0 }}>
@@ -592,7 +645,7 @@ export default function GwasDataList({
                                                             minWidth: 0,
                                                             display: 'flex',
                                                             alignItems: 'center',
-                                                            justifyContent: 'space-between',
+                                                            justifyContent: 'flex-start',
                                                             gap: 1,
                                                             flexWrap: { xs: 'wrap', md: 'nowrap' },
                                                         }}
@@ -600,6 +653,19 @@ export default function GwasDataList({
                                                         <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b5f', lineHeight: 1.15 })}>
                                                             {title}
                                                         </Typography>
+                                                        <Chip
+                                                            label={resultLabel}
+                                                            size="small"
+                                                            sx={{
+                                                                height: 22,
+                                                                color: '#245089',
+                                                                bgcolor: alpha('#245089', 0.08),
+                                                                border: `1px solid ${alpha('#245089', 0.18)}`,
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 680,
+                                                                flexShrink: 0,
+                                                            }}
+                                                        />
                                                     </Box>
                                                     <Box
                                                         sx={{
@@ -622,24 +688,6 @@ export default function GwasDataList({
                                                                 minWidth: 0,
                                                             }}
                                                         >
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-                                                                <Typography
-                                                                    sx={{
-                                                                        px: 0.85,
-                                                                        py: 0.32,
-                                                                        borderRadius: 1,
-                                                                        border: `1px solid ${alpha('#245089', 0.18)}`,
-                                                                        bgcolor: alpha('#245089', 0.08),
-                                                                        color: '#245089',
-                                                                        fontSize: '0.72rem',
-                                                                        fontWeight: 680,
-                                                                        whiteSpace: 'nowrap',
-                                                                        flexShrink: 0,
-                                                                    }}
-                                                                >
-                                                                    {resultLabel}
-                                                                </Typography>
-                                                            </Box>
                                                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 0.55, flexWrap: 'wrap', minWidth: 0 }}>
                                                                 <TextField
                                                                     size="small"
@@ -653,6 +701,7 @@ export default function GwasDataList({
                                                                         flex: { xs: '1 1 100%', sm: '0 1 260px' },
                                                                         maxWidth: { sm: 280 },
                                                                         '& .MuiOutlinedInput-root': {
+                                                                            height: 32,
                                                                             bgcolor: theme.palette.background.paper,
                                                                         },
                                                                         '& .MuiInputBase-input': {
@@ -700,10 +749,11 @@ export default function GwasDataList({
                                                                             value={limit}
                                                                             onChange={handleChangeLimit}
                                                                             sx={{
+                                                                                height: 32,
                                                                                 bgcolor: theme.palette.background.paper,
                                                                                 fontSize: '0.78rem',
                                                                                 fontWeight: 650,
-                                                                                '& .MuiSelect-select': { py: 0.45 },
+                                                                                '& .MuiSelect-select': { py: 0.45, display: 'flex', alignItems: 'center' },
                                                                             }}
                                                                         >
                                                                             {[25, 50, 100, 200].map((v) => (
@@ -724,6 +774,7 @@ export default function GwasDataList({
                                                                     border: `1px solid ${alpha('#245089', 0.18)}`,
                                                                     bgcolor: alpha('#245089', 0.045),
                                                                     minWidth: 64,
+                                                                    height: 32,
                                                                     py: 0.38,
                                                                     '&:hover': {
                                                                         bgcolor: alpha('#245089', 0.08),
@@ -740,17 +791,20 @@ export default function GwasDataList({
                                         </TableRow>
                                     )}
                                     <TableRow>
-                                        {columns.map((column) => (
+                                        {columns.map((column) => {
+                                            const columnAlign = getColumnAlign(column);
+
+                                            return (
                                             <TableCell
                                                 key={column.id}
-                                                align={column.numeric ? 'right' : 'left'}
+                                                align={columnAlign}
                                                 sx={stickyTableHeaderCellSx(theme, {
                                                     headerBg: '#eef7ff',
                                                     headerBorder: alpha('#245089', 0.22),
                                                     headerColor: '#245089',
-                                                }, column.numeric ? 'right' : 'left', {
-                                                    fontSize: '0.8rem',
-                                                    fontWeight: 650,
+                                                }, columnAlign, {
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 700,
                                                     letterSpacing: '0.03em',
                                                     textTransform: 'none',
                                                     py: 1.2,
@@ -763,14 +817,15 @@ export default function GwasDataList({
                                                     active={sortBy === column.id}
                                                     direction={sortBy === column.id ? order.toLowerCase() : 'asc'}
                                                     onClick={() => handleSort(column.id)}
-                                                    sx={{
-                                                        color: 'inherit',
-                                                        display: 'flex',
-                                                        width: '100%',
-                                                        whiteSpace: column.headerWrap ? 'normal' : 'nowrap',
-                                                        lineHeight: column.headerWrap ? 1.1 : 1.2,
-                                                        alignItems: 'center',
-                                                        justifyContent: column.numeric ? 'flex-end' : 'flex-start',
+                                                sx={{
+                                                    color: 'inherit',
+                                                    display: 'flex',
+                                                    width: '100%',
+                                                    fontSize: '0.9rem',
+                                                    whiteSpace: column.headerWrap ? 'normal' : 'nowrap',
+                                                    lineHeight: column.headerWrap ? 1.1 : 1.2,
+                                                    alignItems: 'center',
+                                                        justifyContent: justifyForAlign(columnAlign),
                                                         '&:hover': { color: theme.palette.primary.main },
                                                         '&.Mui-active': { color: theme.palette.primary.main, fontWeight: 650 },
                                                         '& .MuiTableSortLabel-icon': {
@@ -783,7 +838,8 @@ export default function GwasDataList({
                                                     {column.label}
                                                 </TableSortLabel>
                                             </TableCell>
-                                        ))}
+                                            );
+                                        })}
                                     </TableRow>
                                 </TableHead>
 
@@ -792,7 +848,7 @@ export default function GwasDataList({
                                         <LoadingSkeleton columns={columns} rows={Math.min(limit, 20)} theme={theme} />
                                     ) : (
                                         <>
-                                            {rows.map((row, index) => (
+                                            {visibleRows.map((row, index) => (
                                                 <TraitRow key={row.id || index} row={row} index={index} columns={columns} theme={theme} />
                                             ))}
                                         </>
@@ -800,7 +856,7 @@ export default function GwasDataList({
                                 </TableBody>
                             </Table>
 
-                            {!isLoading && rows.length === 0 && (
+                            {!isLoading && visibleRows.length === 0 && (
                                 <Box sx={{ p: 8, textAlign: 'center', color: 'text.secondary', minHeight: 300 }}>
                                     <Typography variant="h6" gutterBottom>
                                         No data available
@@ -811,7 +867,7 @@ export default function GwasDataList({
 
                     </Box>
 
-                    {rows.length > 0 && (
+                    {visibleRows.length > 0 && (
                         <Box
                             sx={{
                                 px: { xs: 1.5, md: 2 },

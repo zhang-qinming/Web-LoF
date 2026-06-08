@@ -1,73 +1,68 @@
 <svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <marker id="surface-arrow-blue" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+    <marker id="surface-arrow-primary" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto" markerUnits="userSpaceOnUse">
       <path d="M1 1 L13 7 L1 13 L5 7 Z" fill="#2563EB"/>
     </marker>
-    <marker id="surface-arrow-green" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+    <marker id="surface-arrow-accent" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto" markerUnits="userSpaceOnUse">
       <path d="M1 1 L13 7 L1 13 L5 7 Z" fill="#0F766E"/>
     </marker>
   </defs>
 
-  <rect x="42" y="42" width="636" height="336" rx="18" fill="white" stroke="#E2E8F0" stroke-width="2"/>
+  <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
+  <rect x="42" y="36" width="636" height="348" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
 
-  <text x="62" y="78" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Browser Surface Map</text>
-  <text x="62" y="101" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">Start with search, interpret evidence in focused analysis views, then retrieve indexed files.</text>
-  <text x="62" y="118" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">Guide, About, and Contact support the workflow without becoming analysis endpoints.</text>
+  <text x="62" y="74" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Browser Surface Map</text>
+  <text x="62" y="97" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">Start with search or a known object, move into focused analysis, then verify and export files.</text>
+  <text x="62" y="114" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">Guide, About, and Contact provide usage context, scope, and issue-report checklists.</text>
 
-  <rect x="62" y="134" width="596" height="32" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-  <text x="80" y="154" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Top nav</text>
-  <text x="152" y="154" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Home</text>
-  <text x="210" y="154" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Trait</text>
-  <text x="263" y="154" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Genes</text>
-  <text x="326" y="154" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Programs</text>
-  <text x="414" y="154" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Data</text>
-  <text x="466" y="154" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Guide</text>
-  <text x="526" y="154" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">About</text>
-  <text x="588" y="154" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Contact</text>
+  <rect x="62" y="128" width="596" height="34" rx="9" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="82" y="150" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Top nav</text>
+  <text x="154" y="150" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Home</text>
+  <text x="213" y="150" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Trait</text>
+  <text x="267" y="150" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Genes</text>
+  <text x="331" y="150" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Programs</text>
+  <text x="422" y="150" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Data</text>
+  <text x="476" y="150" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Guide</text>
+  <text x="537" y="150" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">About</text>
+  <text x="599" y="150" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="650">Contact</text>
 
-  <path d="M204 226 H230" stroke="#2563EB" stroke-width="4" stroke-linecap="round" marker-end="url(#surface-arrow-blue)"/>
-  <path d="M428 226 H510" stroke="#2563EB" stroke-width="4" stroke-linecap="round" marker-end="url(#surface-arrow-blue)"/>
-  <path d="M300 282 C300 292 282 292 282 300" stroke="#0F766E" stroke-width="3" stroke-linecap="round" fill="none" marker-end="url(#surface-arrow-green)"/>
-  <path d="M384 282 C384 292 408 292 408 300" stroke="#0F766E" stroke-width="3" stroke-linecap="round" fill="none" marker-end="url(#surface-arrow-green)"/>
+  <path d="M198 224 H232" stroke="#2563EB" stroke-width="4" stroke-linecap="round" marker-end="url(#surface-arrow-primary)"/>
+  <path d="M472 224 H520" stroke="#2563EB" stroke-width="4" stroke-linecap="round" marker-end="url(#surface-arrow-primary)"/>
+  <path d="M356 286 V300" stroke="#0F766E" stroke-width="3" stroke-linecap="round" marker-end="url(#surface-arrow-accent)"/>
 
-  <rect x="64" y="184" width="140" height="102" rx="10" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="2"/>
+  <rect x="66" y="184" width="132" height="96" rx="11" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="2"/>
   <text x="84" y="207" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Discover</text>
-  <rect x="84" y="218" width="100" height="58" rx="8" fill="white" stroke="#BFDBFE" stroke-width="1.5"/>
-  <text x="134" y="239" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Home</text>
-  <text x="134" y="257" text-anchor="middle" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">search + shortcuts</text>
-  <text x="134" y="271" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">files, folders, traits</text>
+  <rect x="84" y="218" width="96" height="50" rx="8" fill="white" stroke="#BFDBFE" stroke-width="1.5"/>
+  <text x="132" y="239" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700">Home</text>
+  <text x="132" y="257" text-anchor="middle" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">search + shortcuts</text>
 
-  <rect x="240" y="174" width="188" height="108" rx="10" fill="#FFF7ED" stroke="#FED7AA" stroke-width="2"/>
-  <text x="260" y="197" fill="#B45309" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Analyze</text>
-  <rect x="260" y="208" width="148" height="58" rx="8" fill="white" stroke="#FED7AA" stroke-width="1.5"/>
-  <text x="334" y="229" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Trait</text>
-  <text x="334" y="247" text-anchor="middle" fill="#B45309" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">metadata + figure tabs</text>
-  <text x="334" y="261" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">GWAS, LoF, gene evidence</text>
+  <rect x="242" y="174" width="230" height="112" rx="12" fill="#FFF7ED" stroke="#FED7AA" stroke-width="2"/>
+  <text x="262" y="197" fill="#B45309" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Analyze</text>
+  <rect x="264" y="210" width="74" height="50" rx="8" fill="white" stroke="#FED7AA" stroke-width="1.5"/>
+  <text x="301" y="231" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Trait</text>
+  <text x="301" y="248" text-anchor="middle" fill="#B45309" font-family="Inter, Arial, Helvetica, sans-serif" font-size="9">figure tabs</text>
+  <rect x="348" y="210" width="82" height="50" rx="8" fill="white" stroke="#DDD6FE" stroke-width="1.5"/>
+  <text x="389" y="231" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Genes</text>
+  <text x="389" y="248" text-anchor="middle" fill="#6D28D9" font-family="Inter, Arial, Helvetica, sans-serif" font-size="9">evidence</text>
+  <rect x="306" y="266" width="104" height="48" rx="8" fill="white" stroke="#99F6E4" stroke-width="1.5"/>
+  <text x="358" y="286" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Programs</text>
+  <text x="358" y="302" text-anchor="middle" fill="#0F766E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="9">annotations</text>
 
-  <rect x="520" y="184" width="140" height="102" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
-  <text x="540" y="207" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Retrieve</text>
-  <rect x="540" y="218" width="100" height="58" rx="8" fill="white" stroke="#CBD5E1" stroke-width="1.5"/>
-  <text x="590" y="239" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Data</text>
-  <text x="590" y="257" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">browse + ZIP</text>
-  <text x="590" y="271" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">indexed outputs</text>
+  <rect x="520" y="184" width="132" height="96" rx="11" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="538" y="207" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Retrieve</text>
+  <rect x="538" y="218" width="96" height="50" rx="8" fill="white" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="586" y="239" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700">Data</text>
+  <text x="586" y="257" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">verify + export</text>
 
-  <rect x="216" y="304" width="138" height="48" rx="9" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="1.8"/>
-  <text x="285" y="325" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Genes</text>
-  <text x="285" y="341" text-anchor="middle" fill="#6D28D9" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">gene evidence index</text>
-
-  <rect x="376" y="304" width="154" height="48" rx="9" fill="#F0FDFA" stroke="#99F6E4" stroke-width="1.8"/>
-  <text x="453" y="325" text-anchor="middle" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Programs</text>
-  <text x="453" y="341" text-anchor="middle" fill="#0F766E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">program annotations</text>
-
-  <rect x="90" y="362" width="540" height="30" rx="9" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
-  <text x="114" y="381" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12" font-weight="700">Support</text>
-  <line x1="184" y1="369" x2="184" y2="386" stroke="#CBD5E1" stroke-width="1"/>
-  <text x="206" y="381" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12" font-weight="700">Guide</text>
-  <text x="258" y="381" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">usage</text>
-  <line x1="328" y1="369" x2="328" y2="386" stroke="#CBD5E1" stroke-width="1"/>
-  <text x="350" y="381" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12" font-weight="700">About</text>
-  <text x="406" y="381" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">scope</text>
-  <line x1="478" y1="369" x2="478" y2="386" stroke="#CBD5E1" stroke-width="1"/>
-  <text x="500" y="381" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12" font-weight="700">Contact</text>
-  <text x="568" y="381" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">issues</text>
+  <rect x="90" y="338" width="540" height="30" rx="9" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="114" y="357" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12" font-weight="700">Support</text>
+  <line x1="184" y1="345" x2="184" y2="362" stroke="#CBD5E1" stroke-width="1"/>
+  <text x="206" y="357" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12" font-weight="700">Guide</text>
+  <text x="258" y="357" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">usage</text>
+  <line x1="328" y1="345" x2="328" y2="362" stroke="#CBD5E1" stroke-width="1"/>
+  <text x="350" y="357" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12" font-weight="700">About</text>
+  <text x="406" y="357" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">scope</text>
+  <line x1="478" y1="345" x2="478" y2="362" stroke="#CBD5E1" stroke-width="1"/>
+  <text x="500" y="357" fill="#0F172A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12" font-weight="700">Contact</text>
+  <text x="568" y="357" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">checklist</text>
 </svg>

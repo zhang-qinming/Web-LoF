@@ -55,6 +55,39 @@ function ScrollToTopOnPathChange() {
     return null;
 }
 
+function AnimatedRoutes() {
+    const location = useLocation();
+
+    return (
+        <div key={location.pathname} className="route-transition">
+            <Suspense
+                fallback={(
+                    <StatePanel
+                        loading
+                        title="Loading view"
+                        message="Preparing the requested browser panel."
+                        minHeight={320}
+                    />
+                )}
+            >
+                <Routes location={location}>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/trait" element={<Trait />} />
+                    <Route path="/trait/:traitName" element={<Trait />} />
+                    <Route path="/genes" element={<Genes />} />
+                    <Route path="/data" element={<Variants />} />
+                    <Route path="/help" element={<Help />} />
+                    <Route path="/programs" element={<Programs />} />
+                    <Route path="/programs/:programId" element={<Programs />} />
+                    <Route path="*" element={<NotFound />} />
+                </Routes>
+            </Suspense>
+        </div>
+    );
+}
+
 function App() {
     return (
         <BrowserRouter>
@@ -73,30 +106,7 @@ function App() {
                     <MobileNavDrawer links={navLinks} />
                 </div>
                 <main className="main">
-                    <Suspense
-                        fallback={(
-                            <StatePanel
-                                loading
-                                title="Loading view"
-                                message="Preparing the requested browser panel."
-                                minHeight={320}
-                            />
-                        )}
-                    >
-                        <Routes>
-                            <Route path="/" element={<Home />} />
-                            <Route path="/about" element={<About />} />
-                            <Route path="/contact" element={<Contact />} />
-                            <Route path="/trait" element={<Trait />} />
-                            <Route path="/trait/:traitName" element={<Trait />} />
-                            <Route path="/genes" element={<Genes />} />
-                            <Route path="/data" element={<Variants />} />
-                            <Route path="/help" element={<Help />} />
-                            <Route path="/programs" element={<Programs />} />
-                            <Route path="/programs/:programId" element={<Programs />} />
-                            <Route path="*" element={<NotFound />} />
-                        </Routes>
-                    </Suspense>
+                    <AnimatedRoutes />
                     <footer className="footer">
                         &copy; {new Date().getFullYear()}
                     </footer>

@@ -5,17 +5,39 @@ import { useTheme } from '@mui/material/styles';
 import { Timeline } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
-import ProgramScatter from '../components/ProgramScatter';
-import TraitProgramGraph from '../components/TraitProgramGraph';
-import GwasDataList from '../components/GwasDataList';
-import TraitHitManhattan from '../components/TraitHitManhattan';
-import BurdenVolcano from '../components/BurdenVolcano';
-import GeneLevelScatter from '../components/GeneLevelScatter';
-import GeneLevelQQ from '../components/GeneLevelQQ';
-import CrossTraitHeatmap from '../components/CrossTraitHeatmap';
 import TraitMetaCard from '../components/TraitMetaCard';
 import { DATA_PAGE_MAX_WIDTH, sectionTitleSx } from '../themeUtils';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
+
+const loadGwasDataList = () => import('../components/GwasDataList');
+const loadProgramScatter = () => import('../components/ProgramScatter');
+const loadTraitProgramGraph = () => import('../components/TraitProgramGraph');
+const loadTraitHitManhattan = () => import('../components/TraitHitManhattan');
+const loadBurdenVolcano = () => import('../components/BurdenVolcano');
+const loadGeneLevelScatter = () => import('../components/GeneLevelScatter');
+const loadGeneLevelQQ = () => import('../components/GeneLevelQQ');
+const loadCrossTraitHeatmap = () => import('../components/CrossTraitHeatmap');
+
+const GwasDataList = React.lazy(loadGwasDataList);
+const ProgramScatter = React.lazy(loadProgramScatter);
+const TraitProgramGraph = React.lazy(loadTraitProgramGraph);
+const TraitHitManhattan = React.lazy(loadTraitHitManhattan);
+const BurdenVolcano = React.lazy(loadBurdenVolcano);
+const GeneLevelScatter = React.lazy(loadGeneLevelScatter);
+const GeneLevelQQ = React.lazy(loadGeneLevelQQ);
+const CrossTraitHeatmap = React.lazy(loadCrossTraitHeatmap);
+
+const TAB_PRELOADERS = [
+    loadProgramScatter,
+    loadTraitProgramGraph,
+    loadTraitHitManhattan,
+    loadBurdenVolcano,
+    loadBurdenVolcano,
+    loadGeneLevelScatter,
+    loadGeneLevelQQ,
+    loadCrossTraitHeatmap,
+];
+const preloadedTraitLoaders = new Set();
 
 function findAvailableId(files, candidates) {
     if (!Array.isArray(files)) return '';
@@ -56,6 +78,40 @@ function getVisibleHeaderOffset() {
     return visibleHeader?.getBoundingClientRect().height || 0;
 }
 
+function scheduleIdleTask(callback, timeout = 1200) {
+    if (typeof window === 'undefined') return () => {};
+
+    if ('requestIdleCallback' in window) {
+        const idleId = window.requestIdleCallback(callback, { timeout });
+        return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timerId = window.setTimeout(callback, Math.min(timeout, 600));
+    return () => window.clearTimeout(timerId);
+}
+
+function preloadTraitTab(tabIndex) {
+    const loader = TAB_PRELOADERS[tabIndex];
+    if (!loader || preloadedTraitLoaders.has(loader)) return undefined;
+
+    preloadedTraitLoaders.add(loader);
+    return loader().catch((error) => {
+        preloadedTraitLoaders.delete(loader);
+        throw error;
+    });
+}
+
+function TraitFigureFallback() {
+    return (
+        <StatePanel
+            loading
+            title="Loading figure"
+            message="Preparing this visualization panel."
+            minHeight={360}
+        />
+    );
+}
+
 export default function Trait() {
     const theme = useTheme();
     const { traitName } = useParams();
@@ -83,6 +139,13 @@ export default function Trait() {
     const hasProgramGraph = Boolean(graphFileId);
     const preferredTab = hasProgramScatter ? 0 : hasProgramGraph ? 1 : 2;
     const shouldFocusFigure = location.hash === FIGURE_FOCUS_HASH;
+    let displayedTab = tab;
+    if (availabilityReady) {
+        if (tab === 0 && !hasProgramScatter) displayedTab = preferredTab;
+        else if (tab === 1 && !hasProgramGraph) displayedTab = preferredTab;
+        else if (tab === 2 && !userSelectedTabRef.current && !hasExplicitTab) displayedTab = preferredTab;
+    }
+    const shouldDeferFigureTab = Boolean(fileId && !hasExplicitTab && !availabilityReady);
 
     const syncTabParam = React.useCallback((nextTab, options = {}) => {
         const tabKey = TAB_INDEX_TO_KEY[nextTab] || TAB_INDEX_TO_KEY[2];
@@ -90,6 +153,10 @@ export default function Trait() {
         nextParams.set('tab', tabKey);
         setSearchParams(nextParams, options);
     }, [searchParams, setSearchParams]);
+
+    const warmTraitTab = React.useCallback((tabIndex) => {
+        preloadTraitTab(tabIndex)?.catch(() => {});
+    }, []);
 
     React.useEffect(() => {
         userSelectedTabRef.current = false;
@@ -139,6 +206,33 @@ export default function Trait() {
         };
     }, [availabilityReady, fileId, metaData, scrollFigurePanelIntoView, shouldFocusFigure, tab]);
 
+    React.useEffect(() => {
+        if (!fileId || shouldDeferFigureTab) return undefined;
+
+        const preloadQueue = TAB_PRELOADERS
+            .map((_, index) => index)
+            .filter((index) => index !== displayedTab);
+        let cancelled = false;
+        let cancelIdleTask = () => {};
+
+        const preloadNext = () => {
+            if (cancelled || preloadQueue.length === 0) return;
+
+            const nextTab = preloadQueue.shift();
+            cancelIdleTask = scheduleIdleTask(() => {
+                warmTraitTab(nextTab);
+                preloadNext();
+            }, 1400);
+        };
+
+        preloadNext();
+
+        return () => {
+            cancelled = true;
+            cancelIdleTask();
+        };
+    }, [displayedTab, fileId, shouldDeferFigureTab, warmTraitTab]);
+
     if (!fileId) {
         return (
             <PageFrame
@@ -147,19 +241,21 @@ export default function Trait() {
                 maxWidth={DATA_PAGE_MAX_WIDTH}
                 compact
             >
-                <GwasDataList
-                    title="Browse Traits"
-                    columns={[
-                        { id: 'file_id', label: 'LoF ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
-                        { id: 'trait_name', label: 'Trait', width: '34%', minWidth: 360 },
-                        { id: 'sample_size', label: 'Sample Size', numeric: true, width: 132, minWidth: 132, whiteSpace: 'nowrap', headerWrap: true },
-                        { id: 'mesh_term', label: 'MeSH term', width: 170, minWidth: 170, headerWrap: true },
-                        { id: 'year', label: 'Year', numeric: true, width: 84, minWidth: 84, whiteSpace: 'nowrap' },
-                        { id: 'n_variants', label: 'Variants', numeric: true, width: 138, minWidth: 138, whiteSpace: 'nowrap' },
-                    ]}
-                    defaultSortBy="trait_name"
-                    defaultOrder="ASC"
-                />
+                <React.Suspense fallback={<TraitFigureFallback />}>
+                    <GwasDataList
+                        title="Browse Traits"
+                        columns={[
+                            { id: 'file_id', label: 'LoF ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
+                            { id: 'trait_name', label: 'Trait', width: '34%', minWidth: 360 },
+                            { id: 'sample_size', label: 'Sample Size', numeric: true, width: 132, minWidth: 132, whiteSpace: 'nowrap', headerWrap: true },
+                            { id: 'mesh_term', label: 'MeSH term', width: 170, minWidth: 170, headerWrap: true },
+                            { id: 'year', label: 'Year', numeric: true, width: 84, minWidth: 84, whiteSpace: 'nowrap' },
+                            { id: 'n_variants', label: 'Variants', numeric: true, width: 138, minWidth: 138, whiteSpace: 'nowrap' },
+                        ]}
+                        defaultSortBy="trait_name"
+                        defaultOrder="ASC"
+                    />
+                </React.Suspense>
             </PageFrame>
         );
     }
@@ -179,7 +275,7 @@ export default function Trait() {
                 Figures
             </Typography>
             <Tabs
-                value={tab}
+                value={shouldDeferFigureTab ? false : displayedTab}
                 onChange={(e, v) => {
                     userSelectedTabRef.current = true;
                     setTab(v);
@@ -203,14 +299,14 @@ export default function Trait() {
                         borderRadius: 1.5,
                     },
                 }}>
-                <Tab label="Program Scatter" disabled={!hasProgramScatter} />
-                <Tab label="Trait Program Graph" disabled={!hasProgramGraph} />
-                <Tab label="Manhattan" />
-                <Tab label="Burden Volcano" />
-                <Tab label="Posterior Volcano" />
-                <Tab label="Gene Evidence" />
-                <Tab label="Gene QQ" />
-                <Tab label="Cross-trait Heatmap" />
+                <Tab label="Program Scatter" disabled={!hasProgramScatter} onMouseEnter={() => warmTraitTab(0)} onFocus={() => warmTraitTab(0)} />
+                <Tab label="Trait Program Graph" disabled={!hasProgramGraph} onMouseEnter={() => warmTraitTab(1)} onFocus={() => warmTraitTab(1)} />
+                <Tab label="Manhattan" onMouseEnter={() => warmTraitTab(2)} onFocus={() => warmTraitTab(2)} />
+                <Tab label="Burden Volcano" onMouseEnter={() => warmTraitTab(3)} onFocus={() => warmTraitTab(3)} />
+                <Tab label="Posterior Volcano" onMouseEnter={() => warmTraitTab(4)} onFocus={() => warmTraitTab(4)} />
+                <Tab label="Gene Evidence" onMouseEnter={() => warmTraitTab(5)} onFocus={() => warmTraitTab(5)} />
+                <Tab label="Gene QQ" onMouseEnter={() => warmTraitTab(6)} onFocus={() => warmTraitTab(6)} />
+                <Tab label="Cross-trait Heatmap" onMouseEnter={() => warmTraitTab(7)} onFocus={() => warmTraitTab(7)} />
             </Tabs>
 
             <Box
@@ -218,81 +314,87 @@ export default function Trait() {
                 ref={figurePanelRef}
                 sx={{ minHeight: 400, scrollMarginTop: { xs: 7, md: 8 } }}
             >
-                {tab === 0 && hasProgramScatter && <ProgramScatter key={scatterFileId} fileId={scatterFileId} />}
-                {tab === 0 && !hasProgramScatter && (
-                    <StatePanel
-                        icon={Timeline}
-                        title="No Program enrichment data"
-                        message="This trait does not have a Program Scatter TSV available."
-                        minHeight={360}
-                    />
-                )}
-                {tab === 1 && hasProgramGraph && (
-                    <TraitProgramGraph
-                        key={`trait-program-graph-${graphFileId}`}
-                        fileId={graphFileId}
-                        traitLabel={meta?.trait_name || fileId}
-                    />
-                )}
-                {tab === 1 && !hasProgramGraph && (
-                    <StatePanel
-                        icon={Timeline}
-                        title="No Trait Program Graph data"
-                        message="This trait does not have graph-linked program and regulator data available."
-                        minHeight={360}
-                    />
-                )}
-                {tab === 2 && (
-                    <TraitHitManhattan
-                        key={`manhattan-${fileId}-${gwasId}`}
-                        fileId={fileId}
-                        gwasId={gwasId}
-                        traitLabel={meta?.trait_name || fileId}
-                    />
-                )}
-                {tab === 3 && (
-                    <BurdenVolcano
-                        key={`burden-volcano-${fileId}`}
-                        fileId={fileId}
-                        gwasId={gwasId}
-                        traitLabel={meta?.trait_name || fileId}
-                        volcanoType="burden"
-                    />
-                )}
-                {tab === 4 && (
-                    <BurdenVolcano
-                        key={`posterior-volcano-${fileId}`}
-                        fileId={fileId}
-                        gwasId={gwasId}
-                        traitLabel={meta?.trait_name || fileId}
-                        volcanoType="posterior"
-                    />
-                )}
-                {tab === 5 && (
-                    <GeneLevelScatter
-                        key={`gene-level-scatter-${fileId}-${gwasId}`}
-                        fileId={fileId}
-                        gwasId={gwasId}
-                        traitLabel={meta?.trait_name || fileId}
-                        lookupIds={dataIdCandidates}
-                    />
-                )}
-                {tab === 6 && (
-                    <GeneLevelQQ
-                        key={`gene-level-qq-${fileId}-${gwasId}`}
-                        fileId={fileId}
-                        gwasId={gwasId}
-                        traitLabel={meta?.trait_name || fileId}
-                        lookupIds={dataIdCandidates}
-                    />
-                )}
-                {tab === 7 && (
-                    <CrossTraitHeatmap
-                        key={`cross-trait-heatmap-${fileId}-${gwasId}`}
-                        fileId={fileId}
-                        gwasId={gwasId}
-                        traitLabel={meta?.trait_name || fileId}
-                    />
+                {shouldDeferFigureTab ? (
+                    <TraitFigureFallback />
+                ) : (
+                    <React.Suspense fallback={<TraitFigureFallback />}>
+                        {displayedTab === 0 && hasProgramScatter && <ProgramScatter key={scatterFileId} fileId={scatterFileId} />}
+                        {displayedTab === 0 && !hasProgramScatter && (
+                            <StatePanel
+                                icon={Timeline}
+                                title="No Program enrichment data"
+                                message="This trait does not have a Program Scatter TSV available."
+                                minHeight={360}
+                            />
+                        )}
+                        {displayedTab === 1 && hasProgramGraph && (
+                            <TraitProgramGraph
+                                key={`trait-program-graph-${graphFileId}`}
+                                fileId={graphFileId}
+                                traitLabel={meta?.trait_name || fileId}
+                            />
+                        )}
+                        {displayedTab === 1 && !hasProgramGraph && (
+                            <StatePanel
+                                icon={Timeline}
+                                title="No Trait Program Graph data"
+                                message="This trait does not have graph-linked program and regulator data available."
+                                minHeight={360}
+                            />
+                        )}
+                        {displayedTab === 2 && (
+                            <TraitHitManhattan
+                                key={`manhattan-${fileId}-${gwasId}`}
+                                fileId={fileId}
+                                gwasId={gwasId}
+                                traitLabel={meta?.trait_name || fileId}
+                            />
+                        )}
+                        {displayedTab === 3 && (
+                            <BurdenVolcano
+                                key={`burden-volcano-${fileId}`}
+                                fileId={fileId}
+                                gwasId={gwasId}
+                                traitLabel={meta?.trait_name || fileId}
+                                volcanoType="burden"
+                            />
+                        )}
+                        {displayedTab === 4 && (
+                            <BurdenVolcano
+                                key={`posterior-volcano-${fileId}`}
+                                fileId={fileId}
+                                gwasId={gwasId}
+                                traitLabel={meta?.trait_name || fileId}
+                                volcanoType="posterior"
+                            />
+                        )}
+                        {displayedTab === 5 && (
+                            <GeneLevelScatter
+                                key={`gene-level-scatter-${fileId}-${gwasId}`}
+                                fileId={fileId}
+                                gwasId={gwasId}
+                                traitLabel={meta?.trait_name || fileId}
+                                lookupIds={dataIdCandidates}
+                            />
+                        )}
+                        {displayedTab === 6 && (
+                            <GeneLevelQQ
+                                key={`gene-level-qq-${fileId}-${gwasId}`}
+                                fileId={fileId}
+                                gwasId={gwasId}
+                                traitLabel={meta?.trait_name || fileId}
+                                lookupIds={dataIdCandidates}
+                            />
+                        )}
+                        {displayedTab === 7 && (
+                            <CrossTraitHeatmap
+                                key={`cross-trait-heatmap-${fileId}-${gwasId}`}
+                                fileId={fileId}
+                                gwasId={gwasId}
+                                traitLabel={meta?.trait_name || fileId}
+                            />
+                        )}
+                    </React.Suspense>
                 )}
             </Box>
         </Box>

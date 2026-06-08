@@ -26,123 +26,161 @@ import { captionSx, metricChipTone, panelSx, sectionTitleSx, summaryChipSx } fro
 const COPY = {
     en: {
         title: 'Contact',
-        subtitle: 'Use this page to understand what to collect before reaching the project maintainer or data owner.',
+        subtitle: 'Use this page as the project support checklist for TraitVista data, route, chart, and download issues.',
         language: 'Language',
         english: 'English',
         chinese: '中文',
-        chips: ['Data issues', 'UI issues', 'Download issues'],
+        chips: ['Trait files', 'Program evidence', 'Downloads', 'UI behavior'],
         quickLinks: [
             { label: 'Open Guide', to: '/help' },
             { label: 'Open Data Browser', to: '/data' },
             { label: 'Open Trait Browser', to: '/trait' },
+            { label: 'Open Programs', to: '/programs' },
+        ],
+        triageTitle: 'Triage Route Hints',
+        triageBody: 'Most reports can be narrowed quickly by checking the page that owns the failing data surface.',
+        triageItems: [
+            { label: 'Trait plot or tab', route: '/trait/:traitId', owner: 'Trait figure data and linked table state' },
+            { label: 'Gene evidence', route: '/genes?query=GENE', owner: 'Gene index, program relationships, trait evidence rows' },
+            { label: 'Program annotation', route: '/programs/PID', owner: 'Program metadata, program genes, associated traits' },
+            { label: 'Raw file or download', route: '/data?mode=global', owner: 'Indexed paths, folder ZIP, selected-file downloads' },
+        ],
+        templateTitle: 'Report Template',
+        templateBody: 'Copy this structure into the project support channel once a real contact destination is defined.',
+        templateRows: [
+            ['Route', '/trait/GCST90081631?tab=manhattan'],
+            ['Object', 'Trait, GWAS ID, gene, program, rsID, or file path'],
+            ['Expected', 'What should have appeared or downloaded'],
+            ['Actual', 'What appeared, failed, or looked inconsistent'],
+            ['State', 'Active tab, filters, selected files, browser, and approximate time'],
         ],
         sections: [
             {
                 icon: ContactSupportOutlined,
                 title: 'When To Reach Out',
-                body: 'Contact the project maintainer or the relevant data owner when the browser behavior blocks your work or when a result appears inconsistent with the expected project outputs.',
+                body: 'Reach out when browser behavior blocks analysis, when a rendered value disagrees with the underlying result file, or when a route cannot expose data that should exist.',
                 bullets: [
-                    'A trait page is missing files that should exist.',
-                    'A download fails repeatedly or returns the wrong artifact.',
-                    'Metadata, identifiers, or plot-linked values look inconsistent.',
-                    'You need clarification on the intended interpretation of a program or trait-level result.',
+                    'A Trait tab such as Manhattan, Program Scatter, Gene Evidence, Gene QQ, or Cross-trait Heatmap is missing a result file that should exist.',
+                    'A Data Browser download fails repeatedly, returns the wrong artifact, or packages an unexpected folder.',
+                    'Trait metadata, GWAS IDs, LoF IDs, program IDs, gene symbols, or chart-linked table values look inconsistent.',
+                    'A Programs or Genes drilldown cannot find records that are present in the indexed output files.',
                 ],
             },
             {
                 icon: DescriptionOutlined,
                 title: 'What To Include',
-                body: 'A short, concrete report will make support much faster. Include enough context to reproduce the issue on the same page and route.',
+                body: 'A short, concrete report makes the issue reproducible from the same page, route, and filter state.',
                 bullets: [
-                    'The exact page or route, such as /trait, /programs/P12, or /data.',
-                    'The trait name, LoF ID, GWAS ID, program ID, or file path involved.',
+                    'The exact route, such as /trait/GCST90081631?tab=manhattan, /programs/P12, /genes?query=PTMA, or /data?mode=global.',
+                    'The trait name, LoF ID, GWAS ID, program ID, gene symbol, rsID, or file path involved.',
                     'What you expected to see and what actually happened.',
-                    'If possible, include the visible filter state, a screenshot, and the approximate time of the issue.',
+                    'The visible filter state, active tab, selected download paths, browser screenshot, and approximate time of the issue.',
                 ],
             },
             {
                 icon: SearchOutlined,
-                title: 'Before Sending A Report',
-                body: 'A few quick checks often separate a true data issue from a temporary view or filter issue.',
+                title: 'Where To Check First',
+                body: 'Use the page that matches the failing workflow before escalating so the report can point to the right data layer.',
                 bullets: [
-                    'Retry the same page after clearing filters or reopening the route.',
-                    'Check the same trait or file from both the focused page and Data Browser.',
-                    'Use Guide to confirm whether the component is expected to show a fallback or empty-state panel.',
+                    'For trait plots and chart-linked tables, compare the Trait page with the matching TSV or folder in Data Browser.',
+                    'For gene evidence, check both the Genes page and the trait-level Gene Evidence or Gene QQ tab when available.',
+                    'For program annotation or regulator direction, check Programs and the Trait Program Graph or Program Scatter tab.',
+                    'For empty states, use Guide to confirm whether the component is expected to show a fallback panel.',
                 ],
             },
             {
                 icon: BugReportOutlined,
                 title: 'Issue Categories',
-                body: 'Framing the issue clearly helps route it to the right person faster.',
+                body: 'Framing the issue clearly helps route it to the maintainer, data owner, or frontend owner faster.',
                 bullets: [
-                    'Data issue: missing rows, mismatched identifiers, incorrect counts, or unexpected file contents.',
-                    'Interface issue: broken layout, navigation problems, disabled controls, or chart interaction failures.',
-                    'Workflow issue: unclear starting point, confusing export path, or missing explanation in the UI.',
+                    'Data issue: missing rows, mismatched identifiers, incorrect counts, unexpected file contents, or stale indexed paths.',
+                    'Interface issue: broken layout, navigation problems, disabled controls, chart interaction failures, or text overflow.',
+                    'Workflow issue: unclear starting point, confusing export path, unsupported filter combination, or missing explanation in the UI.',
                 ],
             },
         ],
         footerTitle: 'Maintainer Details',
-        footerBody: 'No direct maintainer email or public support channel is currently exposed in the repository. If you want, we can add a real contact method here once you provide it.',
-        footerChip: 'Contact info pending',
+        footerBody: 'No public maintainer email, ticket queue, or support channel is currently defined in the repository. Treat this page as the reporting checklist until the official contact method is added.',
+        footerChip: 'Official contact pending',
     },
     zh: {
         title: '联系',
-        subtitle: '这个页面用于说明在联系项目维护者或数据负责人前，最好先准备哪些信息。',
+        subtitle: '这个页面作为 TraitVista 数据、路由、图表和下载问题的项目支持检查清单。',
         language: '语言',
         english: 'English',
         chinese: '中文',
-        chips: ['数据问题', '界面问题', '下载问题'],
+        chips: ['Trait 文件', 'Program 证据', '下载', '界面行为'],
         quickLinks: [
             { label: '打开 Guide', to: '/help' },
             { label: '打开数据浏览器', to: '/data' },
             { label: '打开 Trait 浏览器', to: '/trait' },
+            { label: '打开 Programs', to: '/programs' },
+        ],
+        triageTitle: '排查路由提示',
+        triageBody: '大多数报告都可以先通过负责该数据面的页面缩小范围。',
+        triageItems: [
+            { label: 'Trait 图或 tab', route: '/trait/:traitId', owner: 'Trait 图形数据和联动表格状态' },
+            { label: 'Gene 证据', route: '/genes?query=GENE', owner: 'Gene 索引、program 关系、trait 证据行' },
+            { label: 'Program 注释', route: '/programs/PID', owner: 'Program metadata、program genes、associated traits' },
+            { label: '原始文件或下载', route: '/data?mode=global', owner: '索引路径、文件夹 ZIP、已选文件下载' },
+        ],
+        templateTitle: '报告模板',
+        templateBody: '正式联系渠道补齐后，可以按这个结构把问题发给项目支持方。',
+        templateRows: [
+            ['路由', '/trait/GCST90081631?tab=manhattan'],
+            ['对象', 'Trait、GWAS ID、gene、program、rsID 或文件路径'],
+            ['预期结果', '原本应该显示或下载什么'],
+            ['实际结果', '实际显示、失败或不一致的内容'],
+            ['状态', '活动 tab、筛选条件、已选文件、浏览器和大致时间'],
         ],
         sections: [
             {
                 icon: ContactSupportOutlined,
                 title: '什么时候需要联系',
-                body: '当浏览器行为已经影响你的工作，或某个结果与预期项目输出不一致时，应联系项目维护者或相关数据负责人。',
+                body: '当浏览器行为阻塞分析、页面展示值与底层结果文件不一致，或某个路由无法展示本应存在的数据时，就需要联系维护者或数据负责人。',
                 bullets: [
-                    '某个 trait 页面缺少本应存在的结果文件。',
-                    '下载反复失败，或返回了错误的文件。',
-                    '元信息、标识符或图表关联数值看起来不一致。',
-                    '你需要确认某个 program 或 trait 级结果的解释方式。',
+                    'Trait 页中的 Manhattan、Program Scatter、Gene Evidence、Gene QQ 或 Cross-trait Heatmap 等 tab 缺少本应存在的结果文件。',
+                    'Data Browser 下载反复失败、返回错误文件，或打包了不符合预期的目录。',
+                    'Trait metadata、GWAS ID、LoF ID、program ID、gene symbol、rsID 或图表联动表格数值看起来不一致。',
+                    'Programs 或 Genes 钻取页找不到已存在于索引输出文件里的记录。',
                 ],
             },
             {
                 icon: DescriptionOutlined,
                 title: '联系时应附带什么',
-                body: '简洁且具体的问题描述会明显加快处理速度。最好提供能在相同页面和路由下复现问题的上下文。',
+                body: '简洁且具体的问题描述可以让维护者从同一页面、路由和筛选状态复现问题。',
                 bullets: [
-                    '准确的页面或路由，例如 /trait、/programs/P12 或 /data。',
-                    '涉及的 trait 名称、LoF ID、GWAS ID、program ID 或文件路径。',
+                    '准确路由，例如 /trait/GCST90081631?tab=manhattan、/programs/P12、/genes?query=PTMA 或 /data?mode=global。',
+                    '涉及的 trait 名称、LoF ID、GWAS ID、program ID、gene symbol、rsID 或文件路径。',
                     '你期望看到什么，以及实际发生了什么。',
-                    '如果可以，附上当前筛选条件、截图以及大致发生时间。',
+                    '当前筛选条件、活动 tab、选中的下载路径、浏览器截图以及大致发生时间。',
                 ],
             },
             {
                 icon: SearchOutlined,
-                title: '发送前先做的检查',
-                body: '一些快速检查可以帮助区分真实数据问题和临时的视图/筛选问题。',
+                title: '先从哪里检查',
+                body: '先用与问题对应的页面复核一次，可以帮助报告直接指向正确的数据层。',
                 bullets: [
-                    '清空筛选条件后重试，或重新打开同一路由。',
-                    '从当前分析页和 Data Browser 两边都检查一次同一个 trait 或文件。',
-                    '使用 Guide 确认该组件是否本来就会显示 fallback 或 empty-state 面板。',
+                    'Trait 图和图表联动表格的问题，先把 Trait 页面与 Data Browser 中对应 TSV 或目录对照。',
+                    'Gene 证据问题，同时检查 Genes 页面，以及可用的 trait-level Gene Evidence 或 Gene QQ tab。',
+                    'Program 注释或 regulator 方向问题，同时检查 Programs 页面、Trait Program Graph 和 Program Scatter tab。',
+                    '空态问题先查 Guide，确认该组件是否本来就会显示 fallback 面板。',
                 ],
             },
             {
                 icon: BugReportOutlined,
                 title: '问题类型',
-                body: '把问题归类清楚，有助于更快找到正确处理人。',
+                body: '把问题归类清楚，有助于更快转给维护者、数据负责人或前端负责人。',
                 bullets: [
-                    '数据问题：缺行、标识符不匹配、计数异常或文件内容不符合预期。',
-                    '界面问题：布局错乱、导航异常、控件失效或图表交互失败。',
-                    '流程问题：入口不清晰、导出路径难懂或 UI 缺少解释信息。',
+                    '数据问题：缺行、标识符不匹配、计数异常、文件内容不符合预期或索引路径过期。',
+                    '界面问题：布局错乱、导航异常、控件失效、图表交互失败或文字溢出。',
+                    '流程问题：入口不清晰、导出路径难懂、筛选组合不支持或 UI 缺少解释信息。',
                 ],
             },
         ],
         footerTitle: '维护者信息',
-        footerBody: '当前仓库里没有公开暴露维护者邮箱或支持渠道。如果你提供真实联系方式，我可以把它补到这里。',
-        footerChip: '联系方式待补充',
+        footerBody: '当前仓库尚未定义公开维护者邮箱、工单队列或支持渠道。在正式联系方式补齐前，这个页面先作为问题报告检查清单使用。',
+        footerChip: '正式联系方式待补充',
     },
 };
 
@@ -201,6 +239,108 @@ function SectionCard({ section, index }) {
                         ))}
                     </Stack>
                 </Box>
+            </Stack>
+        </Paper>
+    );
+}
+
+function TriageHints({ copy }) {
+    const theme = useTheme();
+
+    return (
+        <Paper
+            elevation={0}
+            sx={panelSx(theme, {
+                p: { xs: 1.6, md: 2 },
+                mb: 2,
+                backgroundColor: theme.custom.surface.raised,
+            })}
+        >
+            <Box sx={{ mb: 1.2 }}>
+                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
+                    {copy.triageTitle}
+                </Typography>
+                <Typography variant="body2" sx={captionSx(theme, { mb: 0 })}>
+                    {copy.triageBody}
+                </Typography>
+            </Box>
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(4, minmax(0, 1fr))' },
+                    gap: 1,
+                }}
+            >
+                {copy.triageItems.map((item, index) => (
+                    <Box
+                        key={item.label}
+                        sx={{
+                            p: 1.15,
+                            borderRadius: 1,
+                            border: `1px solid ${theme.custom.border.soft}`,
+                            bgcolor: index % 2 === 0 ? theme.palette.background.paper : alpha(theme.palette.warning.main, 0.045),
+                        }}
+                    >
+                        <Typography variant="subtitle2" sx={{ fontWeight: 740, color: theme.palette.text.primary, lineHeight: 1.25 }}>
+                            {item.label}
+                        </Typography>
+                        <Typography variant="body2" sx={captionSx(theme, { mt: 0.6, mb: 0.7, color: theme.palette.text.primary })}>
+                            {item.owner}
+                        </Typography>
+                        <Chip
+                            label={item.route}
+                            size="small"
+                            sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
+                        />
+                    </Box>
+                ))}
+            </Box>
+        </Paper>
+    );
+}
+
+function ReportTemplate({ copy }) {
+    const theme = useTheme();
+
+    return (
+        <Paper
+            elevation={0}
+            sx={panelSx(theme, {
+                p: { xs: 1.6, md: 2 },
+                mb: 2,
+                backgroundColor: theme.palette.background.paper,
+            })}
+        >
+            <Box sx={{ mb: 1.2 }}>
+                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
+                    {copy.templateTitle}
+                </Typography>
+                <Typography variant="body2" sx={captionSx(theme, { mb: 0 })}>
+                    {copy.templateBody}
+                </Typography>
+            </Box>
+            <Stack spacing={0.75}>
+                {copy.templateRows.map(([label, value]) => (
+                    <Box
+                        key={label}
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', sm: '132px minmax(0, 1fr)' },
+                            gap: { xs: 0.35, sm: 1 },
+                            p: 1,
+                            borderRadius: 1,
+                            border: `1px solid ${theme.custom.border.soft}`,
+                            bgcolor: theme.custom.surface.raised,
+                        }}
+                    >
+                        <Typography variant="body2" sx={{ fontWeight: 740, color: theme.palette.text.primary }}>
+                            {label}
+                        </Typography>
+                        <Typography variant="body2" sx={captionSx(theme, { color: theme.palette.text.primary, mb: 0 })}>
+                            {value}
+                        </Typography>
+                    </Box>
+                ))}
             </Stack>
         </Paper>
     );
@@ -281,6 +421,9 @@ export default function Contact() {
                     <SectionCard key={section.title} section={section} index={index} />
                 ))}
             </Box>
+
+            <TriageHints copy={copy} />
+            <ReportTemplate copy={copy} />
 
             <Paper
                 elevation={0}

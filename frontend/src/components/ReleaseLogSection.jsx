@@ -15,6 +15,7 @@ export default function ReleaseLogSection({
     showDetails,
     showNotes = true,
     subtitle = 'Notes are written for humans rather than copied line-for-line from git, but the milestones still follow the arc of the project.',
+    summaryItems = [],
 }) {
     const theme = useTheme();
     const accent = '#ff6b4a';
@@ -96,6 +97,29 @@ export default function ReleaseLogSection({
                             <Typography sx={{ mt: 0.6, maxWidth: 760, color: '#64748b', fontSize: { xs: '0.92rem', md: '0.98rem' }, lineHeight: 1.72 }}>
                                 {subtitle}
                             </Typography>
+                            {summaryItems.length ? (
+                                <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap" sx={{ mt: 1.2 }}>
+                                    {summaryItems.map((item) => (
+                                        <Box
+                                            key={`${item.label}-${item.value}`}
+                                            sx={{
+                                                px: 1,
+                                                py: 0.65,
+                                                borderRadius: 1,
+                                                border: `1px solid ${alpha(accent, 0.14)}`,
+                                                bgcolor: alpha(accent, 0.045),
+                                            }}
+                                        >
+                                            <Typography sx={{ color: '#64748b', fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.1 }}>
+                                                {item.label}
+                                            </Typography>
+                                            <Typography sx={{ mt: 0.25, color: '#111827', fontSize: '0.86rem', fontWeight: 740, lineHeight: 1.1 }}>
+                                                {item.value}
+                                            </Typography>
+                                        </Box>
+                                    ))}
+                                </Stack>
+                            ) : null}
                         </Box>
                         {action ? (
                             <Box sx={{ flex: '0 0 auto' }}>

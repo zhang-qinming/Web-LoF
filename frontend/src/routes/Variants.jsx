@@ -37,10 +37,12 @@ const PER = 40, COL_W = 440, ANIM = 170;
 const GLOBAL_PAGE_SIZE = 50;
 
 function fmtSize(b) {
-    if (!b) return '';
-    if (b < 1024) return `${b} B`;
-    if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / 1048576).toFixed(1)} MB`;
+    if (b == null) return '';
+    const bytes = Number(b);
+    if (!Number.isFinite(bytes)) return '';
+    if (bytes < 1024) return `${Math.max(0, bytes)} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
 const SelectionCtx = createContext({
@@ -347,9 +349,9 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     const allCk = files.length > 0 && cked.length === files.length;
     const someCk = cked.length > 0 && !allCk;
 
-    const visibleFilePaths = files.map(f => f.path);
-    const searchDownload = Boolean(filter && visibleFilePaths.length > 0);
-    const headerDownloadTitle = searchDownload ? 'Download visible files' : 'Download folder as ZIP';
+    const hasFilter = Boolean(filter);
+    const columnTitle = dir.split('/').pop() || 'data';
+    const headerDownloadTitle = hasFilter ? 'Download filtered files' : 'Download folder as ZIP';
     const hoveredItem = useMemo(
         () => filtered.find((item) => item.path === hovered) || null,
         [filtered, hovered],
@@ -358,10 +360,14 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
         setDownloading(true);
         setError('');
         try {
-            if (searchDownload) {
+            if (hasFilter) {
                 const allMatchingFilePaths = await fetchAllFilePaths(dir, filter);
+                if (!allMatchingFilePaths.length) {
+                    setError('No matching files to download');
+                    return;
+                }
                 await downloadDataPaths(allMatchingFilePaths, {
-                    filename: `${dir.split('/').pop() || 'data'}-filtered.zip`,
+                    filename: `${columnTitle}-filtered.zip`,
                 });
                 return;
             }
@@ -419,12 +425,12 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             })}>
                 <FolderOpen sx={{ fontSize: 17, color: theme.palette.primary.light, flexShrink: 0 }} />
                 <Typography noWrap variant="caption" sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.75rem', textTransform: 'none', letterSpacing: '0.04em', flex: 1 }}>
-                    {dir.split('/').pop() || 'data'}
+                    {columnTitle}
                 </Typography>
                 <Chip label={totalCount} size="small" sx={summaryChipSx(theme, { height: 20, fontSize: '0.65rem', ...metricChipTone(theme, 'neutral') })} />
                 <Tooltip title={downloading ? 'Preparing download...' : headerDownloadTitle}>
                     <span>
-                    <IconButton size="small" disabled={downloading} onClick={() => { void handleHeaderDownload(); }} sx={{ color: searchDownload ? theme.palette.primary.main : theme.palette.text.secondary, '&:hover': { color: searchDownload ? theme.palette.primary.dark : theme.palette.warning.dark, bgcolor: searchDownload ? alpha(theme.palette.primary.main, 0.08) : alpha(theme.palette.warning.main, 0.1) } }}>
+                    <IconButton size="small" disabled={downloading} onClick={() => { void handleHeaderDownload(); }} sx={{ color: hasFilter ? theme.palette.primary.main : theme.palette.text.secondary, '&:hover': { color: hasFilter ? theme.palette.primary.dark : theme.palette.warning.dark, bgcolor: hasFilter ? alpha(theme.palette.primary.main, 0.08) : alpha(theme.palette.warning.main, 0.1) } }}>
                         <FileDownload sx={{ fontSize: 16 }} />
                     </IconButton>
                     </span>
@@ -466,7 +472,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                             </TableRow>
                         ) : filtered.length === 0 ? (
                             <TableRow><TableCell colSpan={4} align="center" sx={{ py: 5, color: theme.custom.chart.axisSoft, fontSize: '0.8rem' }}>
-                                {filter ? 'No match' : '—'}
+                                {filter ? 'No match' : 'No files'}
                             </TableCell></TableRow>
                         ) : (
                             filtered.map((f, rowIndex) => {
