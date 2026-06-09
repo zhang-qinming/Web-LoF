@@ -11,7 +11,7 @@ const router = express.Router();
 const metaTraitsStore = createFileStore(`${config.paths.crossTraitHeatmapDir}/meta/traits`);
 const effectsStore = createFileStore(`${config.paths.crossTraitHeatmapDir}/tables/effects`);
 
-const DEFAULT_TOP_GENES = 30;
+const DEFAULT_TOP_GENES = 80;
 const MAX_TOP_GENES = 100;
 const MAX_TARGET_IDS = 24;
 const DEFAULT_SEARCH_LIMIT = 12;
@@ -69,10 +69,20 @@ function normalizeTraitId(value) {
 
 function pickTraitIdCandidates(fileId, meta) {
     return [...new Set([
-        normalizeTraitId(fileId),
         normalizeTraitId(meta?.file_id),
+        normalizeTraitId(fileId),
         normalizeTraitId(meta?.gwas_id),
     ].filter(Boolean))];
+}
+
+function buildTraitOption(meta, fallbackId) {
+    const fileId = normalizeTraitId(meta?.file_id) || normalizeTraitId(fallbackId);
+    const gwasId = normalizeTraitId(meta?.gwas_id) || fileId;
+    return {
+        file_id: fileId,
+        gwas_id: gwasId,
+        trait_name: meta?.trait_name || fileId || gwasId || '',
+    };
 }
 
 function getFreshCache(cache, key, ttlMs) {
@@ -121,8 +131,10 @@ async function searchTraits(query, limit = DEFAULT_SEARCH_LIMIT, excludeIds = []
     const excluded = [...new Set(excludeIds.filter(Boolean))];
     let excludeSql = '';
     if (excluded.length > 0) {
-        excludeSql = `AND fm.file_id NOT IN (${excluded.map(() => '?').join(', ')})`;
-        params.push(...excluded);
+        const placeholders = excluded.map(() => '?').join(', ');
+        excludeSql = `AND fm.file_id NOT IN (${placeholders})
+           AND (fm.gwas_id IS NULL OR fm.gwas_id NOT IN (${placeholders}))`;
+        params.push(...excluded, ...excluded);
     }
     params.push(limit);
 
@@ -281,27 +293,31 @@ async function getRecommendedTargets(sourceTraitId) {
 
     const availableIds = await getAvailableTraitIds();
     const availableIdSet = new Set(availableIds);
-    const recommendedIds = CURATED_RECOMMENDED_TARGET_IDS.filter(
-        (traitId) => traitId !== safeSourceId && availableIdSet.has(traitId),
-    );
+    const curatedMetaMap = await getTraitMetaMapByIds([safeSourceId, ...CURATED_RECOMMENDED_TARGET_IDS]);
+    const sourceMeta = curatedMetaMap.get(safeSourceId);
+    const sourceIds = new Set(pickTraitIdCandidates(safeSourceId, sourceMeta));
+    const recommendedIds = [];
+
+    const addAvailableId = (traitId) => {
+        const meta = curatedMetaMap.get(traitId);
+        const candidates = pickTraitIdCandidates(traitId, meta);
+        const availableId = candidates.find((candidate) => availableIdSet.has(candidate));
+        if (!availableId || sourceIds.has(availableId) || recommendedIds.includes(availableId)) return;
+        recommendedIds.push(availableId);
+    };
+
+    CURATED_RECOMMENDED_TARGET_IDS.forEach(addAvailableId);
 
     if (recommendedIds.length < MAX_TARGET_IDS) {
         availableIds.forEach((traitId) => {
-            if (traitId === safeSourceId || recommendedIds.includes(traitId)) return;
+            if (sourceIds.has(traitId) || recommendedIds.includes(traitId)) return;
             recommendedIds.push(traitId);
         });
     }
 
     const limitedIds = recommendedIds.slice(0, MAX_TARGET_IDS);
     const metaMap = await getTraitMetaMapByIds(limitedIds);
-    const enriched = limitedIds.map((traitId) => {
-        const meta = metaMap.get(traitId) || { file_id: traitId, gwas_id: traitId, trait_name: traitId };
-        return {
-            file_id: meta.file_id || traitId,
-            gwas_id: meta.gwas_id || traitId,
-            trait_name: meta.trait_name || meta.gwas_id || traitId,
-        };
-    });
+    const enriched = limitedIds.map((traitId) => buildTraitOption(metaMap.get(traitId), traitId));
 
     setCache(recommendedTargetsCache, safeSourceId, enriched);
     return enriched;
@@ -416,18 +432,25 @@ router.get('/api/cross-trait/:fileId/matrix', asyncRoute(async (req, res) => {
     let skippedTargets = 0;
 
     for (const targetId of targetIds) {
-        const rows = await getEffectRows(targetId);
+        const metaRow = targetMetaMap.get(targetId);
+        const candidates = pickTraitIdCandidates(targetId, metaRow);
+        let rows = null;
+        let resolvedTargetId = candidates[0] || targetId;
+
+        for (const candidate of candidates) {
+            rows = await getEffectRows(candidate);
+            if (rows) {
+                resolvedTargetId = candidate;
+                break;
+            }
+        }
+
         if (!rows) {
             skippedTargets += 1;
             continue;
         }
         targetIndexes.push(buildEffectIndex(rows));
-        const metaRow = targetMetaMap.get(targetId) || { file_id: targetId, gwas_id: targetId, trait_name: targetId };
-        targetMetaRows.push({
-            file_id: metaRow.file_id || targetId,
-            gwas_id: metaRow.gwas_id || targetId,
-            trait_name: metaRow.trait_name || metaRow.gwas_id || targetId,
-        });
+        targetMetaRows.push(buildTraitOption(targetMetaMap.get(resolvedTargetId) || metaRow, resolvedTargetId));
     }
 
     const matrix = topGeneRows.map((geneRow) => targetIndexes.map((index) => {
@@ -436,11 +459,7 @@ router.get('/api/cross-trait/:fileId/matrix', asyncRoute(async (req, res) => {
     }));
 
     const valueSummary = summarizeMatrix(matrix);
-    const sourceTrait = {
-        file_id: sourceMeta?.file_id || sourceTraitId,
-        gwas_id: sourceMeta?.gwas_id || sourceTraitId,
-        trait_name: sourceMeta?.trait_name || sourceMeta?.gwas_id || sourceTraitId,
-    };
+    const sourceTrait = buildTraitOption(sourceMeta, sourceTraitId);
 
     res.json({
         sourceTrait,

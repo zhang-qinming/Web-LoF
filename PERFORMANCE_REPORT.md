@@ -6,9 +6,9 @@
 
 ## 结论摘要
 
-当前最大的性能风险不是单个慢索引，而是数据模型与访问路径不一致：
+当前最大的性能风险不是单个慢索引，而是文件型图表响应、Gene 汇总缓存和部分 SQL join 仍有扩展性上限：
 
-1. 旧 GWAS SQL 接口已经从当前代码路径删除；运行库仍没有 `gwas_data` / `gwas_metadata` / `huge_gwas_data` / `moment_ukbb`。后续如果恢复 SQL 大表，需要避免重新引入 `SELECT *`、全量接口和深页 `OFFSET`。
+1. 旧 GWAS SQL 接口已经从当前代码路径删除；当前运行路径使用 `file_metadata`、`gwas_meta` 和文件系统 TSV。不要恢复旧的全量 GWAS SQL JSON 接口。
 2. Gene 首页依赖 `gene_program_trait_edge` 全表聚合后放进 Node 进程内缓存。当前精确行数 297,549；优化器估算扫描 281,492 行，汇总聚合实测约 2.86 秒。数据增长或多进程部署后会放大。
 3. Gene 搜索已经做过一轮优化：后端先 exact lookup，再 prefix search；前端也有 280 ms debounce。`EN` / `ENS` / `ENSG` 已跳过 prefix fallback；普通 symbol 允许 1 字符 prefix，需继续观察 `M` 这类高命中前缀的 p95。
 4. 多个 join key 的 collation 不一致，代码用 `BINARY` / `COLLATE` 规避报错。功能上可运行，但查询计划退化为 hash scan，阻断正常等值索引 join。
@@ -29,7 +29,7 @@
 | `file_metadata` | 2,415 traits | 0.33 MB | 0.42 MB | Trait 列表主表 |
 | `trait_ldsc` | 2,344 | - | - | Trait meta heritability |
 
-运行库没有这些旧表：`gwas_data`、`gwas_metadata`、`huge_gwas_data`、`moment_ukbb`。
+旧 SQL GWAS 大表不属于当前运行路径。
 
 collation 不一致：
 
@@ -42,33 +42,24 @@ collation 不一致：
 
 ## 主要问题
 
-### P0. 旧 GWAS SQL 接口与运行库不一致（当前已删除）
+### P0. 旧 GWAS SQL 接口已删除，避免回归
 
 相关代码：
 
 - 当前已无 `backend/models/MgetGwasByTrait.js`。
 - `backend/routes/Rtrait.js` 当前只保留 `/api/trait/manhattan/:traitName`。
-- `frontend/src/api/gwas.js` 当前已无 `getTraitData()` / `getFilteredGwasDataByTrait()`。
+- `frontend/src/api/gwas.js` 当前已无旧 SQL GWAS 数据 API helper。
 - `frontend/src/components/GwasDataList.jsx` 当前只调用 `/api/browse`。
 
 问题：
 
 - 当前问题已经止血：前后端没有继续暴露旧 SQL GWAS 路由。
-- 风险转为回归风险：将来如果恢复 SNP SQL 表，不应恢复旧式 `SELECT *`、`allgwas` 全量 JSON 和深页 `OFFSET`。
+- 风险转为回归风险：将来如果恢复 SNP SQL 表，不应恢复旧式全量 JSON 和深页 `OFFSET`。
 
 建议：
 
 - 保持当前 TSV/Manhattan 文件路线，不再恢复旧 SQL GWAS API。
-- 如果必须恢复 SQL 表，改为投影列查询，禁止 `SELECT *`，并建立复合索引：
-
-```sql
--- 示例，按真实表名调整
-CREATE INDEX idx_gwas_trait_chr_bp ON gwas_data (Trait, CHR, BP);
-CREATE INDEX idx_gwas_trait_p ON gwas_data (Trait, P);
-CREATE INDEX idx_gwas_trait_rsid ON gwas_data (Trait, rsID);
-```
-
-- 大表分页优先用 keyset/cursor，不要在深页长期使用 `OFFSET`。
+- 如果未来必须恢复 SNP SQL 查询，必须新设计分页契约：投影列查询、强制 limit、优先 keyset/cursor，不要在深页长期使用 `OFFSET`。
 
 ### P1. Gene 首页全表聚合依赖进程内缓存
 
@@ -244,7 +235,7 @@ ALTER TABLE gwas_meta ADD UNIQUE KEY uk_gwas_meta_file_id (file_id);
   - `/api/meta/:fileId`
 - `programs/list`、`graph-list` 是目录扫描，不是 SQL；当前已加 60 秒进程内 TTL 缓存，避免每个 trait 页面都扫目录。
 - Manhattan、volcano、gene evidence 等图表从后端拿整份 TSV JSON/文本，再在前端 `useMemo` 里过滤、排序、构造 Plotly traces。
-- `.env.example` 给出 `DATA_MAX_TSV_ROWS=1000000`、`MANHATTAN_MAX_FILE_BYTES=1gb`；其中通用 TSV 路由使用 max rows，Manhattan 路由当前没有在 `readDelimitedTsv()` 里实际检查 file size。这对浏览器主线程和 Node 响应内存都偏激进。
+- `.env.example` 给出 `DATA_MAX_TSV_ROWS=1000000`、`MANHATTAN_MAX_FILE_BYTES=1gb`；其中通用 TSV 路由使用 max rows，Manhattan 路由现在会检查 file size，但限额内仍整文件解析并返回给前端。这对浏览器主线程和 Node 响应内存仍偏激进。
 
 建议：
 
@@ -285,7 +276,7 @@ ALTER TABLE gwas_meta ADD UNIQUE KEY uk_gwas_meta_file_id (file_id);
 
 ### 第 1 阶段：正确性与低风险止血
 
-1. 保持旧 `/api/trait/:traitName`、`/api/trait/allgwas/:traitName`、`/api/trait/filtergwas/:traitName` 删除状态，避免回归。
+1. 保持旧 Trait SQL GWAS API 删除状态，避免回归。
 2. 保留前端 Gene 搜索 debounce；后端 prefix fallback 允许 1 字符 symbol 前缀，但 `EN` / `ENS` / `ENSG` 不走 prefix fallback。
 3. 保留 `/api/programs/list`、`/api/programs/graph-list` 的 60 秒 TTL 缓存。
 4. Browse 无搜索 COUNT 去掉不必要的 `gwas_meta` join。

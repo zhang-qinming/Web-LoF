@@ -1,5 +1,5 @@
 const express = require('express');
-const { createFileStore } = require('../lib/fileStore');
+const { createFileStore, buildHttpError } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
 const { normalizeSafeBaseNameList } = require('../lib/request');
@@ -70,6 +70,9 @@ function toTsvRow(row) {
 async function readDelimitedTsv(fullPath) {
     const stat = await manhattanStore.stat(fullPath);
     if (!stat || !stat.isFile) return { rows: [], truncated: false, fileSize: 0 };
+    if (stat.size > config.data.maxManhattanFileBytes) {
+        throw buildHttpError(413, 'Manhattan TSV file is too large to load through the API');
+    }
 
     const cacheKey = `${fullPath}:all`;
     const cached = TSV_CACHE.get(cacheKey);

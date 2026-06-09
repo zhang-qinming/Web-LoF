@@ -9,77 +9,73 @@
 
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="82" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Trait correlation</text>
-  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">Pairwise genetic correlation across selected traits</text>
+  <text x="62" y="84" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" font-weight="700">Trait Correlation</text>
 
   <g font-family="Inter, Arial, Helvetica, sans-serif">
-    <text x="169" y="130" text-anchor="middle" fill="#475569" font-size="10" font-weight="700">BMI</text>
-    <text x="203" y="130" text-anchor="middle" fill="#475569" font-size="10" font-weight="700">T2D</text>
-    <text x="237" y="130" text-anchor="middle" fill="#475569" font-size="10" font-weight="700">CAD</text>
-    <text x="271" y="130" text-anchor="middle" fill="#475569" font-size="10" font-weight="700">HTN</text>
-    <text x="305" y="130" text-anchor="middle" fill="#475569" font-size="10" font-weight="700">LDL</text>
-    <text x="339" y="130" text-anchor="middle" fill="#475569" font-size="10" font-weight="700">SCZ</text>
+    <g id="corr-grid" transform="translate(210 136)">
+      <text x="15.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">BMI</text>
+      <text x="50.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">T2D</text>
+      <text x="85.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">CAD</text>
+      <text x="120.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">HTN</text>
+      <text x="155.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">LDL</text>
+      <text x="190.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">SCZ</text>
 
-    <text x="144" y="164" text-anchor="end" fill="#475569" font-size="10" font-weight="700">BMI</text>
-    <text x="144" y="198" text-anchor="end" fill="#475569" font-size="10" font-weight="700">T2D</text>
-    <text x="144" y="232" text-anchor="end" fill="#475569" font-size="10" font-weight="700">CAD</text>
-    <text x="144" y="266" text-anchor="end" fill="#475569" font-size="10" font-weight="700">HTN</text>
-    <text x="144" y="300" text-anchor="end" fill="#475569" font-size="10" font-weight="700">LDL</text>
-    <text x="144" y="334" text-anchor="end" fill="#475569" font-size="10" font-weight="700">SCZ</text>
+      <text x="-15" y="15.5" text-anchor="end" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">BMI</text>
+      <text x="-15" y="50.5" text-anchor="end" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">T2D</text>
+      <text x="-15" y="85.5" text-anchor="end" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">CAD</text>
+      <text x="-15" y="120.5" text-anchor="end" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">HTN</text>
+      <text x="-15" y="155.5" text-anchor="end" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">LDL</text>
+      <text x="-15" y="190.5" text-anchor="end" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">SCZ</text>
 
-    <rect x="154" y="142" width="30" height="30" rx="4" fill="#C2410C"/>
-    <rect x="188" y="142" width="30" height="30" rx="4" fill="#F97316"/>
-    <rect x="222" y="142" width="30" height="30" rx="4" fill="#FDBA74"/>
-    <rect x="256" y="142" width="30" height="30" rx="4" fill="#F59E0B"/>
-    <rect x="290" y="142" width="30" height="30" rx="4" fill="#F1F5F9"/>
-    <rect x="324" y="142" width="30" height="30" rx="4" fill="#93C5FD"/>
+      <rect x="0" y="0" width="31" height="31" rx="4" fill="#C2410C"/>
+      <rect x="35" y="0" width="31" height="31" rx="4" fill="#F97316"/>
+      <rect x="70" y="0" width="31" height="31" rx="4" fill="#FDBA74"/>
+      <rect x="105" y="0" width="31" height="31" rx="4" fill="#F59E0B"/>
+      <rect x="140" y="0" width="31" height="31" rx="4" fill="#F1F5F9"/>
+      <rect x="175" y="0" width="31" height="31" rx="4" fill="#93C5FD"/>
 
-    <rect x="154" y="176" width="30" height="30" rx="4" fill="#F97316"/>
-    <rect x="188" y="176" width="30" height="30" rx="4" fill="#C2410C"/>
-    <rect x="222" y="176" width="30" height="30" rx="4" fill="#FB923C"/>
-    <rect x="256" y="176" width="30" height="30" rx="4" fill="#FDBA74"/>
-    <rect x="290" y="176" width="30" height="30" rx="4" fill="#E2E8F0"/>
-    <rect x="324" y="176" width="30" height="30" rx="4" fill="#DBEAFE"/>
+      <rect x="0" y="35" width="31" height="31" rx="4" fill="#F97316"/>
+      <rect x="35" y="35" width="31" height="31" rx="4" fill="#C2410C"/>
+      <rect x="70" y="35" width="31" height="31" rx="4" fill="#FB923C"/>
+      <rect x="105" y="35" width="31" height="31" rx="4" fill="#FDBA74"/>
+      <rect x="140" y="35" width="31" height="31" rx="4" fill="#E2E8F0"/>
+      <rect x="175" y="35" width="31" height="31" rx="4" fill="#DBEAFE"/>
 
-    <rect x="154" y="210" width="30" height="30" rx="4" fill="#FDBA74"/>
-    <rect x="188" y="210" width="30" height="30" rx="4" fill="#FB923C"/>
-    <rect x="222" y="210" width="30" height="30" rx="4" fill="#C2410C"/>
-    <rect x="256" y="210" width="30" height="30" rx="4" fill="#F97316"/>
-    <rect x="290" y="210" width="30" height="30" rx="4" fill="#DBEAFE"/>
-    <rect x="324" y="210" width="30" height="30" rx="4" fill="#60A5FA"/>
+      <rect x="0" y="70" width="31" height="31" rx="4" fill="#FDBA74"/>
+      <rect x="35" y="70" width="31" height="31" rx="4" fill="#FB923C"/>
+      <rect x="70" y="70" width="31" height="31" rx="4" fill="#C2410C"/>
+      <rect x="105" y="70" width="31" height="31" rx="4" fill="#F97316"/>
+      <rect x="140" y="70" width="31" height="31" rx="4" fill="#DBEAFE"/>
+      <rect x="175" y="70" width="31" height="31" rx="4" fill="#60A5FA"/>
 
-    <rect x="154" y="244" width="30" height="30" rx="4" fill="#F59E0B"/>
-    <rect x="188" y="244" width="30" height="30" rx="4" fill="#FDBA74"/>
-    <rect x="222" y="244" width="30" height="30" rx="4" fill="#F97316"/>
-    <rect x="256" y="244" width="30" height="30" rx="4" fill="#C2410C"/>
-    <rect x="290" y="244" width="30" height="30" rx="4" fill="#E2E8F0"/>
-    <rect x="324" y="244" width="30" height="30" rx="4" fill="#BFDBFE"/>
+      <rect x="0" y="105" width="31" height="31" rx="4" fill="#F59E0B"/>
+      <rect x="35" y="105" width="31" height="31" rx="4" fill="#FDBA74"/>
+      <rect x="70" y="105" width="31" height="31" rx="4" fill="#F97316"/>
+      <rect x="105" y="105" width="31" height="31" rx="4" fill="#C2410C"/>
+      <rect x="140" y="105" width="31" height="31" rx="4" fill="#E2E8F0"/>
+      <rect x="175" y="105" width="31" height="31" rx="4" fill="#BFDBFE"/>
 
-    <rect x="154" y="278" width="30" height="30" rx="4" fill="#F1F5F9"/>
-    <rect x="188" y="278" width="30" height="30" rx="4" fill="#E2E8F0"/>
-    <rect x="222" y="278" width="30" height="30" rx="4" fill="#DBEAFE"/>
-    <rect x="256" y="278" width="30" height="30" rx="4" fill="#E2E8F0"/>
-    <rect x="290" y="278" width="30" height="30" rx="4" fill="#C2410C"/>
-    <rect x="324" y="278" width="30" height="30" rx="4" fill="#EFF6FF"/>
+      <rect x="0" y="140" width="31" height="31" rx="4" fill="#F1F5F9"/>
+      <rect x="35" y="140" width="31" height="31" rx="4" fill="#E2E8F0"/>
+      <rect x="70" y="140" width="31" height="31" rx="4" fill="#DBEAFE"/>
+      <rect x="105" y="140" width="31" height="31" rx="4" fill="#E2E8F0"/>
+      <rect x="140" y="140" width="31" height="31" rx="4" fill="#C2410C"/>
+      <rect x="175" y="140" width="31" height="31" rx="4" fill="#EFF6FF"/>
 
-    <rect x="154" y="312" width="30" height="30" rx="4" fill="#93C5FD"/>
-    <rect x="188" y="312" width="30" height="30" rx="4" fill="#DBEAFE"/>
-    <rect x="222" y="312" width="30" height="30" rx="4" fill="#60A5FA"/>
-    <rect x="256" y="312" width="30" height="30" rx="4" fill="#BFDBFE"/>
-    <rect x="290" y="312" width="30" height="30" rx="4" fill="#EFF6FF"/>
-    <rect x="324" y="312" width="30" height="30" rx="4" fill="#C2410C"/>
+      <rect x="0" y="175" width="31" height="31" rx="4" fill="#93C5FD"/>
+      <rect x="35" y="175" width="31" height="31" rx="4" fill="#DBEAFE"/>
+      <rect x="70" y="175" width="31" height="31" rx="4" fill="#60A5FA"/>
+      <rect x="105" y="175" width="31" height="31" rx="4" fill="#BFDBFE"/>
+      <rect x="140" y="175" width="31" height="31" rx="4" fill="#EFF6FF"/>
+      <rect x="175" y="175" width="31" height="31" rx="4" fill="#C2410C"/>
+    </g>
+
+    <g transform="translate(477 136)">
+      <text x="36" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">rg</text>
+      <rect x="28" y="0" width="16" height="206" rx="8" fill="url(#corrbar)"/>
+      <text x="56" y="8" dominant-baseline="middle" fill="#64748B" font-size="13" font-weight="600">1.0</text>
+      <text x="56" y="103" dominant-baseline="middle" fill="#64748B" font-size="13" font-weight="600">0.0</text>
+      <text x="56" y="206" dominant-baseline="middle" fill="#64748B" font-size="13" font-weight="600">-1.0</text>
+    </g>
   </g>
-
-  <g font-family="Inter, Arial, Helvetica, sans-serif">
-    <text x="418" y="132" fill="#475569" font-size="11" font-weight="700">rg</text>
-    <text x="410" y="154" fill="#94A3B8" font-size="9">positive</text>
-    <rect x="434" y="142" width="16" height="200" rx="8" fill="url(#corrbar)"/>
-    <text x="410" y="342" fill="#94A3B8" font-size="9">negative</text>
-    <text x="458" y="150" fill="#94A3B8" font-size="9">1.0</text>
-    <text x="458" y="246" fill="#94A3B8" font-size="9">0.0</text>
-    <text x="458" y="338" fill="#94A3B8" font-size="9">-1.0</text>
-  </g>
-
-  <rect x="402" y="352" width="206" height="24" rx="9" fill="#FFF7ED" stroke="#FED7AA"/>
-  <text x="420" y="368" fill="#C2410C" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">diagonal cells are self-correlation</text>
 </svg>

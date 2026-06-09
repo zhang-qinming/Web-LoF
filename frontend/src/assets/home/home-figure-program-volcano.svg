@@ -2,56 +2,61 @@
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
   <text x="62" y="82" fill="#7C3AED" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Program volcano</text>
-  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">Signed program-trait effects with association thresholds</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">Gene-level effect size and significance across visible genes</text>
 
   <line x1="104" y1="318" x2="620" y2="318" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="104" y1="318" x2="104" y2="118" stroke="#CBD5E1" stroke-width="2"/>
-  <line x1="362" y1="318" x2="362" y2="118" stroke="#CBD5E1" stroke-width="1.6" stroke-dasharray="7 7"/>
-  <line x1="104" y1="260" x2="620" y2="260" stroke="#C4B5FD" stroke-width="1.7" stroke-dasharray="8 7"/>
-  <line x1="244" y1="318" x2="244" y2="118" stroke="#E9D5FF" stroke-width="1.3" stroke-dasharray="6 7"/>
-  <line x1="480" y1="318" x2="480" y2="118" stroke="#E9D5FF" stroke-width="1.3" stroke-dasharray="6 7"/>
+  <line x1="362" y1="318" x2="362" y2="118" stroke="#CBD5E1" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <line x1="104" y1="262" x2="620" y2="262" stroke="#C4B5FD" stroke-width="1.6" stroke-dasharray="7 6"/>
+  <line x1="294" y1="318" x2="294" y2="118" stroke="#E9D5FF" stroke-width="1.2" stroke-dasharray="5 7"/>
+  <line x1="430" y1="318" x2="430" y2="118" stroke="#E9D5FF" stroke-width="1.2" stroke-dasharray="5 7"/>
 
-  <text x="362" y="356" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">Program effect score</text>
-  <text transform="rotate(-90 76 236)" x="76" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">-log10(P)</text>
-  <text x="112" y="254" fill="#7C3AED" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">FDR threshold</text>
+  <text x="362" y="356" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">Effect size (lm_es)</text>
+  <text transform="rotate(-90 76 236)" x="76" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">-log10(P-value)</text>
+  <text x="112" y="256" fill="#7C3AED" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">P &lt; 0.05</text>
 
-  <g fill="#DDD6FE" fill-opacity="0.62">
-    <circle cx="348" cy="315" r="2.1"/><circle cx="365" cy="314" r="2.1"/><circle cx="383" cy="316" r="2.1"/>
-    <circle cx="329" cy="309" r="2.2"/><circle cx="402" cy="309" r="2.2"/><circle cx="310" cy="305" r="2.3"/>
-    <circle cx="421" cy="305" r="2.3"/><circle cx="291" cy="313" r="2.1"/><circle cx="441" cy="313" r="2.1"/>
-    <circle cx="273" cy="307" r="2.1"/><circle cx="460" cy="307" r="2.1"/><circle cx="255" cy="313" r="2.1"/>
-    <circle cx="479" cy="315" r="2.1"/><circle cx="237" cy="305" r="2.2"/><circle cx="499" cy="307" r="2.2"/>
-    <circle cx="219" cy="311" r="2.1"/><circle cx="520" cy="311" r="2.1"/><circle cx="200" cy="301" r="2.3"/>
-    <circle cx="543" cy="301" r="2.3"/><circle cx="562" cy="309" r="2.1"/><circle cx="326" cy="294" r="2.4"/>
-    <circle cx="348" cy="289" r="2.4"/><circle cx="371" cy="296" r="2.3"/><circle cx="397" cy="291" r="2.3"/>
-    <circle cx="426" cy="294" r="2.3"/><circle cx="303" cy="286" r="2.3"/><circle cx="452" cy="284" r="2.4"/>
-    <circle cx="278" cy="290" r="2.3"/><circle cx="482" cy="288" r="2.3"/><circle cx="252" cy="282" r="2.4"/>
-    <circle cx="508" cy="282" r="2.4"/><circle cx="229" cy="292" r="2.2"/><circle cx="534" cy="290" r="2.2"/>
-    <circle cx="201" cy="284" r="2.2"/><circle cx="560" cy="284" r="2.2"/><circle cx="343" cy="273" r="2.5"/>
-    <circle cx="375" cy="276" r="2.5"/><circle cx="410" cy="273" r="2.5"/><circle cx="440" cy="270" r="2.5"/>
-    <circle cx="306" cy="269" r="2.4"/><circle cx="480" cy="268" r="2.4"/><circle cx="270" cy="267" r="2.4"/>
-    <circle cx="514" cy="265" r="2.4"/><circle cx="236" cy="273" r="2.3"/><circle cx="550" cy="271" r="2.3"/>
+  <g fill="#C3CCD8" fill-opacity="0.44">
+    <circle cx="348" cy="315" r="2.0"/><circle cx="365" cy="314" r="2.0"/><circle cx="383" cy="316" r="2.0"/>
+    <circle cx="329" cy="309" r="2.1"/><circle cx="402" cy="309" r="2.1"/><circle cx="310" cy="305" r="2.2"/>
+    <circle cx="421" cy="305" r="2.2"/><circle cx="291" cy="313" r="2.0"/><circle cx="441" cy="313" r="2.0"/>
+    <circle cx="273" cy="307" r="2.0"/><circle cx="460" cy="307" r="2.0"/><circle cx="255" cy="313" r="2.0"/>
+    <circle cx="479" cy="315" r="2.0"/><circle cx="237" cy="305" r="2.1"/><circle cx="499" cy="307" r="2.1"/>
+    <circle cx="219" cy="311" r="2.0"/><circle cx="520" cy="311" r="2.0"/><circle cx="200" cy="301" r="2.2"/>
+    <circle cx="543" cy="301" r="2.2"/><circle cx="562" cy="309" r="2.0"/><circle cx="326" cy="294" r="2.2"/>
+    <circle cx="348" cy="289" r="2.2"/><circle cx="371" cy="296" r="2.1"/><circle cx="397" cy="291" r="2.1"/>
+    <circle cx="426" cy="294" r="2.1"/><circle cx="303" cy="286" r="2.1"/><circle cx="452" cy="284" r="2.2"/>
+    <circle cx="278" cy="290" r="2.1"/><circle cx="482" cy="288" r="2.1"/><circle cx="252" cy="282" r="2.2"/>
+    <circle cx="508" cy="282" r="2.2"/><circle cx="229" cy="292" r="2.0"/><circle cx="534" cy="290" r="2.0"/>
+    <circle cx="201" cy="284" r="2.0"/><circle cx="560" cy="284" r="2.0"/><circle cx="343" cy="273" r="2.3"/>
+    <circle cx="375" cy="276" r="2.3"/><circle cx="410" cy="273" r="2.3"/><circle cx="440" cy="270" r="2.3"/>
+    <circle cx="306" cy="269" r="2.2"/><circle cx="480" cy="268" r="2.2"/><circle cx="270" cy="267" r="2.2"/>
+    <circle cx="514" cy="265" r="2.2"/><circle cx="236" cy="273" r="2.1"/><circle cx="550" cy="271" r="2.1"/>
   </g>
 
   <g>
-    <circle cx="178" cy="150" r="4.8" fill="#0F766E" fill-opacity="0.96"><title>Program P12: negative effect</title></circle>
-    <circle cx="204" cy="178" r="4.3" fill="#0F766E" fill-opacity="0.93"><title>Program P07: negative effect</title></circle>
-    <circle cx="224" cy="218" r="3.8" fill="#0F766E" fill-opacity="0.9"><title>Program P31: negative effect</title></circle>
-    <circle cx="542" cy="145" r="4.9" fill="#A21CAF" fill-opacity="0.96"><title>Program P54: positive effect</title></circle>
-    <circle cx="574" cy="166" r="4.5" fill="#A21CAF" fill-opacity="0.94"><title>Program P88: positive effect</title></circle>
-    <circle cx="516" cy="204" r="4.0" fill="#A21CAF" fill-opacity="0.9"><title>Program P42: positive effect</title></circle>
-    <circle cx="496" cy="236" r="3.6" fill="#7C3AED" fill-opacity="0.84"><title>moderate positive program</title></circle>
-    <circle cx="236" cy="238" r="3.6" fill="#0F766E" fill-opacity="0.82"><title>moderate negative program</title></circle>
+    <circle cx="184" cy="138" r="5.4" fill="#4B92DF" fill-opacity="0.9"><title>POLRMT: lm_es=-1.23</title></circle>
+    <circle cx="226" cy="162" r="5.0" fill="#4B92DF" fill-opacity="0.88"><title>TEFM: lm_es=-0.89</title></circle>
+    <circle cx="208" cy="202" r="4.2" fill="#79B9F2" fill-opacity="0.72"><title>HSPA9: lm_es=-0.95</title></circle>
+    <circle cx="268" cy="230" r="3.8" fill="#79B9F2" fill-opacity="0.66"><title>RPL24: lm_es=-1.01</title></circle>
+    <circle cx="530" cy="152" r="5.2" fill="#DC7141" fill-opacity="0.9"><title>EXOSC2: lm_es=1.08</title></circle>
+    <circle cx="574" cy="168" r="5.0" fill="#DC7141" fill-opacity="0.88"><title>MED30: lm_es=1.20</title></circle>
+    <circle cx="512" cy="210" r="4.1" fill="#FB986D" fill-opacity="0.72"><title>ZFC3H1: lm_es=0.74</title></circle>
+    <circle cx="492" cy="236" r="3.8" fill="#FB986D" fill-opacity="0.66"><title>EXOSC8: lm_es=0.92</title></circle>
   </g>
 
-  <text x="178" y="137" text-anchor="middle" fill="#064E3B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">P12</text>
-  <text x="542" y="132" text-anchor="middle" fill="#701A75" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">P54</text>
-  <text x="574" y="155" text-anchor="middle" fill="#701A75" font-family="Inter, Arial, Helvetica, sans-serif" font-size="9" font-weight="700">P88</text>
+  <text x="184" y="126" text-anchor="middle" fill="#1E3A8A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">POLRMT</text>
+  <text x="226" y="150" text-anchor="middle" fill="#1E3A8A" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">TEFM</text>
+  <text x="530" y="140" text-anchor="middle" fill="#9A3412" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">EXOSC2</text>
+  <text x="574" y="156" text-anchor="middle" fill="#9A3412" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">MED30</text>
 
-  <circle cx="104" cy="362" r="4" fill="#A21CAF"/>
-  <text x="114" y="366" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">positive programs</text>
-  <circle cx="224" cy="362" r="4" fill="#0F766E"/>
-  <text x="234" y="366" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">negative programs</text>
-  <circle cx="352" cy="362" r="4" fill="#DDD6FE"/>
-  <text x="362" y="366" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">background tests</text>
+  <circle cx="104" cy="362" r="4" fill="#DC7141"/>
+  <text x="114" y="366" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">top positive gene</text>
+  <circle cx="224" cy="362" r="4" fill="#4B92DF"/>
+  <text x="234" y="366" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">top negative gene</text>
+  <circle cx="348" cy="362" r="4" fill="#FB986D" fill-opacity="0.72"/>
+  <text x="358" y="366" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">positive hit</text>
+  <circle cx="452" cy="362" r="4" fill="#79B9F2" fill-opacity="0.72"/>
+  <text x="462" y="366" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">negative hit</text>
+  <circle cx="562" cy="362" r="4" fill="#C3CCD8" fill-opacity="0.62"/>
+  <text x="572" y="366" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10">background</text>
 </svg>

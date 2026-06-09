@@ -6,12 +6,14 @@ import {
     FingerprintOutlined,
     GroupOutlined,
     OpenInNew,
+    Refresh,
 } from '@mui/icons-material';
 import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import { downloadBlob } from '../utils/download';
 import { panelSx } from '../themeUtils';
+import { StatePanel } from './PageScaffold';
 
 const EMPTY_VALUE = '--';
 
@@ -233,8 +235,29 @@ function LofRow({ row, index, total }) {
 
 export default function TraitMetaCard({ fileId }) {
     const theme = useTheme();
-    const { data } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
+    const { data, error, mutate } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
     const info = (data && !data.error) ? data : null;
+
+    if (error) {
+        return (
+            <Box sx={{ mb: 3 }}>
+                <StatePanel
+                    severity="error"
+                    title="Failed to load trait metadata"
+                    message={error?.response?.data?.error || error?.message || 'Trait metadata could not be loaded.'}
+                    minHeight={220}
+                >
+                    <Button
+                        variant="outlined"
+                        startIcon={<Refresh />}
+                        onClick={() => { void mutate(); }}
+                    >
+                        Retry
+                    </Button>
+                </StatePanel>
+            </Box>
+        );
+    }
 
     if (!info) return <MetaSkeleton theme={theme} />;
 

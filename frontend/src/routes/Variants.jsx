@@ -709,6 +709,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
     const [results, setResults] = useState([]);
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [error, setError] = useState('');
@@ -724,23 +725,26 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
         if (!canSearch) {
             setResults([]);
             setTotalCount(0);
+            setTotalPages(1);
             setLoading(false);
             return () => { cancelled = true; };
         }
 
         setLoading(true);
         setError('');
-        API.get('/search', { params: { q: trimmedQuery } })
+        API.get('/search', { params: { q: trimmedQuery, page, limit: GLOBAL_PAGE_SIZE } })
             .then(({ data }) => {
                 if (cancelled) return;
                 const nextResults = data.results || [];
                 setResults(nextResults);
                 setTotalCount(data.totalCount ?? nextResults.length);
+                setTotalPages(data.totalPages || Math.max(1, Math.ceil((data.totalCount ?? nextResults.length) / GLOBAL_PAGE_SIZE)));
             })
             .catch((err) => {
                 if (cancelled) return;
                 setResults([]);
                 setTotalCount(0);
+                setTotalPages(1);
                 setError(getRequestErrorMessage(err, 'Search failed'));
             })
             .finally(() => {
@@ -748,18 +752,13 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
             });
 
         return () => { cancelled = true; };
-    }, [canSearch, trimmedQuery]);
-
-    const totalPages = Math.max(1, Math.ceil(results.length / GLOBAL_PAGE_SIZE));
+    }, [canSearch, page, trimmedQuery]);
 
     useEffect(() => {
         if (page > totalPages) setPage(totalPages);
     }, [page, totalPages]);
 
-    const visibleResults = useMemo(() => {
-        const start = (page - 1) * GLOBAL_PAGE_SIZE;
-        return results.slice(start, start + GLOBAL_PAGE_SIZE);
-    }, [page, results]);
+    const visibleResults = results;
     const fileResults = useMemo(
         () => results.filter((item) => item.type === 'file'),
         [results],
@@ -836,9 +835,9 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                         Search across all indexed files and folders without the column browser layout.
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 0.7, flexWrap: 'wrap', mt: 1 }}>
-                        <Chip size="small" label={`${results.length} matches`} sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                        <Chip size="small" label={`${fileResults.length} files`} sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
-                        <Chip size="small" label={`${results.length - fileResults.length} folders`} sx={summaryChipSx(theme, metricChipTone(theme, 'subtle'))} />
+                        <Chip size="small" label={`${totalCount.toLocaleString()} matches`} sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                        <Chip size="small" label={`${fileResults.length} page files`} sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                        <Chip size="small" label={`${results.length - fileResults.length} page folders`} sx={summaryChipSx(theme, metricChipTone(theme, 'subtle'))} />
                     </Box>
                 </Box>
 
@@ -847,7 +846,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                         <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.4, px: 0.7, py: 0.35, borderRadius: 1, bgcolor: allFilesChecked ? alpha(theme.palette.primary.main, 0.08) : theme.custom.surface.subtle, border: `1px solid ${theme.custom.border.soft}` }}>
                             <Checkbox size="small" sx={{ p: 0.25 }} checked={allFilesChecked} indeterminate={someFilesChecked} onChange={handleToggleAllFiles} />
                             <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700 }}>
-                                All loaded files
+                                Page files
                             </Typography>
                         </Box>
                         <Button
@@ -857,7 +856,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                             sx={{ minWidth: 0, px: 1.4, py: 0.4, fontSize: '0.74rem', textTransform: 'none', borderColor: theme.custom.border.strong, color: theme.palette.text.primary }}
                             onClick={() => { void handleDownloadAllFiles(); }}
                         >
-                            <FileDownload sx={{ fontSize: 14, mr: 0.4 }} /> {downloading ? 'Preparing...' : 'Download all'}
+                            <FileDownload sx={{ fontSize: 14, mr: 0.4 }} /> {downloading ? 'Preparing...' : 'Download page'}
                         </Button>
                         {checkedCount > 0 && (
                             <Chip label={`${checkedCount} selected`} size="small" color="primary" onDelete={clearAll} />

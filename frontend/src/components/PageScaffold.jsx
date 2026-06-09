@@ -74,6 +74,7 @@ export function StatePanel({
     minHeight = 260,
     framed = true,
     sx,
+    children,
 }) {
     const theme = useTheme();
     const tone = severity === 'error'
@@ -126,6 +127,11 @@ export function StatePanel({
                         {message}
                     </Typography>
                 )}
+                {children && (
+                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                        {children}
+                    </Box>
+                )}
             </Box>
         </Box>
     );
@@ -136,6 +142,7 @@ export function StatePanel({
             <Alert severity="error" sx={{ borderRadius: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{title}</Typography>
                 {message && <Typography variant="body2">{message}</Typography>}
+                {children && <Box sx={{ mt: 1.2 }}>{children}</Box>}
             </Alert>
         );
     }

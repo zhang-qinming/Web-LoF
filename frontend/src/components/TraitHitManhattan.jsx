@@ -29,6 +29,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import {
     Insights,
     Place,
+    Refresh,
     RestartAlt,
     ScatterPlot,
     Timeline,
@@ -223,6 +224,8 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const [legendCollapsed, setLegendCollapsed] = useState(false);
     const [tablePage, setTablePage] = useState(0);
     const [tableRowsPerPage, setTableRowsPerPage] = useState(25);
+    const [error, setError] = useState(null);
+    const [retryKey, setRetryKey] = useState(0);
     const deferredGeneQuery = useDeferredValue(geneQuery);
 
     const onInitialized = useCallback((_figure, graphDiv) => {
@@ -237,9 +240,16 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         if (!fileId) return undefined;
         let cancelled = false;
         setLoading(true);
+        setError(null);
         getTraitManhattanHits(fileId, { variant, aliasId: gwasId })
             .then((res) => {
                 if (!cancelled) setPayload(res);
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setError(err);
+                    setPayload(null);
+                }
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -247,7 +257,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         return () => {
             cancelled = true;
         };
-    }, [fileId, gwasId, variant]);
+    }, [fileId, gwasId, retryKey, variant]);
 
     const rows = useMemo(() => payload?.data || [], [payload]);
     const resolvedVariant = payload?.resolvedVariant || variant;
@@ -1016,7 +1026,30 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !shouldAutoSwitchToFull && rows.length === 0 && (
+                    {!loading && !shouldAutoSwitchToFull && error && (
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                            <Alert
+                                severity="error"
+                                sx={{ maxWidth: 760 }}
+                                action={(
+                                    <Button
+                                        color="inherit"
+                                        size="small"
+                                        startIcon={<Refresh />}
+                                        onClick={() => setRetryKey((key) => key + 1)}
+                                    >
+                                        Retry
+                                    </Button>
+                                )}
+                            >
+                                <Typography variant="body2">
+                                    {error?.response?.data?.error || error?.message || 'Failed to load Manhattan data.'}
+                                </Typography>
+                            </Alert>
+                        </Box>
+                    )}
+
+                    {!loading && !shouldAutoSwitchToFull && !error && rows.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No Manhattan rows are currently available for this trait.</Typography>
@@ -1024,7 +1057,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !shouldAutoSwitchToFull && rows.length > 0 && processedRows.length === 0 && (
+                    {!loading && !shouldAutoSwitchToFull && !error && rows.length > 0 && processedRows.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No loci match the current filters.</Typography>
@@ -1032,7 +1065,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !shouldAutoSwitchToFull && processedRows.length > 0 && (
+                    {!loading && !shouldAutoSwitchToFull && !error && processedRows.length > 0 && (
                             <Box sx={{ position: 'relative', minHeight: RESPONSIVE_PLOT_HEIGHT }}>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}

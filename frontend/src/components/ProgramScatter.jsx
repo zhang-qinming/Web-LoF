@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Plot from 'react-plotly.js';
 import Plotly from 'plotly.js-basic-dist';
@@ -21,7 +21,6 @@ import {
     compactToggleGroupSx,
     metricChipTone,
     plotFrameSx,
-    RESPONSIVE_TALL_PLOT_HEIGHT,
     summaryChipSx,
     tableTone,
     toolbarSx,
@@ -59,6 +58,8 @@ const DEFAULT_TOP_N = 10;
 const DEFAULT_EXPORT_WIDTH = 1200;
 const DEFAULT_EXPORT_HEIGHT = 800;
 const PLOT_TRANSITION_DURATION = 450;
+const TRACE_INDICES = TRACE_ORDER.map((_, index) => index);
+const PROGRAM_SCATTER_PLOT_HEIGHT = 'clamp(620px, 74dvh, 980px)';
 
 function toFiniteNumber(value) {
     const num = Number(value);
@@ -94,6 +95,137 @@ function computeAxisRange(values, paddingRatio = 0.08) {
     const span = max - min;
     const padding = span * paddingRatio;
     return [min - padding, max + padding];
+}
+
+function cloneAxisRanges(axisRanges) {
+    return {
+        x: Array.isArray(axisRanges?.x) ? [...axisRanges.x] : [-1, 1],
+        y: Array.isArray(axisRanges?.y) ? [...axisRanges.y] : [-1, 1],
+    };
+}
+
+function cloneMaybeArray(value) {
+    return Array.isArray(value) ? [...value] : value;
+}
+
+function cloneCustomData(value) {
+    return Array.isArray(value)
+        ? value.map((item) => (Array.isArray(item) ? [...item] : item))
+        : value;
+}
+
+function clonePlotData(data) {
+    return (Array.isArray(data) ? data : []).map((trace) => ({
+        ...trace,
+        x: cloneMaybeArray(trace.x),
+        y: cloneMaybeArray(trace.y),
+        text: cloneMaybeArray(trace.text),
+        hovertext: cloneMaybeArray(trace.hovertext),
+        customdata: cloneCustomData(trace.customdata),
+        marker: trace.marker ? {
+            ...trace.marker,
+            size: cloneMaybeArray(trace.marker.size),
+            color: cloneMaybeArray(trace.marker.color),
+            opacity: cloneMaybeArray(trace.marker.opacity),
+            line: trace.marker.line ? { ...trace.marker.line } : trace.marker.line,
+        } : trace.marker,
+    }));
+}
+
+function getTracePointProgram(trace, index) {
+    const customPoint = Array.isArray(trace?.customdata) ? trace.customdata[index] : null;
+    const customProgram = Array.isArray(customPoint) ? customPoint[0] : customPoint;
+    return String(customProgram || '').trim();
+}
+
+function getTraceMarkerSize(trace, index) {
+    const size = trace?.marker?.size;
+    if (Array.isArray(size)) return size[index];
+    return size;
+}
+
+function buildPointSnapshot(plotData) {
+    const points = new Map();
+    (Array.isArray(plotData) ? plotData : []).forEach((trace) => {
+        const xValues = Array.isArray(trace.x) ? trace.x : [];
+        const yValues = Array.isArray(trace.y) ? trace.y : [];
+        xValues.forEach((x, index) => {
+            const program = getTracePointProgram(trace, index);
+            const y = yValues[index];
+            if (!program || !Number.isFinite(x) || !Number.isFinite(y)) return;
+            points.set(program, {
+                x,
+                y,
+                size: getTraceMarkerSize(trace, index),
+            });
+        });
+    });
+    return points;
+}
+
+function projectAxisValue(value, previousRange, nextRange, fallback) {
+    if (!Number.isFinite(value)
+        || !Array.isArray(previousRange)
+        || !Array.isArray(nextRange)
+        || previousRange.length < 2
+        || nextRange.length < 2
+        || !Number.isFinite(previousRange[0])
+        || !Number.isFinite(previousRange[1])
+        || !Number.isFinite(nextRange[0])
+        || !Number.isFinite(nextRange[1])
+        || previousRange[0] === previousRange[1]
+    ) {
+        return fallback;
+    }
+
+    const position = (value - previousRange[0]) / (previousRange[1] - previousRange[0]);
+    const projected = nextRange[0] + (position * (nextRange[1] - nextRange[0]));
+    return Number.isFinite(projected) ? projected : fallback;
+}
+
+function buildAnimationStartData(previousPlotData, nextPlotData, previousRanges, nextRanges) {
+    const previousPoints = buildPointSnapshot(previousPlotData);
+    const safePreviousRanges = cloneAxisRanges(previousRanges);
+    const safeNextRanges = cloneAxisRanges(nextRanges);
+
+    return clonePlotData(nextPlotData).map((trace) => {
+        const xValues = Array.isArray(trace.x) ? trace.x : [];
+        const yValues = Array.isArray(trace.y) ? trace.y : [];
+        if (!xValues.length || !yValues.length) return trace;
+
+        const nextMarkerSizes = Array.isArray(trace.marker?.size) ? trace.marker.size : [];
+        const startX = [];
+        const startY = [];
+        const startMarkerSizes = [];
+
+        xValues.forEach((x, index) => {
+            const y = yValues[index];
+            const program = getTracePointProgram(trace, index);
+            const previous = previousPoints.get(program);
+
+            if (previous) {
+                startX.push(projectAxisValue(previous.x, safePreviousRanges.x, safeNextRanges.x, x));
+                startY.push(projectAxisValue(previous.y, safePreviousRanges.y, safeNextRanges.y, y));
+                startMarkerSizes.push(Number.isFinite(previous.size) && previous.size > 0
+                    ? previous.size
+                    : nextMarkerSizes[index]);
+            } else {
+                startX.push(x);
+                startY.push(y);
+                startMarkerSizes.push(nextMarkerSizes[index]);
+            }
+        });
+
+        return {
+            ...trace,
+            x: startX,
+            y: startY,
+            marker: trace.marker ? {
+                ...trace.marker,
+                size: startMarkerSizes,
+            } : trace.marker,
+        };
+    });
 }
 
 function formatFixed(value, digits) {
@@ -248,14 +380,56 @@ export default function ProgramScatter({ fileId }) {
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
     const plotElRef = useRef(null);
+    const lastPlotStateRef = useRef(null);
+    const pendingAnimationRef = useRef(null);
+    const animationIdRef = useRef(0);
+    const [displayPlotData, setDisplayPlotData] = useState([]);
+
+    const startPendingAnimation = useCallback((graphDiv) => {
+        const pending = pendingAnimationRef.current;
+        if (!pending || pending.id !== animationIdRef.current || !graphDiv) return;
+
+        pendingAnimationRef.current = null;
+
+        Plotly.animate(
+            graphDiv,
+            {
+                data: pending.nextData,
+                traces: TRACE_INDICES,
+            },
+            {
+                mode: 'immediate',
+                transition: { duration: PLOT_TRANSITION_DURATION, easing: 'cubic-in-out' },
+                frame: { duration: PLOT_TRANSITION_DURATION, redraw: false },
+            },
+        ).then(() => {
+            if (animationIdRef.current !== pending.id) return;
+            setDisplayPlotData(pending.nextData);
+            lastPlotStateRef.current = {
+                fileId: pending.fileId,
+                data: pending.nextData,
+                axisRanges: pending.nextRanges,
+            };
+        }).catch(() => {
+            if (animationIdRef.current !== pending.id) return;
+            setDisplayPlotData(pending.nextData);
+            lastPlotStateRef.current = {
+                fileId: pending.fileId,
+                data: pending.nextData,
+                axisRanges: pending.nextRanges,
+            };
+        });
+    }, []);
 
     const onInitialized = useCallback((_figure, graphDiv) => {
         plotElRef.current = graphDiv;
-    }, []);
+        startPendingAnimation(graphDiv);
+    }, [startPendingAnimation]);
 
     const onUpdate = useCallback((_figure, graphDiv) => {
         plotElRef.current = graphDiv;
-    }, []);
+        startPendingAnimation(graphDiv);
+    }, [startPendingAnimation]);
 
     const rows = useMemo(() => {
         if (!Array.isArray(data?.data)) return [];
@@ -332,13 +506,19 @@ export default function ProgramScatter({ fileId }) {
         }
         if (mode === MODES.RANK_PROG) {
             return item.rankProg !== null
-                && item.rankProg <= effectiveTopN
                 && item.progScore !== null;
         }
         return item.rankReg !== null
-            && item.rankReg <= effectiveTopN
             && item.regScore !== null;
-    }), [effectiveTopN, mode, rows]);
+    }), [mode, rows]);
+
+    const focusedRows = useMemo(() => {
+        if (mode === MODES.SCATTER) return visibleRows;
+        if (mode === MODES.RANK_PROG) {
+            return visibleRows.filter((item) => item.rankProg <= effectiveTopN);
+        }
+        return visibleRows.filter((item) => item.rankReg <= effectiveTopN);
+    }, [effectiveTopN, mode, visibleRows]);
 
     const visibleRowsByColor = useMemo(() => {
         const grouped = {
@@ -416,7 +596,7 @@ export default function ProgramScatter({ fileId }) {
     const bubbleSizeConfig = useMemo(() => {
         if (mode === MODES.SCATTER) return null;
 
-        const sizeValues = visibleRows
+        const sizeValues = focusedRows
             .map((item) => {
                 if (mode === MODES.RANK_PROG) return item.regScore;
                 return item.progScore;
@@ -433,7 +613,7 @@ export default function ProgramScatter({ fileId }) {
             max: Math.max(...sizeValues),
             autoScale: Math.min(1, Math.sqrt(10 / Math.max(effectiveTopN, 1))),
         };
-    }, [effectiveTopN, mode, visibleRows]);
+    }, [effectiveTopN, focusedRows, mode]);
 
     const getBubbleSize = useCallback((row) => {
         const categoryScale = CATEGORY_SIZE_SCALE[row.color] || 1;
@@ -456,6 +636,15 @@ export default function ProgramScatter({ fileId }) {
                 type: 'scatter',
                 mode: 'markers',
                 visible: false,
+                marker: {
+                    size: [],
+                    color: COLORS[key],
+                    opacity: [],
+                    line: {
+                        width: key === 'other' ? 0.5 : 1,
+                        color: key === 'other' ? 'rgba(90,98,112,0.14)' : 'rgba(17,24,39,0.22)',
+                    },
+                },
                 name: LEGEND_LABELS[key],
                 legendgroup: key,
                 showlegend: true,
@@ -473,6 +662,12 @@ export default function ProgramScatter({ fileId }) {
             return item.rankReg;
         });
 
+        const inFocus = (item) => {
+            if (mode === MODES.SCATTER) return true;
+            if (mode === MODES.RANK_PROG) return item.rankProg <= effectiveTopN;
+            return item.rankReg <= effectiveTopN;
+        };
+
         return {
             x,
             y,
@@ -484,14 +679,17 @@ export default function ProgramScatter({ fileId }) {
                     return Number.isFinite(sz) && sz > 0 ? sz : markerSize;
                 }),
                 color: COLORS[key],
-                opacity: key === 'other' ? 0.56 : 0.94,
+                opacity: pts.map((item) => {
+                    if (!inFocus(item)) return 0.08;
+                    return key === 'other' ? 0.56 : 0.94;
+                }),
                 line: {
                     width: key === 'other' ? 0.5 : 1,
                     color: key === 'other' ? 'rgba(90,98,112,0.14)' : 'rgba(17,24,39,0.22)',
                 },
             },
             ...(showLabels && {
-                text: pts.map(getProgramLabel),
+                text: pts.map((item) => (inFocus(item) ? getProgramLabel(item) : '')),
                 textposition: 'top center',
                 textfont: { size: 11, color: key === 'other' ? '#667085' : COLORS[key] },
             }),
@@ -510,7 +708,7 @@ export default function ProgramScatter({ fileId }) {
             }),
             customdata: pts.map((item) => [item.program]),
         };
-    }), [getBubbleSize, markerSize, mode, programInfo, showLabels, theme, visibleRowsByColor]);
+    }), [effectiveTopN, getBubbleSize, markerSize, mode, programInfo, showLabels, theme, visibleRowsByColor]);
 
     const axisRanges = useMemo(() => {
         if (mode === MODES.SCATTER) {
@@ -522,16 +720,16 @@ export default function ProgramScatter({ fileId }) {
 
         if (mode === MODES.RANK_PROG) {
             return {
-                x: computeAxisRange(visibleRows.map((item) => item.progScore)),
+                x: computeAxisRange(focusedRows.map((item) => item.progScore)),
                 y: [effectiveTopN + 0.5, 0.5],
             };
         }
 
         return {
-            x: computeAxisRange(visibleRows.map((item) => item.regScore)),
+            x: computeAxisRange(focusedRows.map((item) => item.regScore)),
             y: [effectiveTopN + 0.5, 0.5],
         };
-    }, [effectiveTopN, mode, visibleRows]);
+    }, [effectiveTopN, focusedRows, mode, visibleRows]);
 
     const layout = useMemo(() => {
         const isRank = mode !== MODES.SCATTER;
@@ -549,11 +747,6 @@ export default function ProgramScatter({ fileId }) {
                 text: `${titleText} - ${fileId || ''}`,
                 font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
                 x: 0.01,
-            },
-            transition: {
-                duration: PLOT_TRANSITION_DURATION,
-                easing: 'cubic-in-out',
-                ordering: 'traces first',
             },
             xaxis: {
                 ...axisStyle,
@@ -636,6 +829,57 @@ export default function ProgramScatter({ fileId }) {
         rows.length,
     ].join('|')), [bubbleScale, effectiveTopN, fileId, markerSize, mode, rows.length, showLabels]);
 
+    useLayoutEffect(() => {
+        lastPlotStateRef.current = null;
+        pendingAnimationRef.current = null;
+        animationIdRef.current += 1;
+        setDisplayPlotData([]);
+    }, [fileId]);
+
+    useLayoutEffect(() => {
+        const graphDiv = plotElRef.current;
+        const nextData = clonePlotData(plotData);
+        const nextRanges = cloneAxisRanges(axisRanges);
+        const previousState = lastPlotStateRef.current;
+        const canAnimate = Boolean(
+            graphDiv
+            && previousState
+            && previousState.fileId === fileId
+            && previousState.data.length === nextData.length
+            && nextData.some((trace) => Array.isArray(trace.x) && trace.x.length > 0)
+        );
+
+        const animationId = animationIdRef.current + 1;
+        animationIdRef.current = animationId;
+
+        if (!canAnimate) {
+            pendingAnimationRef.current = null;
+            setDisplayPlotData(nextData);
+            lastPlotStateRef.current = { fileId, data: nextData, axisRanges: nextRanges };
+            return undefined;
+        }
+
+        const startData = buildAnimationStartData(
+            previousState.data,
+            nextData,
+            previousState.axisRanges,
+            nextRanges,
+        );
+        pendingAnimationRef.current = {
+            id: animationId,
+            fileId,
+            nextData,
+            nextRanges,
+        };
+        setDisplayPlotData(startData);
+
+        return () => {
+            if (pendingAnimationRef.current?.id === animationId) {
+                pendingAnimationRef.current = null;
+            }
+        };
+    }, [axisRanges, fileId, plotData]);
+
     if (!fileId) {
         return (
             <Box sx={plotFrameSx(theme, { p: 6, textAlign: 'center' })}>
@@ -650,6 +894,7 @@ export default function ProgramScatter({ fileId }) {
         return <Alert severity="error" sx={{ m: 2 }}>{error.message}</Alert>;
     }
 
+    const renderedPlotData = displayPlotData.length ? displayPlotData : plotData;
     const hasVisiblePoints = plotData.some((trace) => Array.isArray(trace.x) && trace.x.length > 0);
 
     return (
@@ -752,7 +997,7 @@ export default function ProgramScatter({ fileId }) {
                     variant="outlined"
                     sx={plotFrameSx(theme, {
                         position: 'relative',
-                        minHeight: isLoading || hasVisiblePoints ? RESPONSIVE_TALL_PLOT_HEIGHT : undefined,
+                        minHeight: isLoading || hasVisiblePoints ? PROGRAM_SCATTER_PLOT_HEIGHT : undefined,
                     })}
                 >
                     {isLoading && (
@@ -790,12 +1035,12 @@ export default function ProgramScatter({ fileId }) {
                                         setTableOpen(true);
                                     }
                                 }}
-                                data={plotData}
+                                data={renderedPlotData}
                                 layout={layout}
                                 config={plotConfig}
                                 revision={plotRevision}
                                 useResizeHandler
-                                style={{ width: '100%', height: RESPONSIVE_TALL_PLOT_HEIGHT }}
+                                style={{ width: '100%', height: PROGRAM_SCATTER_PLOT_HEIGHT }}
                             />
                             <FloatingLegend
                                 items={legendItems}

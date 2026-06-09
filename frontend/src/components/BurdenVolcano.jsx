@@ -24,6 +24,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import {
     Insights,
+    Refresh,
     RestartAlt,
     Science,
     Timeline,
@@ -187,6 +188,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
+    const [retryKey, setRetryKey] = useState(0);
 
     const onInitialized = useCallback((_figure, graphDiv) => {
         plotRef.current = graphDiv;
@@ -205,7 +207,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         let cancelled = false;
         setIsLoading(true);
         setError(null);
-        fetchVolcano(gwasId || fileId, { variant, aliasId: fileId })
+        fetchVolcano(fileId || gwasId, { variant, aliasId: gwasId })
             .then((res) => {
                 if (!cancelled) setPayload(res);
             })
@@ -222,7 +224,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         return () => {
             cancelled = true;
         };
-    }, [fetchVolcano, fileId, gwasId, variant]);
+    }, [fetchVolcano, fileId, gwasId, retryKey, variant]);
 
     const rows = useMemo(() => {
         if (!Array.isArray(payload?.data)) return [];
@@ -658,7 +660,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         const width = normalizeExportSize(exportWidth, DEFAULT_EXPORT_WIDTH);
         const height = normalizeExportSize(exportHeight, DEFAULT_EXPORT_HEIGHT);
         Plotly.toImage(gd, { format: exportFmt, width, height }).then((dataUrl) => {
-            downloadDataUrl(dataUrl, `${sanitizeFileNamePart(gwasId || fileId)}-${variantLabel}-${plotSuffix}.${exportFmt}`);
+            downloadDataUrl(dataUrl, `${sanitizeFileNamePart(fileId || gwasId)}-${variantLabel}-${plotSuffix}.${exportFmt}`);
         });
     }, [exportFmt, exportHeight, exportWidth, fileId, gwasId, plotSuffix, variantLabel]);
 
@@ -683,11 +685,28 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             row.primaryGeneset || '',
         ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
         const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
-        downloadBlob(blob, `${exportPrefix}_${variantLabel}_${sanitizeFileNamePart(gwasId || fileId)}.csv`);
+        downloadBlob(blob, `${exportPrefix}_${variantLabel}_${sanitizeFileNamePart(fileId || gwasId)}.csv`);
     }, [effectLabel, exportPrefix, fileId, gwasId, includePosteriorColumns, rows, variantLabel]);
 
     if (error) {
-        return <Alert severity="error" sx={{ m: 2 }}>{error.message}</Alert>;
+        return (
+            <Alert
+                severity="error"
+                sx={{ m: 2 }}
+                action={(
+                    <Button
+                        color="inherit"
+                        size="small"
+                        startIcon={<Refresh />}
+                        onClick={() => setRetryKey((key) => key + 1)}
+                    >
+                        Retry
+                    </Button>
+                )}
+            >
+                {error?.response?.data?.error || error?.message || `Failed to load ${title.toLowerCase()} data.`}
+            </Alert>
+        );
     }
 
     const hasVisiblePoints = plotData.some((trace) => Array.isArray(trace.x) && trace.x.length > 0);

@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Plot from 'react-plotly.js';
-import Plotly from 'plotly.js-basic-dist';
 import {
     Alert,
     Autocomplete,
@@ -37,7 +36,7 @@ import {
 } from '../themeUtils';
 import { StatePanel } from './PageScaffold';
 
-const DEFAULT_TOP_GENES = 30;
+const DEFAULT_TOP_GENES = 80;
 const MIN_TOP_GENES = 10;
 const MAX_TOP_GENES = 100;
 const DEFAULT_TARGET_LIMIT = 24;
@@ -60,7 +59,7 @@ function normalizeTraitOption(option) {
     return {
         file_id: fileId || id,
         gwas_id: gwasId || id,
-        trait_name: traitName || gwasId || fileId || id,
+        trait_name: traitName || fileId || gwasId || id,
     };
 }
 
@@ -238,7 +237,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             type: 'heatmap',
             z: matrixPayload.matrix,
             x: matrixPayload.targets.map((target) => truncateLabel(target.trait_name, 24)),
-            y: matrixPayload.genes.map((gene) => truncateLabel(gene.gene || gene.ensg, 22)),
+            y: matrixPayload.genes.map((_, index) => index),
             text: matrixPayload.matrix.map((row, rowIndex) => row.map((value, colIndex) => {
                 const gene = matrixPayload.genes[rowIndex];
                 const target = matrixPayload.targets[colIndex];
@@ -270,6 +269,15 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         }];
     }, [fileId, matrixPayload, theme, traitLabel]);
 
+    const yTickLabels = useMemo(
+        () => (matrixPayload?.genes || []).map((gene) => truncateLabel(gene.gene || gene.ensg, 22)),
+        [matrixPayload?.genes],
+    );
+    const yTickValues = useMemo(
+        () => (matrixPayload?.genes || []).map((_, index) => index),
+        [matrixPayload?.genes],
+    );
+
     const layout = useMemo(() => ({
         autosize: true,
         title: {
@@ -289,29 +297,26 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             zeroline: false,
         },
         yaxis: {
+            tickmode: 'array',
+            tickvals: yTickValues,
+            ticktext: yTickLabels,
             tickfont: { size: 11, color: theme.palette.text.secondary },
             automargin: true,
             showgrid: false,
             zeroline: false,
         },
         hovermode: 'closest',
-    }), [chartTokens.paperBg, chartTokens.plotBg, fileId, theme.palette.text.primary, theme.palette.text.secondary, theme.typography.fontFamily, traitLabel]);
+    }), [chartTokens.paperBg, chartTokens.plotBg, fileId, theme.palette.text.primary, theme.palette.text.secondary, theme.typography.fontFamily, traitLabel, yTickLabels, yTickValues]);
 
     const plotHeight = useMemo(() => {
         const geneRows = matrixPayload?.genes?.length || topGeneCount;
-        return Math.min(1120, Math.max(560, 180 + (geneRows * 18)));
+        return Math.max(560, 180 + (geneRows * 18));
     }, [matrixPayload?.genes?.length, topGeneCount]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
         displaylogo: false,
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
-        modeBarButtonsToAdd: [{
-            name: 'download',
-            title: 'Download plot',
-            icon: Plotly.Icons.disk,
-            click: () => {},
-        }],
     }), []);
 
     if (statusLoading) {

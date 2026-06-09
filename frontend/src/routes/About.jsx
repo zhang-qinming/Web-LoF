@@ -13,7 +13,6 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import {
     AccountTreeOutlined,
-    ArticleOutlined,
     BiotechOutlined,
     DataObjectOutlined,
     InsightsOutlined,
@@ -22,10 +21,10 @@ import {
     StorageOutlined,
 } from '@mui/icons-material';
 import { PageFrame } from '../components/PageScaffold';
+import AboutDataStatistics from '../components/AboutDataStatistics';
 import ReleaseLogSection from '../components/ReleaseLogSection';
 import { RELEASE_LOG_ANCHOR, releaseEntriesByLocale } from '../components/releaseLogData';
 import { captionSx, metricChipTone, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
-import homeFigureBrowserWorkflow from '../assets/home/home-figure-browser-workflow.svg';
 
 const COPY = {
     en: {
@@ -42,14 +41,75 @@ const COPY = {
             { label: 'Open Data Browser', to: '/data' },
         ],
         heroChips: ['GWAS trait signals', 'LoF gene evidence', 'Perturb-seq programs', 'Downloadable outputs'],
-        figureCards: [
-            {
-                title: 'Analysis Workflow',
-                body: 'This is the project-side data path: GWAS and LoF evidence are organized through perturb-seq program modeling, association, and result-file indexing before they appear in the browser.',
-                image: homeFigureBrowserWorkflow,
-                alt: 'Analysis workflow from GWAS and LoF to web display',
+        dataStatistics: {
+            title: 'Data Coverage Statistics',
+            body: 'A compact view of how much GWAS, LoF, perturb-seq, and result-file evidence is currently indexed for browsing.',
+            chip: 'Live API summary',
+            emptyValue: 'Not available',
+            errorTitle: 'Statistics unavailable',
+            errorBody: 'The coverage summary request failed.',
+            emptyTitle: 'No coverage statistics yet',
+            emptyBody: 'The home statistics endpoint returned no measurable coverage values.',
+            metrics: {
+                traits: { label: 'GWAS traits' },
+                variants: { label: 'Variants indexed' },
+                significantLoci: { label: 'Significant loci' },
+                dataOutputs: { label: 'Result files' },
             },
-        ],
+            supplemental: {
+                title: 'Additional coverage',
+                chartAria: 'Additional coverage bar chart and text summary',
+                summaryTitle: 'Coverage counts',
+                countAxisLabel: 'count',
+                items: {
+                    programs: { label: 'Perturb-seq programs' },
+                    populations: { label: 'Population groups' },
+                    sourceBatches: { label: 'Source batches' },
+                    studyYears: { label: 'Study years covered' },
+                },
+            },
+            chart: {
+                chartAria: 'Data coverage bar charts and text summary',
+                catalogScale: 'Catalog scale',
+                annotationScale: 'Annotation scale',
+                logAxisLabel: 'log count',
+                countAxisLabel: 'count',
+                summaryTitle: 'Coverage dimensions',
+                summaryBody: 'The catalog chart uses a log axis so variants do not hide smaller trait, locus, and file counts. Annotation dimensions stay on a linear count axis.',
+                dimensions: {
+                    traits: { label: 'Traits' },
+                    variants: { label: 'Variants' },
+                    significantLoci: { label: 'Significant loci' },
+                    programs: { label: 'Programs' },
+                    dataOutputs: { label: 'Data outputs' },
+                    populations: { label: 'Populations' },
+                    sourceBatches: { label: 'Source batches' },
+                },
+            },
+            studySpan: {
+                yearRange: 'Study years',
+                latestCollectDate: 'Latest collection',
+                populations: 'Populations',
+                sourceBatches: 'Source batches',
+            },
+            derived: {
+                title: 'Derived coverage density',
+                body: 'These ratios translate raw totals into browsing density, helping compare catalog scale, result-file depth, and source coverage.',
+                chartAria: 'Derived coverage density bar chart and text summary',
+                summaryTitle: 'Density ratios',
+                logAxisLabel: 'log ratio',
+                items: {
+                    variantsPerTrait: { label: 'Variants per trait', unit: 'variants / trait' },
+                    lociPerTrait: { label: 'Significant loci per trait', unit: 'loci / trait' },
+                    lociPerMillionVariants: { label: 'Significant loci per 1M variants', unit: 'loci / 1M variants' },
+                    filesPerTrait: { label: 'Result files per trait', unit: 'files / trait' },
+                    filesPerProgram: { label: 'Result files per program', unit: 'files / program' },
+                    traitsPerYear: { label: 'Traits per study year', unit: 'traits / year' },
+                    traitsPerBatch: { label: 'Traits per source batch', unit: 'traits / batch' },
+                    variantsPerPopulation: { label: 'Variants per population group', unit: 'variants / population' },
+                },
+            },
+        },
         releaseEyebrow: 'Release',
         releaseTitle: 'Full release log',
         releaseSubtitle: 'A longer milestone view of the project since May 7, 2026, written as readable product notes instead of raw commit text.',
@@ -57,42 +117,6 @@ const COPY = {
             { label: 'History span', value: 'May 7 - Jun 3, 2026' },
             { label: 'Milestones', value: '15 releases' },
             { label: 'Coverage', value: 'Home, Trait, Genes, Programs, Data' },
-        ],
-        routeMatrixTitle: 'Route Capability Matrix',
-        routeMatrixBody: 'Use this matrix when you are choosing between pages that can all touch the same biological result from different angles.',
-        routeMatrixInputLabel: 'Input',
-        routeMatrixOutputLabel: 'Output',
-        routeMatrix: [
-            {
-                route: 'Home',
-                bestFor: 'Fast lookup and orientation',
-                inputs: 'Filename, folder, GCST accession, output keyword',
-                outputs: 'Search results, figure shortcuts, release milestones',
-            },
-            {
-                route: 'Trait',
-                bestFor: 'Figure-centric trait interpretation',
-                inputs: 'Trait name, GWAS ID, LoF ID, GCST accession',
-                outputs: 'Metadata, figure tabs, chart-linked evidence tables',
-            },
-            {
-                route: 'Genes',
-                bestFor: 'Gene-first evidence review',
-                inputs: 'Gene symbol or Ensembl ID',
-                outputs: 'Gene metadata, program relationships, trait evidence',
-            },
-            {
-                route: 'Programs',
-                bestFor: 'cNMF program and regulator review',
-                inputs: 'Program ID, annotation, representative gene',
-                outputs: 'Program information, program genes, associated traits',
-            },
-            {
-                route: 'Data',
-                bestFor: 'Raw artifact verification and export',
-                inputs: 'Directory, filename, search keyword, selected paths',
-                outputs: 'Indexed files, folders, ZIP packages, batch downloads',
-            },
         ],
         sections: [
             {
@@ -157,14 +181,75 @@ const COPY = {
             { label: '打开数据浏览器', to: '/data' },
         ],
         heroChips: ['GWAS trait 信号', 'LoF gene 证据', 'Perturb-seq programs', '结果下载'],
-        figureCards: [
-            {
-                title: '分析工作流',
-                body: '这张图对应项目侧的数据路径：GWAS 和 LoF 证据经过 perturb-seq program 建模、association 和结果文件索引后，再进入浏览器展示。',
-                image: homeFigureBrowserWorkflow,
-                alt: '从 GWAS 和 LoF 到网页展示的分析工作流',
+        dataStatistics: {
+            title: '数据覆盖统计',
+            body: '用紧凑统计视图概览当前已进入浏览器索引的 GWAS、LoF、perturb-seq 和结果文件覆盖范围。',
+            chip: '实时 API 汇总',
+            emptyValue: '暂无数据',
+            errorTitle: '统计信息不可用',
+            errorBody: '覆盖统计请求失败。',
+            emptyTitle: '暂无覆盖统计',
+            emptyBody: 'Home 统计接口没有返回可展示的覆盖数值。',
+            metrics: {
+                traits: { label: 'GWAS traits' },
+                variants: { label: '已索引变异' },
+                significantLoci: { label: '显著位点' },
+                dataOutputs: { label: '结果文件' },
             },
-        ],
+            supplemental: {
+                title: '补充覆盖量',
+                chartAria: '补充覆盖量柱状图与文本摘要',
+                summaryTitle: '覆盖计数',
+                countAxisLabel: '数量',
+                items: {
+                    programs: { label: 'Perturb-seq programs' },
+                    populations: { label: '人群分组' },
+                    sourceBatches: { label: '来源批次' },
+                    studyYears: { label: '覆盖研究年份' },
+                },
+            },
+            chart: {
+                chartAria: '数据覆盖柱状图与文本摘要',
+                catalogScale: '目录规模',
+                annotationScale: '注释规模',
+                logAxisLabel: 'log 数量',
+                countAxisLabel: '数量',
+                summaryTitle: '覆盖维度',
+                summaryBody: '目录规模图使用 log 轴，避免 variants 数量过大时压缩 traits、loci 和文件数量；注释维度保持线性计数。',
+                dimensions: {
+                    traits: { label: 'Traits' },
+                    variants: { label: 'Variants' },
+                    significantLoci: { label: 'Significant loci' },
+                    programs: { label: 'Programs' },
+                    dataOutputs: { label: 'Data outputs' },
+                    populations: { label: 'Populations' },
+                    sourceBatches: { label: 'Source batches' },
+                },
+            },
+            studySpan: {
+                yearRange: '研究年份',
+                latestCollectDate: '最近收集日期',
+                populations: '人群数量',
+                sourceBatches: '来源批次',
+            },
+            derived: {
+                title: '派生覆盖密度',
+                body: '这些比率把原始总量转成浏览密度，用于比较目录规模、结果文件深度和来源覆盖。',
+                chartAria: '派生覆盖密度柱状图与文本摘要',
+                summaryTitle: '密度比率',
+                logAxisLabel: 'log 比率',
+                items: {
+                    variantsPerTrait: { label: '每个 trait 的变异数', unit: 'variants / trait' },
+                    lociPerTrait: { label: '每个 trait 的显著位点', unit: 'loci / trait' },
+                    lociPerMillionVariants: { label: '每百万变异的显著位点', unit: 'loci / 1M variants' },
+                    filesPerTrait: { label: '每个 trait 的结果文件', unit: 'files / trait' },
+                    filesPerProgram: { label: '每个 program 的结果文件', unit: 'files / program' },
+                    traitsPerYear: { label: '每个研究年份的 traits', unit: 'traits / year' },
+                    traitsPerBatch: { label: '每个来源批次的 traits', unit: 'traits / batch' },
+                    variantsPerPopulation: { label: '每个人群分组的变异数', unit: 'variants / population' },
+                },
+            },
+        },
         releaseEyebrow: '版本',
         releaseTitle: '完整版本记录',
         releaseSubtitle: '这里汇总了 2026 年 5 月 7 日以来的主要里程碑，用可读的版本说明而不是直接复制 git 提交信息。',
@@ -172,42 +257,6 @@ const COPY = {
             { label: '历史范围', value: '2026-05-07 至 2026-06-03' },
             { label: '里程碑', value: '15 个版本' },
             { label: '覆盖页面', value: 'Home、Trait、Genes、Programs、Data' },
-        ],
-        routeMatrixTitle: '路由能力矩阵',
-        routeMatrixBody: '当多个页面都能触达同一个生物学结果时，用这张矩阵判断应该从哪个角度进入。',
-        routeMatrixInputLabel: '输入',
-        routeMatrixOutputLabel: '输出',
-        routeMatrix: [
-            {
-                route: 'Home',
-                bestFor: '快速检索和定位',
-                inputs: '文件名、文件夹、GCST accession、输出关键词',
-                outputs: '搜索结果、图形快捷入口、版本里程碑',
-            },
-            {
-                route: 'Trait',
-                bestFor: '以图表为中心解释 trait',
-                inputs: 'Trait 名称、GWAS ID、LoF ID、GCST accession',
-                outputs: 'Metadata、figure tabs、图表联动证据表',
-            },
-            {
-                route: 'Genes',
-                bestFor: 'Gene-first 证据核查',
-                inputs: 'Gene symbol 或 Ensembl ID',
-                outputs: 'Gene 元信息、program 关系、trait 证据',
-            },
-            {
-                route: 'Programs',
-                bestFor: 'cNMF program 和 regulator 核查',
-                inputs: 'Program ID、annotation、代表性 gene',
-                outputs: 'Program 信息、program genes、associated traits',
-            },
-            {
-                route: 'Data',
-                bestFor: '原始结果文件核查和导出',
-                inputs: '目录、文件名、搜索关键词、已选路径',
-                outputs: '索引文件、文件夹、ZIP 包、批量下载',
-            },
         ],
         sections: [
             {
@@ -320,114 +369,6 @@ function SectionCard({ section, index }) {
     );
 }
 
-function FigureCard({ figure, index }) {
-    const theme = useTheme();
-
-    return (
-        <Paper
-            elevation={0}
-            sx={panelSx(theme, {
-                p: 0,
-                overflow: 'hidden',
-                backgroundColor: index % 2 === 0 ? theme.palette.background.paper : theme.custom.surface.raised,
-            })}
-        >
-            <Box
-                component="img"
-                src={figure.image}
-                alt={figure.alt}
-                loading="lazy"
-                sx={{
-                    width: '100%',
-                    height: 'auto',
-                    display: 'block',
-                    borderBottom: `1px solid ${theme.custom.border.soft}`,
-                    bgcolor: alpha(theme.palette.primary.main, 0.03),
-                }}
-            />
-            <Box sx={{ p: { xs: 1.5, md: 1.8 } }}>
-                <Stack direction="row" spacing={0.8} alignItems="center" sx={{ mb: 0.7 }}>
-                    <Chip
-                        icon={<ArticleOutlined sx={{ fontSize: 15 }} />}
-                        label={figure.title}
-                        size="small"
-                        sx={summaryChipSx(theme, metricChipTone(theme, index % 2 === 0 ? 'primary' : 'success'))}
-                    />
-                </Stack>
-                <Typography variant="body2" sx={captionSx(theme, { color: theme.palette.text.primary, mb: 0 })}>
-                    {figure.body}
-                </Typography>
-            </Box>
-        </Paper>
-    );
-}
-
-function RouteMatrix({ rows, title, body, inputLabel, outputLabel }) {
-    const theme = useTheme();
-
-    return (
-        <Paper
-            elevation={0}
-            sx={panelSx(theme, {
-                p: { xs: 1.6, md: 2 },
-                mb: 2,
-                overflow: 'hidden',
-                backgroundColor: theme.custom.surface.raised,
-            })}
-        >
-            <Box sx={{ mb: 1.4 }}>
-                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
-                    {title}
-                </Typography>
-                <Typography variant="body2" sx={captionSx(theme, { mb: 0 })}>
-                    {body}
-                </Typography>
-            </Box>
-            <Box
-                sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: 'repeat(5, minmax(0, 1fr))' },
-                    gap: 1,
-                }}
-            >
-                {rows.map((row, index) => (
-                    <Box
-                        key={row.route}
-                        sx={{
-                            p: 1.15,
-                            borderRadius: 1,
-                            border: `1px solid ${theme.custom.border.soft}`,
-                            bgcolor: index % 2 === 0 ? theme.palette.background.paper : alpha(theme.palette.primary.main, 0.035),
-                            minWidth: 0,
-                        }}
-                    >
-                        <Chip
-                            label={row.route}
-                            size="small"
-                            sx={summaryChipSx(theme, metricChipTone(theme, index % 2 === 0 ? 'primary' : 'success'))}
-                        />
-                        <Typography variant="subtitle2" sx={{ mt: 1, fontWeight: 740, color: theme.palette.text.primary, lineHeight: 1.25 }}>
-                            {row.bestFor}
-                        </Typography>
-                        <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: theme.palette.text.secondary, fontWeight: 700 }}>
-                            {inputLabel}
-                        </Typography>
-                        <Typography variant="body2" sx={captionSx(theme, { color: theme.palette.text.primary, mb: 0 })}>
-                            {row.inputs}
-                        </Typography>
-                        <Typography variant="caption" sx={{ display: 'block', mt: 0.9, color: theme.palette.text.secondary, fontWeight: 700 }}>
-                            {outputLabel}
-                        </Typography>
-                        <Typography variant="body2" sx={captionSx(theme, { color: theme.palette.text.primary, mb: 0 })}>
-                            {row.outputs}
-                        </Typography>
-                    </Box>
-                ))}
-            </Box>
-        </Paper>
-    );
-}
-
 export default function About() {
     const theme = useTheme();
     const location = useLocation();
@@ -508,26 +449,7 @@ export default function About() {
                 </Stack>
             </Paper>
 
-            <Box
-                sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(0, 1fr)',
-                    gap: 1.5,
-                    mb: 2,
-                }}
-            >
-                {copy.figureCards.map((figure, index) => (
-                    <FigureCard key={figure.title} figure={figure} index={index} />
-                ))}
-            </Box>
-
-            <RouteMatrix
-                rows={copy.routeMatrix}
-                title={copy.routeMatrixTitle}
-                body={copy.routeMatrixBody}
-                inputLabel={copy.routeMatrixInputLabel}
-                outputLabel={copy.routeMatrixOutputLabel}
-            />
+            <AboutDataStatistics copy={copy.dataStatistics} />
 
             <Box
                 sx={{

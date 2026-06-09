@@ -559,13 +559,13 @@ router.get('/api/data/search', asyncRoute(async (req, res) => {
     if (!q || q.length < 2) return res.json({ results: [], totalCount: 0, truncated: false });
 
     const forceRefresh = config.data.allowSearchRefresh && req.query.refresh === '1';
-    const limit = req.query.limit == null ? null : parsePositiveInt(req.query.limit, 50, 200);
-    const page = limit ? parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER) : 1;
-    const offset = limit ? (page - 1) * limit : 0;
-    const maxMatches = limit ? offset + limit : Number.POSITIVE_INFINITY;
+    const limit = parsePositiveInt(req.query.limit, 50, 200);
+    const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
+    const offset = (page - 1) * limit;
+    const maxMatches = offset + limit;
     const searchIndex = await getSearchIndex(forceRefresh);
     const { matches, totalCount } = findSearchMatches(searchIndex, q, maxMatches);
-    const pagedMatches = limit ? matches.slice(offset, offset + limit) : matches;
+    const pagedMatches = matches.slice(offset, offset + limit);
     const results = await Promise.all(pagedMatches.map(async (entry) => {
         if (entry.type === 'file' && !Number.isFinite(entry.size)) {
             try {
@@ -583,12 +583,12 @@ router.get('/api/data/search', asyncRoute(async (req, res) => {
             size: Number.isFinite(entry.size) ? entry.size : 0,
         };
     }));
-    const totalPages = limit ? Math.max(1, Math.ceil(totalCount / limit)) : 1;
+    const totalPages = Math.max(1, Math.ceil(totalCount / limit));
 
     res.json({
         results,
         totalCount,
-        truncated: limit ? totalCount > (offset + results.length) : false,
+        truncated: totalCount > (offset + results.length),
         page,
         limit,
         totalPages,

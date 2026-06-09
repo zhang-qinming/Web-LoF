@@ -92,7 +92,7 @@ function normalizeTraitOption(option) {
     return {
         file_id: fileId || id,
         gwas_id: gwasId || id,
-        trait_name: traitName || gwasId || fileId || id,
+        trait_name: traitName || fileId || gwasId || id,
     };
 }
 
@@ -111,7 +111,7 @@ function uniqueTraitOptions(items = []) {
 
 function buildTraitStamp(selectedTraits = [], fallback = '') {
     const labels = selectedTraits
-        .map((trait) => String(trait?.trait_name || trait?.gwas_id || trait?.file_id || '').trim())
+        .map((trait) => String(trait?.trait_name || trait?.file_id || trait?.gwas_id || '').trim())
         .filter(Boolean);
     if (!labels.length) return fallback;
     if (labels.length === 1) return labels[0];
@@ -487,7 +487,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const primaryTrait = useMemo(() => normalizeTraitOption({
         file_id: fileId,
         gwas_id: gwasId,
-        trait_name: traitLabel || gwasId || fileId,
+        trait_name: traitLabel || fileId || gwasId,
     }), [fileId, gwasId, traitLabel]);
 
     useEffect(() => {
@@ -499,7 +499,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     }, [primaryTrait]);
 
     useEffect(() => {
-        setTraitStampText(buildTraitStamp(selectedTraits, String(traitLabel || gwasId || fileId || '').trim()));
+        setTraitStampText(buildTraitStamp(selectedTraits, String(traitLabel || fileId || gwasId || '').trim()));
     }, [fileId, gwasId, selectedTraits, traitLabel]);
 
     const candidateIds = useMemo(() => (
@@ -1103,7 +1103,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setShowTopLabels(true);
         setShowTraitStamp(false);
         setSelectedTraits(primaryTrait ? [primaryTrait] : []);
-        setTraitStampText(buildTraitStamp(primaryTrait ? [primaryTrait] : [], String(traitLabel || gwasId || fileId || '').trim()));
+        setTraitStampText(buildTraitStamp(primaryTrait ? [primaryTrait] : [], String(traitLabel || fileId || gwasId || '').trim()));
         setPointSize(DEFAULT_POINT_SIZE);
         setLabelLimit(DEFAULT_LABEL_LIMIT);
         setHighlight({ rowKey: '', key: 0 });
@@ -1223,7 +1223,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     value={activeTraits}
                     groupBy={(option) => option.group || 'Traits'}
                     isOptionEqualToValue={(option, value) => option.file_id === value.file_id}
-                    getOptionLabel={(option) => option.trait_name || option.gwas_id || option.file_id}
+                    getOptionLabel={(option) => option.trait_name || option.file_id || option.gwas_id}
                     onChange={(_, value) => setSelectedTraits(uniqueTraitOptions(value).slice(0, MAX_COMPARE_TRAITS))}
                     onInputChange={(_, value) => setSearchInput(value)}
                     renderInput={(params) => (

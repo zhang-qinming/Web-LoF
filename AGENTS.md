@@ -1,128 +1,156 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Codex when working with code in this repository.
 
 ## 项目概览
 
-GWAS (全基因组关联分析) 数据浏览与可视化 Web 应用。前后端分离架构。
+GWAS 数据浏览与可视化 Web 应用，前后端分离架构。当前代码已经迁移到以 `file_metadata`、`gwas_meta`、文件系统 TSV、Program/Gene/Trait 关联表为核心的数据模型；旧 SQL GWAS 分页接口不再是当前运行路径。
 
 ## 环境配置
 
-### 本地开发 (Windows)
+### 本地开发 Windows
 
 MySQL 运行在 Linux 集群上，通过 SSH 隧道连接：
 
 ```powershell
-# PowerShell 中运行（保持窗口打开）
 ssh -N -L 33306:127.0.0.1:33306 qinminzhang@101.76.96.10
 ```
 
 ```bash
-# 后端配置
 cp backend/.env.example backend/.env
 # 编辑 backend/.env：DB_HOST=localhost, DB_PORT=33306
-
-# 前端配置 — 使用 Vite 代理，无需额外配置
 ```
+
+前端使用 Vite 代理 `/api -> localhost:4000`，通常无需额外配置。
 
 ### Linux 集群部署
 
 ```bash
-# 首次配置
 bash scripts/setup_cluster.sh
 
-# 后续启动（两个终端）
-cd backend  && conda activate gwas-browser && npm run dev   # 后端 :4000
-cd frontend && conda activate gwas-browser && npm run dev   # 前端 :5173
+cd backend  && conda activate gwas-browser && npm run dev
+cd frontend && conda activate gwas-browser && npm run dev
 
-# 本地浏览器访问（通过 SSH 隧道）
 ssh -N -L 5173:localhost:5173 -L 4000:localhost:4000 qinminzhang@101.76.96.10
 # 浏览器打开 http://localhost:5173
 ```
 
-### 数据库 Schema 迁移
+### 数据库迁移
 
 ```bash
 cd backend
-node scripts/migrate.js   # 创建新表（需 DB_HOST/DB_PORT/DB_USER/DB_PASSWORD 环境变量）
+node scripts/migrate.js
 ```
 
 ## 常用命令
 
-### 后端 (`backend/`)
+### 后端 `backend/`
 
 ```bash
-cd backend
-npm run dev        # 启动后端 (nodemon, 热重载, 端口 4000)
-npm start          # 启动后端 (node, 端口 4000)
+npm run dev
+npm start
 ```
 
-### 前端 (`frontend/`)
+### 前端 `frontend/`
 
 ```bash
-cd frontend
-npm run dev        # 启动开发服务器 (Vite, 端口 5173, 内置代理 /api → localhost:4000)
-npm run build      # 生产构建
-npm run lint       # ESLint 检查
-npm run preview    # 预览生产构建
+npm run dev
+npm run build
+npm run lint
+npm run preview
 ```
 
 ## 架构
 
-```
+```text
 frontend (React 19 + Vite 7, port 5173)
-  └─ /api proxy → backend (Express 5 + MySQL2, port 4000) → MySQL (数据库: gwas)
+  -> /api proxy
+backend (Express 5 + MySQL2, port 4000)
+  -> MySQL gwas + TSV file stores
 ```
 
 ### 后端分层
 
-- **`app.js`** — 应用入口，注册 CORS、JSON 中间件，挂载路由，监听 4000 端口
-- **`routes/Rbrowse.js`** — `/api/browse` 路由，Trait 浏览接口
-- **`routes/Rtrait.js`** — `/api/trait/*` 三个路由，GWAS 数据查询与筛选
-- **`models/MgetTrait.js`** — Trait 元数据查询 (gwas_metadata 表)
-- **`models/MgetGwasByTrait.js`** — GWAS SNP 数据查询与筛选 (gwas_data 表)
-- **`models/utils.js`** — 共享工具函数 (`buildOrderBy`, `buildWhereForGwas`)
-- **`models/db.js`** — MySQL 连接池，支持环境变量: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_POOL_SIZE`
-- **`scripts/init_schema.sql`** — 新版数据库 Schema（15 张表）
-- **`scripts/migrate.js`** — 数据库迁移脚本
+- `app.js`：应用入口，注册 CORS、JSON 中间件，挂载路由，监听 4000。
+- `routes/Rbrowse.js`：`/api/browse` Trait 浏览、`/api/meta/:fileId` Trait 元信息、`/api/home/stats` 首页统计。
+- `routes/Rtrait.js`：`/api/trait/manhattan/:traitName` Manhattan TSV 数据接口。
+- `routes/Rprogram.js`：Program scatter/graph、Burden Volcano、Posterior Volcano 相关接口。
+- `routes/Rgene.js`：Gene 列表、搜索、推荐和 Gene-Program 明细接口。
+- `routes/Rdata.js`：文件浏览、全局搜索、单文件/批量下载接口。
+- `routes/RcrossTrait.js`：Cross-trait 搜索、状态、推荐 target、heatmap matrix 接口。
+- `routes/Rregulation.js`：Regulation 数据接口。
+- `models/Mmeta.js`：Trait 元数据查询，主要使用 `file_metadata` 和 `gwas_meta`。
+- `models/MgeneProgram.js`：Gene/Program/Trait 关联查询。
+- `models/db.js`：MySQL 连接池，支持 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`、`DB_POOL_SIZE`。
+- `lib/tsv.js`：TSV 流解析工具。
+- `lib/config.js`：服务、路径、分页、文件大小等配置。
 
-API 端点：
-- `GET /api/browse` — 分页获取所有 Trait 元数据
-- `GET /api/trait/:traitName` — 分页获取 Trait 的 GWAS 数据
-- `GET /api/trait/allgwas/:traitName` — 获取 Trait 全部 GWAS 数据（不分页）
-- `GET /api/trait/filtergwas/:traitName` — 筛选 GWAS 数据 (CHR, BP 区间, P 值范围, rsID)
+### 当前主要 API
+
+- `GET /api/browse`：分页获取 Trait 元数据。
+- `GET /api/meta/:fileId`：获取 Trait 元信息，可包含 `trait_ldsc`。
+- `GET /api/home/stats`：首页统计，可能扫描文件系统并使用内存缓存。
+- `GET /api/trait/manhattan/:traitName`：读取 Manhattan TSV。请求失败应向前端暴露为 error，不应伪装为空数据。接口会检查 `MANHATTAN_MAX_FILE_BYTES`，但不限制行数；未超限时完整读取并返回 `sourceRowCount`，超过大小返回 413。
+- `GET /api/burden-volcano/:fileId`、`GET /api/posterior-volcano/:fileId`：Volcano TSV 数据。前端应显式渲染错误和重试入口。
+- `GET /api/data/search`：Data Browser 全局搜索。后端默认强制分页，前端应传 `page` 和 `limit`，不要一次性拉取所有匹配结果。
+- `GET /api/cross-trait/:fileId/matrix`：Cross-trait heatmap matrix。`topGenes` 默认 80，最大 100；target 文件按 LOF `file_id` 命名。
+
+旧 Trait SQL GWAS 接口当前不存在，不要按旧接口开发新功能。
 
 ### 前端分层
 
-- **`src/main.jsx`** — React 入口
-- **`src/App.jsx`** — 根组件，BrowserRouter + 响应式导航 (大屏 NavLink，小屏 HamburgerMenu)
-- **`src/api/gwas.js`** — API 层，封装 `fetcher`、`getTraitData`、`getFilteredGwasDataByTrait`
-- **`src/routes/*.jsx`** — 页面级路由组件
-- **`src/components/*.jsx`** — 可复用组件
+- `src/main.jsx`：React 入口。
+- `src/App.jsx`：根组件、BrowserRouter、响应式导航。
+- `src/api/gwas.js`：API 层，封装 axios 请求。Manhattan/Volcano 请求失败应抛出给组件处理。
+- `src/routes/*.jsx`：页面级路由组件。
+- `src/components/*.jsx`：可复用图表、表格和控制组件。
 
 关键组件：
 
 | 组件 | 用途 |
-|------|------|
-| `GwasDataList` | 通用 GWAS 数据表格，服务端分页/排序/SWR 取数 |
-| `ManhattanPlot` | 曼哈顿图核心组件 (Plotly.js scattergl) |
-| `TraitManhattan` | Trait 详情页，组合 ManhattanPlot + 筛选面板 + 统计信息 |
-| `HamburgerMenu` | 移动端可拖拽汉堡菜单导航 |
-| `SearchGwasData` | 搜索输入组件 |
+| --- | --- |
+| `GwasDataList` | Trait browse 表格，服务端分页/排序/SWR 取数 |
+| `TraitHitManhattan` | Trait Manhattan 图和联动表格 |
+| `BurdenVolcano` | Burden/Posterior volcano 共用图表组件 |
+| `CrossTraitHeatmap` | Cross-trait heatmap，默认 80 个 gene rows |
+| `Variants` | Data Browser 页面，实际路由是 `/data` |
+| `Genes` | Gene index、Gene detail 和相关导出 |
+| `ProgramScatter` / `TraitProgramGraph` | Program/Trait 关联可视化 |
 
-路由：`/` Home, `/trait` & `/trait/:traitName` Trait, `/genes` Genes, `/variants` Variants, `/browse` Browse, `/contact` Contact, `/about` About
+路由：`/` Home, `/trait`, `/trait/:traitName`, `/genes`, `/programs`, `/programs/:programId`, `/data`, `/help`, `/contact`, `/about`。
 
-技术栈：React 19, Vite 7, MUI 7, react-router-dom v7, SWR, Plotly.js (basic-dist), axios + qs
+`/variants` 和 `/browse` 当前不是已注册路由。如需兼容旧链接，应显式添加 alias。
 
-## 数据库
+## 数据库与文件数据
 
-数据库 `gwas` 含 4 张表：
+当前主要数据库表：
 
-| 表名 | 用途 | 记录数 |
-|------|------|--------|
-| `gwas_metadata` | Trait 元信息 (Trait, mesh_term, sample_size, author, pmid, year, n_blocks, n_variants 等 17 列) | — |
-| `gwas_data` | GWAS SNP 级数据 (Trait, CHR, BP, rsID, P, BETA, SE, MAF 等 14 列) | — |
-| `huge_gwas_data` | 与 gwas_data 结构相同，大型数据集 | — |
-| `moment_ukbb` | UK Biobank 数据 (summary, UDI, ratio, ICD10 等 17 列) | — |
+| 表名 | 用途 |
+| --- | --- |
+| `file_metadata` | Trait 文件 ID、GWAS ID、trait name 主索引 |
+| `gwas_meta` | GWAS 元信息 |
+| `lof_meta` | LOF 元信息 |
+| `trait_ldsc` | Trait heritability/meta 扩展 |
+| `program_info` | Program 元信息 |
+| `trait_program_edge` | Trait-Program 关联 |
+| `gene_program_trait_edge` | Gene-Program-Trait 关联 |
+| `gene_info_hg37_matched` | Gene 注释 |
+| `file_id_mapping` | file_id / gwas_id / lof_id 映射 |
 
-当前代码使用 `gwas_metadata` 和 `gwas_data`。`huge_gwas_data` 和 `moment_ukbb` 尚未在代码中引用。
+当前图表大量依赖文件系统 TSV：
+
+- Manhattan：`GWAS_MANHATTAN_DATA_DIR`
+- Program/Burden/Posterior/Gene-level 图表：相关 TSV 文件 store
+- Cross-trait heatmap：`CROSS_TRAIT_HEATMAP_DIR`
+- Data Browser：`DATA_ROOT`
+
+不要假设旧 SQL GWAS 大表在当前运行库中存在。
+
+## 实现注意事项
+
+- 文件型图表接口要明确区分“真实无数据”和“请求失败”。前端组件应显示错误状态和重试按钮。
+- 大 TSV 路径优先做文件大小检查；是否限制行数需要按具体业务确认。
+- Data Browser 全局搜索必须服务端分页；不要把全部匹配结果一次性发给前端再本地分页。
+- Cross-trait target 文件当前按 LOF `file_id` 命名；不要在没有数据确认的情况下改成只按 `gwas_id` 查找。
+- `topGenes` 默认 80，最大 100。如果实际返回少于请求数，优先检查源 TSV 中是否有足够的 `gene/ensg` 且 `post_mean` 可解析的行。
+- 工作区可能已有用户修改。不要回滚或覆盖无关改动。

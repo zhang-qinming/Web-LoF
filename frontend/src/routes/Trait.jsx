@@ -1,8 +1,8 @@
 import React from 'react';
 import { useLocation, useParams, useSearchParams } from 'react-router-dom';
-import { Box, Typography, Tabs, Tab } from '@mui/material';
+import { Box, Button, Typography, Tabs, Tab } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Timeline } from '@mui/icons-material';
+import { Refresh, Timeline } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import TraitMetaCard from '../components/TraitMetaCard';
@@ -124,15 +124,28 @@ export default function Trait() {
     const [tab, setTab] = React.useState(requestedTab);
     const userSelectedTabRef = React.useRef(false);
     const figurePanelRef = React.useRef(null);
-    const { data: scatterListData } = useSWR('/api/programs/list', fetcher);
-    const { data: graphListData } = useSWR('/api/programs/graph-list', fetcher);
+    const {
+        data: scatterListData,
+        error: scatterListError,
+        mutate: retryScatterList,
+    } = useSWR('/api/programs/list', fetcher);
+    const {
+        data: graphListData,
+        error: graphListError,
+        mutate: retryGraphList,
+    } = useSWR('/api/programs/graph-list', fetcher);
     const { data: metaData } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
-    const availabilityReady = scatterListData !== undefined && graphListData !== undefined;
+    const availabilityError = scatterListError || graphListError;
+    const availabilityReady = (
+        (scatterListData !== undefined || scatterListError)
+        && (graphListData !== undefined || graphListError)
+    );
     const meta = (metaData && !metaData.error) ? metaData : null;
+    const resolvedFileId = meta?.file_id || fileId;
     const gwasId = metaData === undefined ? '' : (meta?.gwas_id || fileId);
     const dataIdCandidates = React.useMemo(() => (
-        [...new Set([fileId, gwasId, meta?.file_id].filter(Boolean))]
-    ), [fileId, gwasId, meta?.file_id]);
+        [...new Set([resolvedFileId, fileId, gwasId].filter(Boolean))]
+    ), [fileId, gwasId, resolvedFileId]);
     const scatterFileId = findAvailableId(scatterListData?.files, dataIdCandidates);
     const graphFileId = findAvailableId(graphListData?.files, dataIdCandidates);
     const hasProgramScatter = Boolean(scatterFileId);
@@ -314,7 +327,26 @@ export default function Trait() {
                 ref={figurePanelRef}
                 sx={{ minHeight: 400, scrollMarginTop: { xs: 7, md: 8 } }}
             >
-                {shouldDeferFigureTab ? (
+                {availabilityError ? (
+                    <StatePanel
+                        severity="error"
+                        icon={Timeline}
+                        title="Failed to load trait figure availability"
+                        message={availabilityError?.response?.data?.error || availabilityError?.message || 'Program figure lists could not be loaded.'}
+                        minHeight={360}
+                    >
+                        <Button
+                            variant="outlined"
+                            startIcon={<Refresh />}
+                            onClick={() => {
+                                void retryScatterList();
+                                void retryGraphList();
+                            }}
+                        >
+                            Retry
+                        </Button>
+                    </StatePanel>
+                ) : shouldDeferFigureTab ? (
                     <TraitFigureFallback />
                 ) : (
                     <React.Suspense fallback={<TraitFigureFallback />}>
@@ -345,7 +377,7 @@ export default function Trait() {
                         {displayedTab === 2 && (
                             <TraitHitManhattan
                                 key={`manhattan-${fileId}-${gwasId}`}
-                                fileId={fileId}
+                                fileId={resolvedFileId}
                                 gwasId={gwasId}
                                 traitLabel={meta?.trait_name || fileId}
                             />
@@ -353,7 +385,7 @@ export default function Trait() {
                         {displayedTab === 3 && (
                             <BurdenVolcano
                                 key={`burden-volcano-${fileId}`}
-                                fileId={fileId}
+                                fileId={resolvedFileId}
                                 gwasId={gwasId}
                                 traitLabel={meta?.trait_name || fileId}
                                 volcanoType="burden"
@@ -362,7 +394,7 @@ export default function Trait() {
                         {displayedTab === 4 && (
                             <BurdenVolcano
                                 key={`posterior-volcano-${fileId}`}
-                                fileId={fileId}
+                                fileId={resolvedFileId}
                                 gwasId={gwasId}
                                 traitLabel={meta?.trait_name || fileId}
                                 volcanoType="posterior"
@@ -371,7 +403,7 @@ export default function Trait() {
                         {displayedTab === 5 && (
                             <GeneLevelScatter
                                 key={`gene-level-scatter-${fileId}-${gwasId}`}
-                                fileId={fileId}
+                                fileId={resolvedFileId}
                                 gwasId={gwasId}
                                 traitLabel={meta?.trait_name || fileId}
                                 lookupIds={dataIdCandidates}
@@ -380,7 +412,7 @@ export default function Trait() {
                         {displayedTab === 6 && (
                             <GeneLevelQQ
                                 key={`gene-level-qq-${fileId}-${gwasId}`}
-                                fileId={fileId}
+                                fileId={resolvedFileId}
                                 gwasId={gwasId}
                                 traitLabel={meta?.trait_name || fileId}
                                 lookupIds={dataIdCandidates}
@@ -389,7 +421,7 @@ export default function Trait() {
                         {displayedTab === 7 && (
                             <CrossTraitHeatmap
                                 key={`cross-trait-heatmap-${fileId}-${gwasId}`}
-                                fileId={fileId}
+                                fileId={resolvedFileId}
                                 gwasId={gwasId}
                                 traitLabel={meta?.trait_name || fileId}
                             />

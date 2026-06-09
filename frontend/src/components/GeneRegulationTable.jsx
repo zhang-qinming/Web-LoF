@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
     Box,
     Button,
@@ -54,6 +55,34 @@ function formatCell(row, key) {
     if (key === 'p') return row.p?.toExponential(3) ?? '-';
     if (key === 'negLogP') return row.negLogP?.toFixed(4) ?? '-';
     return '-';
+}
+
+function renderCellContent(row, column, theme) {
+    if (column.key !== 'gene') return formatCell(row, column.key);
+
+    const gene = row.gene || '';
+    if (!gene) return '-';
+
+    return (
+        <Button
+            component={RouterLink}
+            to={`/genes?query=${encodeURIComponent(gene)}`}
+            sx={{
+                textTransform: 'none',
+                px: 0,
+                py: 0,
+                minWidth: 0,
+                minHeight: 0,
+                color: theme.palette.primary.dark,
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+            }}
+        >
+            {gene}
+        </Button>
+    );
 }
 
 export default function GeneRegulationTable({
@@ -204,7 +233,7 @@ export default function GeneRegulationTable({
                                                     borderBottom: `1px solid ${theme.custom.border.soft}`,
                                                 }}
                                             >
-                                                {formatCell(row, column.key)}
+                                                {renderCellContent(row, column, theme)}
                                             </TableCell>
                                         ))}
                                     </TableRow>
