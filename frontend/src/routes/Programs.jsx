@@ -463,7 +463,7 @@ function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
                         size="small"
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search P54 or ATP"
+                        placeholder="e.g. P21"
                         InputProps={{
                             startAdornment: <Search fontSize="small" sx={{ color: theme.custom.chart.axisSoft, mr: 0.75 }} />,
                         }}
@@ -600,16 +600,8 @@ function ProgramInfoTable({ row, loading, loadingCounts = false }) {
                                         <Typography sx={sectionTitleSx(theme, { fontSize: '0.94rem', lineHeight: 1.2 })}>
                                             Program Information
                                         </Typography>
-                                        <Typography sx={captionSx(theme, { fontSize: '0.7rem', lineHeight: 1.35 })}>
-                                            Reference annotation, representative function, and linked evidence counts
-                                        </Typography>
                                     </Box>
                                     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-                                        <Chip
-                                            label={row?.associatedGenes == null ? 'genes loading' : `${Number(row.associatedGenes || 0).toLocaleString()} genes`}
-                                            size="small"
-                                            sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))}
-                                        />
                                         <Button
                                             size="small"
                                             startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
@@ -1172,7 +1164,7 @@ export default function Programs() {
                 >
                     <Stack direction="row" spacing={0.55} alignItems="center" sx={{ flexWrap: 'wrap', minWidth: 0 }}>
                         <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#7c4d12', lineHeight: 1.15 })}>
-                            Program Explorer
+                            Program
                         </Typography>
                         <Chip
                             label={programGeneSearch
@@ -1218,7 +1210,7 @@ export default function Programs() {
                             size="small"
                             value={programGeneInput}
                             onChange={(event) => setProgramGeneInput(event.target.value)}
-                            placeholder="Filter by gene"
+                            placeholder="e.g. PTMA"
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">

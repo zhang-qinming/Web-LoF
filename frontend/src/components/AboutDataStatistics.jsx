@@ -64,23 +64,52 @@ function asNumber(value) {
     return Number.isFinite(number) ? number : 0;
 }
 
-function formatNumber(value) {
-    return asNumber(value).toLocaleString();
+function getLocaleCode(locale) {
+    return locale === 'zh' ? 'zh-CN' : 'en-US';
 }
 
-function formatCompactNumber(value) {
+function formatNumber(value, locale = 'en') {
+    return asNumber(value).toLocaleString(getLocaleCode(locale));
+}
+
+function formatCompactNumber(value, locale = 'en') {
     const number = asNumber(value);
     if (!number) return '0';
+    const localeCode = getLocaleCode(locale);
     if (Math.abs(number) >= 1000000) {
-        return number.toLocaleString(undefined, { maximumFractionDigits: 1, notation: 'compact' });
+        return number.toLocaleString(localeCode, { maximumFractionDigits: 1, notation: 'compact' });
     }
     if (Math.abs(number) >= 1000) {
-        return number.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        return number.toLocaleString(localeCode, { maximumFractionDigits: 0 });
     }
     if (Math.abs(number) >= 100) {
-        return number.toLocaleString(undefined, { maximumFractionDigits: 1 });
+        return number.toLocaleString(localeCode, { maximumFractionDigits: 1 });
     }
-    return number.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return number.toLocaleString(localeCode, { maximumFractionDigits: 2 });
+}
+
+function buildLogTicks(values, locale) {
+    const positiveValues = values.map(asNumber).filter((value) => value > 0);
+    if (!positiveValues.length) return {};
+
+    const minExponent = Math.floor(Math.log10(Math.min(...positiveValues)));
+    const maxExponent = Math.floor(Math.log10(Math.max(...positiveValues)));
+    const exponentCount = maxExponent - minExponent + 1;
+    const step = Math.max(1, Math.ceil(exponentCount / 5));
+    const tickvals = [];
+
+    for (let exponent = minExponent; exponent <= maxExponent; exponent += step) {
+        tickvals.push(10 ** exponent);
+    }
+
+    return {
+        tickmode: 'array',
+        tickvals,
+        ticktext: tickvals.map((value) => value.toLocaleString(getLocaleCode(locale), {
+            notation: value >= 1000 ? 'compact' : 'standard',
+            maximumFractionDigits: 1,
+        })),
+    };
 }
 
 function progressPercent(value, maxValue, { log = false } = {}) {
@@ -166,7 +195,7 @@ function getDerivedStats(stats) {
     };
 }
 
-function MetricCard({ item, stats, maxValue }) {
+function MetricCard({ item, stats, maxValue, locale }) {
     const theme = useTheme();
     const tone = metricChipTone(theme, item.tone);
     const Icon = item.icon;
@@ -176,7 +205,7 @@ function MetricCard({ item, stats, maxValue }) {
     return (
         <Box
             role="group"
-            aria-label={`${item.label}: ${formatNumber(value)}`}
+            aria-label={`${item.label}: ${formatNumber(value, locale)}`}
             sx={{
                 minWidth: 0,
                 p: 1.25,
@@ -224,7 +253,7 @@ function MetricCard({ item, stats, maxValue }) {
                     overflowWrap: 'anywhere',
                 }}
             >
-                {formatNumber(value)}
+                {formatNumber(value, locale)}
             </Typography>
             <Box
                 sx={{
@@ -248,7 +277,7 @@ function MetricCard({ item, stats, maxValue }) {
     );
 }
 
-function SupplementalCard({ item, stats, maxValue }) {
+function SupplementalCard({ item, stats, maxValue, locale }) {
     const theme = useTheme();
     const tone = metricChipTone(theme, item.tone);
     const Icon = item.icon;
@@ -258,7 +287,7 @@ function SupplementalCard({ item, stats, maxValue }) {
     return (
         <Box
             role="group"
-            aria-label={`${item.label}: ${formatNumber(value)}`}
+            aria-label={`${item.label}: ${formatNumber(value, locale)}`}
             sx={{
                 minWidth: 0,
                 display: 'flex',
@@ -290,7 +319,7 @@ function SupplementalCard({ item, stats, maxValue }) {
                 </Typography>
                 <Stack direction="row" spacing={0.8} alignItems="center">
                     <Typography variant="subtitle1" sx={{ color: theme.palette.text.primary, fontWeight: 760, lineHeight: 1.15, overflowWrap: 'anywhere' }}>
-                        {formatNumber(value)}
+                        {formatNumber(value, locale)}
                     </Typography>
                     <Box
                         sx={{
@@ -362,7 +391,7 @@ function SupplementalSkeleton() {
     );
 }
 
-function SummaryRow({ item, stats }) {
+function SummaryRow({ item, stats, locale }) {
     const theme = useTheme();
     const value = asNumber(stats?.[item.key]);
     const percent = progressPercent(value, stats?.variants || value, { log: true });
@@ -383,7 +412,7 @@ function SummaryRow({ item, stats }) {
                     {item.label}
                 </Typography>
                 <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontWeight: 760, whiteSpace: 'nowrap' }}>
-                    {formatNumber(value)}
+                    {formatNumber(value, locale)}
                 </Typography>
             </Stack>
             <Box sx={{ height: 3, borderRadius: 1, bgcolor: alpha(theme.palette.text.primary, 0.07), overflow: 'hidden' }}>
@@ -393,14 +422,14 @@ function SummaryRow({ item, stats }) {
     );
 }
 
-function DerivedMetricCard({ item, maxValue }) {
+function DerivedMetricCard({ item, maxValue, locale }) {
     const theme = useTheme();
     const percent = progressPercent(item.value, maxValue, { log: true });
 
     return (
         <Box
             role="group"
-            aria-label={`${item.label}: ${formatCompactNumber(item.value)} ${item.unit}`}
+            aria-label={`${item.label}: ${formatCompactNumber(item.value, locale)} ${item.unit}`}
             sx={{
                 minWidth: 0,
                 p: 0,
@@ -415,7 +444,7 @@ function DerivedMetricCard({ item, maxValue }) {
                 </Typography>
             </Stack>
             <Typography variant="subtitle1" sx={{ color: theme.palette.text.primary, fontWeight: 760, lineHeight: 1.15, overflowWrap: 'anywhere' }}>
-                {formatCompactNumber(item.value)}
+                {formatCompactNumber(item.value, locale)}
             </Typography>
             <Typography variant="caption" sx={{ display: 'block', mt: 0.2, color: theme.palette.text.secondary, lineHeight: 1.2 }}>
                 {item.unit}
@@ -478,13 +507,14 @@ function CompactPlotCard({ title, ariaLabel, children, summary, summaryColumns =
     );
 }
 
-function SupplementalCoveragePanel({ copy, stats, items }) {
+function SupplementalCoveragePanel({ copy, stats, items, locale }) {
     const theme = useTheme();
     const chartTokens = chartLayoutTokens(theme);
     const plotItems = items.map((item) => ({ ...item, value: getRawValue(stats, item.key) }));
     const maxValue = Math.max(...plotItems.map((item) => item.value), 0);
     const config = React.useMemo(() => ({
         responsive: true,
+        displayModeBar: false,
         displaylogo: false,
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     }), []);
@@ -501,7 +531,7 @@ function SupplementalCoveragePanel({ copy, stats, items }) {
                 title={copy.summaryTitle}
                 ariaLabel={copy.chartAria}
                 summary={plotItems.map((item) => (
-                    <SupplementalCard key={item.key} item={item} stats={stats} maxValue={maxValue} />
+                    <SupplementalCard key={item.key} item={item} stats={stats} maxValue={maxValue} locale={locale} />
                 ))}
             >
                 <Plot
@@ -510,13 +540,14 @@ function SupplementalCoveragePanel({ copy, stats, items }) {
                         orientation: 'h',
                         x: plotItems.map((item) => item.value),
                         y: plotItems.map((item) => item.label),
-                        text: plotItems.map((item) => formatNumber(item.value)),
+                        text: plotItems.map((item) => formatNumber(item.value, locale)),
                         textposition: 'auto',
                         marker: {
                             color: ['#3f7eb8', '#36a269', '#6b7a90', '#b7791f'],
                             line: { color: 'rgba(15,23,42,0.14)', width: 1 },
                         },
-                        hovertemplate: '%{y}<br>%{x:,}<extra></extra>',
+                        customdata: plotItems.map((item) => formatNumber(item.value, locale)),
+                        hovertemplate: '%{y}<br>%{customdata}<extra></extra>',
                     }]}
                     layout={{
                         autosize: true,
@@ -556,7 +587,7 @@ function SupplementalCoveragePanel({ copy, stats, items }) {
     );
 }
 
-function DerivedStatsPanel({ copy, stats }) {
+function DerivedStatsPanel({ copy, stats, locale }) {
     const theme = useTheme();
     const chartTokens = chartLayoutTokens(theme);
     const derivedStats = getDerivedStats(stats);
@@ -566,8 +597,10 @@ function DerivedStatsPanel({ copy, stats }) {
         value: derivedStats[key],
     }));
     const maxValue = Math.max(...items.map((item) => item.value), 0);
+    const logTicks = buildLogTicks(items.map((item) => item.value), locale);
     const config = React.useMemo(() => ({
         responsive: true,
+        displayModeBar: false,
         displaylogo: false,
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     }), []);
@@ -594,7 +627,7 @@ function DerivedStatsPanel({ copy, stats }) {
                 title={copy.summaryTitle}
                 ariaLabel={copy.chartAria}
                 summary={items.map((item) => (
-                    <DerivedMetricCard key={item.key} item={item} maxValue={maxValue} />
+                    <DerivedMetricCard key={item.key} item={item} maxValue={maxValue} locale={locale} />
                 ))}
                 summaryColumns={{ xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(2, minmax(0, 1fr))' }}
             >
@@ -604,14 +637,17 @@ function DerivedStatsPanel({ copy, stats }) {
                         orientation: 'h',
                         x: items.map((item) => Math.max(item.value, 0.001)),
                         y: items.map((item) => item.label),
-                        text: items.map((item) => formatCompactNumber(item.value)),
-                        customdata: items.map((item) => [item.value, item.unit]),
+                        text: items.map((item) => formatCompactNumber(item.value, locale)),
+                        customdata: items.map((item) => [
+                            item.value.toLocaleString(getLocaleCode(locale), { maximumFractionDigits: 3 }),
+                            item.unit,
+                        ]),
                         textposition: 'auto',
                         marker: {
                             color: ['#2f80c3', '#2ca58d', '#b7791f', '#6d5aa8', '#3f7eb8', '#36a269', '#6b7a90', '#b35b7d'],
                             line: { color: 'rgba(15,23,42,0.14)', width: 1 },
                         },
-                        hovertemplate: '%{y}<br>%{customdata[0]:,.3f} %{customdata[1]}<extra></extra>',
+                        hovertemplate: '%{y}<br>%{customdata[0]} %{customdata[1]}<extra></extra>',
                     }]}
                     layout={{
                         autosize: true,
@@ -626,6 +662,7 @@ function DerivedStatsPanel({ copy, stats }) {
                         bargap: 0.32,
                         xaxis: {
                             type: 'log',
+                            ...logTicks,
                             title: { text: copy.logAxisLabel, font: { size: 11, color: theme.palette.text.secondary } },
                             tickfont: { size: 10, color: theme.palette.text.secondary },
                             gridcolor: chartTokens.gridColor,
@@ -687,13 +724,15 @@ function SpanItem({ icon, label, value }) {
     );
 }
 
-function CoverageChart({ copy, stats }) {
+function CoverageChart({ copy, stats, locale }) {
     const theme = useTheme();
     const chartTokens = chartLayoutTokens(theme);
     const catalogItems = CATALOG_KEYS.map((key) => ({ ...copy.dimensions[key], key, value: asNumber(stats?.[key]) }));
     const annotationItems = ANNOTATION_KEYS.map((key) => ({ ...copy.dimensions[key], key, value: asNumber(stats?.[key]) }));
+    const catalogLogTicks = buildLogTicks(catalogItems.map((item) => item.value), locale);
     const config = React.useMemo(() => ({
         responsive: true,
+        displayModeBar: false,
         displaylogo: false,
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     }), []);
@@ -756,14 +795,14 @@ function CoverageChart({ copy, stats }) {
                             orientation: 'h',
                             x: catalogItems.map((item) => Math.max(item.value, 1)),
                             y: catalogItems.map((item) => item.label),
-                            text: catalogItems.map((item) => formatNumber(item.value)),
-                            customdata: catalogItems.map((item) => item.value),
+                            text: catalogItems.map((item) => formatNumber(item.value, locale)),
+                            customdata: catalogItems.map((item) => formatNumber(item.value, locale)),
                             textposition: 'auto',
                             marker: {
                                 color: ['#2f80c3', '#2ca58d', '#b7791f', '#6d5aa8'],
                                 line: { color: 'rgba(15,23,42,0.14)', width: 1 },
                             },
-                            hovertemplate: '%{y}<br>%{customdata:,}<extra></extra>',
+                            hovertemplate: '%{y}<br>%{customdata}<extra></extra>',
                         }]}
                         layout={{
                             ...commonLayout,
@@ -774,6 +813,7 @@ function CoverageChart({ copy, stats }) {
                             },
                             xaxis: {
                                 type: 'log',
+                                ...catalogLogTicks,
                                 title: { text: copy.logAxisLabel, font: { size: 11, color: theme.palette.text.secondary } },
                                 tickfont: { size: 10, color: theme.palette.text.secondary },
                                 gridcolor: chartTokens.gridColor,
@@ -803,13 +843,14 @@ function CoverageChart({ copy, stats }) {
                             orientation: 'h',
                             x: annotationItems.map((item) => item.value),
                             y: annotationItems.map((item) => item.label),
-                            text: annotationItems.map((item) => formatNumber(item.value)),
+                            text: annotationItems.map((item) => formatNumber(item.value, locale)),
+                            customdata: annotationItems.map((item) => formatNumber(item.value, locale)),
                             textposition: 'auto',
                             marker: {
                                 color: ['#3f7eb8', '#36a269', '#6b7a90'],
                                 line: { color: 'rgba(15,23,42,0.14)', width: 1 },
                             },
-                            hovertemplate: '%{y}<br>%{x:,}<extra></extra>',
+                            hovertemplate: '%{y}<br>%{customdata}<extra></extra>',
                         }]}
                         layout={{
                             ...commonLayout,
@@ -850,14 +891,14 @@ function CoverageChart({ copy, stats }) {
                     {copy.summaryBody}
                 </Typography>
                 {[...catalogItems, ...annotationItems].map((item) => (
-                    <SummaryRow key={item.key} item={item} stats={stats} />
+                    <SummaryRow key={item.key} item={item} stats={stats} locale={locale} />
                 ))}
             </Box>
         </Box>
     );
 }
 
-export default function AboutDataStatistics({ copy }) {
+export default function AboutDataStatistics({ copy, locale = 'en' }) {
     const theme = useTheme();
     const [stats, setStats] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
@@ -912,12 +953,12 @@ export default function AboutDataStatistics({ copy }) {
         {
             icon: GroupsOutlined,
             label: copy.studySpan.populations,
-            value: formatNumber(stats?.populations),
+            value: formatNumber(stats?.populations, locale),
         },
         {
             icon: FolderOutlined,
             label: copy.studySpan.sourceBatches,
-            value: formatNumber(stats?.sourceBatches),
+            value: formatNumber(stats?.sourceBatches, locale),
         },
     ];
 
@@ -978,6 +1019,7 @@ export default function AboutDataStatistics({ copy }) {
                             item={item}
                             stats={stats}
                             maxValue={metricMaxValue}
+                            locale={locale}
                         />
                     ))}
             </Box>
@@ -1023,9 +1065,9 @@ export default function AboutDataStatistics({ copy }) {
 
             {!loading && !error && hasStats(stats) && (
                 <Stack spacing={1.4}>
-                    <SupplementalCoveragePanel copy={copy.supplemental} stats={stats} items={supplementalItems} />
-                    <CoverageChart copy={copy.chart} stats={stats} />
-                    <DerivedStatsPanel copy={copy.derived} stats={stats} />
+                    <SupplementalCoveragePanel copy={copy.supplemental} stats={stats} items={supplementalItems} locale={locale} />
+                    <CoverageChart copy={copy.chart} stats={stats} locale={locale} />
+                    <DerivedStatsPanel copy={copy.derived} stats={stats} locale={locale} />
                     <Box
                         sx={{
                             display: 'grid',

@@ -9,7 +9,6 @@ import {
     CardContent,
     Chip,
     CircularProgress,
-    Stack,
     TextField,
     Typography,
     Slider,
@@ -35,11 +34,12 @@ import {
     toolbarSx,
 } from '../themeUtils';
 import { StatePanel } from './PageScaffold';
+import CrossTraitHeatmapTable from './CrossTraitHeatmapTable';
 
 const DEFAULT_TOP_GENES = 80;
 const MIN_TOP_GENES = 10;
 const MAX_TOP_GENES = 100;
-const DEFAULT_TARGET_LIMIT = 24;
+const DEFAULT_TARGET_LIMIT = 25;
 const RECENT_STORAGE_KEY = 'cross-trait-heatmap-recent';
 const MAX_RECENT = 12;
 
@@ -60,6 +60,10 @@ function normalizeTraitOption(option) {
         file_id: fileId || id,
         gwas_id: gwasId || id,
         trait_name: traitName || fileId || gwasId || id,
+        n_sig: option.n_sig == null ? null : Number(option.n_sig),
+        sample_size: option.sample_size == null ? null : Number(option.sample_size),
+        selection_rank: option.selection_rank == null ? null : Number(option.selection_rank),
+        selection_basis: option.selection_basis || null,
     };
 }
 
@@ -221,7 +225,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         const recommendIds = new Set(recommended.map((item) => item.file_id));
         const recentIds = new Set(recentTargets.map((item) => item.file_id));
         return prependPinnedTrait([
-            ...recommended.map((item) => ({ ...item, group: 'Recommended' })),
+            ...recommended.map((item) => ({ ...item, group: 'High GWAS signal' })),
             ...recentTargets
                 .filter((item) => !recommendIds.has(item.file_id))
                 .map((item) => ({ ...item, group: 'Recent' })),
@@ -233,6 +237,11 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
 
     const plotData = useMemo(() => {
         if (!matrixPayload?.targets?.length || !matrixPayload?.genes?.length || !matrixPayload?.matrix?.length) return [];
+        const maxAbs = Math.max(
+            Math.abs(Number(matrixPayload?.summary?.valueRange?.min) || 0),
+            Math.abs(Number(matrixPayload?.summary?.valueRange?.max) || 0),
+            0.0001,
+        );
         return [{
             type: 'heatmap',
             z: matrixPayload.matrix,
@@ -253,6 +262,8 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                 [0.5, '#eef2f6'],
                 [1, '#c96a43'],
             ],
+            zmin: -maxAbs,
+            zmax: maxAbs,
             zmid: 0,
             hoverinfo: 'text',
             hoverlabel: buildPlotHoverTone(theme, '#64748b', {
@@ -261,10 +272,22 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             }),
             showscale: true,
             colorbar: {
-                title: { text: 'post_mean', side: 'right' },
-                thickness: 14,
-                len: 0.72,
+                title: { text: 'Gene effect (post_mean)', side: 'top', font: { size: 11 } },
+                orientation: 'h',
+                x: 0.99,
+                xanchor: 'right',
+                y: 1.055,
+                yanchor: 'bottom',
+                thickness: 10,
+                len: 0.28,
                 outlinewidth: 0,
+                tickvals: [-maxAbs, 0, maxAbs],
+                ticktext: [
+                    `-${maxAbs.toFixed(2)}`,
+                    '0',
+                    `+${maxAbs.toFixed(2)}`,
+                ],
+                tickfont: { size: 10, color: theme.palette.text.secondary },
             },
         }];
     }, [fileId, matrixPayload, theme, traitLabel]);
@@ -285,7 +308,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             x: 0.01,
             font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
         },
-        margin: { l: 110, r: 60, t: 64, b: 120 },
+        margin: { l: 110, r: 28, t: 88, b: 120 },
         paper_bgcolor: chartTokens.paperBg,
         plot_bgcolor: chartTokens.plotBg,
         xaxis: {
@@ -312,6 +335,10 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         const geneRows = matrixPayload?.genes?.length || topGeneCount;
         return Math.max(560, 180 + (geneRows * 18));
     }, [matrixPayload?.genes?.length, topGeneCount]);
+    const plotMinWidth = useMemo(
+        () => Math.max(960, 260 + ((matrixPayload?.targets?.length || selectedTargets.length) * 56)),
+        [matrixPayload?.targets?.length, selectedTargets.length],
+    );
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -354,7 +381,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                 </Box>
 
                 <Chip icon={<Timeline />} label={`${matrixPayload?.summary?.topGenes || topGeneCount} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                <Chip icon={<Hub />} label={`${selectedTargets.length.toLocaleString()} targets`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                <Chip icon={<Hub />} label={`${selectedTargets.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
                 <Chip icon={<Search />} label={`${matrixPayload?.summary?.missingCells?.toLocaleString?.() || 0} missing`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
             </Box>
 
@@ -376,14 +403,14 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                         <TextField
                             {...params}
                             label="Target traits"
-                            placeholder="Search traits"
-                            helperText="The current trait stays first; recommended, recent, and search results are merged after it."
+                            placeholder="e.g. GCST90081631"
+                            helperText="Defaults are the 24 available traits with the most significant GWAS loci; the current trait stays first."
                         />
                     )}
                     sx={{
-                        minWidth: 420,
-                        maxWidth: 720,
-                        flex: 1,
+                        minWidth: { xs: '100%', md: 420 },
+                        maxWidth: { xs: '100%', md: 720 },
+                        flex: '1 1 520px',
                         '& .MuiAutocomplete-inputRoot': {
                             alignItems: 'flex-start',
                             maxHeight: 168,
@@ -498,39 +525,27 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     )}
 
                     {!matrixLoading && plotData.length > 0 && (
-                        <Plot
-                            data={plotData}
-                            layout={layout}
-                            config={plotConfig}
-                            onClick={(event) => {
-                                const point = event?.points?.[0];
-                                const target = matrixPayload?.targets?.[point?.pointNumber?.[1] ?? point?.pointIndex];
-                                if (target?.file_id) navigate(`/trait/${encodeURIComponent(target.file_id)}`);
-                            }}
-                            useResizeHandler
-                            style={{ width: '100%', height: `${plotHeight}px` }}
-                        />
+                        <Box sx={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' }}>
+                            <Box sx={{ minWidth: { xs: `${plotMinWidth}px`, xl: '100%' } }}>
+                                <Plot
+                                    data={plotData}
+                                    layout={layout}
+                                    config={plotConfig}
+                                    onClick={(event) => {
+                                        const point = event?.points?.[0];
+                                        const target = matrixPayload?.targets?.[point?.pointNumber?.[1] ?? point?.pointIndex];
+                                        if (target?.file_id) navigate(`/trait/${encodeURIComponent(target.file_id)}`);
+                                    }}
+                                    useResizeHandler
+                                    style={{ width: '100%', height: `${plotHeight}px` }}
+                                />
+                            </Box>
+                        </Box>
                     )}
                 </CardContent>
             </Card>
 
-            {matrixPayload?.targets?.length > 0 && (
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {matrixPayload.targets.map((target) => (
-                        <Chip
-                            key={target.file_id}
-                            label={truncateLabel(target.trait_name, 36)}
-                            onClick={() => navigate(`/trait/${encodeURIComponent(target.file_id)}`)}
-                            sx={{
-                                borderRadius: 1,
-                                backgroundColor: alpha(theme.palette.primary.main, 0.07),
-                                border: `1px solid ${alpha(theme.palette.primary.main, 0.14)}`,
-                                color: theme.palette.text.primary,
-                            }}
-                        />
-                    ))}
-                </Stack>
-            )}
+            <CrossTraitHeatmapTable payload={matrixPayload} fileId={fileId} />
         </Box>
     );
 }

@@ -2,9 +2,11 @@ const pool = require('./db');
 
 const TABLE_MISSING_CODES = new Set(['ER_NO_SUCH_TABLE', 'ER_BAD_TABLE_ERROR']);
 const GENE_INFO_TABLE = 'gene_info_hg37_matched';
+const GENE_SUMMARY_TABLE = 'gene_summary';
 const GENE_SUMMARY_CACHE_TTL_MS = 60 * 60 * 1000;
 const PREFIX_FALLBACK_BLOCKLIST = new Set(['EN', 'ENS', 'ENSG']);
 let geneInfoTableAvailablePromise = null;
+let geneSummaryTableAvailablePromise = null;
 let geneSummaryCache = null;
 let geneSummaryCachePromise = null;
 
@@ -28,6 +30,28 @@ async function hasGeneInfoTable() {
             });
     }
     return geneInfoTableAvailablePromise;
+}
+
+async function hasGeneSummaryTable() {
+    if (!geneSummaryTableAvailablePromise) {
+        geneSummaryTableAvailablePromise = pool.query(
+            `SELECT 1
+             FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+            LIMIT 1`,
+            [GENE_SUMMARY_TABLE],
+        )
+            .then(([rows]) => {
+                const available = rows.length > 0;
+                if (!available) geneSummaryTableAvailablePromise = null;
+                return available;
+            })
+            .catch((err) => {
+                geneSummaryTableAvailablePromise = null;
+                throw err;
+            });
+    }
+    return geneSummaryTableAvailablePromise;
 }
 
 function normalizeGeneQuery(value) {
@@ -86,7 +110,7 @@ function normalizeGeneSummary(row) {
     return {
         geneSymbol: row.gene_symbol || '',
         ensgId: row.ensg_id || '',
-        geneLabel: row.gene_symbol || row.ensg_id || '',
+        geneLabel: row.gene_label || row.gene_symbol || row.ensg_id || '',
         geneName: row.gene_name || '',
         totalPrograms: Number(row.total_programs) || 0,
         totalTraits: Number(row.total_traits) || 0,
@@ -160,6 +184,54 @@ function buildGeneListOrderBy(sortBy, order, includeGeneInfo) {
             END ${direction},
             COALESCE(MAX(gi.begin_pos), 9223372036854775807) ${direction},
             COALESCE(MAX(gi.end_pos), 9223372036854775807) ${direction},
+            ${tieBreakers.join(', ')}`;
+    }
+
+    if (key === 'totalPrograms') {
+        return `ORDER BY total_programs ${direction}, total_traits DESC, ${tieBreakers.join(', ')}`;
+    }
+
+    return `ORDER BY total_traits ${direction}, total_programs DESC, total_rows DESC, ${tieBreakers.join(', ')}`;
+}
+
+function buildGeneSummaryOrderBy(sortBy, order) {
+    const key = normalizeGeneListSortBy(sortBy);
+    const direction = normalizeSortDirection(order);
+    const tieBreakers = [
+        "COALESCE(NULLIF(gene_symbol, ''), NULLIF(ensg_id, ''), gene_key, '') ASC",
+        'ensg_id ASC',
+    ];
+
+    if (key === 'geneSymbol') {
+        return `ORDER BY COALESCE(NULLIF(gene_symbol, ''), NULLIF(ensg_id, ''), gene_key, '') ${direction}, ${tieBreakers.join(', ')}`;
+    }
+
+    if (key === 'ensgId') {
+        return `ORDER BY COALESCE(NULLIF(ensg_id, ''), NULLIF(gene_symbol, ''), gene_key, '') ${direction}, ${tieBreakers.join(', ')}`;
+    }
+
+    if (key === 'geneType') {
+        return `ORDER BY COALESCE(gene_type, '') ${direction}, ${tieBreakers.join(', ')}`;
+    }
+
+    if (key === 'location') {
+        const chrExpr = "UPPER(REPLACE(REPLACE(COALESCE(chromosome, ''), 'chr', ''), 'CHR', ''))";
+        return `ORDER BY
+            (${chrExpr} = '') ASC,
+            CASE
+                WHEN ${chrExpr} REGEXP '^[0-9]+$' THEN 0
+                WHEN ${chrExpr} IN ('X', 'Y', 'M', 'MT') THEN 1
+                ELSE 2
+            END ${direction},
+            CASE
+                WHEN ${chrExpr} REGEXP '^[0-9]+$' THEN CAST(${chrExpr} AS UNSIGNED)
+                WHEN ${chrExpr} = 'X' THEN 23
+                WHEN ${chrExpr} = 'Y' THEN 24
+                WHEN ${chrExpr} IN ('M', 'MT') THEN 25
+                ELSE 999
+            END ${direction},
+            COALESCE(begin_pos, 9223372036854775807) ${direction},
+            COALESCE(end_pos, 9223372036854775807) ${direction},
             ${tieBreakers.join(', ')}`;
     }
 
@@ -596,16 +668,128 @@ async function getGeneSummaryCache(includeGeneInfo) {
     return geneSummaryCachePromise;
 }
 
+async function getGeneSummaryMaxTotals() {
+    const [[row]] = await pool.query(
+        `SELECT
+            COALESCE(MAX(total_programs), 0) AS total_programs,
+            COALESCE(MAX(total_traits), 0) AS total_traits
+         FROM ${GENE_SUMMARY_TABLE}`,
+    );
+
+    return {
+        totalPrograms: Number(row?.total_programs) || 0,
+        totalTraits: Number(row?.total_traits) || 0,
+    };
+}
+
+async function hasGeneSummaryRows() {
+    if (!(await hasGeneSummaryTable())) return false;
+    const [[row]] = await pool.query(
+        `SELECT 1 AS has_rows
+         FROM ${GENE_SUMMARY_TABLE}
+         LIMIT 1`,
+    );
+    return Boolean(row?.has_rows);
+}
+
+async function getGenesFromSummaryTable({
+    page,
+    limit,
+    exportAll,
+    offset,
+    sortBy,
+    order,
+    searchText,
+}) {
+    const where = [];
+    const params = [];
+
+    if (searchText) {
+        const like = `%${escapeLike(searchText)}%`;
+        where.push(`(
+            gene_symbol LIKE ? ESCAPE '\\\\'
+            OR ensg_id LIKE ? ESCAPE '\\\\'
+            OR gene_label LIKE ? ESCAPE '\\\\'
+        )`);
+        params.push(like, like, like);
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const orderBy = buildGeneSummaryOrderBy(sortBy, order);
+    const limitSql = exportAll ? '' : 'LIMIT ? OFFSET ?';
+    const limitParams = exportAll ? [] : [limit, offset];
+
+    const [rows] = await pool.query(
+        `SELECT
+            gene_symbol,
+            ensg_id,
+            gene_label,
+            chromosome,
+            begin_pos,
+            end_pos,
+            gene_name,
+            gene_type,
+            total_rows,
+            total_programs,
+            total_traits,
+            program_role_rows,
+            regulator_role_rows
+         FROM ${GENE_SUMMARY_TABLE}
+         ${whereSql}
+         ${orderBy}
+         ${limitSql}`,
+        [...params, ...limitParams],
+    );
+
+    const [[{ total }]] = await pool.query(
+        `SELECT COUNT(*) AS total
+         FROM ${GENE_SUMMARY_TABLE}
+         ${whereSql}`,
+        params,
+    );
+
+    const [maxTotals] = await Promise.all([getGeneSummaryMaxTotals()]);
+    const genes = rows.map((row) => normalizeGeneSummary(row));
+    const totalCount = Number(total) || 0;
+
+    return {
+        genes,
+        data: genes,
+        totalCount,
+        maxTotals,
+        page,
+        limit: exportAll ? genes.length : limit,
+        totalPages: exportAll ? 1 : Math.ceil(totalCount / limit),
+        sortBy: normalizeGeneListSortBy(sortBy),
+        order: normalizeSortDirection(order),
+        search: searchText,
+        source: GENE_SUMMARY_TABLE,
+    };
+}
+
 async function getGenes({ page = 1, limit = 25, sortBy = 'totalTraits', order = 'DESC', search = '' } = {}) {
     const p = Math.max(1, Number(page) || 1);
     const requestedLimit = Number(limit);
     const exportAll = requestedLimit === 0;
     const l = exportAll ? 0 : Math.max(1, Math.min(200, requestedLimit || 25));
     const offset = exportAll ? 0 : (p - 1) * l;
-    const includeGeneInfo = await hasGeneInfoTable();
     const searchText = normalizeGeneQuery(search);
 
     try {
+        if (await hasGeneSummaryRows()) {
+            const summaryResult = await getGenesFromSummaryTable({
+                page: p,
+                limit: l,
+                exportAll,
+                offset,
+                sortBy,
+                order,
+                searchText,
+            });
+            if (summaryResult.totalCount > 0 || searchText) return summaryResult;
+        }
+
+        const includeGeneInfo = await hasGeneInfoTable();
         const cache = await getGeneSummaryCache(includeGeneInfo);
         const filteredGenes = searchText
             ? cache.genes.filter((gene) => geneMatchesSearch(gene, searchText))
@@ -653,17 +837,103 @@ async function searchGenes(query, limit = 20) {
 
     const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
     const prefixLike = `${escapeLike(q)}%`;
-    const includeGeneInfo = await hasGeneInfoTable();
-    const geneInfoSelect = includeGeneInfo ? `
+
+    try {
+        if (await hasGeneSummaryRows()) {
+            const [exactRows] = await pool.query(
+                `SELECT
+                    gene_symbol,
+                    ensg_id,
+                    gene_label,
+                    chromosome,
+                    begin_pos,
+                    end_pos,
+                    gene_name,
+                    gene_type,
+                    total_rows,
+                    total_programs,
+                    total_traits,
+                    program_role_rows,
+                    regulator_role_rows
+                 FROM ${GENE_SUMMARY_TABLE}
+                 WHERE gene_symbol = ?
+                    OR ensg_id = ?
+                    OR gene_label = ?
+                 ORDER BY
+                    (gene_symbol = ?) DESC,
+                    (ensg_id = ?) DESC,
+                    (gene_label = ?) DESC,
+                    total_traits DESC,
+                    total_programs DESC,
+                    COALESCE(NULLIF(gene_symbol, ''), NULLIF(ensg_id, ''), gene_key, '') ASC
+                 LIMIT ?`,
+                [q, q, q, q, q, q, safeLimit],
+            );
+
+            if (exactRows.length) {
+                return {
+                    query: q,
+                    totalGenes: exactRows.length,
+                    genes: exactRows.map((row) => normalizeGeneSummary(row)),
+                    source: GENE_SUMMARY_TABLE,
+                };
+            }
+
+            if (PREFIX_FALLBACK_BLOCKLIST.has(q.toUpperCase())) {
+                return {
+                    query: q,
+                    totalGenes: 0,
+                    genes: [],
+                    prefixFallbackSkipped: true,
+                    source: GENE_SUMMARY_TABLE,
+                };
+            }
+
+            const [prefixRows] = await pool.query(
+                `SELECT
+                    gene_symbol,
+                    ensg_id,
+                    gene_label,
+                    chromosome,
+                    begin_pos,
+                    end_pos,
+                    gene_name,
+                    gene_type,
+                    total_rows,
+                    total_programs,
+                    total_traits,
+                    program_role_rows,
+                    regulator_role_rows
+                 FROM ${GENE_SUMMARY_TABLE}
+                 WHERE gene_symbol LIKE ? ESCAPE '\\\\'
+                    OR ensg_id LIKE ? ESCAPE '\\\\'
+                    OR gene_label LIKE ? ESCAPE '\\\\'
+                 ORDER BY
+                    total_traits DESC,
+                    total_programs DESC,
+                    COALESCE(NULLIF(gene_symbol, ''), NULLIF(ensg_id, ''), gene_key, '') ASC
+                 LIMIT ?`,
+                [prefixLike, prefixLike, prefixLike, safeLimit],
+            );
+
+            return {
+                query: q,
+                totalGenes: prefixRows.length,
+                genes: prefixRows.map((row) => normalizeGeneSummary(row)),
+                source: GENE_SUMMARY_TABLE,
+            };
+        }
+
+        const includeGeneInfo = await hasGeneInfoTable();
+        const geneInfoSelect = includeGeneInfo ? `
                 MAX(gi.chromosome) AS chromosome,
                 MAX(gi.begin_pos) AS begin_pos,
                 MAX(gi.end_pos) AS end_pos,
                 MAX(gi.gene_name) AS gene_name,
                 MAX(gi.gene_type) AS gene_type,` : '';
-    const geneInfoJoin = includeGeneInfo ? `LEFT JOIN ${GENE_INFO_TABLE} gi
+        const geneInfoJoin = includeGeneInfo ? `LEFT JOIN ${GENE_INFO_TABLE} gi
                 ON gi.ensembl = gpte.ensg_id` : '';
 
-    try {
         const [exactRows] = await pool.query(
             `SELECT
                 gpte.gene_symbol,
@@ -742,9 +1012,42 @@ async function searchGenes(query, limit = 20) {
 
 async function getRecommendedGenes(limit = 12) {
     const safeLimit = Math.max(1, Math.min(50, Number(limit) || 12));
-    const includeGeneInfo = await hasGeneInfoTable();
 
     try {
+        if (await hasGeneSummaryTable()) {
+            const [rows] = await pool.query(
+                `SELECT
+                    gene_symbol,
+                    ensg_id,
+                    gene_label,
+                    chromosome,
+                    begin_pos,
+                    end_pos,
+                    gene_name,
+                    gene_type,
+                    total_rows,
+                    total_programs,
+                    total_traits,
+                    program_role_rows,
+                    regulator_role_rows
+                 FROM ${GENE_SUMMARY_TABLE}
+                 ORDER BY total_traits DESC,
+                    total_programs DESC,
+                    total_rows DESC,
+                    COALESCE(NULLIF(gene_symbol, ''), NULLIF(ensg_id, ''), gene_key, '') ASC
+                 LIMIT ?`,
+                [safeLimit],
+            );
+
+            if (rows.length) {
+                return {
+                    genes: rows.map((row) => normalizeGeneSummary(row)),
+                    source: GENE_SUMMARY_TABLE,
+                };
+            }
+        }
+
+        const includeGeneInfo = await hasGeneInfoTable();
         const cache = await getGeneSummaryCache(includeGeneInfo);
         const genes = [...cache.genes]
             .sort((a, b) => compareGeneSummaryRows(a, b, 'totalTraits', 'DESC'))

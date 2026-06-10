@@ -112,3 +112,11 @@ export async function getCrossTraitMatrix(fileId, { targetIds = [], topGenes = 5
     });
     return res.data;
 }
+
+export async function getTraitCorrelation(fileId, { targetIds = [], method = 'spearman' } = {}) {
+    const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/correlation`, {
+        params: { targetIds, method },
+        paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),
+    });
+    return res.data;
+}

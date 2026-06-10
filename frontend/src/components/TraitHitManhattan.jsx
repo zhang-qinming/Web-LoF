@@ -215,7 +215,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const [highlight, setHighlight] = useState({ rowKey: '', key: 0 });
     const [sortBy, setSortBy] = useState('logp');
     const [sortDir, setSortDir] = useState('desc');
-    const [tableOpen, setTableOpen] = useState(false);
+    const [tableOpen, setTableOpen] = useState(true);
     const [exportOpen, setExportOpen] = useState(false);
     const [exportWidth, setExportWidth] = useState(DEFAULT_EXPORT_WIDTH);
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
@@ -979,7 +979,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     label="Gene / rsID"
                     value={geneQuery}
                     onChange={(event) => setGeneQuery(event.target.value)}
-                    placeholder="e.g. NADK or rs35301881"
+                    placeholder="e.g. rs11902841"
                     sx={{ width: 190 }}
                 />
 

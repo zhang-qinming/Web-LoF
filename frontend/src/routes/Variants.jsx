@@ -1319,7 +1319,7 @@ export default function DataBrowser() {
                     flexShrink: 0,
                     flexWrap: compactBrowseLayout ? 'nowrap' : 'wrap',
                 })}>
-                    <TextField placeholder={isGlobalSearch ? 'Search all files and folders...' : 'Filter by name...'} size="small"
+                    <TextField placeholder={isGlobalSearch ? 'e.g. GCST90081631' : 'e.g. GCST90081631'} size="small"
                         value={filter} onChange={e => setFilter(e.target.value)}
                         sx={controlFieldSx(theme, { width: { xs: '100%', sm: isGlobalSearch ? 440 : 320 } })}
                         InputProps={{

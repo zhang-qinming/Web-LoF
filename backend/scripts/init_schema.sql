@@ -187,3 +187,28 @@ CREATE TABLE IF NOT EXISTS gene_program_trait_edge (
     INDEX idx_gpte_program_trait (program, trait_id),
     INDEX idx_gpte_trait_program (trait_id, program)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS gene_summary (
+    gene_key                   VARCHAR(120) NOT NULL,
+    gene_symbol                VARCHAR(100) DEFAULT NULL,
+    ensg_id                    VARCHAR(30)  DEFAULT NULL,
+    gene_label                 VARCHAR(120) DEFAULT NULL,
+    chromosome                 VARCHAR(50)  DEFAULT NULL,
+    begin_pos                  BIGINT       DEFAULT NULL,
+    end_pos                    BIGINT       DEFAULT NULL,
+    gene_name                  VARCHAR(255) DEFAULT NULL,
+    gene_type                  VARCHAR(100) DEFAULT NULL,
+    total_rows                 BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    total_programs             INT UNSIGNED    NOT NULL DEFAULT 0,
+    total_traits               INT UNSIGNED    NOT NULL DEFAULT 0,
+    program_role_rows          BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    regulator_role_rows        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    summary_updated_at         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (gene_key),
+    INDEX idx_gene_summary_symbol (gene_symbol),
+    INDEX idx_gene_summary_ensg (ensg_id),
+    INDEX idx_gene_summary_traits (total_traits, total_programs, total_rows),
+    INDEX idx_gene_summary_programs (total_programs, total_traits),
+    INDEX idx_gene_summary_location (chromosome, begin_pos, end_pos),
+    INDEX idx_gene_summary_type (gene_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

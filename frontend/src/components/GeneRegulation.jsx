@@ -488,9 +488,6 @@ export default function GeneRegulation({ programId }) {
                                     <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: theme.palette.text.primary }}>
                                         Volcano plot
                                     </Typography>
-                                    <Typography sx={{ fontSize: '0.82rem', color: theme.palette.text.secondary, mt: 0.25 }}>
-                                        Gene-level effect size and significance across visible genes.
-                                    </Typography>
                                 </Box>
                             </Box>
                             <Plot

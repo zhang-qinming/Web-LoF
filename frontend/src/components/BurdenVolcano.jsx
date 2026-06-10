@@ -177,7 +177,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const [effectMode, setEffectMode] = useState(EFFECT_MODES.ALL);
     const [significantOnly, setSignificantOnly] = useState(false);
     const [pointSize, setPointSize] = useState(DEFAULT_POINT_SIZE);
-    const [tableOpen, setTableOpen] = useState(false);
+    const [tableOpen, setTableOpen] = useState(true);
     const [sortBy, setSortBy] = useState('logp');
     const [sortDir, setSortDir] = useState('desc');
     const [highlight, setHighlight] = useState({ rowKey: '', key: 0 });

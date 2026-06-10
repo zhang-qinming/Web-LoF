@@ -29,7 +29,13 @@ import {
     InputAdornment,
     Chip,
 } from '@mui/material';
-import { Clear, Search } from '@mui/icons-material';
+import {
+    Clear,
+    DownloadOutlined,
+    KeyboardArrowLeft,
+    KeyboardArrowRight,
+    Search,
+} from '@mui/icons-material';
 import {
     panelSx,
     sectionTitleSx,
@@ -52,16 +58,16 @@ function PaginationControl({ totalPages, page, onChange }) {
                 color="primary"
                 shape="rounded"
                 size="small"
-                showFirstButton
-                showLastButton
+                siblingCount={0}
+                boundaryCount={1}
                 sx={{
                     '& .MuiPagination-ul': {
                         flexWrap: 'nowrap',
                     },
                     '& .MuiPaginationItem-root': {
-                        minWidth: 28,
+                        minWidth: 26,
                         height: 28,
-                        fontSize: '0.76rem',
+                        fontSize: '0.74rem',
                     },
                 }}
             />
@@ -131,6 +137,111 @@ function JumpToPageControl({ totalPages, page, onChange }) {
             <Button type="submit" size="small" variant="outlined" disabled={!isValid} sx={{ minWidth: 38, height: 32, px: 0.9, py: 0.35, textTransform: 'none', fontSize: '0.72rem', fontWeight: 680 }}>
                 Go
             </Button>
+        </Box>
+    );
+}
+
+function HeaderPageControl({ totalPages, page, onChange }) {
+    const [inputPage, setInputPage] = useState(page);
+    const pageNumber = Number(inputPage);
+    const isValid = inputPage !== ''
+        && Number.isInteger(pageNumber)
+        && pageNumber >= 1
+        && pageNumber <= totalPages;
+
+    useEffect(() => {
+        setInputPage(page);
+    }, [page]);
+
+    if (totalPages <= 1) return null;
+
+    const commitPage = () => {
+        if (isValid) {
+            onChange(pageNumber);
+            return;
+        }
+        setInputPage(page);
+    };
+
+    return (
+        <Box
+            component="form"
+            onSubmit={(event) => {
+                event.preventDefault();
+                commitPage();
+            }}
+            sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                height: 32,
+                overflow: 'hidden',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                bgcolor: 'background.paper',
+                flexShrink: 0,
+            }}
+        >
+            <IconButton
+                size="small"
+                aria-label="Previous page"
+                disabled={page <= 1}
+                onClick={() => onChange(page - 1)}
+                sx={{ width: 31, height: 30, borderRadius: 0 }}
+            >
+                <KeyboardArrowLeft fontSize="small" />
+            </IconButton>
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.65, borderLeft: '1px solid', borderRight: '1px solid', borderColor: 'divider' }}>
+                <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 650 }}>
+                    Page
+                </Typography>
+                <TextField
+                    size="small"
+                    value={inputPage}
+                    onChange={(event) => setInputPage(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            commitPage();
+                        }
+                    }}
+                    onBlur={commitPage}
+                    inputProps={{
+                        'aria-label': 'Page number',
+                        inputMode: 'numeric',
+                        pattern: '[0-9]*',
+                    }}
+                    sx={{
+                        width: 38,
+                        '& .MuiOutlinedInput-root': {
+                            height: 30,
+                            bgcolor: 'transparent',
+                        },
+                        '& .MuiOutlinedInput-notchedOutline': {
+                            border: 0,
+                        },
+                        '& .MuiOutlinedInput-input': {
+                            py: 0,
+                            px: 0.25,
+                            textAlign: 'center',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                        },
+                    }}
+                />
+                <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 650, whiteSpace: 'nowrap' }}>
+                    / {totalPages.toLocaleString()}
+                </Typography>
+            </Box>
+            <IconButton
+                size="small"
+                aria-label="Next page"
+                disabled={page >= totalPages}
+                onClick={() => onChange(page + 1)}
+                sx={{ width: 31, height: 30, borderRadius: 0 }}
+            >
+                <KeyboardArrowRight fontSize="small" />
+            </IconButton>
         </Box>
     );
 }
@@ -208,7 +319,7 @@ function headerLayoutSx(column = {}) {
     };
 }
 
-const GWAS_TABLE_TITLE_HEADER_HEIGHT = 94;
+const GWAS_TABLE_TITLE_HEADER_HEIGHT = 52;
 const GWAS_TABLE_COLUMN_HEADER_HEIGHT = 46;
 const TABLE_PAGINATION_THRESHOLD = 50;
 const DEFAULT_ROWS_PER_PAGE = 25;
@@ -635,9 +746,13 @@ export default function GwasDataList({
                                                 <Box
                                                     sx={{
                                                         display: 'grid',
-                                                        gridTemplateColumns: '1fr',
+                                                        gridTemplateColumns: {
+                                                            xs: '1fr',
+                                                            lg: 'max-content minmax(180px, 1fr) max-content',
+                                                        },
                                                         alignItems: 'center',
-                                                        gap: 0.65,
+                                                        gap: { xs: 0.7, lg: 1.1 },
+                                                        minWidth: 0,
                                                     }}
                                                 >
                                                     <Box
@@ -646,8 +761,9 @@ export default function GwasDataList({
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'flex-start',
-                                                            gap: 1,
-                                                            flexWrap: { xs: 'wrap', md: 'nowrap' },
+                                                            gap: 0.65,
+                                                            flexWrap: 'wrap',
+                                                            maxWidth: { lg: 280 },
                                                         }}
                                                     >
                                                         <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b5f', lineHeight: 1.15 })}>
@@ -667,124 +783,97 @@ export default function GwasDataList({
                                                             }}
                                                         />
                                                     </Box>
-                                                    <Box
-                                                        sx={{
-                                                            display: 'grid',
-                                                            gridTemplateColumns: {
-                                                                xs: '1fr',
-                                                                lg: 'minmax(0, 1fr) auto minmax(0, 1fr)',
-                                                            },
-                                                            alignItems: 'center',
-                                                            justifyItems: { xs: 'stretch', md: 'start' },
-                                                            gap: { xs: 0.7, md: 0.9, lg: 1.1 },
-                                                            minWidth: 0,
-                                                        }}
-                                                    >
-                                                        <Box
+                                                    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'center' }, gap: 0.55, flexWrap: 'wrap', minWidth: 0 }}>
+                                                        <TextField
+                                                            size="small"
+                                                            value={search}
+                                                            onChange={(event) => {
+                                                                setSearch(event.target.value);
+                                                                setPage(1);
+                                                            }}
+                                                            placeholder="e.g. GCST90081631"
                                                             sx={{
                                                                 width: '100%',
-                                                                display: 'grid',
-                                                                gap: 0.35,
-                                                                minWidth: 0,
+                                                                maxWidth: { lg: 260 },
+                                                                '& .MuiOutlinedInput-root': {
+                                                                    height: 32,
+                                                                    bgcolor: theme.palette.background.paper,
+                                                                },
+                                                                '& .MuiInputBase-input': {
+                                                                    py: 0.55,
+                                                                    fontSize: '0.8rem',
+                                                                },
+                                                            }}
+                                                            InputProps={{
+                                                                startAdornment: (
+                                                                    <InputAdornment position="start">
+                                                                        <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
+                                                                    </InputAdornment>
+                                                                ),
+                                                                endAdornment: search ? (
+                                                                    <InputAdornment position="end">
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            aria-label="Clear trait search"
+                                                                            onClick={() => {
+                                                                                setSearch('');
+                                                                                setPage(1);
+                                                                            }}
+                                                                            edge="end"
+                                                                        >
+                                                                            <Clear fontSize="small" />
+                                                                        </IconButton>
+                                                                    </InputAdornment>
+                                                                ) : null,
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                    <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'flex-end' }, justifySelf: { xs: 'start', lg: 'end' }, gap: 0.85, minWidth: 0, flexWrap: { xs: 'wrap', lg: 'nowrap' }, whiteSpace: { lg: 'nowrap' } }}>
+                                                        {shouldPaginate && <HeaderPageControl totalPages={totalPages} page={page} onChange={setPage} />}
+                                                        {shouldPaginate && (
+                                                            <FormControl size="small" sx={{ minWidth: 94 }}>
+                                                                <Select
+                                                                    value={limit}
+                                                                    onChange={handleChangeLimit}
+                                                                    inputProps={{ 'aria-label': 'Rows per page' }}
+                                                                    renderValue={(value) => `${value} / page`}
+                                                                    sx={{
+                                                                        height: 32,
+                                                                        bgcolor: theme.palette.background.paper,
+                                                                        fontSize: '0.78rem',
+                                                                        fontWeight: 650,
+                                                                        '& .MuiSelect-select': { py: 0.45, display: 'flex', alignItems: 'center' },
+                                                                    }}
+                                                                >
+                                                                    {[25, 50, 100, 200].map((v) => (
+                                                                        <MenuItem key={v} value={v} dense>{v}</MenuItem>
+                                                                    ))}
+                                                                </Select>
+                                                            </FormControl>
+                                                        )}
+                                                        <Button
+                                                            size="small"
+                                                            startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
+                                                            onClick={handleDownloadTsv}
+                                                            disabled={!totalCount || downloading}
+                                                            sx={{
+                                                                textTransform: 'none',
+                                                                fontSize: '0.74rem',
+                                                                color: '#245089',
+                                                                border: `1px solid ${alpha('#245089', 0.18)}`,
+                                                                bgcolor: alpha('#245089', 0.045),
+                                                                minWidth: 116,
+                                                                height: 32,
+                                                                py: 0.38,
+                                                                flexShrink: 0,
+                                                                '&:hover': {
+                                                                    bgcolor: alpha('#245089', 0.08),
+                                                                    borderColor: alpha('#245089', 0.28),
+                                                                },
                                                             }}
                                                         >
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 0.55, flexWrap: 'wrap', minWidth: 0 }}>
-                                                                <TextField
-                                                                    size="small"
-                                                                    value={search}
-                                                                    onChange={(event) => {
-                                                                        setSearch(event.target.value);
-                                                                        setPage(1);
-                                                                    }}
-                                                                    placeholder="Search trait, LoF ID, MeSH term"
-                                                                    sx={{
-                                                                        flex: { xs: '1 1 100%', sm: '0 1 260px' },
-                                                                        maxWidth: { sm: 280 },
-                                                                        '& .MuiOutlinedInput-root': {
-                                                                            height: 32,
-                                                                            bgcolor: theme.palette.background.paper,
-                                                                        },
-                                                                        '& .MuiInputBase-input': {
-                                                                            py: 0.55,
-                                                                            fontSize: '0.8rem',
-                                                                        },
-                                                                    }}
-                                                                    InputProps={{
-                                                                        startAdornment: (
-                                                                            <InputAdornment position="start">
-                                                                                <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
-                                                                            </InputAdornment>
-                                                                        ),
-                                                                        endAdornment: search ? (
-                                                                            <InputAdornment position="end">
-                                                                                <IconButton
-                                                                                    size="small"
-                                                                                    aria-label="Clear trait search"
-                                                                                    onClick={() => {
-                                                                                        setSearch('');
-                                                                                        setPage(1);
-                                                                                    }}
-                                                                                    edge="end"
-                                                                                >
-                                                                                    <Clear fontSize="small" />
-                                                                                </IconButton>
-                                                                            </InputAdornment>
-                                                                        ) : null,
-                                                                    }}
-                                                                />
-                                                            </Box>
-                                                        </Box>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', justifySelf: { xs: 'stretch', lg: 'center' }, gap: 0.75, flexWrap: 'wrap' }}>
-                                                            {shouldPaginate && <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />}
-                                                        </Box>
-                                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, justifySelf: { xs: 'start', lg: 'end' }, gap: 0.7, flexShrink: 0, flexWrap: 'wrap' }}>
-                                                            {shouldPaginate && <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />}
-                                                            {shouldPaginate && (
-                                                                <>
-                                                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}>
-                                                                        Rows
-                                                                    </Typography>
-                                                                    <FormControl size="small" sx={{ minWidth: 70 }}>
-                                                                        <Select
-                                                                            value={limit}
-                                                                            onChange={handleChangeLimit}
-                                                                            sx={{
-                                                                                height: 32,
-                                                                                bgcolor: theme.palette.background.paper,
-                                                                                fontSize: '0.78rem',
-                                                                                fontWeight: 650,
-                                                                                '& .MuiSelect-select': { py: 0.45, display: 'flex', alignItems: 'center' },
-                                                                            }}
-                                                                        >
-                                                                            {[25, 50, 100, 200].map((v) => (
-                                                                                <MenuItem key={v} value={v} dense>{v}</MenuItem>
-                                                                            ))}
-                                                                        </Select>
-                                                                    </FormControl>
-                                                                </>
-                                                            )}
-                                                            <Button
-                                                                size="small"
-                                                                onClick={handleDownloadTsv}
-                                                                disabled={!totalCount || downloading}
-                                                                sx={{
-                                                                    textTransform: 'none',
-                                                                    fontSize: '0.74rem',
-                                                                    color: '#245089',
-                                                                    border: `1px solid ${alpha('#245089', 0.18)}`,
-                                                                    bgcolor: alpha('#245089', 0.045),
-                                                                    minWidth: 64,
-                                                                    height: 32,
-                                                                    py: 0.38,
-                                                                    '&:hover': {
-                                                                        bgcolor: alpha('#245089', 0.08),
-                                                                        borderColor: alpha('#245089', 0.28),
-                                                                    },
-                                                                }}
-                                                            >
-                                                                {downloading ? 'Preparing' : 'TSV'}
-                                                            </Button>
-                                                        </Box>
+                                                            {downloading ? 'Preparing' : 'Download TSV'}
+                                                        </Button>
                                                     </Box>
                                                 </Box>
                                             </TableCell>

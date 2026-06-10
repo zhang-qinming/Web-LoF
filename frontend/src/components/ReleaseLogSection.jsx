@@ -77,14 +77,16 @@ export default function ReleaseLogSection({
                         justifyContent="space-between"
                     >
                         <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none' }}>
-                                {eyebrow}
-                            </Typography>
+                            {eyebrow ? (
+                                <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none' }}>
+                                    {eyebrow}
+                                </Typography>
+                            ) : null}
                             <Typography
                                 id={anchorId ? `${anchorId}-heading` : 'release-log-heading'}
                                 component="h2"
                                 sx={{
-                                    mt: 0.3,
+                                    mt: eyebrow ? 0.3 : 0,
                                     color: '#111827',
                                     fontFamily: theme.typography.fontFamily,
                                     fontSize: { xs: '1.85rem', md: '2.3rem' },
@@ -94,9 +96,11 @@ export default function ReleaseLogSection({
                             >
                                 {heading}
                             </Typography>
-                            <Typography sx={{ mt: 0.6, maxWidth: 760, color: '#64748b', fontSize: { xs: '0.92rem', md: '0.98rem' }, lineHeight: 1.72 }}>
-                                {subtitle}
-                            </Typography>
+                            {subtitle ? (
+                                <Typography sx={{ mt: 0.6, maxWidth: 760, color: '#64748b', fontSize: { xs: '0.92rem', md: '0.98rem' }, lineHeight: 1.72 }}>
+                                    {subtitle}
+                                </Typography>
+                            ) : null}
                             {summaryItems.length ? (
                                 <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap" sx={{ mt: 1.2 }}>
                                     {summaryItems.map((item) => (

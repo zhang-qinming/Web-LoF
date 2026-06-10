@@ -17,6 +17,7 @@ const loadBurdenVolcano = () => import('../components/BurdenVolcano');
 const loadGeneLevelScatter = () => import('../components/GeneLevelScatter');
 const loadGeneLevelQQ = () => import('../components/GeneLevelQQ');
 const loadCrossTraitHeatmap = () => import('../components/CrossTraitHeatmap');
+const loadTraitCorrelation = () => import('../components/TraitCorrelation');
 
 const GwasDataList = React.lazy(loadGwasDataList);
 const ProgramScatter = React.lazy(loadProgramScatter);
@@ -26,6 +27,7 @@ const BurdenVolcano = React.lazy(loadBurdenVolcano);
 const GeneLevelScatter = React.lazy(loadGeneLevelScatter);
 const GeneLevelQQ = React.lazy(loadGeneLevelQQ);
 const CrossTraitHeatmap = React.lazy(loadCrossTraitHeatmap);
+const TraitCorrelation = React.lazy(loadTraitCorrelation);
 
 const TAB_PRELOADERS = [
     loadProgramScatter,
@@ -36,12 +38,18 @@ const TAB_PRELOADERS = [
     loadGeneLevelScatter,
     loadGeneLevelQQ,
     loadCrossTraitHeatmap,
+    loadTraitCorrelation,
 ];
 const preloadedTraitLoaders = new Set();
 
 function findAvailableId(files, candidates) {
     if (!Array.isArray(files)) return '';
     return candidates.find((candidate) => candidate && files.includes(candidate)) || '';
+}
+
+function cleanTraitLabel(value, fallback) {
+    const text = String(value || '').replace(/^["'\s]+|["'\s]+$/g, '');
+    return text || fallback;
 }
 
 const TAB_KEY_TO_INDEX = {
@@ -53,6 +61,7 @@ const TAB_KEY_TO_INDEX = {
     'gene-evidence': 5,
     'gene-qq': 6,
     'cross-trait-heatmap': 7,
+    'trait-correlation': 8,
 };
 
 const TAB_INDEX_TO_KEY = [
@@ -64,6 +73,7 @@ const TAB_INDEX_TO_KEY = [
     'gene-evidence',
     'gene-qq',
     'cross-trait-heatmap',
+    'trait-correlation',
 ];
 
 const FIGURE_FOCUS_HASH = '#trait-figure-panel';
@@ -143,6 +153,7 @@ export default function Trait() {
     const meta = (metaData && !metaData.error) ? metaData : null;
     const resolvedFileId = meta?.file_id || fileId;
     const gwasId = metaData === undefined ? '' : (meta?.gwas_id || fileId);
+    const traitLabel = cleanTraitLabel(meta?.trait_name, fileId);
     const dataIdCandidates = React.useMemo(() => (
         [...new Set([resolvedFileId, fileId, gwasId].filter(Boolean))]
     ), [fileId, gwasId, resolvedFileId]);
@@ -258,7 +269,7 @@ export default function Trait() {
                     <GwasDataList
                         title="Browse Traits"
                         columns={[
-                            { id: 'file_id', label: 'LoF ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
+                            { id: 'file_id', label: 'File ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
                             { id: 'trait_name', label: 'Trait', width: '34%', minWidth: 360 },
                             { id: 'sample_size', label: 'Sample Size', numeric: true, width: 132, minWidth: 132, whiteSpace: 'nowrap', headerWrap: true },
                             { id: 'mesh_term', label: 'MeSH term', width: 170, minWidth: 170, headerWrap: true },
@@ -320,6 +331,7 @@ export default function Trait() {
                 <Tab label="Gene Evidence" onMouseEnter={() => warmTraitTab(5)} onFocus={() => warmTraitTab(5)} />
                 <Tab label="Gene QQ" onMouseEnter={() => warmTraitTab(6)} onFocus={() => warmTraitTab(6)} />
                 <Tab label="Cross-trait Heatmap" onMouseEnter={() => warmTraitTab(7)} onFocus={() => warmTraitTab(7)} />
+                <Tab label="Trait Correlation" onMouseEnter={() => warmTraitTab(8)} onFocus={() => warmTraitTab(8)} />
             </Tabs>
 
             <Box
@@ -363,7 +375,7 @@ export default function Trait() {
                             <TraitProgramGraph
                                 key={`trait-program-graph-${graphFileId}`}
                                 fileId={graphFileId}
-                                traitLabel={meta?.trait_name || fileId}
+                                traitLabel={traitLabel}
                             />
                         )}
                         {displayedTab === 1 && !hasProgramGraph && (
@@ -379,7 +391,7 @@ export default function Trait() {
                                 key={`manhattan-${fileId}-${gwasId}`}
                                 fileId={resolvedFileId}
                                 gwasId={gwasId}
-                                traitLabel={meta?.trait_name || fileId}
+                                traitLabel={traitLabel}
                             />
                         )}
                         {displayedTab === 3 && (
@@ -387,7 +399,7 @@ export default function Trait() {
                                 key={`burden-volcano-${fileId}`}
                                 fileId={resolvedFileId}
                                 gwasId={gwasId}
-                                traitLabel={meta?.trait_name || fileId}
+                                traitLabel={traitLabel}
                                 volcanoType="burden"
                             />
                         )}
@@ -396,7 +408,7 @@ export default function Trait() {
                                 key={`posterior-volcano-${fileId}`}
                                 fileId={resolvedFileId}
                                 gwasId={gwasId}
-                                traitLabel={meta?.trait_name || fileId}
+                                traitLabel={traitLabel}
                                 volcanoType="posterior"
                             />
                         )}
@@ -405,7 +417,7 @@ export default function Trait() {
                                 key={`gene-level-scatter-${fileId}-${gwasId}`}
                                 fileId={resolvedFileId}
                                 gwasId={gwasId}
-                                traitLabel={meta?.trait_name || fileId}
+                                traitLabel={traitLabel}
                                 lookupIds={dataIdCandidates}
                             />
                         )}
@@ -414,7 +426,7 @@ export default function Trait() {
                                 key={`gene-level-qq-${fileId}-${gwasId}`}
                                 fileId={resolvedFileId}
                                 gwasId={gwasId}
-                                traitLabel={meta?.trait_name || fileId}
+                                traitLabel={traitLabel}
                                 lookupIds={dataIdCandidates}
                             />
                         )}
@@ -423,7 +435,15 @@ export default function Trait() {
                                 key={`cross-trait-heatmap-${fileId}-${gwasId}`}
                                 fileId={resolvedFileId}
                                 gwasId={gwasId}
-                                traitLabel={meta?.trait_name || fileId}
+                                traitLabel={traitLabel}
+                            />
+                        )}
+                        {displayedTab === 8 && (
+                            <TraitCorrelation
+                                key={`trait-correlation-${fileId}-${gwasId}`}
+                                fileId={resolvedFileId}
+                                gwasId={gwasId}
+                                traitLabel={traitLabel}
                             />
                         )}
                     </React.Suspense>

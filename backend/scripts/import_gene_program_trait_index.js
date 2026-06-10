@@ -6,6 +6,7 @@ const readline = require('readline');
 const { once } = require('events');
 const mysql = require('mysql2/promise');
 const { config } = require('../lib/config');
+const { REFRESH_GENE_SUMMARY_SQL, refreshGeneSummary } = require('./lib/geneSummary');
 
 const BATCH_SIZE = 1000;
 
@@ -413,6 +414,7 @@ async function emitImportSql(records, stream = process.stdout) {
     await writeStream(stream, 'DELETE FROM `trait_program_edge`;\n');
     await writeInsertSql(stream, 'trait_program_edge', PROGRAM_COLUMNS, records.programRecords);
     await writeInsertSql(stream, 'gene_program_trait_edge', GENE_COLUMNS, records.geneRecords);
+    await writeStream(stream, REFRESH_GENE_SUMMARY_SQL.trimStart());
     await writeStream(stream, 'COMMIT;\n');
 }
 
@@ -444,6 +446,7 @@ async function importRecords(records) {
         await connection.query('DELETE FROM trait_program_edge');
         await insertRows(connection, 'trait_program_edge', PROGRAM_COLUMNS, records.programRecords);
         await insertRows(connection, 'gene_program_trait_edge', GENE_COLUMNS, records.geneRecords);
+        await refreshGeneSummary(connection);
         await connection.commit();
     } catch (err) {
         await connection.rollback();

@@ -373,7 +373,7 @@ export default function ProgramScatter({ fileId }) {
     const [expFmt, setExpFmt] = useState('svg');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
     const exportGdRef = useRef(null);
-    const [tableOpen, setTableOpen] = useState(false);
+    const [tableOpen, setTableOpen] = useState(true);
     const [sortBy, setSortBy] = useState('progScore');
     const [sortDir, setSortDir] = useState('desc');
     const [highlight, setHighlight] = useState({ program: null, key: 0 });

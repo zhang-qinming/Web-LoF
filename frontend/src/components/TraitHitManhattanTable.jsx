@@ -254,7 +254,7 @@ export default function TraitHitManhattanTable({
                     <TextField
                         size="small"
                         value={searchQuery}
-                        placeholder="Search SNP, Gene, Program..."
+                        placeholder="e.g. rs11902841"
                         error={Boolean(searchError)}
                         helperText={searchError || undefined}
                         onChange={(event) => {

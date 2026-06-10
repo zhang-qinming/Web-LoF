@@ -322,7 +322,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     const [geneQuery, setGeneQuery] = useState('');
     const [pointSize, setPointSize] = useState(DEFAULT_POINT_SIZE);
     const [labelLimit, setLabelLimit] = useState(DEFAULT_LABEL_LIMIT);
-    const [tableOpen, setTableOpen] = useState(false);
+    const [tableOpen, setTableOpen] = useState(true);
     const [sortBy, setSortBy] = useState('combinedScore');
     const [sortDir, setSortDir] = useState('desc');
     const [highlight, setHighlight] = useState({ rowKey: '', key: 0 });

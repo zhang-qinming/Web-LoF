@@ -1,0 +1,1408 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gene-Program-Trait Atlas - LDLR evidence concept</title>
+    <style>
+        :root {
+            --ink: #10233f;
+            --muted: #65748a;
+            --rule: #d9e2ec;
+            --soft-rule: #edf1f5;
+            --paper: #ffffff;
+            --page: #f7f9fb;
+            --coral: #ef6548;
+            --coral-soft: #fff1ed;
+            --blue: #285ea8;
+            --blue-soft: #eef5ff;
+            --teal: #087f80;
+            --teal-soft: #eaf7f5;
+            --gold: #c38816;
+            --gold-soft: #fff8e8;
+            --shadow: 0 18px 46px rgba(31, 58, 93, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            min-width: 1180px;
+            color: var(--ink);
+            background: var(--page);
+            font-family: Aptos, "Segoe UI", sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .nav {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--rule);
+            background: rgba(255, 255, 255, 0.96);
+        }
+
+        .nav-inner {
+            width: min(1500px, calc(100% - 76px));
+            height: 100%;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: Cambria, Georgia, serif;
+            font-size: 23px;
+            font-weight: 700;
+        }
+
+        .brand-mark {
+            width: 34px;
+            height: 34px;
+        }
+
+        .nav-links {
+            height: 100%;
+            display: flex;
+            align-items: stretch;
+            gap: 36px;
+        }
+
+        .nav-link {
+            position: relative;
+            display: grid;
+            place-items: center;
+            color: #293b55;
+            font-size: 15px;
+            text-decoration: none;
+        }
+
+        .nav-link.active {
+            color: var(--coral);
+            font-weight: 650;
+        }
+
+        .nav-link.active::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 3px;
+            background: var(--coral);
+        }
+
+        main {
+            background: var(--paper);
+        }
+
+        .hero {
+            width: min(1500px, calc(100% - 76px));
+            min-height: 700px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 345px minmax(0, 1fr);
+            gap: 30px;
+            align-items: center;
+            padding: 54px 0 44px;
+        }
+
+        .intro {
+            align-self: center;
+            padding: 6px 0 10px;
+        }
+
+        .eyebrow {
+            margin: 0 0 15px;
+            color: var(--coral);
+            font-size: 13px;
+            font-weight: 750;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 0;
+            font-family: Cambria, Georgia, serif;
+            font-size: 51px;
+            font-weight: 500;
+            line-height: 0.98;
+            letter-spacing: 0;
+            color: #182235;
+        }
+
+        h1 .atlas {
+            display: inline;
+            margin-left: 8px;
+            color: var(--coral);
+            font-size: 57px;
+            font-style: italic;
+        }
+
+        h1 .title-line {
+            display: block;
+            white-space: nowrap;
+        }
+
+        .intro-copy {
+            margin: 28px 0 0;
+            color: #44536a;
+            font-family: Cambria, Georgia, serif;
+            font-size: 18px;
+            line-height: 1.72;
+        }
+
+        .intro-copy strong {
+            color: var(--ink);
+            font-weight: 650;
+        }
+
+        .intro-actions {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-top: 28px;
+        }
+
+        .primary-action {
+            min-height: 48px;
+            padding: 0 23px;
+            border: 1.5px solid var(--coral);
+            border-radius: 5px;
+            color: var(--coral);
+            background: #fff;
+            font-weight: 700;
+        }
+
+        .source-note {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .source-note::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--teal);
+            box-shadow: 0 0 0 4px var(--teal-soft);
+        }
+
+        .evidence-figure {
+            position: relative;
+            min-width: 0;
+            height: 586px;
+            overflow: hidden;
+            border: 1px solid #cfdae6;
+            border-radius: 7px;
+            background:
+                linear-gradient(rgba(16, 35, 63, 0.022) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(16, 35, 63, 0.022) 1px, transparent 1px),
+                #fff;
+            background-size: 22px 22px;
+            box-shadow: var(--shadow);
+        }
+
+        .figure-header {
+            height: 76px;
+            padding: 17px 21px 14px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--rule);
+            background: rgba(255, 255, 255, 0.94);
+        }
+
+        .figure-kicker {
+            margin: 0 0 4px;
+            color: var(--blue);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .figure-title {
+            margin: 0;
+            color: #172a46;
+            font-family: Cambria, Georgia, serif;
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .trait-context {
+            max-width: 335px;
+            padding-left: 17px;
+            border-left: 3px solid var(--coral);
+            text-align: right;
+        }
+
+        .trait-context strong {
+            display: block;
+            color: #253b5a;
+            font-size: 13px;
+        }
+
+        .trait-context span {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .evidence-grid {
+            position: relative;
+            height: 462px;
+            display: grid;
+            grid-template-columns: 1.13fr 0.94fr 1fr 1.03fr;
+            background: rgba(255, 255, 255, 0.72);
+        }
+
+        .stage {
+            position: relative;
+            min-width: 0;
+            padding: 17px 17px 13px;
+        }
+
+        .stage + .stage {
+            border-left: 1px solid var(--rule);
+        }
+
+        .stage-index {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 27px;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .stage-index b {
+            width: 23px;
+            height: 23px;
+            display: grid;
+            place-items: center;
+            border: 1px solid currentColor;
+            border-radius: 50%;
+            font-size: 11px;
+        }
+
+        .stage:nth-child(1) .stage-index {
+            color: var(--blue);
+        }
+
+        .stage:nth-child(2) .stage-index {
+            color: var(--coral);
+        }
+
+        .stage:nth-child(3) .stage-index {
+            color: var(--teal);
+        }
+
+        .stage:nth-child(4) .stage-index {
+            color: var(--gold);
+        }
+
+        .flow-node {
+            position: relative;
+            height: 68px;
+            margin: 10px 0 12px;
+            padding: 10px 11px;
+            border: 1px solid var(--rule);
+            border-radius: 5px;
+            background: #fff;
+        }
+
+        .flow-node strong {
+            display: block;
+            color: #152a47;
+            font-family: Cambria, Georgia, serif;
+            font-size: 14px;
+            line-height: 1.08;
+            text-overflow: ellipsis;
+        }
+
+        .flow-node span {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 9px;
+            line-height: 1.22;
+            white-space: normal;
+        }
+
+        .flow-node.lead {
+            border-color: #a8c0df;
+            background: var(--blue-soft);
+        }
+
+        .flow-node.gene {
+            border-color: #efad9f;
+            background: var(--coral-soft);
+        }
+
+        .flow-node.perturb {
+            border-color: #92cbc7;
+            background: var(--teal-soft);
+        }
+
+        .flow-node.association {
+            border-color: #dfc47c;
+            background: var(--gold-soft);
+        }
+
+        .stage:not(:first-child) .flow-node::before {
+            content: "";
+            position: absolute;
+            left: -35px;
+            top: 33px;
+            width: 27px;
+            border-top: 1.5px solid #6f8197;
+        }
+
+        .stage:not(:first-child) .flow-node::after {
+            content: "";
+            position: absolute;
+            left: -11px;
+            top: 29px;
+            width: 7px;
+            height: 7px;
+            border-top: 1.5px solid #6f8197;
+            border-right: 1.5px solid #6f8197;
+            transform: rotate(45deg);
+        }
+
+        .connector-label {
+            position: absolute;
+            z-index: 2;
+            top: 61px;
+            left: -51px;
+            width: 60px;
+            padding: 0 2px;
+            color: #6b788c;
+            background: rgba(255, 255, 255, 0.94);
+            font-size: 8px;
+            line-height: 1.15;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .stage-body {
+            height: 265px;
+            padding-top: 2px;
+        }
+
+        .micro-title {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+            margin: 0 0 6px;
+            color: #263b58;
+            font-size: 11px;
+            font-weight: 750;
+        }
+
+        .micro-title span {
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 500;
+        }
+
+        .chart-shell {
+            position: relative;
+            width: 100%;
+            height: 194px;
+            overflow: hidden;
+            border: 1px solid var(--soft-rule);
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.94);
+        }
+
+        .chart-shell svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-note {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 7px;
+            color: var(--muted);
+            font-size: 9px;
+        }
+
+        .chart-note i {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--coral);
+        }
+
+        .evidence-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .evidence-row {
+            position: relative;
+            min-height: 88px;
+            padding: 10px;
+            border: 1px solid var(--soft-rule);
+            border-left: 3px solid var(--coral);
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .evidence-row .row-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            color: #223a59;
+            font-size: 11px;
+            font-weight: 750;
+        }
+
+        .evidence-row .row-head em {
+            color: var(--teal);
+            font-size: 9px;
+            font-style: normal;
+        }
+
+        .estimate-track {
+            position: relative;
+            height: 19px;
+            margin: 8px 0 5px;
+        }
+
+        .estimate-track::before {
+            content: "";
+            position: absolute;
+            left: 4px;
+            right: 4px;
+            top: 9px;
+            border-top: 1px solid #d4dde7;
+        }
+
+        .estimate-track .zero {
+            position: absolute;
+            left: 4px;
+            top: 4px;
+            height: 11px;
+            border-left: 1px solid #8e9bad;
+        }
+
+        .estimate-track .ci {
+            position: absolute;
+            top: 8px;
+            height: 3px;
+            border-radius: 2px;
+            background: #ef9a87;
+        }
+
+        .estimate-track .point {
+            position: absolute;
+            top: 4px;
+            width: 11px;
+            height: 11px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            background: var(--coral);
+            box-shadow: 0 0 0 1px var(--coral);
+            transform: translateX(-50%);
+        }
+
+        .row-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 10px;
+            color: #6c788a;
+            font-size: 9px;
+            line-height: 1.35;
+        }
+
+        .row-meta b {
+            color: #34465e;
+            font-weight: 700;
+        }
+
+        .perturb-summary {
+            display: flex;
+            justify-content: space-between;
+            gap: 9px;
+            margin: 8px 0 7px;
+        }
+
+        .metric {
+            min-width: 0;
+        }
+
+        .metric strong {
+            display: block;
+            color: var(--teal);
+            font-size: 15px;
+        }
+
+        .metric span {
+            display: block;
+            color: var(--muted);
+            font-size: 8px;
+        }
+
+        .association-plot {
+            position: relative;
+            min-height: 116px;
+            padding: 8px;
+            border: 1px solid var(--soft-rule);
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .test-row {
+            position: relative;
+            min-height: 48px;
+            padding: 7px 8px;
+        }
+
+        .test-row + .test-row {
+            border-top: 1px solid var(--soft-rule);
+        }
+
+        .test-row-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            color: #31445d;
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        .test-status {
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: #728095;
+            background: #f0f3f6;
+            font-size: 7px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .test-status.sig {
+            color: #72520b;
+            background: #fff0c5;
+        }
+
+        .test-row p {
+            margin: 5px 0 0;
+            color: #68778b;
+            font-size: 8px;
+            line-height: 1.35;
+        }
+
+        .effect-ruler {
+            position: relative;
+            height: 18px;
+            margin-top: 6px;
+        }
+
+        .effect-ruler::before {
+            content: "";
+            position: absolute;
+            left: 3px;
+            right: 3px;
+            top: 8px;
+            border-top: 1px solid #cbd5df;
+        }
+
+        .effect-ruler .effect-zero {
+            position: absolute;
+            left: 50%;
+            top: 2px;
+            height: 13px;
+            border-left: 1px dashed #9eacbc;
+        }
+
+        .effect-ruler .effect-ci {
+            position: absolute;
+            left: 12.4%;
+            top: 7px;
+            width: 20.3%;
+            height: 3px;
+            border-radius: 2px;
+            background: var(--gold);
+        }
+
+        .effect-ruler .effect-point {
+            position: absolute;
+            left: 22.4%;
+            top: 3px;
+            width: 11px;
+            height: 11px;
+            border: 2px solid white;
+            border-radius: 50%;
+            background: var(--gold);
+            box-shadow: 0 0 0 1px var(--gold);
+            transform: translateX(-50%);
+        }
+
+        .association-result {
+            margin-top: 10px;
+            padding: 9px 10px;
+            border-left: 3px solid var(--gold);
+            background: var(--gold-soft);
+        }
+
+        .association-result strong {
+            display: block;
+            color: #674a0b;
+            font-size: 11px;
+        }
+
+        .association-result span {
+            display: block;
+            margin-top: 3px;
+            color: #7d682f;
+            font-size: 9px;
+            line-height: 1.35;
+        }
+
+        .figure-footnote {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 0 20px;
+            border-top: 1px solid var(--rule);
+            background: rgba(250, 252, 254, 0.98);
+            color: #647387;
+            font-size: 10px;
+        }
+
+        .stage-source {
+            position: absolute;
+            left: 17px;
+            right: 17px;
+            bottom: 12px;
+            overflow: hidden;
+            color: #7a8798;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 8px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .figure-footnote strong {
+            color: #3c4f68;
+        }
+
+        .tooltip {
+            position: absolute;
+            z-index: 20;
+            display: none;
+            width: 180px;
+            padding: 10px 11px;
+            border: 1px solid #cdd8e4;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 10px 24px rgba(25, 46, 75, 0.16);
+            color: #31445d;
+            font-size: 9px;
+            line-height: 1.45;
+            pointer-events: none;
+        }
+
+        .tooltip.show {
+            display: block;
+        }
+
+        .tooltip strong {
+            display: block;
+            margin-bottom: 3px;
+            color: #172c48;
+            font-size: 11px;
+        }
+
+        .tooltip b {
+            color: var(--coral);
+        }
+
+        .stats-band {
+            border-top: 1px solid var(--rule);
+            border-bottom: 1px solid var(--rule);
+            background: #fbfcfd;
+        }
+
+        .stats-inner {
+            width: min(1420px, calc(100% - 120px));
+            height: 144px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .stat {
+            display: grid;
+            grid-template-columns: 72px 1fr;
+            align-items: center;
+            gap: 16px;
+            padding: 0 28px;
+        }
+
+        .stat + .stat {
+            border-left: 1px solid var(--rule);
+        }
+
+        .stat-icon {
+            width: 68px;
+            height: 68px;
+            display: grid;
+            place-items: center;
+            border: 1px solid currentColor;
+            border-radius: 50%;
+        }
+
+        .stat-icon svg {
+            width: 43px;
+            height: 43px;
+        }
+
+        .stat:nth-child(1) {
+            color: var(--coral);
+        }
+
+        .stat:nth-child(2) {
+            color: var(--blue);
+        }
+
+        .stat:nth-child(3) {
+            color: var(--teal);
+        }
+
+        .stat:nth-child(4) {
+            color: #6757a7;
+        }
+
+        .stat-value {
+            display: block;
+            font-family: Cambria, Georgia, serif;
+            font-size: 42px;
+            font-weight: 650;
+            line-height: 1.1;
+        }
+
+        .stat-label {
+            display: block;
+            margin-top: 8px;
+            color: #33465e;
+            font-size: 16px;
+        }
+
+        .search-preview {
+            height: 116px;
+            padding-top: 27px;
+            background: var(--page);
+        }
+
+        .search-box {
+            width: min(1400px, calc(100% - 120px));
+            height: 58px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 20px;
+            border: 1px solid #d5dee8;
+            border-radius: 6px;
+            background: #fff;
+            color: #7a8799;
+            box-shadow: 0 7px 20px rgba(33, 57, 89, 0.04);
+        }
+
+        .search-box svg {
+            width: 22px;
+            height: 22px;
+            stroke: #5f7188;
+        }
+
+        .search-box span {
+            font-size: 15px;
+        }
+
+        @media (max-width: 1320px) {
+            .hero {
+                grid-template-columns: 320px minmax(0, 1fr);
+                gap: 28px;
+            }
+
+            h1 {
+                font-size: 53px;
+            }
+
+            h1 .atlas {
+                font-size: 64px;
+            }
+
+            .stage {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <div class="brand">
+                <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true">
+                    <g fill="none" stroke="#173453" stroke-width="1.6">
+                        <path d="M8 10 18 5l10 6v13l-10 7-10-6Z"/>
+                        <path d="m8 10 10 8 10-7M18 5v13m0 0v13"/>
+                    </g>
+                    <circle cx="8" cy="10" r="3" fill="#ef6548"/>
+                    <circle cx="18" cy="5" r="3" fill="#285ea8"/>
+                    <circle cx="28" cy="11" r="3" fill="#087f80"/>
+                    <circle cx="18" cy="18" r="3.3" fill="#173453"/>
+                    <circle cx="8" cy="25" r="3" fill="#285ea8"/>
+                    <circle cx="18" cy="31" r="3" fill="#ef6548"/>
+                    <circle cx="28" cy="24" r="3" fill="#c38816"/>
+                </svg>
+                Gene-Program-Trait Atlas
+            </div>
+            <div class="nav-links">
+                <a class="nav-link active" href="#">Home</a>
+                <a class="nav-link" href="#">Traits</a>
+                <a class="nav-link" href="#">Genes</a>
+                <a class="nav-link" href="#">Programs</a>
+                <a class="nav-link" href="#">Data</a>
+                <a class="nav-link" href="#">Guide</a>
+                <a class="nav-link" href="#">Contact</a>
+                <a class="nav-link" href="#">About</a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="intro">
+                <p class="eyebrow">Gene · Program · Trait</p>
+                <h1>
+                    <span class="title-line">Gene–Program</span>
+                    <span class="title-line">Trait <span class="atlas">Atlas</span></span>
+                </h1>
+                <p class="intro-copy">
+                    Follow a trait-associated locus into <strong>gene-level evidence</strong>,
+                    perturb-seq regulation, and cellular programs. Every connection stays
+                    linked to the underlying result.
+                </p>
+                <div class="intro-actions">
+                    <button class="primary-action">Explore traits</button>
+                    <span class="source-note">Example uses project data</span>
+                </div>
+            </div>
+
+            <figure class="evidence-figure" aria-labelledby="evidence-title">
+                <header class="figure-header">
+                    <div>
+                        <p class="figure-kicker">Worked example · project result</p>
+                        <h2 class="figure-title" id="evidence-title">How the LDLR evidence aligns across analyses</h2>
+                    </div>
+                    <div class="trait-context">
+                        <strong>ICD10 E78 · Lipoprotein metabolism disorders</strong>
+                        <span>GCST90083754 · European ancestry · N = 372,199</span>
+                    </div>
+                </header>
+
+                <div class="evidence-grid">
+                    <section class="stage">
+                        <div class="stage-index"><b>1</b> Genetic localization</div>
+                        <div class="flow-node lead">
+                            <strong>rs28942084</strong>
+                            <span>chr19:11,231,112 · inside LDLR</span>
+                        </div>
+                        <div class="stage-body">
+                            <p class="micro-title">LDLR locus <span>−log10(p)</span></p>
+                            <div class="chart-shell" id="locusShell">
+                                <svg id="locusChart" viewBox="0 0 250 194" role="img" aria-label="Regional association plot around LDLR"></svg>
+                            </div>
+                            <div class="chart-note"><i></i>Sampled regional context; all 4 significant hits retained inside LDLR</div>
+                        </div>
+                        <div class="stage-source">gwas_variants.tsv + gwas_hits.tsv</div>
+                    </section>
+
+                    <section class="stage">
+                        <span class="connector-label">in-gene</span>
+                        <div class="stage-index"><b>2</b> Gene-level support</div>
+                        <div class="flow-node gene">
+                            <strong>LDLR</strong>
+                            <span>ENSG00000130164 · candidate gene</span>
+                        </div>
+                        <div class="stage-body">
+                            <p class="micro-title">Independent gene analyses <span>same trait</span></p>
+                            <div class="evidence-list">
+                                <div class="evidence-row hover-target" data-tooltip="lof">
+                                    <div class="row-head"><span>LoF burden</span><em>significant</em></div>
+                                    <div class="estimate-track">
+                                        <span class="zero"></span>
+                                        <span class="point" style="left:77.1%"></span>
+                                    </div>
+                                    <div class="row-meta">
+                                        <span>β <b>1.2339</b></span>
+                                        <span>p <b>1.80 × 10<sup>−17</sup></b></span>
+                                        <span>FDR <b>3.35 × 10<sup>−13</sup></b></span>
+                                    </div>
+                                </div>
+                                <div class="evidence-row hover-target" data-tooltip="genebayes">
+                                    <div class="row-head"><span>GeneBayes</span><em>95% CI excludes 0</em></div>
+                                    <div class="estimate-track">
+                                        <span class="zero"></span>
+                                        <span class="ci" style="left:62.4%; width:28.7%"></span>
+                                        <span class="point" style="left:76.7%"></span>
+                                    </div>
+                                    <div class="row-meta">
+                                        <span>post. mean <b>1.2269</b></span>
+                                        <span>95% CI <b>0.998–1.457</b></span>
+                                        <span>p <b>1.42 × 10<sup>−18</sup></b></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stage-source">burden_hits.tsv + posterior_hits.tsv</div>
+                    </section>
+
+                    <section class="stage">
+                        <span class="connector-label">same gene</span>
+                        <div class="stage-index"><b>3</b> Perturbation evidence</div>
+                        <div class="flow-node perturb">
+                            <strong>LDLR perturbation → P21</strong>
+                            <span>K562 genome-wide perturb-seq · signed effect</span>
+                        </div>
+                        <div class="stage-body">
+                            <p class="micro-title">P21 perturbation screen <span>9,847 genes</span></p>
+                            <div class="chart-shell" id="perturbShell">
+                                <svg id="perturbChart" viewBox="0 0 226 194" role="img" aria-label="Distribution of perturbation effects on Program P21"></svg>
+                            </div>
+                            <div class="perturb-summary">
+                                <div class="metric">
+                                    <strong>−0.0879</strong>
+                                    <span>LDLR effect</span>
+                                </div>
+                                <div class="metric">
+                                    <strong>0.00581</strong>
+                                    <span>nominal p-value</span>
+                                </div>
+                                <div class="metric">
+                                    <strong>7.9%</strong>
+                                    <span>effect percentile</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stage-source">K60_program21_perturb_effects.txt</div>
+                    </section>
+
+                    <section class="stage">
+                        <span class="connector-label">regulator model</span>
+                        <div class="stage-index"><b>4</b> Trait–program association</div>
+                        <div class="flow-node association">
+                            <strong>P21 regulators ↔ E78 trait</strong>
+                            <span>Ribosome (general, GTF2A2)</span>
+                        </div>
+                        <div class="stage-body">
+                            <p class="micro-title">Two distinct program tests <span>do not conflate</span></p>
+                            <div class="association-plot hover-target" data-tooltip="association">
+                                <div class="test-row">
+                                    <div class="test-row-head">
+                                        <span>Program-loading enrichment</span>
+                                        <span class="test-status">not significant</span>
+                                    </div>
+                                    <p>Mean γ = 0.0240 · empirical p = 0.574</p>
+                                </div>
+                                <div class="test-row">
+                                    <div class="test-row-head">
+                                        <span>Regulator-level association</span>
+                                        <span class="test-status sig">significant</span>
+                                    </div>
+                                    <div class="effect-ruler">
+                                        <span class="effect-zero"></span>
+                                        <span class="effect-ci"></span>
+                                        <span class="effect-point"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="association-result">
+                                <strong>Regulator-level association is significant</strong>
+                                <span>β = −0.0553 · 95% CI −0.075 to −0.035</span>
+                                <span>p = 6.43 × 10<sup>−8</sup></span>
+                                <span>Program-loading test: p = 0.574, not significant</span>
+                            </div>
+                        </div>
+                        <div class="stage-source">GCST90083754_programs.tsv</div>
+                    </section>
+                </div>
+
+                <figcaption class="figure-footnote">
+                    <span><strong>Interpretation:</strong> converging localization, gene, perturbation, and association evidence.</span>
+                    <span>Connectors show analysis linkage, <strong>not biological causality</strong>.</span>
+                </figcaption>
+                <div class="tooltip" id="tooltip"></div>
+            </figure>
+        </section>
+
+        <section class="stats-band">
+            <div class="stats-inner">
+                <div class="stat">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                            <path d="M8 36h32M11 34V16m8 18V23m8 11V12m8 22V19"/>
+                            <circle cx="11" cy="16" r="3" fill="currentColor" stroke="none"/>
+                            <circle cx="19" cy="23" r="3" fill="currentColor" stroke="none" opacity=".72"/>
+                            <circle cx="27" cy="12" r="3" fill="currentColor" stroke="none"/>
+                            <circle cx="35" cy="19" r="3" fill="currentColor" stroke="none" opacity=".72"/>
+                        </svg>
+                    </div>
+                    <div><span class="stat-value">2,415</span><span class="stat-label">Traits</span></div>
+                </div>
+                <div class="stat">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                            <path d="M16 7c0 10 16 24 16 34M32 7c0 10-16 24-16 34"/>
+                            <path d="M18 11h12M19 17h10M19 24h10M19 31h10M18 37h12" opacity=".6"/>
+                            <circle cx="32" cy="7" r="3" fill="currentColor" stroke="none"/>
+                            <circle cx="16" cy="41" r="3" fill="currentColor" stroke="none"/>
+                        </svg>
+                    </div>
+                    <div><span class="stat-value">10.25B</span><span class="stat-label">Variants</span></div>
+                </div>
+                <div class="stat">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M24 24 12 13m12 11 12-11M24 24v13"/>
+                            <rect x="7" y="8" width="10" height="10" rx="2"/>
+                            <rect x="31" y="8" width="10" height="10" rx="2"/>
+                            <rect x="19" y="32" width="10" height="10" rx="2"/>
+                            <circle cx="24" cy="24" r="4" fill="currentColor" stroke="none"/>
+                        </svg>
+                    </div>
+                    <div><span class="stat-value">60</span><span class="stat-label">Programs</span></div>
+                </div>
+                <div class="stat">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+                            <path d="M16 9h17l6 6v25H16Z"/>
+                            <path d="M33 9v7h6M21 23h12M21 29h12M21 35h8"/>
+                            <path d="M10 15v28h23" opacity=".55"/>
+                        </svg>
+                    </div>
+                    <div><span class="stat-value">67,524</span><span class="stat-label">Data outputs</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="search-preview">
+            <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round">
+                    <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                    <path d="m15.5 15.5 5 5"></path>
+                </svg>
+                <span>Search traits, genes, programs, or result files</span>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const locusData = [
+            [11200292, 0.1570, "rs762417023", false],
+            [11213450, 10.1661, "rs144172724", true],
+            [11213463, 13.8800, "rs112029328", true],
+            [11215995, 0.0042, "rs755799528", false],
+            [11216061, 0.2327, "rs879254541", false],
+            [11216183, 0.3662, "rs879254589", false],
+            [11217252, 0.6483, "rs879254655", false],
+            [11218077, 0.6763, "rs730882089", false],
+            [11218109, 0.5036, "rs375495026", false],
+            [11218156, 0.3840, "rs879254716", false],
+            [11221390, 0.7118, "rs544453230", false],
+            [11221400, 0.0785, "rs879254754", false],
+            [11222285, 0.3516, "rs1402951356", false],
+            [11223968, 0.0478, "rs146200173", false],
+            [11223982, 0.3088, "rs879254837", false],
+            [11223984, 1.6440, "rs552422789", false],
+            [11224005, 4.6006, "rs368562025", false],
+            [11224010, 0.9985, "rs879254844", false],
+            [11224094, 0.1260, "rs773566855", false],
+            [11224118, 0.1397, "rs879254873", false],
+            [11224296, 12.7644, "rs139624145", true],
+            [11224299, 0.5364, "rs879254905", false],
+            [11224300, 0.8181, "rs875989921", false],
+            [11224381, 0.2424, "rs755154048", false],
+            [11224438, 1.0151, "rs878854025", false],
+            [11226771, 0.0746, "rs875989924", false],
+            [11227612, 0.5958, "rs373371572", false],
+            [11230873, 0.3999, "rs730882110", false],
+            [11231112, 15.6749, "rs28942084", true],
+            [11231152, 0.5372, "rs879255137", false],
+            [11231189, 0.6192, "rs879255144", false],
+            [11233876, 1.6682, "rs1057516127", false],
+            [11240347, 0.1260, "rs879255224", false],
+            [11241961, 0.2880, "rs372328061", false]
+        ];
+
+        const perturbBins = [13, 15, 13, 17, 31, 40, 57, 73, 102, 208, 372, 685, 1316, 1878, 1871, 1330, 614, 341, 171, 107, 92, 70, 66, 38, 27, 27, 28, 17];
+        const NS = "http://www.w3.org/2000/svg";
+
+        function svgEl(name, attrs = {}, text = "") {
+            const el = document.createElementNS(NS, name);
+            Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+            if (text) el.textContent = text;
+            return el;
+        }
+
+        function drawLocus() {
+            const svg = document.getElementById("locusChart");
+            const w = 250;
+            const h = 194;
+            const margin = { left: 29, right: 10, top: 11, bottom: 44 };
+            const xMin = 11195000;
+            const xMax = 11250000;
+            const yMax = 17;
+            const x = bp => margin.left + ((bp - xMin) / (xMax - xMin)) * (w - margin.left - margin.right);
+            const y = value => margin.top + (1 - value / yMax) * (h - margin.top - margin.bottom);
+
+            [0, 5, 10, 15].forEach(tick => {
+                svg.appendChild(svgEl("line", { x1: margin.left, x2: w - margin.right, y1: y(tick), y2: y(tick), stroke: "#e5eaf0", "stroke-width": 1 }));
+                svg.appendChild(svgEl("text", { x: margin.left - 6, y: y(tick) + 3, fill: "#718096", "font-size": 8, "text-anchor": "end" }, String(tick)));
+            });
+
+            const threshold = -Math.log10(5e-8);
+            svg.appendChild(svgEl("line", {
+                x1: margin.left,
+                x2: w - margin.right,
+                y1: y(threshold),
+                y2: y(threshold),
+                stroke: "#c38816",
+                "stroke-width": 1,
+                "stroke-dasharray": "4 3"
+            }));
+            svg.appendChild(svgEl("text", { x: w - margin.right, y: y(threshold) - 4, fill: "#9a731d", "font-size": 7, "text-anchor": "end" }, "5 × 10⁻⁸"));
+
+            locusData.forEach(([bp, logp, snp, hit]) => {
+                const circle = svgEl("circle", {
+                    cx: x(bp),
+                    cy: y(logp),
+                    r: snp === "rs28942084" ? 5 : (hit ? 3.7 : 2.35),
+                    fill: snp === "rs28942084" ? "#ef6548" : (hit ? "#285ea8" : "#9eb5cf"),
+                    opacity: hit ? 1 : 0.72,
+                    class: snp === "rs28942084" ? "lead-snp" : "",
+                    "data-snp": snp
+                });
+                if (hit) {
+                    circle.style.cursor = "default";
+                    circle.addEventListener("mouseenter", event => showTooltip(event, "snp", { snp, bp, logp }));
+                    circle.addEventListener("mouseleave", hideTooltip);
+                }
+                svg.appendChild(circle);
+            });
+
+            const leadX = x(11231112);
+            const leadY = y(15.6749);
+            svg.appendChild(svgEl("path", {
+                d: `M ${leadX + 4} ${leadY - 2} L ${leadX + 21} ${leadY - 12}`,
+                fill: "none",
+                stroke: "#ef6548",
+                "stroke-width": 1
+            }));
+            svg.appendChild(svgEl("text", { x: leadX + 23, y: leadY - 10, fill: "#c94830", "font-size": 8, "font-weight": 700 }, "lead SNP"));
+
+            const geneY = h - 29;
+            svg.appendChild(svgEl("line", { x1: margin.left, x2: w - margin.right, y1: geneY, y2: geneY, stroke: "#9ba9ba", "stroke-width": 1 }));
+            const geneStart = x(11200139);
+            const geneEnd = x(11244496);
+            svg.appendChild(svgEl("rect", {
+                x: geneStart,
+                y: geneY - 5,
+                width: geneEnd - geneStart,
+                height: 10,
+                rx: 2,
+                fill: "#fff1ed",
+                stroke: "#ef6548",
+                "stroke-width": 1
+            }));
+            [0.15, 0.32, 0.47, 0.63, 0.81].forEach(position => {
+                svg.appendChild(svgEl("rect", {
+                    x: geneStart + (geneEnd - geneStart) * position,
+                    y: geneY - 6,
+                    width: 5,
+                    height: 12,
+                    fill: "#ef6548"
+                }));
+            });
+            svg.appendChild(svgEl("text", { x: (geneStart + geneEnd) / 2, y: geneY + 17, fill: "#b44832", "font-size": 8, "font-weight": 700, "text-anchor": "middle" }, "LDLR"));
+            svg.appendChild(svgEl("text", { x: margin.left, y: h - 3, fill: "#7a8798", "font-size": 7 }, "11.195 Mb"));
+            svg.appendChild(svgEl("text", { x: w - margin.right, y: h - 3, fill: "#7a8798", "font-size": 7, "text-anchor": "end" }, "11.250 Mb"));
+        }
+
+        function drawPerturb() {
+            const svg = document.getElementById("perturbChart");
+            const w = 226;
+            const h = 194;
+            const margin = { left: 29, right: 10, top: 12, bottom: 34 };
+            const plotW = w - margin.left - margin.right;
+            const plotH = h - margin.top - margin.bottom;
+            const maxCount = Math.max(...perturbBins);
+            const xFor = value => margin.left + ((value + 0.35) / 0.7) * plotW;
+            const zeroX = xFor(0);
+
+            [0, 500, 1000, 1500].forEach(tick => {
+                const yy = margin.top + plotH - (tick / maxCount) * plotH;
+                svg.appendChild(svgEl("line", { x1: margin.left, x2: w - margin.right, y1: yy, y2: yy, stroke: "#e7edf2", "stroke-width": 1 }));
+                svg.appendChild(svgEl("text", { x: margin.left - 5, y: yy + 3, fill: "#778497", "font-size": 7, "text-anchor": "end" }, String(tick)));
+            });
+
+            const barW = plotW / perturbBins.length;
+            perturbBins.forEach((count, index) => {
+                const barH = (count / maxCount) * plotH;
+                svg.appendChild(svgEl("rect", {
+                    x: margin.left + index * barW + 0.5,
+                    y: margin.top + plotH - barH,
+                    width: Math.max(2, barW - 1),
+                    height: barH,
+                    fill: index < 14 ? "#84bdb8" : "#b4d6d2",
+                    opacity: 0.95
+                }));
+            });
+
+            svg.appendChild(svgEl("line", {
+                x1: zeroX,
+                x2: zeroX,
+                y1: margin.top,
+                y2: margin.top + plotH,
+                stroke: "#52657b",
+                "stroke-width": 1,
+                "stroke-dasharray": "3 3"
+            }));
+
+            const ldlrX = xFor(-0.0878707651);
+            svg.appendChild(svgEl("line", {
+                x1: ldlrX,
+                x2: ldlrX,
+                y1: margin.top + 9,
+                y2: margin.top + plotH,
+                stroke: "#ef6548",
+                "stroke-width": 2
+            }));
+            const marker = svgEl("circle", {
+                cx: ldlrX,
+                cy: margin.top + 9,
+                r: 5,
+                fill: "#ef6548",
+                stroke: "#fff",
+                "stroke-width": 2,
+                class: "ldlr-effect"
+            });
+            marker.addEventListener("mouseenter", event => showTooltip(event, "perturb"));
+            marker.addEventListener("mouseleave", hideTooltip);
+            svg.appendChild(marker);
+            svg.appendChild(svgEl("text", {
+                x: ldlrX - 5,
+                y: margin.top + 6,
+                fill: "#c94830",
+                "font-size": 8,
+                "font-weight": 700,
+                "text-anchor": "end"
+            }, "LDLR"));
+
+            [-0.35, 0, 0.35].forEach(value => {
+                svg.appendChild(svgEl("text", {
+                    x: xFor(value),
+                    y: h - 17,
+                    fill: "#748296",
+                    "font-size": 8,
+                    "text-anchor": "middle"
+                }, value === 0 ? "0" : value.toFixed(2)));
+            });
+            svg.appendChild(svgEl("text", { x: w / 2, y: h - 4, fill: "#607085", "font-size": 8, "text-anchor": "middle" }, "signed perturbation effect (lm_es)"));
+        }
+
+        const tooltip = document.getElementById("tooltip");
+        const evidenceFigure = document.querySelector(".evidence-figure");
+        const tooltipContent = {
+            lof: "<strong>LDLR · LoF burden</strong>β = <b>1.2339</b><br>p = 1.80 × 10<sup>−17</sup><br>FDR = 3.35 × 10<sup>−13</sup>",
+            genebayes: "<strong>LDLR · GeneBayes</strong>Posterior mean = <b>1.2269</b><br>95% CI = 0.998–1.457<br>p = 1.42 × 10<sup>−18</sup>",
+            perturb: "<strong>LDLR perturbation on P21</strong>lm_es = <b>−0.0879</b><br>nominal p = 0.00581<br>779 / 9,847 by ascending effect",
+            association: "<strong>P21 regulator-level test</strong>β = <b>−0.0553</b><br>95% CI = −0.075 to −0.035<br>p = 6.43 × 10<sup>−8</sup><br><br>Loading-gene test: p = 0.574"
+        };
+
+        function showTooltip(event, type, extra = {}) {
+            if (type === "snp") {
+                tooltip.innerHTML = `<strong>${extra.snp}</strong>chr19:${extra.bp.toLocaleString()}<br>p = <b>${extra.snp === "rs28942084" ? "2.11 × 10<sup>−16</sup>" : "significant"}</b><br>−log10(p) = ${extra.logp.toFixed(2)}<br>distance to LDLR = 0 bp`;
+            } else {
+                tooltip.innerHTML = tooltipContent[type];
+            }
+
+            const figureRect = evidenceFigure.getBoundingClientRect();
+            const targetRect = event.currentTarget.getBoundingClientRect();
+            const stageRect = event.currentTarget.closest(".stage")?.getBoundingClientRect() || figureRect;
+            const stageLeft = stageRect.left - figureRect.left;
+            const stageRight = stageRect.right - figureRect.left;
+            const tooltipWidth = 180;
+            const targetCenter = targetRect.left - figureRect.left + targetRect.width / 2;
+            const rightCandidate = targetCenter + 10;
+            const desiredLeft = rightCandidate + tooltipWidth <= stageRight - 8
+                ? rightCandidate
+                : targetCenter - tooltipWidth - 10;
+            const desiredTop = targetRect.top - figureRect.top + targetRect.height / 2 + 9;
+            tooltip.style.left = `${Math.min(stageRight - tooltipWidth - 8, Math.max(stageLeft + 8, desiredLeft))}px`;
+            tooltip.style.top = `${Math.min(figureRect.height - 132, Math.max(82, desiredTop))}px`;
+            tooltip.classList.add("show");
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove("show");
+        }
+
+        document.querySelectorAll(".hover-target").forEach(target => {
+            target.addEventListener("mouseenter", event => showTooltip(event, target.dataset.tooltip));
+            target.addEventListener("mouseleave", hideTooltip);
+        });
+
+        drawLocus();
+        drawPerturb();
+
+        if (new URLSearchParams(window.location.search).get("preview") === "snp") {
+            const lead = document.querySelector(".lead-snp");
+            showTooltip(
+                { currentTarget: lead },
+                "snp",
+                { snp: "rs28942084", bp: 11231112, logp: 15.6749 }
+            );
+        }
+    </script>
+</body>
+</html>

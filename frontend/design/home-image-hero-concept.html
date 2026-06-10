@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gene-Program-Trait Atlas - image hero concept</title>
+    <style>
+        :root {
+            --ink: #17263d;
+            --body: #4a586d;
+            --muted: #758196;
+            --line: #dce3eb;
+            --coral: #ef6548;
+            --blue: #2864a9;
+            --teal: #087f80;
+            --gold: #b88319;
+        }
+
+        * { box-sizing: border-box; }
+
+        html,
+        body {
+            margin: 0;
+            min-width: 1180px;
+            color: var(--ink);
+            background: #fff;
+            font-family: Aptos, "Segoe UI", sans-serif;
+        }
+
+        .nav {
+            height: 72px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .nav-inner {
+            width: min(1500px, calc(100% - 80px));
+            height: 100%;
+            margin: auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            font-family: Cambria, Georgia, serif;
+            font-size: 23px;
+            font-weight: 700;
+        }
+
+        .brand svg { width: 34px; height: 34px; }
+
+        .nav-links {
+            height: 100%;
+            display: flex;
+            align-items: stretch;
+            gap: 35px;
+        }
+
+        .nav-links a {
+            position: relative;
+            display: grid;
+            place-items: center;
+            color: #283a54;
+            font-size: 15px;
+            text-decoration: none;
+        }
+
+        .nav-links a.active {
+            color: var(--coral);
+            font-weight: 700;
+        }
+
+        .nav-links a.active::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 3px;
+            background: var(--coral);
+        }
+
+        .hero {
+            width: min(1500px, calc(100% - 80px));
+            min-height: 660px;
+            margin: auto;
+            display: grid;
+            grid-template-columns: 39% 61%;
+            align-items: center;
+            padding: 49px 0 37px;
+        }
+
+        .copy {
+            position: relative;
+            z-index: 2;
+            max-width: 520px;
+            padding-right: 42px;
+        }
+
+        .eyebrow {
+            margin: 0 0 15px;
+            color: var(--coral);
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 0;
+            font-family: Cambria, Georgia, serif;
+            font-size: 47px;
+            font-weight: 500;
+            line-height: .98;
+            letter-spacing: 0;
+        }
+
+        h1 span {
+            display: block;
+            margin-top: 10px;
+            color: var(--coral);
+            font-size: 68px;
+            font-style: italic;
+        }
+
+        .description {
+            margin: 27px 0 0;
+            max-width: 485px;
+            color: var(--body);
+            font-family: Cambria, Georgia, serif;
+            font-size: 18px;
+            line-height: 1.72;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-top: 29px;
+        }
+
+        .primary {
+            height: 49px;
+            padding: 0 25px;
+            border: 1.5px solid var(--coral);
+            border-radius: 5px;
+            color: var(--coral);
+            background: #fff;
+            font-weight: 750;
+        }
+
+        .evidence-note {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .evidence-note::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--teal);
+            box-shadow: 0 0 0 4px #e6f5f3;
+        }
+
+        .visual {
+            min-width: 0;
+            align-self: center;
+            padding-top: 10px;
+        }
+
+        .image-wrap {
+            position: relative;
+        }
+
+        .hero-image {
+            width: 100%;
+            height: 505px;
+            display: block;
+            object-fit: contain;
+            object-position: center;
+        }
+
+        .hotspot {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            border: 1px solid rgba(23, 38, 61, .28);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, .82);
+            box-shadow: 0 3px 10px rgba(22, 41, 67, .14);
+            cursor: default;
+        }
+
+        .hotspot::after {
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .hotspot.one { left: 26%; top: 43%; color: var(--blue); }
+        .hotspot.two { left: 31%; top: 64%; color: var(--coral); }
+        .hotspot.three { left: 58%; top: 45%; color: var(--teal); }
+        .hotspot.four { left: 88%; top: 34%; color: var(--gold); }
+
+        .image-tip {
+            position: absolute;
+            z-index: 5;
+            display: none;
+            width: 205px;
+            padding: 10px 11px;
+            border: 1px solid #d4dee8;
+            border-radius: 4px;
+            color: #55657a;
+            background: rgba(255, 255, 255, .98);
+            box-shadow: 0 10px 25px rgba(30, 53, 83, .16);
+            font-size: 10px;
+            line-height: 1.45;
+            text-align: left;
+        }
+
+        .image-tip strong {
+            display: block;
+            margin-bottom: 3px;
+            color: #203754;
+            font-size: 11px;
+        }
+
+        .hotspot:hover .image-tip,
+        .hotspot:focus-visible .image-tip,
+        .hotspot.preview .image-tip {
+            display: block;
+        }
+
+        .hotspot.one .image-tip,
+        .hotspot.two .image-tip {
+            left: 28px;
+            top: -38px;
+        }
+
+        .hotspot.three .image-tip,
+        .hotspot.four .image-tip {
+            right: 28px;
+            top: -38px;
+        }
+
+        .evidence-caption {
+            display: grid;
+            grid-template-columns: 1.07fr .93fr 1fr 1fr;
+            margin: -16px 18px 0 22px;
+            border-top: 1px solid var(--line);
+        }
+
+        .caption-item {
+            position: relative;
+            min-height: 60px;
+            padding: 11px 10px 0 27px;
+            color: var(--muted);
+            font-size: 9px;
+            line-height: 1.35;
+        }
+
+        .caption-item + .caption-item {
+            border-left: 1px solid #edf0f4;
+        }
+
+        .caption-item b {
+            display: block;
+            margin-bottom: 2px;
+            color: #30445f;
+            font-size: 10px;
+        }
+
+        .caption-index {
+            position: absolute;
+            left: 8px;
+            top: 12px;
+            width: 14px;
+            height: 14px;
+            display: grid;
+            place-items: center;
+            border: 1px solid currentColor;
+            border-radius: 50%;
+            font-size: 7px;
+            font-weight: 800;
+        }
+
+        .caption-item:nth-child(1) { color: var(--blue); }
+        .caption-item:nth-child(2) { color: var(--coral); }
+        .caption-item:nth-child(3) { color: var(--teal); }
+        .caption-item:nth-child(4) { color: var(--gold); }
+
+        .caption-item span:not(.caption-index) {
+            color: #6e7c90;
+        }
+
+        .disclaimer {
+            margin: 8px 22px 0;
+            color: #8792a2;
+            font-size: 9px;
+            text-align: right;
+        }
+
+        .disclaimer strong { color: #5e6d82; }
+
+        .stats {
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+            background: #fbfcfd;
+        }
+
+        .stats-inner {
+            width: min(1420px, calc(100% - 120px));
+            height: 145px;
+            margin: auto;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .stat {
+            display: grid;
+            grid-template-columns: 68px 1fr;
+            align-items: center;
+            gap: 17px;
+            padding: 0 28px;
+        }
+
+        .stat + .stat { border-left: 1px solid var(--line); }
+
+        .icon {
+            width: 66px;
+            height: 66px;
+            display: grid;
+            place-items: center;
+            border: 1px solid currentColor;
+            border-radius: 50%;
+        }
+
+        .icon svg { width: 40px; height: 40px; }
+        .stat:nth-child(1) { color: var(--coral); }
+        .stat:nth-child(2) { color: var(--blue); }
+        .stat:nth-child(3) { color: var(--teal); }
+        .stat:nth-child(4) { color: #6858aa; }
+
+        .value {
+            display: block;
+            font-family: Cambria, Georgia, serif;
+            font-size: 43px;
+            font-weight: 650;
+            line-height: 1.1;
+        }
+
+        .label {
+            display: block;
+            margin-top: 4px;
+            color: #33465f;
+            font-size: 16px;
+        }
+
+        .search {
+            height: 115px;
+            padding-top: 26px;
+            background: #f7f9fb;
+        }
+
+        .search-inner {
+            width: min(1400px, calc(100% - 120px));
+            height: 58px;
+            margin: auto;
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            padding: 0 20px;
+            border: 1px solid #d6dfe9;
+            border-radius: 6px;
+            background: #fff;
+            color: #748197;
+            box-shadow: 0 7px 20px rgba(33,57,89,.04);
+        }
+
+        .search-inner svg { width: 22px; height: 22px; }
+
+        @media (max-width: 1320px) {
+            .hero { grid-template-columns: 37% 63%; }
+            h1 { font-size: 48px; }
+            h1 span { font-size: 64px; }
+            .copy { padding-right: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <div class="brand">
+                <svg viewBox="0 0 36 36" aria-hidden="true">
+                    <g fill="none" stroke="#173453" stroke-width="1.6">
+                        <path d="M8 10 18 5l10 6v13l-10 7-10-6Z"/>
+                        <path d="m8 10 10 8 10-7M18 5v13m0 0v13"/>
+                    </g>
+                    <circle cx="8" cy="10" r="3" fill="#ef6548"/>
+                    <circle cx="18" cy="5" r="3" fill="#2864a9"/>
+                    <circle cx="28" cy="11" r="3" fill="#087f80"/>
+                    <circle cx="18" cy="18" r="3.3" fill="#173453"/>
+                    <circle cx="8" cy="25" r="3" fill="#2864a9"/>
+                    <circle cx="18" cy="31" r="3" fill="#ef6548"/>
+                    <circle cx="28" cy="24" r="3" fill="#b88319"/>
+                </svg>
+                Gene-Program-Trait Atlas
+            </div>
+            <div class="nav-links">
+                <a class="active" href="#">Home</a>
+                <a href="#">Traits</a>
+                <a href="#">Genes</a>
+                <a href="#">Programs</a>
+                <a href="#">Data</a>
+                <a href="#">Guide</a>
+                <a href="#">Contact</a>
+                <a href="#">About</a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="copy">
+                <p class="eyebrow">Gene · Program · Trait</p>
+                <h1>Gene–Program–Trait<span>Atlas</span></h1>
+                <p class="description">
+                    Trace trait-associated variants to candidate genes, examine independent
+                    gene-level evidence, and see how perturb-seq connects those genes with
+                    cellular programs.
+                </p>
+                <div class="actions">
+                    <button class="primary">Explore traits</button>
+                    <span class="evidence-note">Illustrated from project data</span>
+                </div>
+            </div>
+
+            <div class="visual">
+                <div class="image-wrap">
+                    <img
+                        class="hero-image"
+                        src="ldlr-evidence-hero-v1.png"
+                        alt="Illustrated evidence path from variants inside LDLR through gene-level evidence and perturb-seq Program P21 to a lipid trait context"
+                    >
+                    <button class="hotspot one" aria-label="Variant localization details">
+                        <span class="image-tip">
+                            <strong>Variant localization</strong>
+                            rs28942084 · chr19:11,231,112<br>
+                            p = 2.11 × 10<sup>−16</sup><br>
+                            4 significant SNPs inside LDLR
+                        </span>
+                    </button>
+                    <button class="hotspot two" aria-label="Gene-level evidence details">
+                        <span class="image-tip">
+                            <strong>LDLR gene evidence</strong>
+                            LoF β = 1.2339 · p = 1.80 × 10<sup>−17</sup><br>
+                            GeneBayes mean = 1.2269
+                        </span>
+                    </button>
+                    <button class="hotspot three" aria-label="Perturb-seq details">
+                        <span class="image-tip">
+                            <strong>LDLR perturbation → P21</strong>
+                            K562 genome-wide perturb-seq<br>
+                            lm_es = −0.0879 · p = 0.00581
+                        </span>
+                    </button>
+                    <button class="hotspot four" aria-label="Trait program result details">
+                        <span class="image-tip">
+                            <strong>P21 regulator association</strong>
+                            β = −0.0553<br>
+                            95% CI −0.075 to −0.035<br>
+                            p = 6.43 × 10<sup>−8</sup>
+                        </span>
+                    </button>
+                </div>
+                <div class="evidence-caption">
+                    <div class="caption-item">
+                        <span class="caption-index">1</span>
+                        <b>Variant localization</b>
+                        <span>4 significant SNPs inside LDLR; lead SNP rs28942084</span>
+                    </div>
+                    <div class="caption-item">
+                        <span class="caption-index">2</span>
+                        <b>Gene-level evidence</b>
+                        <span>LoF β 1.2339 · GeneBayes mean 1.2269</span>
+                    </div>
+                    <div class="caption-item">
+                        <span class="caption-index">3</span>
+                        <b>Perturb-seq</b>
+                        <span>LDLR → P21 in K562 · lm_es −0.0879</span>
+                    </div>
+                    <div class="caption-item">
+                        <span class="caption-index">4</span>
+                        <b>Trait–program result</b>
+                        <span>P21 regulator association · p 6.43 × 10⁻⁸</span>
+                    </div>
+                </div>
+                <p class="disclaimer">Illustration summarizes evidence alignment; <strong>it does not claim a causal mechanism.</strong></p>
+            </div>
+        </section>
+
+        <section class="stats">
+            <div class="stats-inner">
+                <div class="stat">
+                    <div class="icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                            <path d="M8 36h32M11 34V16m8 18V23m8 11V12m8 22V19"/>
+                            <circle cx="11" cy="16" r="3" fill="currentColor" stroke="none"/>
+                            <circle cx="19" cy="23" r="3" fill="currentColor" stroke="none" opacity=".72"/>
+                            <circle cx="27" cy="12" r="3" fill="currentColor" stroke="none"/>
+                            <circle cx="35" cy="19" r="3" fill="currentColor" stroke="none" opacity=".72"/>
+                        </svg>
+                    </div>
+                    <div><span class="value">2,415</span><span class="label">Traits</span></div>
+                </div>
+                <div class="stat">
+                    <div class="icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                            <path d="M16 7c0 10 16 24 16 34M32 7c0 10-16 24-16 34"/>
+                            <path d="M18 11h12M19 17h10M19 24h10M19 31h10M18 37h12" opacity=".6"/>
+                            <circle cx="32" cy="7" r="3" fill="currentColor" stroke="none"/>
+                            <circle cx="16" cy="41" r="3" fill="currentColor" stroke="none"/>
+                        </svg>
+                    </div>
+                    <div><span class="value">10.25B</span><span class="label">Variants</span></div>
+                </div>
+                <div class="stat">
+                    <div class="icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M24 24 12 13m12 11 12-11M24 24v13"/>
+                            <rect x="7" y="8" width="10" height="10" rx="2"/>
+                            <rect x="31" y="8" width="10" height="10" rx="2"/>
+                            <rect x="19" y="32" width="10" height="10" rx="2"/>
+                            <circle cx="24" cy="24" r="4" fill="currentColor" stroke="none"/>
+                        </svg>
+                    </div>
+                    <div><span class="value">60</span><span class="label">Programs</span></div>
+                </div>
+                <div class="stat">
+                    <div class="icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+                            <path d="M16 9h17l6 6v25H16Z"/>
+                            <path d="M33 9v7h6M21 23h12M21 29h12M21 35h8"/>
+                            <path d="M10 15v28h23" opacity=".55"/>
+                        </svg>
+                    </div>
+                    <div><span class="value">67,524</span><span class="label">Data outputs</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="search">
+            <div class="search-inner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#5f7188" stroke-width="1.8" stroke-linecap="round">
+                    <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                    <path d="m15.5 15.5 5 5"></path>
+                </svg>
+                Search traits, genes, programs, or result files
+            </div>
+        </section>
+    </main>
+    <script>
+        const preview = new URLSearchParams(window.location.search).get("preview");
+        if (preview) document.querySelector(`.hotspot.${preview}`)?.classList.add("preview");
+    </script>
+</body>
+</html>

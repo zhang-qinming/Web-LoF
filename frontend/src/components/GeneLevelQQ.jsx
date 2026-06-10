@@ -465,7 +465,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [showTopLabels, setShowTopLabels] = useState(true);
     const [pointSize, setPointSize] = useState(DEFAULT_POINT_SIZE);
     const [labelLimit, setLabelLimit] = useState(DEFAULT_LABEL_LIMIT);
-    const [tableOpen, setTableOpen] = useState(false);
+    const [tableOpen, setTableOpen] = useState(true);
     const [sortBy, setSortBy] = useState('absDeviation');
     const [sortDir, setSortDir] = useState('desc');
     const [highlight, setHighlight] = useState({ rowKey: '', key: 0 });
@@ -1230,7 +1230,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                         <TextField
                             {...params}
                             label="Compare traits"
-                            placeholder="Search traits"
+                            placeholder="e.g. GCST90081631"
                             helperText="Overlay up to 6 traits in the same QQ frame."
                         />
                     )}

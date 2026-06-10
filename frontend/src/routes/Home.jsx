@@ -23,27 +23,12 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
-    AccountTree,
     ArrowForward,
-    Article,
-    CompareArrows,
     Close,
     FileDownload,
     Folder,
-    FolderOpen,
-    GraphicEq,
-    GridOn,
-    Hub,
-    Insights,
     InsertDriveFile,
-    QueryStats,
-    ScatterPlot,
     Search,
-    Science,
-    ShowChart,
-    StackedLineChart,
-    Storage,
-    Whatshot,
 } from '@mui/icons-material';
 import axios from 'axios';
 import ReleaseLogSection from '../components/ReleaseLogSection';
@@ -64,7 +49,7 @@ import homeFigureTraitCorrelation from '../assets/home/home-figure-trait-correla
 import homeFigureVariantDetail from '../assets/home/home-figure-variant-detail.svg';
 
 const accent = '#ff6b4a';
-const siteName = 'TraitVista';
+const siteName = 'Gene-Program-Trait Atlas';
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const SEARCH_CACHE = new Map();
 const SEARCH_DEBOUNCE_MS = 220;
@@ -123,98 +108,86 @@ function traitTabPath(tab) {
 const traitFigureCards = [
     {
         title: 'Program Scatter',
-        description: 'Program x regulator',
+        description: 'Review program and regulator burden scores with highlighted outlier programs.',
         image: homeFigureProgramScatter,
         to: traitTabPath('program-scatter'),
-        icon: ScatterPlot,
         color: '#0284c7',
     },
     {
         title: 'Trait Program Graph',
-        description: 'Trait-program graph',
+        description: 'Open the network view linking traits, programs, and gene-level evidence.',
         image: homeFigureTraitProgramNetwork,
         to: traitTabPath('trait-program-graph'),
-        icon: AccountTree,
         color: '#0f766e',
     },
     {
         title: 'Manhattan',
-        description: 'GWAS signal view',
+        description: 'Inspect genome-wide variant signals by chromosome for the selected trait.',
         image: homeFigureGwasManhattan,
         to: traitTabPath('manhattan'),
-        icon: ShowChart,
         color: '#2563eb',
     },
     {
         title: 'Burden Volcano',
-        description: 'LoF burden genes',
+        description: 'Compare LoF burden effects and significance across candidate genes.',
         image: homeFigureBurdenVolcano,
         to: traitTabPath('burden-volcano'),
-        icon: Whatshot,
         color: '#ea580c',
     },
     {
         title: 'Posterior Volcano',
-        description: 'GeneBayes effects',
+        description: 'Explore GeneBayes posterior effects and gene-level association strength.',
         image: homeFigurePosteriorVolcano,
         to: traitTabPath('posterior-volcano'),
-        icon: Insights,
         color: '#a21caf',
     },
     {
         title: 'Gene Evidence',
-        description: 'Gene-level evidence',
+        description: 'Move from trait associations into gene-centered supporting evidence.',
         image: homeFigureLofGene,
         to: traitTabPath('gene-evidence'),
-        icon: Science,
         color: '#7c3aed',
     },
     {
         title: 'Gene QQ',
-        description: 'Gene-level QQ',
+        description: 'Check gene-level test calibration and tail behavior in the QQ view.',
         image: homeFigureQqPlot,
         to: traitTabPath('gene-qq'),
-        icon: GraphicEq,
         color: '#1d4ed8',
     },
     {
         title: 'Cross-trait Heatmap',
-        description: 'Cross-trait comparison',
+        description: 'Compare related traits across shared genes and posterior evidence.',
         image: homeFigureCrossTraitHeatmap,
         to: traitTabPath('cross-trait-heatmap'),
-        icon: GridOn,
         color: '#c2410c',
     },
     {
         title: 'Program Volcano',
-        description: 'Program-trait effects',
+        description: 'Review program-trait effects and highlighted cellular program signals.',
         image: homeFigureProgramVolcano,
         to: traitTabPath('program-scatter'),
-        icon: StackedLineChart,
         color: '#7c3aed',
     },
     {
         title: 'Trait Correlation',
-        description: 'Pairwise genetic correlation',
+        description: 'Compare GeneBayes effect profiles across shared genes with Spearman or Pearson correlation.',
         image: homeFigureTraitCorrelation,
-        to: traitTabPath('cross-trait-heatmap'),
-        icon: CompareArrows,
+        to: traitTabPath('trait-correlation'),
         color: '#2563eb',
     },
     {
         title: 'Trait Detail',
-        description: 'Trait metadata and modules',
+        description: 'Open the trait metadata page with available modules and result links.',
         image: homeFigureVariantDetail,
         to: '/trait',
-        icon: Article,
         color: '#d97706',
     },
     {
         title: 'Data Browser',
-        description: 'File retrieval and export',
+        description: 'Search indexed project outputs and download the underlying result files.',
         image: homeFigureDataBrowser,
         to: '/data',
-        icon: FolderOpen,
         color: '#b45309',
     },
 ];
@@ -236,6 +209,66 @@ function fmtSize(bytes) {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+function CoverageGlyph({ color, kind }) {
+    const common = {
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        strokeWidth: 2,
+    };
+
+    return (
+        <Box
+            component="svg"
+            viewBox="0 0 40 40"
+            sx={{
+                width: { xs: 25, md: 28 },
+                height: { xs: 25, md: 28 },
+                color,
+                overflow: 'visible',
+            }}
+            aria-hidden="true"
+        >
+            {kind === 'traits' && (
+                <>
+                    <path {...common} d="M9 30V11M9 30h23" opacity="0.48" />
+                    <path {...common} d="m11 25 6-7 5 4 8-11" />
+                    <circle cx="11" cy="25" r="2.2" fill="currentColor" />
+                    <circle cx="17" cy="18" r="2.2" fill="currentColor" opacity="0.72" />
+                    <circle cx="22" cy="22" r="2.2" fill="currentColor" opacity="0.72" />
+                    <circle cx="30" cy="11" r="2.8" fill="currentColor" />
+                </>
+            )}
+            {kind === 'variants' && (
+                <>
+                    <path {...common} d="M13 8c0 8 14 16 14 24M27 8c0 8-14 16-14 24" />
+                    <path {...common} d="M15 12h10M16 17h8M16 23h8M15 28h10" opacity="0.5" />
+                    <circle cx="27" cy="8" r="2.5" fill="currentColor" />
+                    <circle cx="13" cy="32" r="2.5" fill="currentColor" opacity="0.72" />
+                </>
+            )}
+            {kind === 'programs' && (
+                <>
+                    <path {...common} d="M20 19 12 12M20 19l8-7M20 19v10" opacity="0.58" />
+                    <rect x="8" y="8" width="8" height="8" rx="2.2" {...common} />
+                    <rect x="24" y="8" width="8" height="8" rx="2.2" {...common} />
+                    <rect x="16" y="25" width="8" height="8" rx="2.2" {...common} />
+                    <circle cx="20" cy="19" r="3.4" fill="currentColor" />
+                </>
+            )}
+            {kind === 'outputs' && (
+                <>
+                    <path {...common} d="M14 9h10l5 5v17H14V9Z" />
+                    <path {...common} d="M24 9v6h5M18 21h7M18 26h7" opacity="0.62" />
+                    <path {...common} d="M10 13v21h15" opacity="0.48" />
+                    <circle cx="29" cy="31" r="2.6" fill="currentColor" />
+                </>
+            )}
+        </Box>
+    );
 }
 
 function getRequestErrorMessage(err, fallback) {
@@ -302,38 +335,6 @@ function writeHomeStatsCache(stats) {
     } catch {
         // Cache failure should not affect the home page.
     }
-}
-
-function SectionHeading({ eyebrow, title, description, theme, align = 'center' }) {
-    return (
-        <Stack spacing={0.65} alignItems={align === 'center' ? 'center' : 'flex-start'} sx={{ mb: { xs: 2.5, md: 3.4 } }}>
-            {eyebrow && (
-                <Typography sx={{ color: accent, fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none' }}>
-                    {eyebrow}
-                </Typography>
-            )}
-            <Typography
-                component="h2"
-                sx={{
-                    color: '#111827',
-                    fontFamily: theme.typography.fontFamily,
-                    fontSize: { xs: '1.85rem', md: '2.35rem' },
-                    fontWeight: 760,
-                    lineHeight: 1.08,
-                    letterSpacing: 0,
-                    textAlign: align,
-                    textWrap: 'balance',
-                }}
-            >
-                {title}
-            </Typography>
-            {description && (
-                <Typography sx={captionSx(theme, { maxWidth: 720, textAlign: align, fontSize: { xs: '0.9rem', md: '0.96rem' } })}>
-                    {description}
-                </Typography>
-            )}
-        </Stack>
-    );
 }
 
 function SearchResultsPanel({
@@ -797,16 +798,6 @@ function HomeSearch({
                                 Find output files and folders.
                             </Typography>
                         </Box>
-                        <Button
-                            size="small"
-                            variant="text"
-                            endIcon={<ArrowForward sx={{ fontSize: 15 }} />}
-                            component={RouterLink}
-                            to="/data"
-                            sx={{ whiteSpace: 'nowrap', px: 0, color: theme.palette.warning.dark }}
-                        >
-                            Data browser
-                        </Button>
                     </Stack>
                     <ClickAwayListener onClickAway={() => setOpen(false)}>
                         <Stack spacing={1.1}>
@@ -827,7 +818,7 @@ function HomeSearch({
                             <Box sx={{ position: 'relative' }}>
                             <TextField
                                 fullWidth
-                                placeholder="Search result files or folders"
+                                placeholder="e.g. GCST90081631"
                                 inputProps={{ 'aria-label': 'Search result files and folders' }}
                                 value={q}
                                 onChange={(event) => {
@@ -904,26 +895,26 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
         {
             label: 'Traits',
             value: stats?.traits,
-            icon: QueryStats,
+            kind: 'traits',
             color: '#2563eb',
         },
         {
             label: 'Variants',
             value: stats?.variants,
-            icon: Storage,
+            kind: 'variants',
             color: '#0f766e',
             compact: true,
         },
         {
             label: 'Programs',
             value: stats?.programs,
-            icon: Hub,
+            kind: 'programs',
             color: '#7c3aed',
         },
         {
             label: 'Data outputs',
             value: stats?.dataOutputs,
-            icon: InsertDriveFile,
+            kind: 'outputs',
             color: '#b45309',
         },
     ];
@@ -948,18 +939,16 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
                     gap: { xs: 1.1, md: 1.4 },
                 }}
             >
-                {metrics.map((metric) => {
-                    const Icon = metric.icon;
-                    return (
+                {metrics.map((metric) => (
                         <Box
                             key={metric.label}
                             sx={{
-                                minHeight: 78,
-                                px: 1.4,
-                                py: 1.2,
+                                minHeight: { xs: 92, md: 96 },
+                                px: { xs: 1.5, md: 1.7 },
+                                py: { xs: 1.35, md: 1.45 },
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 1,
+                                gap: { xs: 1, md: 1.15 },
                                 borderRadius: 1,
                                 border: `1px solid ${alpha(metric.color, 0.13)}`,
                                 bgcolor: '#fff',
@@ -968,8 +957,8 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
                         >
                             <Box
                                 sx={{
-                                    width: 34,
-                                    height: 34,
+                                    width: { xs: 38, md: 42 },
+                                    height: { xs: 38, md: 42 },
                                     borderRadius: 1,
                                     display: 'grid',
                                     placeItems: 'center',
@@ -979,27 +968,26 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
                                 }}
                                 aria-hidden="true"
                             >
-                                <Icon sx={{ fontSize: 18 }} />
+                                <CoverageGlyph color={metric.color} kind={metric.kind} />
                             </Box>
                             <Box sx={{ minWidth: 0 }}>
                                 <Typography
                                     sx={{
                                         color: '#111827',
-                                        fontSize: { xs: '1.04rem', md: '1.12rem' },
-                                        fontWeight: 740,
+                                        fontSize: { xs: '1.35rem', md: '1.55rem' },
+                                        fontWeight: 780,
                                         lineHeight: 1,
                                         fontVariantNumeric: 'tabular-nums',
                                     }}
                                 >
-                                    {loading ? <Skeleton variant="text" width={68} height={26} /> : fmtMetricCount(metric.value, metric.compact)}
+                                    {loading ? <Skeleton variant="text" width={82} height={34} /> : fmtMetricCount(metric.value, metric.compact)}
                                 </Typography>
-                                <Typography sx={{ mt: 0.35, color: '#64748b', fontSize: '0.72rem', lineHeight: 1.2 }}>
+                                <Typography sx={{ mt: 0.55, color: '#64748b', fontSize: { xs: '0.76rem', md: '0.8rem' }, lineHeight: 1.2 }}>
                                     {metric.label}
                                 </Typography>
                             </Box>
                         </Box>
-                    );
-                })}
+                ))}
             </Box>
             {error && (
                 <Typography sx={{ mt: 1, color: theme.palette.warning.dark, fontSize: '0.76rem', textAlign: 'center' }}>
@@ -1011,15 +999,12 @@ function DataCoveragePanel({ embedded = false, error, loading, stats, theme }) {
 }
 
 function FigureCard({ item }) {
-    const Icon = item.icon;
-
     return (
         <Box
             component={RouterLink}
             to={item.to}
             aria-label={`Open ${item.title}`}
             sx={{
-                minHeight: { xs: 292, md: 304 },
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: 1,
@@ -1030,15 +1015,24 @@ function FigureCard({ item }) {
                 position: 'relative',
                 textDecoration: 'none',
                 boxShadow: '0 14px 34px rgba(15,23,42,0.06)',
-                transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
+                transition: 'transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease',
                 '&:hover': {
-                    transform: 'translateY(-5px)',
+                    transform: 'translateY(-4px)',
                     borderColor: alpha(item.color, 0.28),
                     boxShadow: `0 22px 48px ${alpha(item.color, 0.15)}`,
                 },
-                '&:hover .figure-card-description, &:focus-visible .figure-card-description': {
+                '&:hover .figure-card-image, &:focus-visible .figure-card-image': {
+                    transform: 'scale(1.04)',
+                },
+                '&:hover .figure-card-frame, &:focus-visible .figure-card-frame': {
+                    opacity: 1,
+                },
+                '&:hover .figure-card-details, &:focus-visible .figure-card-details': {
                     opacity: 1,
                     transform: 'translateY(0)',
+                },
+                '&:hover .figure-card-title, &:focus-visible .figure-card-title': {
+                    color: item.color,
                 },
                 '&:focus-visible': {
                     outline: `3px solid ${alpha(item.color, 0.24)}`,
@@ -1057,6 +1051,7 @@ function FigureCard({ item }) {
             >
                 <Box
                     component="img"
+                    className="figure-card-image"
                     src={item.image}
                     alt=""
                     sx={{
@@ -1064,44 +1059,72 @@ function FigureCard({ item }) {
                         height: '100%',
                         objectFit: 'cover',
                         display: 'block',
-                        transform: 'scale(1.06)',
+                        transform: 'scale(1.03)',
                         transformOrigin: 'center',
+                        transition: 'transform 360ms ease',
                     }}
                 />
                 <Box
-                    className="figure-card-description"
-                    aria-hidden="true"
+                    className="figure-card-frame"
+                    sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        border: `1px solid ${alpha(item.color, 0.22)}`,
+                        boxShadow: `inset 0 0 0 1px ${alpha(item.color, 0.08)}`,
+                        opacity: 0,
+                        transition: 'opacity 180ms ease',
+                        pointerEvents: 'none',
+                    }}
+                />
+                <Box
+                    className="figure-card-details"
                     sx={{
                         position: 'absolute',
                         left: 12,
                         right: 12,
                         bottom: 12,
-                        px: 1.2,
+                        zIndex: 2,
+                        px: 1.25,
                         py: 0.85,
                         borderRadius: 1,
-                        bgcolor: 'rgba(15,23,42,0.82)',
-                        color: '#fff',
-                        fontSize: '0.78rem',
-                        lineHeight: 1.45,
+                        bgcolor: 'rgba(255,255,255,0.98)',
+                        border: `1px solid ${alpha(item.color, 0.16)}`,
+                        boxShadow: '0 12px 28px rgba(15,23,42,0.16)',
                         opacity: 0,
                         transform: 'translateY(8px)',
-                        transition: 'opacity 160ms ease, transform 160ms ease',
+                        transition: 'opacity 160ms ease, transform 180ms ease',
+                        pointerEvents: 'none',
                     }}
                 >
-                    {item.description}
+                    <Typography
+                        sx={{
+                            maxWidth: 320,
+                            color: '#475569',
+                            fontSize: '0.76rem',
+                            fontWeight: 560,
+                            lineHeight: 1.45,
+                            textAlign: 'left',
+                        }}
+                    >
+                        {item.description}
+                    </Typography>
                 </Box>
             </Box>
-            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ px: 1.5, pt: 1.25, minWidth: 0 }}>
-                <Icon sx={{ color: item.color, fontSize: 18, flex: '0 0 auto' }} />
-                <Typography component="h3" sx={{ color: '#111827', fontSize: '1rem', fontWeight: 740, lineHeight: 1.22 }}>
+            <Stack alignItems="center" justifyContent="center" sx={{ px: 1.5, pt: 1, pb: 1.15, minWidth: 0 }}>
+                <Typography
+                    component="h3"
+                    className="figure-card-title"
+                    sx={{
+                        color: '#111827',
+                        fontSize: '1rem',
+                        fontWeight: 740,
+                        lineHeight: 1.22,
+                        textAlign: 'center',
+                        transition: 'color 180ms ease',
+                    }}
+                >
                     {item.title}
                 </Typography>
-            </Stack>
-            <Stack direction="row" spacing={0.55} alignItems="center" sx={{ mt: 'auto', px: 1.5, pt: 1, pb: 1.25, color: item.color }}>
-                <Typography component="span" sx={{ fontSize: '0.78rem', fontWeight: 680, color: 'inherit' }}>
-                    Open
-                </Typography>
-                <ArrowForward sx={{ fontSize: 14 }} />
             </Stack>
         </Box>
     );
@@ -1120,10 +1143,6 @@ function FigureGateway({ items }) {
                 pb: { xs: 6, md: 8 },
             }}
         >
-            <SectionHeading
-                title="Result views"
-                theme={theme}
-            />
             <Box
                 sx={{
                     display: 'grid',
@@ -1159,29 +1178,26 @@ function HeroSection({ stats, statsLoading, theme }) {
         >
             <Box sx={{ maxWidth: 820, mx: 'auto', textAlign: 'center' }}>
                 <Typography
-                    sx={{
-                        color: accent,
-                        fontSize: '0.76rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.14em',
-                        textTransform: 'none',
-                        mb: 1,
-                    }}
-                >
-                    Genome-Wide Association Study Browser
-                </Typography>
-                <Typography
                     component="h1"
+                    aria-label={siteName}
                     sx={{
+                        maxWidth: 920,
+                        mx: 'auto',
                         color: '#111827',
                         fontFamily: theme.typography.fontFamily,
-                        fontSize: 'clamp(2.85rem, 5.7vw, 5.15rem)',
+                        fontSize: { xs: '1.9rem', sm: '3.2rem', md: '4.6rem' },
                         fontWeight: 780,
-                        lineHeight: 0.94,
+                        lineHeight: { xs: 1.08, md: 0.98 },
                         letterSpacing: 0,
+                        textWrap: 'balance',
                     }}
                 >
-                    {siteName}
+                    <Box component="span" sx={{ display: { xs: 'block', sm: 'inline' }, whiteSpace: 'nowrap' }}>
+                        Gene-Program-Trait
+                    </Box>
+                    <Box component="span" sx={{ display: { xs: 'block', sm: 'inline' }, ml: { xs: 0, sm: 1 }, whiteSpace: 'nowrap' }}>
+                        Atlas
+                    </Box>
                 </Typography>
                 <Typography
                     sx={{
@@ -1194,7 +1210,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                         lineHeight: 1.72,
                     }}
                 >
-                    Navigate from trait metadata to Manhattan peaks, gene-level evidence, cellular program context, and downloadable data outputs, all in one place.
+                    Gene-Program-Trait Atlas is a browser for following genetic associations from traits to candidate genes and cellular programs. It brings together GWAS summary statistics, loss-of-function burden tests, GeneBayes posterior estimates, perturb-seq program annotations, and cross-trait comparisons across 2,415 traits, 10.25B variant records, 60 programs, and 67,524 indexed outputs. Users can start from a trait, gene, program, or result file, review the supporting plots and metadata, compare related traits, and download the underlying data.
                 </Typography>
 
                 <DataCoveragePanel
@@ -1233,62 +1249,6 @@ function HeroSection({ stats, statsLoading, theme }) {
                     statsLoading={statsLoading}
                     theme={theme}
                 />
-            </Box>
-
-            {/* Decorative SVG preview strip */}
-            <Box
-                sx={{
-                    mt: { xs: 4, md: 5 },
-                    display: 'grid',
-                    gridTemplateColumns: {
-                        xs: 'repeat(2, 1fr)',
-                        sm: 'repeat(3, 1fr)',
-                        md: 'repeat(5, 1fr)',
-                    },
-                    gap: { xs: 1, md: 1.4 },
-                }}
-            >
-                {[
-                    { src: homeFigureGwasManhattan, label: 'Manhattan', color: '#2563eb' },
-                    { src: homeFigureTraitCorrelation, label: 'Correlation', color: '#c2410c' },
-                    { src: homeFigureProgramScatter, label: 'Programs', color: '#0284c7' },
-                    { src: homeFigureBurdenVolcano, label: 'Burden', color: '#ea580c' },
-                    { src: homeFigureVariantDetail, label: 'Trait Detail', color: '#d97706' },
-                ].map((item) => (
-                    <Box
-                        key={item.label}
-                        sx={panelSx(theme, {
-                            overflow: 'hidden',
-                            p: 0,
-                            transition: 'transform 200ms ease, box-shadow 200ms ease',
-                            '&:hover': {
-                                transform: 'translateY(-3px)',
-                                boxShadow: theme.custom.shadow.float,
-                            },
-                        })}
-                    >
-                        <Box
-                            component="img"
-                            src={item.src}
-                            alt={item.label}
-                            loading="lazy"
-                            sx={{ width: '100%', height: 'auto', display: 'block' }}
-                        />
-                        <Box sx={{ px: 1, py: 0.6, borderTop: `1px solid ${theme.custom.border.soft}` }}>
-                            <Typography
-                                sx={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: 680,
-                                    color: item.color,
-                                    textAlign: 'center',
-                                    lineHeight: 1,
-                                }}
-                            >
-                                {item.label}
-                            </Typography>
-                        </Box>
-                    </Box>
-                ))}
             </Box>
         </Box>
     );
@@ -1335,8 +1295,9 @@ function Home() {
             <FigureGateway items={traitFigureCards} />
 
             <ReleaseLogSection
+                eyebrow={null}
                 heading="Recent releases"
-                subtitle="The latest milestones stay on Home; the complete release log lives in About."
+                subtitle={null}
                 limit={3}
                 newestFirst
                 outerSx={{
