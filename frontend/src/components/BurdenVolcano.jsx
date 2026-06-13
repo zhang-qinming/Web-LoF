@@ -42,7 +42,6 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
-    RESPONSIVE_PLOT_HEIGHT,
     sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
@@ -65,6 +64,7 @@ const SIGNIFICANCE_LOGP = -Math.log10(0.05);
 const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 800;
 const DEFAULT_POINT_SIZE = 8;
+const VOLCANO_PLOT_HEIGHT = 'clamp(620px, 72dvh, 960px)';
 const MIN_DEFAULT_HIT_ROWS = 20;
 
 const VOLCANO_CONFIGS = {
@@ -840,7 +840,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {(isLoading || shouldAutoSwitchToFull) && (
-                        <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: VOLCANO_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -882,7 +882,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                                     setTableOpen(true);
                                 }}
                                 useResizeHandler
-                                style={{ width: '100%', height: RESPONSIVE_PLOT_HEIGHT }}
+                                style={{ width: '100%', height: VOLCANO_PLOT_HEIGHT }}
                             />
                             <FloatingLegend
                                 items={legendItems}

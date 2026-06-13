@@ -1372,11 +1372,8 @@ function WorkflowCards({ copy }) {
             })}
         >
             <Box sx={{ mb: 1.3 }}>
-                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
+                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0 })}>
                     {copy.workflowCardsTitle}
-                </Typography>
-                <Typography variant="body2" sx={captionSx(theme, { mb: 0 })}>
-                    {copy.workflowCardsBody}
                 </Typography>
             </Box>
             <Box
@@ -1500,7 +1497,6 @@ export default function Help() {
     return (
         <PageFrame
             title={copy.pageTitle}
-            subtitle={copy.pageSubtitle}
             maxWidth={1480}
             compact
         >
@@ -1676,9 +1672,7 @@ export default function Help() {
                                 <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.3 })}>
                                     {copy.componentCoverageTitle}
                                 </Typography>
-                                <Typography variant="body2" sx={captionSx(theme, { mb: 0 })}>
-                                    {copy.componentCoverageBody}
-                                </Typography>
+
                             </Box>
                             <Chip
                                 label={copy.mapped(indexCount)}

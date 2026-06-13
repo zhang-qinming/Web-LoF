@@ -614,15 +614,12 @@ function DerivedStatsPanel({ copy, stats, locale }) {
                 bgcolor: alpha(theme.palette.background.paper, 0.58),
             }}
         >
-            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.45 }}>
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 1.1 }}>
                 <DifferenceOutlined sx={{ fontSize: 18, color: theme.palette.primary.main }} />
                 <Typography variant="subtitle2" sx={sectionTitleSx(theme)}>
                     {copy.title}
                 </Typography>
             </Stack>
-            <Typography variant="body2" sx={captionSx(theme, { mb: 1.1 })}>
-                {copy.body}
-            </Typography>
             <CompactPlotCard
                 title={copy.summaryTitle}
                 ariaLabel={copy.chartAria}
@@ -884,11 +881,8 @@ function CoverageChart({ copy, stats, locale }) {
                     bgcolor: theme.custom.surface.subtle,
                 }}
             >
-                <Typography variant="subtitle2" sx={sectionTitleSx(theme, { mb: 0.45 })}>
+                <Typography variant="subtitle2" sx={sectionTitleSx(theme, { mb: 1 })}>
                     {copy.summaryTitle}
-                </Typography>
-                <Typography variant="body2" sx={captionSx(theme, { mb: 1 })}>
-                    {copy.summaryBody}
                 </Typography>
                 {[...catalogItems, ...annotationItems].map((item) => (
                     <SummaryRow key={item.key} item={item} stats={stats} locale={locale} />
@@ -984,9 +978,7 @@ export default function AboutDataStatistics({ copy, locale = 'en' }) {
                     <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
                         {copy.title}
                     </Typography>
-                    <Typography variant="body2" sx={captionSx(theme, { mb: 0, maxWidth: 760 })}>
-                        {copy.body}
-                    </Typography>
+
                 </Box>
                 <Chip
                     icon={<DatasetOutlined sx={{ fontSize: 16 }} />}

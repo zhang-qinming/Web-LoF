@@ -257,11 +257,8 @@ function TriageHints({ copy }) {
             })}
         >
             <Box sx={{ mb: 1.2 }}>
-                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
+                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0 })}>
                     {copy.triageTitle}
-                </Typography>
-                <Typography variant="body2" sx={captionSx(theme, { mb: 0 })}>
-                    {copy.triageBody}
                 </Typography>
             </Box>
             <Box
@@ -315,9 +312,7 @@ function ReportTemplate({ copy }) {
                 <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
                     {copy.templateTitle}
                 </Typography>
-                <Typography variant="body2" sx={captionSx(theme, { mb: 0 })}>
-                    {copy.templateBody}
-                </Typography>
+
             </Box>
             <Stack spacing={0.75}>
                 {copy.templateRows.map(([label, value]) => (
@@ -354,7 +349,6 @@ export default function Contact() {
     return (
         <PageFrame
             title={copy.title}
-            subtitle={copy.subtitle}
             maxWidth={1080}
             compact
             actions={(

@@ -3,10 +3,12 @@ const path = require('path');
 const express = require('express');
 const router = express.Router();
 const metaModel = require('../models/Mmeta');
+const programModel = require('../models/Mprogram');
+const geneProgramModel = require('../models/MgeneProgram');
 const { config } = require('../lib/config');
 const { createFileStore } = require('../lib/fileStore');
 const { asyncRoute } = require('../lib/http');
-const { normalizeIdentifier, parsePageOptions } = require('../lib/request');
+const { normalizeIdentifier, parsePageOptions, parsePositiveInt } = require('../lib/request');
 
 const regulationStore = createFileStore(config.paths.regulationDataDir);
 const dataStore = createFileStore(config.paths.dataDir);
@@ -107,6 +109,18 @@ async function getHomeStats() {
     return homeStatsPromise;
 }
 
+async function settleHomeSearch(key, promise) {
+    try {
+        return { key, value: await promise };
+    } catch (error) {
+        return {
+            key,
+            value: null,
+            error: error?.message || `Failed to search ${key}`,
+        };
+    }
+}
+
 router.get('/api/browse', asyncRoute(async (req, res) => {
     const result = await metaModel.getTraits({
         ...parsePageOptions(req.query, {
@@ -129,6 +143,69 @@ router.get('/api/meta/:fileId', asyncRoute(async (req, res) => {
 
 router.get('/api/home/stats', asyncRoute(async (req, res) => {
     res.json(await getHomeStats());
+}));
+
+router.get('/api/home/search', asyncRoute(async (req, res) => {
+    const q = normalizeIdentifier(req.query.q, 120) || '';
+    const limit = parsePositiveInt(req.query.limit, 6, 20);
+
+    if (q.length < 2) {
+        return res.json({
+            query: q,
+            limit,
+            traits: { results: [], totalCount: 0 },
+            genes: { results: [], totalCount: 0 },
+            programs: { results: [], totalCount: 0 },
+            errors: {},
+        });
+    }
+
+    const [traitsResult, genesResult, programsResult] = await Promise.all([
+        settleHomeSearch('traits', metaModel.getTraits({
+            page: 1,
+            limit,
+            sortBy: 'trait_name',
+            order: 'ASC',
+            search: q,
+        })),
+        settleHomeSearch('genes', geneProgramModel.getGenes({
+            page: 1,
+            limit,
+            sortBy: 'totalTraits',
+            order: 'DESC',
+            search: q,
+        })),
+        settleHomeSearch('programs', programModel.searchPrograms(q, limit)),
+    ]);
+
+    const errors = {};
+    [traitsResult, genesResult, programsResult].forEach((result) => {
+        if (result.error) errors[result.key] = result.error;
+    });
+
+    const traits = traitsResult.value || {};
+    const genes = genesResult.value || {};
+    const programs = programsResult.value || {};
+
+    res.json({
+        query: q,
+        limit,
+        traits: {
+            results: traits.data || [],
+            totalCount: Number(traits.totalCount) || 0,
+            totalPages: Number(traits.totalPages) || 0,
+        },
+        genes: {
+            results: genes.genes || genes.data || [],
+            totalCount: Number(genes.totalCount) || 0,
+            totalPages: Number(genes.totalPages) || 0,
+        },
+        programs: {
+            results: programs.programs || [],
+            totalCount: Number(programs.totalPrograms) || 0,
+        },
+        errors,
+    });
 }));
 
 module.exports = router;

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#F0FDF4" />
+  <g transform="translate(14, 14) scale(1.5)">
+    <line x1="8" y1="3" x2="16" y2="3" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" />
+    <line x1="8" y1="12" x2="16" y2="12" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" />
+    <line x1="8" y1="21" x2="16" y2="21" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" />
+    
+    <line x1="9" y1="6" x2="15" y2="6" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" />
+    <line x1="10" y1="9" x2="14" y2="9" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" />
+    <line x1="10" y1="15" x2="14" y2="15" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" />
+    <line x1="9" y1="18" x2="15" y2="18" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" />
+
+    <path d="M8 3 c 0 4 8 5 8 9 c 0 4 -8 5 -8 9" stroke="#0F766E" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M16 3 c 0 4 -8 5 -8 9 c 0 4 8 5 8 9" stroke="#34D399" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

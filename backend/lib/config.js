@@ -36,6 +36,7 @@ function parseBytes(value, fallback) {
 }
 
 const dataDir = process.env.DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs';
+const crossTraitHeatmapDir = process.env.CROSS_TRAIT_HEATMAP_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/cross_trait_heatmap';
 
 const paths = {
     dataDir,
@@ -45,7 +46,8 @@ const paths = {
     gwasManhattanDataDir: process.env.GWAS_MANHATTAN_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/gwas_manhattan/tables',
     burdenVolcanoDir: process.env.BURDEN_VOLCANO_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/burden_volcano/tables',
     posteriorVolcanoDir: process.env.POSTERIOR_VOLCANO_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/posterior_volcano/tables',
-    crossTraitHeatmapDir: process.env.CROSS_TRAIT_HEATMAP_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/cross_trait_heatmap',
+    crossTraitHeatmapDir,
+    traitEffectNeighborsFile: process.env.TRAIT_EFFECT_NEIGHBORS_FILE || path.join(crossTraitHeatmapDir, 'trait_effect_neighbors.json'),
 };
 
 const config = {

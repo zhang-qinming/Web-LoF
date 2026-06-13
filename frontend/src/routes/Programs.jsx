@@ -6,13 +6,12 @@ import {
     TableHead, TableRow, TableSortLabel, TextField, Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { AccountTreeOutlined, BiotechOutlined, DownloadOutlined, ExpandMore, HubOutlined, OpenInNew, ScienceOutlined, Search, TableChartOutlined } from '@mui/icons-material';
+import { DownloadOutlined, ExpandMore, OpenInNew, Search } from '@mui/icons-material';
 import useSWR from 'swr';
 import { fetcher, getProgramGenes, getProgramTraits } from '../api/gwas';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
 import { downloadBlob } from '../utils/download';
 import {
-    captionSx,
     DATA_PAGE_MAX_WIDTH,
     groupedTableColumnHeaderCellSx,
     groupedTableHeaderMetrics,
@@ -312,20 +311,28 @@ function programTableColumnHeaderSx(theme, tone, align) {
 function ProgramSummaryChips({ summary }) {
     const theme = useTheme();
     const items = [
-        { label: 'Traits', value: summary?.totalTraits, tone: 'neutral', icon: <TableChartOutlined /> },
-        { label: 'Program', value: summary?.selectedByProgram, tone: 'primary', icon: <ScienceOutlined /> },
-        { label: 'Regulator', value: summary?.selectedByRegulator, tone: 'accent', icon: <AccountTreeOutlined /> },
-        { label: 'Both', value: summary?.bothSelected, tone: 'success', icon: <HubOutlined /> },
-        { label: 'Genes', value: summary?.totalGenes, tone: 'warning', icon: <BiotechOutlined /> },
+        { label: 'Traits', value: summary?.totalTraits, tone: 'neutral' },
+        { label: 'Program', value: summary?.selectedByProgram, tone: 'primary' },
+        { label: 'Regulator', value: summary?.selectedByRegulator, tone: 'accent' },
+        { label: 'Both', value: summary?.bothSelected, tone: 'success' },
+        { label: 'Genes', value: summary?.totalGenes, tone: 'warning' },
     ];
 
     return (
         <Box
             sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(5, minmax(92px, 1fr))', xl: 'repeat(5, 104px)' },
-                gap: 0.75,
-                width: { xs: '100%', xl: 'auto' },
+                gridTemplateColumns: {
+                    xs: 'repeat(2, minmax(0, 1fr))',
+                    sm: 'repeat(3, minmax(104px, 1fr))',
+                    md: 'repeat(5, minmax(104px, 1fr))',
+                    lg: 'repeat(5, minmax(116px, 1fr))',
+                },
+                gap: { xs: 0.75, md: 0.9 },
+                width: '100%',
+                minWidth: 0,
+                flex: { xs: '1 1 auto', md: '1 1 0%' },
+                maxWidth: { md: 660 },
             }}
         >
             {items.map((item) => {
@@ -334,22 +341,28 @@ function ProgramSummaryChips({ summary }) {
                     <Box
                         key={item.label}
                         sx={{
-                            px: 1,
-                            py: 0.8,
-                            borderRadius: 1,
+                            px: { xs: 1, md: 1.15 },
+                            py: { xs: 0.85, md: 0.95 },
+                            minHeight: { xs: 58, md: 64 },
+                            borderRadius: 1.2,
                             border: colors.border,
                             bgcolor: colors.backgroundColor,
                             color: colors.color,
-                            minWidth: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s cubic-bezier(0.2, 0, 0, 1)',
+                            '&:hover': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: `0 6px 14px ${alpha(colors.color, 0.08)}`,
+                                borderColor: alpha(colors.color, 0.32),
+                            },
                         }}
                     >
-                        <Stack direction="row" spacing={0.55} alignItems="center">
-                            {React.cloneElement(item.icon, { sx: { fontSize: 15, flexShrink: 0 } })}
-                            <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 740, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
-                                {(Number(item.value) || 0).toLocaleString()}
-                            </Typography>
-                        </Stack>
-                        <Typography sx={{ mt: 0.25, fontSize: '0.62rem', fontWeight: 650, textTransform: 'none', letterSpacing: '0.05em' }}>
+                        <Typography sx={{ fontSize: { xs: '1rem', md: '1.1rem' }, lineHeight: 1.08, fontWeight: 760, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
+                            {(Number(item.value) || 0).toLocaleString()}
+                        </Typography>
+                        <Typography sx={{ mt: 0.28, fontSize: { xs: '0.62rem', md: '0.68rem' }, fontWeight: 680, textTransform: 'none', letterSpacing: '0.045em' }}>
                             {item.label}
                         </Typography>
                     </Box>
@@ -399,31 +412,27 @@ function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
                 }}
                 disableRipple={!interactive}
                 sx={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: 1.25,
-                    px: 0.5,
-                    py: 0.25,
-                    borderRadius: 1.2,
-                    textAlign: 'left',
-                    transition: `transform ${theme.custom.motion.swift}, background-color ${theme.custom.motion.swift}`,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 1.5,
+                    py: 0.75,
+                    borderRadius: 1.5,
+                    border: interactive ? `1px solid ${theme.custom.border.soft}` : 'none',
+                    bgcolor: interactive ? alpha(theme.palette.primary.main, 0.015) : 'transparent',
+                    transition: `all ${theme.custom.motion.swift}`,
                     '&:hover': interactive ? {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.04),
+                        bgcolor: alpha(theme.palette.primary.main, 0.05),
+                        borderColor: alpha(theme.palette.primary.main, 0.25),
                         transform: 'translateY(-1px)',
+                        boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.06)}`,
                     } : undefined,
                 }}
             >
-                <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="h5" sx={sectionTitleSx(theme, { lineHeight: 1.2 })}>
-                        Program {selectedProgram?.label || '-'}
-                    </Typography>
-                    <Typography sx={captionSx(theme, { fontSize: '0.86rem', mt: 0.35 })}>
-                        {selectedProgram?.annotation || 'Program annotation is not available'}
-                    </Typography>
-                </Box>
-                {interactive && <ExpandMore sx={{ mt: 0.45, color: theme.palette.text.secondary }} />}
+                <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.35rem', md: '1.55rem' }, fontWeight: 800, color: '#173b35', lineHeight: 1 })}>
+                    Program {selectedProgram?.label || '-'}
+                </Typography>
+                {interactive && <ExpandMore sx={{ color: theme.palette.text.secondary, flexShrink: 0 }} />}
             </ButtonBase>
 
             <Popover
@@ -772,11 +781,6 @@ function ProgramGenesTable({ programId }) {
                                         <Typography sx={sectionTitleSx(theme, { fontSize: '0.94rem', lineHeight: 1.2 })}>
                                             Program Genes
                                         </Typography>
-                                        <Typography sx={captionSx(theme, { fontSize: '0.7rem', lineHeight: 1.35 })}>
-                                            {shouldPaginate
-                                                ? `Showing ${rows.length ? (start + 1).toLocaleString() : 0}-${Math.min(start + rowsPerPage, rows.length).toLocaleString()} of ${rows.length.toLocaleString()} genes.`
-                                                : `Showing all ${rows.length.toLocaleString()} genes.`}
-                                        </Typography>
                                     </Box>
                                     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: 'wrap' }}>
                                         <Chip
@@ -1084,18 +1088,35 @@ export default function Programs() {
                 px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
                 py: { xs: 1.5, md: 2.5, xl: 3 },
             }}>
-                <Paper elevation={0} sx={panelSx(theme, { p: 1.5, mb: 1.5 })}>
-                    <Stack direction={{ xs: 'column', xl: 'row' }} spacing={1.25} justifyContent="space-between" alignItems={{ xs: 'stretch', xl: 'flex-start' }}>
-                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Paper
+                    elevation={0}
+                    sx={panelSx(theme, {
+                        p: { xs: 1.5, md: 2 },
+                        bgcolor: theme.palette.background.paper,
+                        boxShadow: '0 10px 22px rgba(15, 23, 42, 0.045)',
+                        mb: 1.5,
+                    })}
+                >
+                    <Stack
+                        direction={{ xs: 'column', md: 'row' }}
+                        spacing={{ xs: 1.5, md: 1.9 }}
+                        alignItems={{ xs: 'stretch', md: 'center' }}
+                        justifyContent="space-between"
+                    >
+                        <Box
+                            sx={{
+                                minWidth: 0,
+                                width: 'auto',
+                                flex: { xs: '1 1 auto', md: '0 1 auto' },
+                            }}
+                        >
                             <ProgramSwitcher
                                 programOptions={programOptions}
                                 selectedProgram={selectedProgramOption}
                                 onSelect={handleProgramSelect}
                             />
                         </Box>
-                        <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', xl: 'flex-end' } }}>
-                            <ProgramSummaryChips summary={detailSummary} />
-                        </Box>
+                        <ProgramSummaryChips summary={detailSummary} />
                     </Stack>
                 </Paper>
 

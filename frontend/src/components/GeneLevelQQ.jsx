@@ -41,7 +41,6 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
-    RESPONSIVE_PLOT_HEIGHT,
     sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
@@ -55,7 +54,9 @@ const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 820;
 const DEFAULT_POINT_SIZE = 7;
 const DEFAULT_LABEL_LIMIT = 4;
-const MAX_COMPARE_TRAITS = 6;
+const DEFAULT_COMPARE_TRAITS = 1;
+const MAX_COMPARE_TRAITS = 12;
+const GENE_QQ_PLOT_HEIGHT = 'clamp(640px, 74dvh, 1000px)';
 const MAX_ENVELOPE_POINTS = 360;
 const NOMINAL_LOGP = -Math.log10(0.05);
 const BASE_POINT_COLOR = '#53677f';
@@ -480,6 +481,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [traitStampText, setTraitStampText] = useState('');
     const [availableTraits, setAvailableTraits] = useState([]);
     const [selectedTraits, setSelectedTraits] = useState([]);
+    const [comparisonTraitCount, setComparisonTraitCount] = useState(DEFAULT_COMPARE_TRAITS);
     const [searchInput, setSearchInput] = useState('');
     const [searchOptions, setSearchOptions] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
@@ -492,10 +494,8 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
 
     useEffect(() => {
         if (!primaryTrait) return;
-        setSelectedTraits((prev) => {
-            const preserved = uniqueTraitOptions([primaryTrait, ...prev.filter((item) => item.file_id !== primaryTrait.file_id)]);
-            return preserved.slice(0, MAX_COMPARE_TRAITS);
-        });
+        setComparisonTraitCount(DEFAULT_COMPARE_TRAITS);
+        setSelectedTraits([primaryTrait]);
     }, [primaryTrait]);
 
     useEffect(() => {
@@ -684,12 +684,35 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const groupedTraitOptions = useMemo(() => {
         const availableIds = new Set(availableTraits.map((item) => item.file_id));
         return uniqueTraitOptions([
-            ...availableTraits.map((item) => ({ ...item, group: item.file_id === primaryTrait?.file_id ? 'Current' : 'Related' })),
+            ...availableTraits.map((item) => ({
+                ...item,
+                group: item.file_id === primaryTrait?.file_id ? 'Current' : 'Nearest effect profiles',
+            })),
             ...searchOptions
                 .filter((item) => !availableIds.has(item.file_id))
                 .map((item) => ({ ...item, group: 'Search' })),
         ]);
     }, [availableTraits, primaryTrait, searchOptions]);
+
+    const relatedTraitSliderMax = useMemo(
+        () => Math.max(DEFAULT_COMPARE_TRAITS, Math.min(MAX_COMPARE_TRAITS, availableTraits.length || MAX_COMPARE_TRAITS)),
+        [availableTraits.length],
+    );
+
+    const applyComparisonTraitCount = useCallback((value) => {
+        const nextCount = Math.min(
+            relatedTraitSliderMax,
+            Math.max(DEFAULT_COMPARE_TRAITS, Number(value) || DEFAULT_COMPARE_TRAITS),
+        );
+        setComparisonTraitCount(nextCount);
+        setSelectedTraits(uniqueTraitOptions([primaryTrait, ...availableTraits]).slice(0, nextCount));
+    }, [availableTraits, primaryTrait, relatedTraitSliderMax]);
+
+    const comparisonTraitCountMarks = useMemo(() => (
+        [...new Set([DEFAULT_COMPARE_TRAITS, relatedTraitSliderMax])]
+            .filter((value) => value >= DEFAULT_COMPARE_TRAITS && value <= relatedTraitSliderMax)
+            .map((value) => ({ value, label: String(value) }))
+    ), [relatedTraitSliderMax]);
 
     const fdrGuide = useMemo(() => {
         const sig = filteredRows.filter((row) => Number.isFinite(row.fdr) && row.fdr <= 0.05 && Number.isFinite(row.p) && row.p > 0);
@@ -1003,9 +1026,15 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
 
         return {
             autosize: true,
+            title: {
+                text: `${traitLabel || payload.fileId || fileId} - Gene-level QQ`,
+                font: { size: 18, color: theme.palette.text.primary, family: theme.typography.fontFamily },
+                x: 0.02,
+                xanchor: 'left',
+            },
             paper_bgcolor: theme.palette.background.paper,
             plot_bgcolor: chartTokens.plotBg,
-            margin: { l: 68, r: 22, t: 28, b: 56 },
+            margin: { l: 72, r: 26, t: 76, b: 64 },
             hovermode: 'closest',
             hoverdistance: 16,
             dragmode: 'pan',
@@ -1028,7 +1057,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             annotations,
             transition: { duration: 220, easing: 'cubic-in-out' },
         };
-    }, [axisRange, axisStyle, chartTokens.plotBg, chartTokens.threshold, fdrGuide, showExpectedLine, showFdrLine, showNominalLine, showTraitStamp, theme, traitStampText]);
+    }, [axisRange, axisStyle, chartTokens.plotBg, chartTokens.threshold, fdrGuide, fileId, payload.fileId, showExpectedLine, showFdrLine, showNominalLine, showTraitStamp, theme, traitLabel, traitStampText]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -1102,6 +1131,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setShowEnvelope(true);
         setShowTopLabels(true);
         setShowTraitStamp(false);
+        setComparisonTraitCount(DEFAULT_COMPARE_TRAITS);
         setSelectedTraits(primaryTrait ? [primaryTrait] : []);
         setTraitStampText(buildTraitStamp(primaryTrait ? [primaryTrait] : [], String(traitLabel || fileId || gwasId || '').trim()));
         setPointSize(DEFAULT_POINT_SIZE);
@@ -1224,18 +1254,70 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     groupBy={(option) => option.group || 'Traits'}
                     isOptionEqualToValue={(option, value) => option.file_id === value.file_id}
                     getOptionLabel={(option) => option.trait_name || option.file_id || option.gwas_id}
-                    onChange={(_, value) => setSelectedTraits(uniqueTraitOptions(value).slice(0, MAX_COMPARE_TRAITS))}
+                    onChange={(_, value) => {
+                        const nextTraits = uniqueTraitOptions(value).slice(0, MAX_COMPARE_TRAITS);
+                        setSelectedTraits(nextTraits);
+                        setComparisonTraitCount(Math.min(relatedTraitSliderMax, Math.max(DEFAULT_COMPARE_TRAITS, nextTraits.length)));
+                    }}
                     onInputChange={(_, value) => setSearchInput(value)}
                     renderInput={(params) => (
                         <TextField
                             {...params}
                             label="Compare traits"
                             placeholder="e.g. GCST90081631"
-                            helperText="Overlay up to 6 traits in the same QQ frame."
+                            helperText={`Current trait is shown by default; use the slider for nearest overlays, up to ${MAX_COMPARE_TRAITS} traits.`}
                         />
                     )}
                     sx={{ minWidth: 360, maxWidth: 720, flex: 1 }}
                 />
+
+                <Box
+                    sx={{
+                        width: 230,
+                        minWidth: 230,
+                        px: 1.2,
+                        py: 0.85,
+                        borderRadius: 2,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                    }}
+                >
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
+                        Trait overlays
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                        <Slider
+                            size="small"
+                            value={Math.min(comparisonTraitCount, relatedTraitSliderMax)}
+                            min={DEFAULT_COMPARE_TRAITS}
+                            max={relatedTraitSliderMax}
+                            step={1}
+                            marks={comparisonTraitCountMarks}
+                            onChange={(_, value) => applyComparisonTraitCount(Array.isArray(value) ? value[0] : value)}
+                            sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                        />
+                        <TextField
+                            size="small"
+                            value={Math.min(comparisonTraitCount, relatedTraitSliderMax)}
+                            onChange={(event) => applyComparisonTraitCount(event.target.value)}
+                            slotProps={{
+                                htmlInput: {
+                                    min: DEFAULT_COMPARE_TRAITS,
+                                    max: relatedTraitSliderMax,
+                                    step: 1,
+                                    inputMode: 'numeric',
+                                },
+                            }}
+                            sx={{
+                                width: 64,
+                                '& .MuiInputBase-input': {
+                                    textAlign: 'center',
+                                    fontWeight: 700,
+                                },
+                            }}
+                        />
+                    </Box>
+                </Box>
 
                 <Stack direction="row" spacing={0.4} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
                     <FormControlLabel control={<Checkbox checked={showExpectedLine} onChange={(event) => setShowExpectedLine(event.target.checked)} size="small" />} label="Expected line" />
@@ -1300,7 +1382,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {isLoading && (
-                        <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: GENE_QQ_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -1349,7 +1431,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                                     setTableOpen(true);
                                 }}
                                 useResizeHandler
-                                style={{ width: '100%', height: RESPONSIVE_PLOT_HEIGHT }}
+                                style={{ width: '100%', height: GENE_QQ_PLOT_HEIGHT }}
                             />
                             <FloatingLegend
                                 items={legendItems}

@@ -394,7 +394,6 @@ export default function About() {
     return (
         <PageFrame
             title={copy.title}
-            subtitle={copy.subtitle}
             maxWidth={1080}
             compact
             actions={(

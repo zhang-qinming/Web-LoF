@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Plot from 'react-plotly.js';
 import {
     Alert,
@@ -36,17 +36,19 @@ import {
 import { StatePanel } from './PageScaffold';
 import CrossTraitHeatmapTable from './CrossTraitHeatmapTable';
 
-const DEFAULT_TOP_GENES = 80;
+const DEFAULT_TOP_GENES = 25;
 const MIN_TOP_GENES = 10;
 const MAX_TOP_GENES = 100;
 const DEFAULT_TARGET_LIMIT = 25;
+const MIN_TARGET_LIMIT = 2;
+const MAX_TARGET_LIMIT = 100;
 const RECENT_STORAGE_KEY = 'cross-trait-heatmap-recent';
 const MAX_RECENT = 12;
 
 function truncateLabel(value, maxLength = 28) {
     const text = String(value || '').trim();
     if (!text) return '';
-    return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+    return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
 }
 
 function normalizeTraitOption(option) {
@@ -64,6 +66,8 @@ function normalizeTraitOption(option) {
         sample_size: option.sample_size == null ? null : Number(option.sample_size),
         selection_rank: option.selection_rank == null ? null : Number(option.selection_rank),
         selection_basis: option.selection_basis || null,
+        correlation: option.correlation == null ? null : Number(option.correlation),
+        shared_genes: option.shared_genes == null ? null : Number(option.shared_genes),
     };
 }
 
@@ -115,6 +119,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const [statusLoading, setStatusLoading] = useState(true);
     const [recommended, setRecommended] = useState([]);
     const [selectedTargets, setSelectedTargets] = useState([]);
+    const [targetTraitCount, setTargetTraitCount] = useState(DEFAULT_TARGET_LIMIT);
     const [topGeneCount, setTopGeneCount] = useState(DEFAULT_TOP_GENES);
     const [recentTargets, setRecentTargets] = useState(() => readRecentTraits());
     const [searchOptions, setSearchOptions] = useState([]);
@@ -133,6 +138,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         setStatusLoading(true);
         setStatus(null);
         setTopGeneCount(DEFAULT_TOP_GENES);
+        setTargetTraitCount(DEFAULT_TARGET_LIMIT);
         getCrossTraitStatus(fileId)
             .then((res) => {
                 if (!cancelled) setStatus(res);
@@ -152,8 +158,10 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         getCrossTraitTargets(fileId).then((res) => {
             if (cancelled) return;
             const nextTargets = prependPinnedTrait(res?.targets || [], currentTrait);
+            const nextCount = Math.min(DEFAULT_TARGET_LIMIT, Math.max(MIN_TARGET_LIMIT, nextTargets.length));
             setRecommended(nextTargets);
-            setSelectedTargets(nextTargets.slice(0, DEFAULT_TARGET_LIMIT));
+            setTargetTraitCount(nextCount);
+            setSelectedTargets(nextTargets.slice(0, nextCount));
         }).catch(() => {
             if (!cancelled) setRecommended([]);
         });
@@ -225,7 +233,12 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         const recommendIds = new Set(recommended.map((item) => item.file_id));
         const recentIds = new Set(recentTargets.map((item) => item.file_id));
         return prependPinnedTrait([
-            ...recommended.map((item) => ({ ...item, group: 'High GWAS signal' })),
+            ...recommended.map((item) => ({
+                ...item,
+                group: item.selection_basis === 'trait_effect_similarity'
+                    ? 'Nearest effect profiles'
+                    : 'Fallback recommendations',
+            })),
             ...recentTargets
                 .filter((item) => !recommendIds.has(item.file_id))
                 .map((item) => ({ ...item, group: 'Recent' })),
@@ -234,6 +247,26 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                 .map((item) => ({ ...item, group: 'Search' })),
         ], currentTrait);
     }, [currentTrait, recommended, recentTargets, searchOptions]);
+
+    const relatedTraitSliderMax = useMemo(
+        () => Math.max(MIN_TARGET_LIMIT, Math.min(MAX_TARGET_LIMIT, recommended.length || MAX_TARGET_LIMIT)),
+        [recommended.length],
+    );
+
+    const applyTopRelatedTraitCount = useCallback((value) => {
+        const nextCount = Math.min(
+            relatedTraitSliderMax,
+            Math.max(MIN_TARGET_LIMIT, Number(value) || DEFAULT_TARGET_LIMIT),
+        );
+        setTargetTraitCount(nextCount);
+        setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, nextCount));
+    }, [currentTrait, recommended, relatedTraitSliderMax]);
+
+    const relatedTraitCountMarks = useMemo(() => (
+        [...new Set([MIN_TARGET_LIMIT, DEFAULT_TARGET_LIMIT, relatedTraitSliderMax])]
+            .filter((value) => value >= MIN_TARGET_LIMIT && value <= relatedTraitSliderMax)
+            .map((value) => ({ value, label: String(value) }))
+    ), [relatedTraitSliderMax]);
 
     const plotData = useMemo(() => {
         if (!matrixPayload?.targets?.length || !matrixPayload?.genes?.length || !matrixPayload?.matrix?.length) return [];
@@ -276,10 +309,10 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                 orientation: 'h',
                 x: 0.99,
                 xanchor: 'right',
-                y: 1.055,
+                y: 1.015,
                 yanchor: 'bottom',
                 thickness: 10,
-                len: 0.28,
+                len: 0.24,
                 outlinewidth: 0,
                 tickvals: [-maxAbs, 0, maxAbs],
                 ticktext: [
@@ -303,12 +336,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
 
     const layout = useMemo(() => ({
         autosize: true,
-        title: {
-            text: `${traitLabel || fileId} - Cross-trait Heatmap`,
-            x: 0.01,
-            font: { size: 18, family: theme.typography.fontFamily, color: theme.palette.text.primary },
-        },
-        margin: { l: 110, r: 28, t: 88, b: 120 },
+        margin: { l: 110, r: 26, t: 44, b: 112 },
         paper_bgcolor: chartTokens.paperBg,
         plot_bgcolor: chartTokens.plotBg,
         xaxis: {
@@ -329,7 +357,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             zeroline: false,
         },
         hovermode: 'closest',
-    }), [chartTokens.paperBg, chartTokens.plotBg, fileId, theme.palette.text.primary, theme.palette.text.secondary, theme.typography.fontFamily, traitLabel, yTickLabels, yTickValues]);
+    }), [chartTokens.paperBg, chartTokens.plotBg, theme.palette.text.secondary, yTickLabels, yTickValues]);
 
     const plotHeight = useMemo(() => {
         const geneRows = matrixPayload?.genes?.length || topGeneCount;
@@ -397,14 +425,20 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     groupBy={(option) => option.group || 'Selected'}
                     isOptionEqualToValue={(option, value) => option.file_id === value.file_id}
                     getOptionLabel={(option) => option.trait_name || option.file_id}
-                    onChange={(_, value) => setSelectedTargets(prependPinnedTrait(value, currentTrait).slice(0, DEFAULT_TARGET_LIMIT))}
+                    onChange={(_, value) => {
+                        const nextTargets = prependPinnedTrait(value, currentTrait).slice(0, MAX_TARGET_LIMIT);
+                        setSelectedTargets(nextTargets);
+                        setTargetTraitCount(Math.min(relatedTraitSliderMax, Math.max(MIN_TARGET_LIMIT, nextTargets.length)));
+                    }}
                     onInputChange={(_, value) => setSearchInput(value)}
                     renderInput={(params) => (
                         <TextField
                             {...params}
                             label="Target traits"
                             placeholder="e.g. GCST90081631"
-                            helperText="Defaults are the 24 available traits with the most significant GWAS loci; the current trait stays first."
+                            helperText={recommended.some((item) => item.selection_basis === 'trait_effect_similarity')
+                                ? 'Defaults use the 24 nearest robust Trait Effect profiles. Up to 100 candidates remain available in this selector.'
+                                : 'No robust precomputed neighbors are available; defaults use high-signal fallback traits.'}
                         />
                     )}
                     sx={{
@@ -418,6 +452,54 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                         },
                     }}
                 />
+
+                <Box
+                    sx={{
+                        width: 250,
+                        minWidth: 250,
+                        px: 1.2,
+                        py: 0.85,
+                        borderRadius: 2,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                    }}
+                >
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
+                        Top related traits
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                        <Slider
+                            size="small"
+                            value={Math.min(targetTraitCount, relatedTraitSliderMax)}
+                            min={MIN_TARGET_LIMIT}
+                            max={relatedTraitSliderMax}
+                            step={1}
+                            marks={relatedTraitCountMarks}
+                            onChange={(_, value) => applyTopRelatedTraitCount(Array.isArray(value) ? value[0] : value)}
+                            sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                        />
+                        <TextField
+                            size="small"
+                            value={Math.min(targetTraitCount, relatedTraitSliderMax)}
+                            onChange={(event) => applyTopRelatedTraitCount(event.target.value)}
+                            slotProps={{
+                                htmlInput: {
+                                    min: MIN_TARGET_LIMIT,
+                                    max: relatedTraitSliderMax,
+                                    step: 1,
+                                    inputMode: 'numeric',
+                                },
+                            }}
+                            sx={{
+                                width: 72,
+                                '& .MuiInputBase-input': {
+                                    textAlign: 'center',
+                                    fontWeight: 700,
+                                },
+                            }}
+                        />
+                    </Box>
+                </Box>
 
                 <Box
                     sx={{
@@ -482,6 +564,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     variant="text"
                     startIcon={<RestartAlt />}
                     onClick={() => {
+                        setTargetTraitCount(DEFAULT_TARGET_LIMIT);
                         setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT));
                         setTopGeneCount(DEFAULT_TOP_GENES);
                     }}

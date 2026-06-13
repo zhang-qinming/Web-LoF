@@ -26,7 +26,6 @@ import { getProgramTraits } from '../api/gwas';
 import { StatePanel } from './PageScaffold';
 import { downloadBlob } from '../utils/download';
 import {
-    captionSx,
     compactToggleGroupSx,
     groupedTableColumnHeaderCellSx,
     metricChipTone,
@@ -293,11 +292,6 @@ export default function ProgramAssociatedTraits({
                                     <Box sx={{ minWidth: 0 }}>
                                         <Typography sx={sectionTitleSx(theme, { fontSize: '0.92rem', lineHeight: 1.2 })}>
                                             Associated Traits
-                                        </Typography>
-                                        <Typography sx={captionSx(theme, { fontSize: '0.7rem', lineHeight: 1.35 })}>
-                                            {!shouldPaginate
-                                                ? `Showing all ${sortedTraits.length.toLocaleString()} traits.`
-                                                : `Showing ${sortedTraits.length ? (start + 1).toLocaleString() : 0}-${Math.min(start + rowsPerPage, sortedTraits.length).toLocaleString()} of ${sortedTraits.length.toLocaleString()} traits.`}
                                         </Typography>
                                     </Box>
                                     <Stack direction="row" spacing={0.8} alignItems="center" sx={{ flexWrap: 'wrap' }}>

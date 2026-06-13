@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Plot from 'react-plotly.js';
 import {
     Alert,
@@ -11,7 +11,7 @@ import {
     CircularProgress,
     IconButton,
     Paper,
-    Stack,
+    Slider,
     Table,
     TableBody,
     TableCell,
@@ -61,15 +61,16 @@ import {
 import { StatePanel } from './PageScaffold';
 import { downloadBlob } from '../utils/download';
 
-const DEFAULT_TRAIT_LIMIT = 12;
-const MAX_TRAIT_LIMIT = 24;
+const DEFAULT_TRAIT_LIMIT = 25;
+const MIN_TRAIT_LIMIT = 2;
+const MAX_TRAIT_LIMIT = 100;
 const RECENT_STORAGE_KEY = 'cross-trait-heatmap-recent';
 const MAX_RECENT = 12;
 
 function truncateLabel(value, maxLength = 28) {
     const text = String(value || '').trim();
     if (!text) return '';
-    return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+    return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
 }
 
 function normalizeTraitOption(option) {
@@ -83,6 +84,10 @@ function normalizeTraitOption(option) {
         file_id: fileId || id,
         gwas_id: gwasId || id,
         trait_name: traitName || id,
+        correlation: option.correlation == null ? null : Number(option.correlation),
+        shared_genes: option.shared_genes == null ? null : Number(option.shared_genes),
+        selection_rank: option.selection_rank == null ? null : Number(option.selection_rank),
+        selection_basis: option.selection_basis || null,
     };
 }
 
@@ -168,6 +173,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
     const [recommended, setRecommended] = useState([]);
     const [recentTraits, setRecentTraits] = useState(() => readRecentTraits());
     const [selectedTraits, setSelectedTraits] = useState([]);
+    const [targetTraitCount, setTargetTraitCount] = useState(DEFAULT_TRAIT_LIMIT);
     const [searchOptions, setSearchOptions] = useState([]);
     const [searchInput, setSearchInput] = useState('');
     const [searchLoading, setSearchLoading] = useState(false);
@@ -185,6 +191,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
         setStatusLoading(true);
         setStatusError(null);
         setStatus(null);
+        setTargetTraitCount(DEFAULT_TRAIT_LIMIT);
         getCrossTraitStatus(fileId)
             .then((result) => {
                 if (!cancelled) setStatus(result);
@@ -205,8 +212,10 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
             .then((result) => {
                 if (cancelled) return;
                 const nextRecommended = prependPinnedTrait(result?.targets || [], currentTrait);
+                const nextCount = Math.min(DEFAULT_TRAIT_LIMIT, Math.max(MIN_TRAIT_LIMIT, nextRecommended.length));
                 setRecommended(nextRecommended);
-                setSelectedTraits(nextRecommended.slice(0, DEFAULT_TRAIT_LIMIT));
+                setTargetTraitCount(nextCount);
+                setSelectedTraits(nextRecommended.slice(0, nextCount));
             })
             .catch(() => {
                 if (!cancelled) setRecommended(prependPinnedTrait([], currentTrait));
@@ -279,7 +288,12 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
         const recommendedIds = new Set(recommended.map((item) => item.file_id));
         const recentIds = new Set(recentTraits.map((item) => item.file_id));
         return prependPinnedTrait([
-            ...recommended.map((item) => ({ ...item, group: 'Recommended' })),
+            ...recommended.map((item) => ({
+                ...item,
+                group: item.selection_basis === 'trait_effect_similarity'
+                    ? 'Nearest effect profiles'
+                    : 'Fallback recommendations',
+            })),
             ...recentTraits
                 .filter((item) => !recommendedIds.has(item.file_id))
                 .map((item) => ({ ...item, group: 'Recent' })),
@@ -288,6 +302,26 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                 .map((item) => ({ ...item, group: 'Search' })),
         ], currentTrait);
     }, [currentTrait, recentTraits, recommended, searchOptions]);
+
+    const relatedTraitSliderMax = useMemo(
+        () => Math.max(MIN_TRAIT_LIMIT, Math.min(MAX_TRAIT_LIMIT, recommended.length || MAX_TRAIT_LIMIT)),
+        [recommended.length],
+    );
+
+    const applyTopRelatedTraitCount = useCallback((value) => {
+        const nextCount = Math.min(
+            relatedTraitSliderMax,
+            Math.max(MIN_TRAIT_LIMIT, Number(value) || DEFAULT_TRAIT_LIMIT),
+        );
+        setTargetTraitCount(nextCount);
+        setSelectedTraits(prependPinnedTrait(recommended, currentTrait).slice(0, nextCount));
+    }, [currentTrait, recommended, relatedTraitSliderMax]);
+
+    const relatedTraitCountMarks = useMemo(() => (
+        [...new Set([MIN_TRAIT_LIMIT, DEFAULT_TRAIT_LIMIT, relatedTraitSliderMax])]
+            .filter((value) => value >= MIN_TRAIT_LIMIT && value <= relatedTraitSliderMax)
+            .map((value) => ({ value, label: String(value) }))
+    ), [relatedTraitSliderMax]);
 
     const sourceCorrelationRows = useMemo(() => {
         const traits = payload?.traits || [];
@@ -308,7 +342,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
         const traits = payload?.traits || [];
         if (!traits.length || !payload?.matrix?.length) return [];
         const labels = traits.map((trait) => truncateLabel(trait.trait_name || trait.file_id, 25));
-        const coefficientSymbol = method === 'spearman' ? 'ρ' : 'r';
+        const coefficientSymbol = method === 'spearman' ? 'rho' : 'r';
         const hovertext = payload.matrix.map((row, rowIndex) => row.map((value, colIndex) => {
             const rowTrait = traits[rowIndex];
             const colTrait = traits[colIndex];
@@ -359,10 +393,10 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                 orientation: 'h',
                 x: 0.99,
                 xanchor: 'right',
-                y: 1.055,
+                y: 1.015,
                 yanchor: 'bottom',
                 thickness: 10,
-                len: 0.3,
+                len: 0.26,
                 outlinewidth: 0,
                 tickvals: [-1, -0.5, 0, 0.5, 1],
                 ticktext: ['Opposite', '-0.5', '0', '+0.5', 'Aligned'],
@@ -373,16 +407,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
 
     const plotLayout = useMemo(() => ({
         autosize: true,
-        title: {
-            text: `${traitLabel || fileId} - Trait Effect Correlation`,
-            x: 0.01,
-            font: {
-                size: 18,
-                family: theme.typography.fontFamily,
-                color: theme.palette.text.primary,
-            },
-        },
-        margin: { l: 180, r: 28, t: 94, b: 170 },
+        margin: { l: 180, r: 26, t: 44, b: 160 },
         paper_bgcolor: chartTokens.paperBg,
         plot_bgcolor: chartTokens.plotBg,
         xaxis: {
@@ -403,11 +428,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
     }), [
         chartTokens.paperBg,
         chartTokens.plotBg,
-        fileId,
-        theme.palette.text.primary,
         theme.palette.text.secondary,
-        theme.typography.fontFamily,
-        traitLabel,
     ]);
 
     const plotConfig = useMemo(() => ({
@@ -483,7 +504,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                 </Box>
                 <Chip
                     icon={<CompareArrows />}
-                    label={method === 'spearman' ? 'Spearman ρ' : 'Pearson r'}
+                    label={method === 'spearman' ? 'Spearman rho' : 'Pearson r'}
                     size="small"
                     sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))}
                 />
@@ -520,16 +541,20 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                     groupBy={(option) => option.group || 'Selected'}
                     isOptionEqualToValue={(option, value) => option.file_id === value.file_id}
                     getOptionLabel={(option) => option.trait_name || option.file_id}
-                    onChange={(_, value) => setSelectedTraits(
-                        prependPinnedTrait(value, currentTrait).slice(0, MAX_TRAIT_LIMIT),
-                    )}
+                    onChange={(_, value) => {
+                        const nextTraits = prependPinnedTrait(value, currentTrait).slice(0, MAX_TRAIT_LIMIT);
+                        setSelectedTraits(nextTraits);
+                        setTargetTraitCount(Math.min(relatedTraitSliderMax, Math.max(MIN_TRAIT_LIMIT, nextTraits.length)));
+                    }}
                     onInputChange={(_, value) => setSearchInput(value)}
                     renderInput={(params) => (
                         <TextField
                             {...params}
                             label="Traits"
                             placeholder="e.g. GCST90081631"
-                            helperText={`Select up to ${MAX_TRAIT_LIMIT} traits; the current trait remains first.`}
+                            helperText={recommended.some((item) => item.selection_basis === 'trait_effect_similarity')
+                                ? `Up to 100 robust nearest effect profiles are available; select up to ${MAX_TRAIT_LIMIT} traits. The current trait remains first.`
+                                : `No robust precomputed neighbors are available; fallback traits are shown. Select up to ${MAX_TRAIT_LIMIT} traits.`}
                         />
                     )}
                     sx={{
@@ -543,6 +568,54 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                         },
                     }}
                 />
+
+                <Box
+                    sx={{
+                        width: 250,
+                        minWidth: 250,
+                        px: 1.2,
+                        py: 0.85,
+                        borderRadius: 2,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                    }}
+                >
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
+                        Top related traits
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                        <Slider
+                            size="small"
+                            value={Math.min(targetTraitCount, relatedTraitSliderMax)}
+                            min={MIN_TRAIT_LIMIT}
+                            max={relatedTraitSliderMax}
+                            step={1}
+                            marks={relatedTraitCountMarks}
+                            onChange={(_, value) => applyTopRelatedTraitCount(Array.isArray(value) ? value[0] : value)}
+                            sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                        />
+                        <TextField
+                            size="small"
+                            value={Math.min(targetTraitCount, relatedTraitSliderMax)}
+                            onChange={(event) => applyTopRelatedTraitCount(event.target.value)}
+                            slotProps={{
+                                htmlInput: {
+                                    min: MIN_TRAIT_LIMIT,
+                                    max: relatedTraitSliderMax,
+                                    step: 1,
+                                    inputMode: 'numeric',
+                                },
+                            }}
+                            sx={{
+                                width: 72,
+                                '& .MuiInputBase-input': {
+                                    textAlign: 'center',
+                                    fontWeight: 700,
+                                },
+                            }}
+                        />
+                    </Box>
+                </Box>
 
                 <ToggleButtonGroup
                     exclusive
@@ -560,6 +633,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                     <IconButton
                         aria-label="Reset correlation controls"
                         onClick={() => {
+                            setTargetTraitCount(DEFAULT_TRAIT_LIMIT);
                             setSelectedTraits(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TRAIT_LIMIT));
                             setMethod('spearman');
                         }}

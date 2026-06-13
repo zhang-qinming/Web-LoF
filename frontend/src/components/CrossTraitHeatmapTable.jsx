@@ -53,6 +53,11 @@ function effectCellColor(theme, value, maxAbs) {
     return alpha(value >= 0 ? '#c45f3c' : '#3f78a8', strength);
 }
 
+const GENE_COL_WIDTH = 150;
+const ENSG_COL_WIDTH = 176;
+const TRAIT_COL_WIDTH = 196;
+const FROZEN_COL_WIDTH = GENE_COL_WIDTH + ENSG_COL_WIDTH;
+
 export default function CrossTraitHeatmapTable({ payload, fileId }) {
     const theme = useTheme();
     const navigate = useNavigate();
@@ -109,28 +114,31 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                     size="small"
                     sx={stickyTableSx(theme, {
                         tableLayout: 'fixed',
-                        minWidth: 300 + (targets.length * 132),
+                        minWidth: FROZEN_COL_WIDTH + (targets.length * TRAIT_COL_WIDTH),
                     })}
                 >
                     <colgroup>
-                        <col style={{ width: 130 }} />
-                        <col style={{ width: 170 }} />
-                        {targets.map((target) => <col key={target.file_id} style={{ width: 132 }} />)}
+                        <col style={{ width: GENE_COL_WIDTH }} />
+                        <col style={{ width: ENSG_COL_WIDTH }} />
+                        {targets.map((target) => <col key={target.file_id} style={{ width: TRAIT_COL_WIDTH }} />)}
                     </colgroup>
                     <TableHead>
                         <TableRow>
                             <TableCell
                                 sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', {
                                     left: 0,
-                                    zIndex: '44 !important',
+                                    zIndex: '46 !important',
+                                    minWidth: GENE_COL_WIDTH,
                                 })}
                             >
                                 Gene
                             </TableCell>
                             <TableCell
                                 sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', {
-                                    left: 130,
-                                    zIndex: '44 !important',
+                                    left: GENE_COL_WIDTH,
+                                    zIndex: '47 !important',
+                                    minWidth: ENSG_COL_WIDTH,
+                                    boxShadow: `8px 0 12px -12px ${alpha(theme.palette.common.black, 0.42)}, 0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${neutralTone.headerBorder}`,
                                 })}
                             >
                                 ENSG
@@ -138,16 +146,22 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                             {targets.map((target) => (
                                 <TableCell
                                     key={target.file_id}
-                                    align="right"
+                                    align="left"
                                     onClick={() => navigate(`/trait/${encodeURIComponent(target.file_id)}`)}
-                                    sx={stickyTableHeaderCellSx(theme, effectTone, 'right', {
+                                    sx={stickyTableHeaderCellSx(theme, effectTone, 'left', {
                                         cursor: 'pointer',
                                         whiteSpace: 'normal',
-                                        lineHeight: 1.2,
-                                        py: 0.8,
+                                        wordBreak: 'break-word',
+                                        overflowWrap: 'anywhere',
+                                        overflow: 'visible',
+                                        textOverflow: 'clip',
+                                        lineHeight: 1.18,
+                                        py: 0.9,
+                                        px: 1,
+                                        verticalAlign: 'top',
                                     })}
                                 >
-                                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, lineHeight: 1.2 }}>
+                                    <Typography sx={{ fontSize: '0.68rem', fontWeight: 720, lineHeight: 1.18 }}>
                                         {target.trait_name || target.file_id}
                                     </Typography>
                                     <Typography sx={{ mt: 0.25, fontSize: '0.6rem', color: theme.palette.text.secondary }}>
@@ -161,26 +175,32 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                         {genes.map((gene, rowIndex) => (
                             <TableRow key={`${gene.ensg || gene.gene}-${rowIndex}`} hover sx={tableRowRevealSx(theme, rowIndex)}>
                                 <TableCell sx={{
-                                    position: 'sticky',
+                                    position: 'sticky !important',
                                     left: 0,
-                                    zIndex: 2,
+                                    zIndex: '4 !important',
                                     py: 0.72,
-                                    bgcolor: theme.palette.background.paper,
+                                    bgcolor: `${theme.palette.background.paper} !important`,
                                     borderBottom: `1px solid ${theme.custom.border.soft}`,
                                     fontSize: '0.74rem',
                                     fontWeight: 680,
+                                    whiteSpace: 'nowrap',
+                                    minWidth: GENE_COL_WIDTH,
                                 }}>
                                     {gene.gene || gene.ensg}
                                 </TableCell>
                                 <TableCell sx={{
-                                    position: 'sticky',
-                                    left: 130,
-                                    zIndex: 2,
+                                    position: 'sticky !important',
+                                    left: GENE_COL_WIDTH,
+                                    zIndex: '5 !important',
                                     py: 0.72,
-                                    bgcolor: theme.palette.background.paper,
+                                    bgcolor: `${theme.palette.background.paper} !important`,
                                     borderBottom: `1px solid ${theme.custom.border.soft}`,
                                     fontSize: '0.68rem',
                                     color: theme.palette.text.secondary,
+                                    whiteSpace: 'nowrap',
+                                    fontVariantNumeric: 'tabular-nums',
+                                    minWidth: ENSG_COL_WIDTH,
+                                    boxShadow: `8px 0 12px -12px ${alpha(theme.palette.common.black, 0.32)}`,
                                 }}>
                                     {gene.ensg || '-'}
                                 </TableCell>

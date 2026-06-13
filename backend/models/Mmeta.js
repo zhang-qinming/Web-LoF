@@ -171,9 +171,12 @@ async function getHomeSummary() {
          LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id`
     );
 
+    const [[geneRow]] = await pool.query(`SELECT COUNT(*) AS genes FROM gene_info_hg37_matched`);
+
     return {
         traits: Number(row?.traits) || 0,
         variants: Number(row?.variants) || 0,
+        genes: Number(geneRow?.genes) || 0,
         significantLoci: Number(row?.significantLoci) || 0,
         minYear: row?.minYear ? Number(row.minYear) : null,
         maxYear: row?.maxYear ? Number(row.maxYear) : null,

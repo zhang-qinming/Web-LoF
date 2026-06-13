@@ -65,6 +65,23 @@ export async function getRecommendedGenes({ limit = 12 } = {}) {
     return res.data;
 }
 
+export async function getGeneOverview(geneId) {
+    const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/overview`);
+    return res.data;
+}
+
+export async function getGeneProgramRecords(geneId, {
+    page = 1,
+    limit = 50,
+    sortBy = 'absGamma',
+    order = 'desc',
+} = {}) {
+    const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/records`, {
+        params: { page, limit, sortBy, order },
+    });
+    return res.data;
+}
+
 export async function getGenePrograms(geneId, {
     page = 1,
     limit = 50,
@@ -105,7 +122,7 @@ export async function searchCrossTraits(query, { limit = 12, excludeId = [] } = 
     return res.data;
 }
 
-export async function getCrossTraitMatrix(fileId, { targetIds = [], topGenes = 50 } = {}) {
+export async function getCrossTraitMatrix(fileId, { targetIds = [], topGenes = 25 } = {}) {
     const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/matrix`, {
         params: { targetIds, topGenes },
         paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),

@@ -9,10 +9,11 @@
 
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
-  <text x="62" y="84" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" font-weight="700">Trait Correlation</text>
+  <text x="62" y="82" fill="#2563EB" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Trait Correlation</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">GeneBayes effect profiles compared across shared genes</text>
 
   <g font-family="Inter, Arial, Helvetica, sans-serif">
-    <g id="corr-grid" transform="translate(210 136)">
+    <g id="corr-grid" transform="translate(210 148)">
       <text x="15.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">BMI</text>
       <text x="50.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">T2D</text>
       <text x="85.5" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">CAD</text>
@@ -70,7 +71,7 @@
       <rect x="175" y="175" width="31" height="31" rx="4" fill="#C2410C"/>
     </g>
 
-    <g transform="translate(477 136)">
+    <g transform="translate(477 148)">
       <text x="36" y="-18" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="14" font-weight="700">rg</text>
       <rect x="28" y="0" width="16" height="206" rx="8" fill="url(#corrbar)"/>
       <text x="56" y="8" dominant-baseline="middle" fill="#64748B" font-size="13" font-weight="600">1.0</text>

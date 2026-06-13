@@ -610,6 +610,58 @@ function normalizeGeneFromRow(row, fallbackLabel = '') {
     };
 }
 
+function buildGeneInfoSelect(includeGeneInfo) {
+    return includeGeneInfo ? `
+                gi.chromosome,
+                gi.begin_pos,
+                gi.end_pos,
+                gi.gene_type,
+                gi.gene_name,
+                gi.gene_id,
+                gi.hgnc,
+                gi.synonyms,
+                gi.description,` : `
+                '' AS chromosome,
+                NULL AS begin_pos,
+                NULL AS end_pos,
+                '' AS gene_type,
+                '' AS gene_name,
+                '' AS gene_id,
+                '' AS hgnc,
+                '' AS synonyms,
+                '' AS description,`;
+}
+
+function buildGeneInfoJoin(includeGeneInfo) {
+    return includeGeneInfo ? `LEFT JOIN ${GENE_INFO_TABLE} gi
+                ON BINARY gi.ensembl = BINARY gpte.ensg_id` : '';
+}
+
+function buildGeneOverviewPayload(gene, summary, programs, query) {
+    return {
+        query,
+        gene,
+        summary,
+        genes: gene?.geneSymbol || gene?.ensgId ? [{
+            geneSymbol: gene.geneSymbol || '',
+            ensgId: gene.ensgId || '',
+            geneLabel: gene.geneSymbol || gene.ensgId || query,
+            chromosome: gene.chromosome || '',
+            beginPos: gene.beginPos == null ? null : gene.beginPos,
+            endPos: gene.endPos == null ? null : gene.endPos,
+            location: gene.location || formatLocation(gene.chromosome, gene.beginPos, gene.endPos),
+            geneType: gene.geneType || '',
+            totalPrograms: summary.totalPrograms,
+            totalTraits: summary.totalTraits,
+            roles: {
+                program: summary.programRoleRows,
+                regulator: summary.regulatorRoleRows,
+            },
+        }] : [],
+        programs,
+    };
+}
+
 async function getGeneSummaryCache(includeGeneInfo) {
     const now = Date.now();
     if (
@@ -1062,45 +1114,23 @@ async function getRecommendedGenes(limit = 12) {
     }
 }
 
-async function getGenePrograms(geneId, {
-    page = 1,
-    limit = 50,
-    sortBy = 'absGamma',
-    order = 'DESC',
-} = {}) {
+async function getGeneOverview(geneId) {
     const q = normalizeGeneQuery(geneId);
-    if (!q) return { gene: { geneSymbol: '', ensgId: '' }, summary: buildSummary([]), records: [] };
+    if (!q) {
+        return {
+            query: '',
+            gene: { geneSymbol: '', ensgId: '' },
+            summary: buildSummary([]),
+            genes: [],
+            programs: [],
+        };
+    }
 
-    const p = Math.max(1, Number(page) || 1);
-    const l = Math.max(1, Math.min(250, Number(limit) || 50));
-    const offset = (p - 1) * l;
     const includeGeneInfo = await hasGeneInfoTable();
     const whereSql = 'WHERE gpte.gene_symbol = ? OR gpte.ensg_id = ?';
     const whereParams = [q, q];
-    const orderBySql = buildGeneRecordOrderBy(sortBy, order);
-    const normalizedSortBy = normalizeGeneRecordSortBy(sortBy);
-    const normalizedOrder = normalizeSortDirection(order);
-    const geneInfoSelect = includeGeneInfo ? `
-                gi.chromosome,
-                gi.begin_pos,
-                gi.end_pos,
-                gi.gene_type,
-                gi.gene_name,
-                gi.gene_id,
-                gi.hgnc,
-                gi.synonyms,
-                gi.description,` : `
-                '' AS chromosome,
-                NULL AS begin_pos,
-                NULL AS end_pos,
-                '' AS gene_type,
-                '' AS gene_name,
-                '' AS gene_id,
-                '' AS hgnc,
-                '' AS synonyms,
-                '' AS description,`;
-    const geneInfoJoin = includeGeneInfo ? `LEFT JOIN ${GENE_INFO_TABLE} gi
-                ON BINARY gi.ensembl = BINARY gpte.ensg_id` : '';
+    const geneInfoSelect = buildGeneInfoSelect(includeGeneInfo);
+    const geneInfoJoin = buildGeneInfoJoin(includeGeneInfo);
 
     try {
         const summaryQuery = pool.query(
@@ -1174,6 +1204,74 @@ async function getGenePrograms(geneId, {
             whereParams,
         );
 
+        const [
+            [[summaryRow]],
+            [geneRows],
+            [programRows],
+        ] = await Promise.all([summaryQuery, geneQuery, programRowsQuery]);
+
+        const gene = normalizeGeneFromRow(geneRows[0], q);
+        const summary = normalizeSummaryRow(summaryRow);
+        const programs = programRows.map((row) => normalizeProgramAggregate(row, gene.geneSymbol || gene.ensgId || q));
+
+        return buildGeneOverviewPayload(gene, summary, programs, q);
+    } catch (err) {
+        if (isMissingIndexTableError(err)) {
+            return emptyUnavailable({
+                query: q,
+                gene: { geneSymbol: q, ensgId: '' },
+                summary: buildSummary([]),
+                genes: [],
+                programs: [],
+            });
+        }
+        throw err;
+    }
+}
+
+async function getGeneProgramRecords(geneId, {
+    page = 1,
+    limit = 50,
+    sortBy = 'absGamma',
+    order = 'DESC',
+} = {}) {
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.max(1, Math.min(250, Number(limit) || 50));
+    const offset = (p - 1) * l;
+    const q = normalizeGeneQuery(geneId);
+    const normalizedSortBy = normalizeGeneRecordSortBy(sortBy);
+    const normalizedOrder = normalizeSortDirection(order);
+
+    if (!q) {
+        return {
+            query: '',
+            records: [],
+            recordPage: {
+                page: p,
+                limit: l,
+                totalCount: 0,
+                totalPages: 1,
+                sortBy: normalizedSortBy,
+                order: normalizedOrder,
+            },
+        };
+    }
+
+    const includeGeneInfo = await hasGeneInfoTable();
+    const whereSql = 'WHERE gpte.gene_symbol = ? OR gpte.ensg_id = ?';
+    const whereParams = [q, q];
+    const orderBySql = buildGeneRecordOrderBy(sortBy, order);
+    const geneInfoSelect = buildGeneInfoSelect(includeGeneInfo);
+    const geneInfoJoin = buildGeneInfoJoin(includeGeneInfo);
+
+    try {
+        const countQuery = pool.query(
+            `SELECT COUNT(*) AS total_rows
+             FROM gene_program_trait_edge gpte
+             ${whereSql}`,
+            whereParams,
+        );
+
         const recordsQuery = pool.query(
             `SELECT
                 gpte.*,
@@ -1216,46 +1314,24 @@ async function getGenePrograms(geneId, {
         );
 
         const [
-            [[summaryRow]],
-            [geneRows],
-            [programRows],
+            [[countRow]],
             [rows],
-        ] = await Promise.all([summaryQuery, geneQuery, programRowsQuery, recordsQuery]);
+        ] = await Promise.all([countQuery, recordsQuery]);
 
         const records = rows.map((row) => normalizeRecord({
             ...row,
             file_id: row.joined_file_id || row.file_id,
         }));
-        const gene = normalizeGeneFromRow(geneRows[0], q);
-        const summary = normalizeSummaryRow(summaryRow);
-        const programs = programRows.map((row) => normalizeProgramAggregate(row, gene.geneSymbol || gene.ensgId || q));
+        const totalCount = Number(countRow?.total_rows) || 0;
 
         return {
-            gene,
-            summary,
-            genes: gene?.geneSymbol || gene?.ensgId ? [{
-                geneSymbol: gene.geneSymbol || '',
-                ensgId: gene.ensgId || '',
-                geneLabel: gene.geneSymbol || gene.ensgId || q,
-                chromosome: gene.chromosome || '',
-                beginPos: gene.beginPos == null ? null : gene.beginPos,
-                endPos: gene.endPos == null ? null : gene.endPos,
-                location: gene.location || formatLocation(gene.chromosome, gene.beginPos, gene.endPos),
-                geneType: gene.geneType || '',
-                totalPrograms: summary.totalPrograms,
-                totalTraits: summary.totalTraits,
-                roles: {
-                    program: summary.programRoleRows,
-                    regulator: summary.regulatorRoleRows,
-                },
-            }] : [],
-            programs,
+            query: q,
             records,
             recordPage: {
                 page: p,
                 limit: l,
-                totalCount: summary.totalRows,
-                totalPages: Math.max(1, Math.ceil(summary.totalRows / l)),
+                totalCount,
+                totalPages: Math.max(1, Math.ceil(totalCount / l)),
                 sortBy: normalizedSortBy,
                 order: normalizedOrder,
             },
@@ -1263,14 +1339,52 @@ async function getGenePrograms(geneId, {
     } catch (err) {
         if (isMissingIndexTableError(err)) {
             return emptyUnavailable({
-                gene: { geneSymbol: q, ensgId: '' },
-                summary: buildSummary([]),
-                genes: [],
+                query: q,
                 records: [],
+                recordPage: {
+                    page: p,
+                    limit: l,
+                    totalCount: 0,
+                    totalPages: 1,
+                    sortBy: normalizedSortBy,
+                    order: normalizedOrder,
+                },
             });
         }
         throw err;
     }
+}
+
+async function getGenePrograms(geneId, options = {}) {
+    const [overview, recordPayload] = await Promise.all([
+        getGeneOverview(geneId),
+        getGeneProgramRecords(geneId, options),
+    ]);
+
+    if (overview?.unavailable || recordPayload?.unavailable) {
+        return emptyUnavailable({
+            query: overview?.query || recordPayload?.query || normalizeGeneQuery(geneId),
+            gene: overview?.gene || { geneSymbol: normalizeGeneQuery(geneId), ensgId: '' },
+            summary: overview?.summary || buildSummary([]),
+            genes: overview?.genes || [],
+            programs: overview?.programs || [],
+            records: recordPayload?.records || [],
+            recordPage: recordPayload?.recordPage || {
+                page: Math.max(1, Number(options?.page) || 1),
+                limit: Math.max(1, Math.min(250, Number(options?.limit) || 50)),
+                totalCount: 0,
+                totalPages: 1,
+                sortBy: normalizeGeneRecordSortBy(options?.sortBy),
+                order: normalizeSortDirection(options?.order),
+            },
+        });
+    }
+
+    return {
+        ...overview,
+        records: recordPayload.records,
+        recordPage: recordPayload.recordPage,
+    };
 }
 
 async function getProgramTraits(programId) {
@@ -1505,6 +1619,8 @@ async function warmGeneSummaryCache() {
 
 module.exports = {
     getGenes,
+    getGeneOverview,
+    getGeneProgramRecords,
     getRecommendedGenes,
     getGenePrograms,
     getProgramGenes,

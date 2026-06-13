@@ -39,7 +39,6 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
-    RESPONSIVE_TALL_PLOT_HEIGHT,
     sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
@@ -53,6 +52,7 @@ const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 820;
 const DEFAULT_POINT_SIZE = 7;
 const DEFAULT_LABEL_LIMIT = 10;
+const GENE_EVIDENCE_PLOT_HEIGHT = 'clamp(640px, 74dvh, 1000px)';
 
 const EVIDENCE_CLASSES = {
     background: {
@@ -903,7 +903,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {isLoading && (
-                        <Box sx={{ minHeight: RESPONSIVE_TALL_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: GENE_EVIDENCE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -951,7 +951,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                                     setTableOpen(true);
                                 }}
                                 useResizeHandler
-                                style={{ width: '100%', height: RESPONSIVE_TALL_PLOT_HEIGHT }}
+                                style={{ width: '100%', height: GENE_EVIDENCE_PLOT_HEIGHT }}
                             />
                             <FloatingLegend
                                 items={legendItems}

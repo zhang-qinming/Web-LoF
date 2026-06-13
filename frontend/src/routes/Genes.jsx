@@ -14,6 +14,7 @@ import {
     Pagination,
     Popover,
     Select,
+    Skeleton,
     Stack,
     Table,
     TableBody,
@@ -40,7 +41,7 @@ import {
     TableChartOutlined,
 } from '@mui/icons-material';
 import useSWR from 'swr';
-import { getGenePrograms, getGenes, getRecommendedGenes, searchGenes } from '../api/gwas';
+import { getGeneOverview, getGeneProgramRecords, getGenes, getRecommendedGenes, searchGenes } from '../api/gwas';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
 import { downloadBlob } from '../utils/download';
 import {
@@ -1820,28 +1821,29 @@ function GeneSwitcher({ gene, query, onSelect }) {
                     setSearch(currentLabel);
                 }}
                 sx={{
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
+                    display: 'inline-flex',
+                    alignItems: 'center',
                     gap: 1,
-                    px: 0.5,
-                    py: 0.35,
-                    borderRadius: 1,
-                    textAlign: 'left',
-                    transition: `background-color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
+                    px: 1.5,
+                    py: 0.75,
+                    borderRadius: 1.5,
+                    border: `1px solid ${theme.custom.border.soft}`,
+                    bgcolor: alpha(theme.palette.primary.main, 0.015),
+                    transition: `all ${theme.custom.motion.swift}`,
                     '&:hover': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.04),
+                        bgcolor: alpha(theme.palette.primary.main, 0.05),
+                        borderColor: alpha(theme.palette.primary.main, 0.25),
                         transform: 'translateY(-1px)',
+                        boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.06)}`,
                     },
                 }}
             >
                 <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.55rem', md: '1.85rem' }, lineHeight: 1.12 })}>
+                    <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.35rem', md: '1.55rem' }, fontWeight: 800, color: '#173b35', lineHeight: 1 })}>
                         {currentLabel}
                     </Typography>
                 </Box>
-                <ExpandMore sx={{ mt: 0.55, color: theme.palette.text.secondary, flexShrink: 0 }} />
+                <ExpandMore sx={{ color: theme.palette.text.secondary, flexShrink: 0 }} />
             </ButtonBase>
 
             <Popover
@@ -1970,16 +1972,35 @@ function GeneDetailHeader({ gene, query, summary, onSelect }) {
                 boxShadow: '0 10px 22px rgba(15, 23, 42, 0.045)',
             })}
         >
-            <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.75} alignItems={{ xs: 'stretch', lg: 'flex-start' }}>
-                <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={{ xs: 1.5, md: 1.9 }}
+                alignItems={{ xs: 'stretch', md: 'center' }}
+                justifyContent="space-between"
+            >
+                <Box
+                    sx={{
+                        minWidth: 0,
+                        width: 'auto',
+                        flex: { xs: '1 1 auto', md: '0 1 auto' },
+                    }}
+                >
                     <GeneSwitcher gene={gene} query={query} onSelect={onSelect} />
                 </Box>
                 <Box
                     sx={{
                         display: 'grid',
-                        gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(5, minmax(92px, 1fr))', lg: 'repeat(5, 104px)' },
-                        gap: 0.75,
-                        flexShrink: 0,
+                        gridTemplateColumns: {
+                            xs: 'repeat(2, minmax(0, 1fr))',
+                            sm: 'repeat(3, minmax(104px, 1fr))',
+                            md: 'repeat(5, minmax(104px, 1fr))',
+                            lg: 'repeat(5, minmax(116px, 1fr))',
+                        },
+                        gap: { xs: 0.75, md: 0.9 },
+                        width: '100%',
+                        minWidth: 0,
+                        flex: { xs: '1 1 auto', md: '1 1 0%' },
+                        maxWidth: { md: 660 },
                     }}
                 >
                     {metrics.map((metric) => {
@@ -1988,18 +2009,28 @@ function GeneDetailHeader({ gene, query, summary, onSelect }) {
                             <Box
                                 key={metric.label}
                                 sx={{
-                                    px: 1,
-                                    py: 0.8,
-                                    borderRadius: 1,
+                                    px: { xs: 1, md: 1.15 },
+                                    py: { xs: 0.85, md: 0.95 },
+                                    minHeight: { xs: 58, md: 64 },
+                                    borderRadius: 1.2,
                                     border: colors.border,
                                     bgcolor: colors.backgroundColor,
                                     color: colors.color,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center',
+                                    transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s cubic-bezier(0.2, 0, 0, 1)',
+                                    '&:hover': {
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: `0 6px 14px ${alpha(colors.color, 0.08)}`,
+                                        borderColor: alpha(colors.color, 0.32),
+                                    },
                                 }}
                             >
-                                <Typography sx={{ fontSize: '1rem', lineHeight: 1.1, fontWeight: 740, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
+                                <Typography sx={{ fontSize: { xs: '1rem', md: '1.1rem' }, lineHeight: 1.08, fontWeight: 760, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
                                     {(Number(metric.value) || 0).toLocaleString()}
                                 </Typography>
-                                <Typography sx={{ mt: 0.25, fontSize: '0.62rem', fontWeight: 650, textTransform: 'none', letterSpacing: '0.05em' }}>
+                                <Typography sx={{ mt: 0.28, fontSize: { xs: '0.62rem', md: '0.68rem' }, fontWeight: 680, textTransform: 'none', letterSpacing: '0.045em' }}>
                                     {metric.label}
                                 </Typography>
                             </Box>
@@ -2114,7 +2145,7 @@ function GeneInfoTable({ gene, summary }) {
                                     {row.label}
                                 </TableCell>
                                 <TableCell
-                                    align="center"
+                                    align="left"
                                     sx={{
                                         py: 1.05,
                                         px: 1.35,
@@ -2126,14 +2157,14 @@ function GeneInfoTable({ gene, summary }) {
                                         color: row.tone === 'link' ? '#245089' : theme.palette.text.primary,
                                         bgcolor: theme.palette.background.paper,
                                         borderBottom: `1px solid ${theme.custom.border.soft}`,
-                                        textAlign: 'center',
+                                        textAlign: 'left',
                                         whiteSpace: row.wrap ? 'normal' : 'nowrap',
                                         wordBreak: row.wrap ? 'break-word' : 'normal',
                                         verticalAlign: 'middle',
                                     }}
                                 >
                                     {row.links ? (
-                                        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ flexWrap: 'wrap' }}>
+                                        <Stack direction="row" spacing={0.75} justifyContent="flex-start" sx={{ flexWrap: 'wrap' }}>
                                             {row.links.length ? row.links.map((link) => (
                                                 <Button
                                                     key={link.label}
@@ -2360,16 +2391,16 @@ function GeneProgramTable({ gene, records, programRows }) {
                                                     fontWeight: 700,
                                                     fontSize: '0.69rem',
                                                     px: 0,
-                                                py: 0,
-                                                justifyContent: 'flex-start',
-                                                minHeight: 0,
-                                                color: TONES.annotation.headerColor,
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                whiteSpace: 'normal',
-                                            }}
-                                        >
-                                            {row.programGoLabel}
+                                                    py: 0,
+                                                    justifyContent: 'flex-start',
+                                                    minHeight: 0,
+                                                    color: TONES.annotation.headerColor,
+                                                    width: '100%',
+                                                    textAlign: 'left',
+                                                    whiteSpace: 'normal',
+                                                }}
+                                            >
+                                                {row.programGoLabel}
                                             </Button>
                                         </>
                                     ) : (
@@ -2394,6 +2425,91 @@ function GeneProgramTable({ gene, records, programRows }) {
                     </TableBody>
                 </Table>
             </TableContainer>
+        </Paper>
+    );
+}
+
+function GeneDetailHeaderSkeleton() {
+    const theme = useTheme();
+
+    return (
+        <Paper
+            elevation={0}
+            sx={panelSx(theme, {
+                p: { xs: 1.5, md: 2 },
+                bgcolor: theme.palette.background.paper,
+                boxShadow: '0 10px 22px rgba(15, 23, 42, 0.045)',
+            })}
+        >
+            <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={{ xs: 1.5, md: 1.9 }}
+                alignItems={{ xs: 'stretch', md: 'center' }}
+                justifyContent="space-between"
+            >
+                <Box sx={{ minWidth: 0, width: 'auto', flex: { xs: '1 1 auto', md: '0 1 auto' }, display: 'flex', alignItems: 'center' }}>
+                    <Skeleton variant="rounded" width={120} height={38} sx={{ borderRadius: 1.5 }} />
+                </Box>
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                            xs: 'repeat(2, minmax(0, 1fr))',
+                            sm: 'repeat(3, minmax(104px, 1fr))',
+                            md: 'repeat(5, minmax(104px, 1fr))',
+                            lg: 'repeat(5, minmax(116px, 1fr))',
+                        },
+                        gap: { xs: 0.75, md: 0.9 },
+                        width: '100%',
+                        minWidth: 0,
+                        flex: { xs: '1 1 auto', md: '1 1 0%' },
+                        maxWidth: { md: 660 },
+                    }}
+                >
+                    {Array.from({ length: 5 }).map((_, index) => (
+                        <Box
+                            key={index}
+                            sx={{
+                                px: { xs: 1, md: 1.15 },
+                                py: { xs: 0.85, md: 0.95 },
+                                minHeight: { xs: 58, md: 64 },
+                                borderRadius: 1.2,
+                                border: `1px solid ${theme.custom.border.soft}`,
+                                bgcolor: theme.custom.surface.subtle,
+                            }}
+                        >
+                            <Skeleton variant="text" width="52%" height={26} />
+                            <Skeleton variant="text" width="68%" height={18} sx={{ mt: 0.2 }} />
+                        </Box>
+                    ))}
+                </Box>
+            </Stack>
+        </Paper>
+    );
+}
+
+function GeneInfoTableSkeleton() {
+    const theme = useTheme();
+
+    return (
+        <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden', bgcolor: theme.palette.background.paper, p: 1.5 })}>
+            <Skeleton variant="text" width={180} height={30} sx={{ mb: 1 }} />
+            <Stack spacing={0.85}>
+                {Array.from({ length: 6 }).map((_, index) => (
+                    <Box
+                        key={index}
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: '220px minmax(0, 1fr)' },
+                            gap: 0.9,
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Skeleton variant="rounded" height={34} />
+                        <Skeleton variant="rounded" height={34 + (index === 1 || index === 5 ? 20 : 0)} />
+                    </Box>
+                ))}
+            </Stack>
         </Paper>
     );
 }
@@ -2433,6 +2549,11 @@ function GeneProgramTraitTable({
     }, [gene, rows]);
 
     const safeTotalCount = Number(totalCount) || rows.length;
+    const safeRowsPerPage = Number(rowsPerPage) || DEFAULT_ROWS_PER_PAGE;
+    const shouldPaginate = safeTotalCount > TABLE_PAGINATION_THRESHOLD;
+    const pageCount = shouldPaginate ? Math.max(1, Math.ceil(safeTotalCount / safeRowsPerPage)) : 1;
+    const currentPage = Math.min(Math.max(Number(page) || 0, 0), pageCount - 1);
+    const start = safeTotalCount ? currentPage * safeRowsPerPage : 0;
 
     if (!rows.length && !safeTotalCount) return null;
 
@@ -2613,7 +2734,7 @@ function GeneProgramTraitTable({
                     count={safeTotalCount}
                     page={currentPage}
                     onPageChange={(event, nextPage) => onPageChange?.(nextPage)}
-                    rowsPerPage={rowsPerPage}
+                    rowsPerPage={safeRowsPerPage}
                     labelRowsPerPage="Associations per page"
                     rowsPerPageOptions={[25, 50, 100, 250]}
                     onRowsPerPageChange={(event) => {
@@ -2668,15 +2789,10 @@ export default function Genes() {
         { keepPreviousData: true, revalidateOnFocus: false },
     );
 
-    const { data: details, isLoading: detailLoading, error } = useSWR(
-        query ? ['gene-programs', query, traitPage, traitRowsPerPage, traitSortBy, traitSortDir] : null,
-        ([, q, pageIndex, limit, sortKey, direction]) => getGenePrograms(q, {
-            page: pageIndex + 1,
-            limit,
-            sortBy: sortKey,
-            order: direction,
-        }),
-        { keepPreviousData: true, revalidateOnFocus: false },
+    const { data: overview, isLoading: overviewLoading, error: overviewError } = useSWR(
+        query ? ['gene-overview', query] : null,
+        ([, q]) => getGeneOverview(q),
+        { revalidateOnFocus: false },
     );
 
     const runSearch = React.useCallback((value = input) => {
@@ -2696,11 +2812,35 @@ export default function Genes() {
         setParams({});
     }, [setParams]);
 
-    const records = details?.records || [];
-    const programRows = details?.programs || [];
-    const summary = details?.summary || {};
-    const recordPage = details?.recordPage || {};
-    const totalRecordCount = Number(recordPage.totalCount ?? summary.totalRows) || 0;
+    const overviewUnavailable = Boolean(overview?.unavailable);
+    const overviewGene = overview?.gene || (query ? { geneSymbol: query } : null);
+    const programRows = overview?.programs || [];
+    const summary = overview?.summary || {};
+    const totalOverviewCount = Number(summary.totalRows) || 0;
+
+    const { data: recordData, isLoading: recordsLoading, error: recordsError } = useSWR(
+        query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount > 0
+            ? ['gene-records', query, traitPage, traitRowsPerPage, traitSortBy, traitSortDir]
+            : null,
+        ([, q, pageIndex, limit, sortKey, direction]) => getGeneProgramRecords(q, {
+            page: pageIndex + 1,
+            limit,
+            sortBy: sortKey,
+            order: direction,
+        }),
+        { revalidateOnFocus: false },
+    );
+
+    const recordPage = recordData?.recordPage || {};
+    const hasFreshRecordPage = Boolean(
+        recordData?.query === query
+        && Number(recordPage.page || 1) === traitPage + 1
+        && Number(recordPage.limit || traitRowsPerPage) === traitRowsPerPage
+        && String(recordPage.sortBy || '') === traitSortBy
+        && String(recordPage.order || '').toLowerCase() === String(traitSortDir || '').toLowerCase(),
+    );
+    const records = hasFreshRecordPage ? (recordData?.records || []) : [];
+    const totalRecordCount = Number(recordPage.totalCount ?? summary.totalRows) || totalOverviewCount;
 
     const handleTraitSort = React.useCallback((key, direction) => {
         setTraitSortBy(key);
@@ -2722,29 +2862,34 @@ export default function Genes() {
             sx={{ py: { xs: 1.5, md: 2 } }}
         >
             <Stack spacing={query ? 1.5 : 2}>
-                {details?.unavailable && (
+                {(overviewUnavailable || recordData?.unavailable) && (
                     <Alert severity="warning" sx={{ borderRadius: 1 }}>
                         Gene SQL index is not available yet. Run the schema migration and import script before using this page.
                     </Alert>
                 )}
 
-                {query && detailLoading && (
-                    <StatePanel loading title="Loading gene evidence" message={`Searching ${query}`} minHeight={300} />
+                {query && overviewLoading && (
+                    <>
+                        <GeneDetailHeaderSkeleton />
+                        <GeneInfoTableSkeleton />
+                        <StatePanel loading title="Loading gene-program summary" message={`Preparing ${query} overview`} minHeight={220} />
+                        <StatePanel loading title="Loading linked traits" message={`Searching ${query} evidence rows`} minHeight={300} />
+                    </>
                 )}
 
-                {query && error && (
-                    <StatePanel severity="error" title="Failed to load gene evidence" message={error.message || 'The gene lookup request failed.'} />
+                {query && overviewError && (
+                    <StatePanel severity="error" title="Failed to load gene evidence" message={overviewError.message || 'The gene lookup request failed.'} />
                 )}
 
-                {query && !detailLoading && !error && !details?.unavailable && totalRecordCount === 0 && (
+                {query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount === 0 && (
                     <>
                         <GeneDetailHeader
-                            gene={details?.gene || { geneSymbol: query }}
+                            gene={overviewGene || { geneSymbol: query }}
                             query={query}
                             summary={summary}
                             onSelect={(gene) => runSearch(gene)}
                         />
-                        <GeneInfoTable gene={details?.gene || { geneSymbol: query }} summary={summary} />
+                        <GeneInfoTable gene={overviewGene || { geneSymbol: query }} summary={summary} />
                         <StatePanel
                             icon={TableChartOutlined}
                             title="No linked records"
@@ -2754,28 +2899,43 @@ export default function Genes() {
                     </>
                 )}
 
-                {query && !detailLoading && totalRecordCount > 0 && (
+                {query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount > 0 && (
                     <>
                         <GeneDetailHeader
-                            gene={details?.gene}
+                            gene={overviewGene}
                             query={query}
                             summary={summary}
                             onSelect={(gene) => runSearch(gene)}
                         />
-                        <GeneInfoTable gene={details?.gene} summary={summary} />
-                        <GeneProgramTable gene={details?.gene} records={records} programRows={programRows} />
-                        <GeneProgramTraitTable
-                            gene={details?.gene}
-                            records={records}
-                            page={traitPage}
-                            rowsPerPage={traitRowsPerPage}
-                            totalCount={totalRecordCount}
-                            sortBy={traitSortBy}
-                            sortDir={traitSortDir}
-                            onPageChange={setTraitPage}
-                            onRowsPerPageChange={handleTraitRowsPerPageChange}
-                            onSort={handleTraitSort}
-                        />
+                        <GeneInfoTable gene={overviewGene} summary={summary} />
+                        <GeneProgramTable gene={overviewGene} records={records} programRows={programRows} />
+                        {recordsError ? (
+                            <StatePanel
+                                severity="error"
+                                title="Failed to load linked traits"
+                                message={recordsError.message || 'The trait evidence request failed.'}
+                            />
+                        ) : (recordsLoading || !hasFreshRecordPage) ? (
+                            <StatePanel
+                                loading
+                                title="Loading linked traits"
+                                message={`Querying ${query} trait evidence`}
+                                minHeight={300}
+                            />
+                        ) : (
+                            <GeneProgramTraitTable
+                                gene={overviewGene}
+                                records={records}
+                                page={traitPage}
+                                rowsPerPage={traitRowsPerPage}
+                                totalCount={totalRecordCount}
+                                sortBy={traitSortBy}
+                                sortDir={traitSortDir}
+                                onPageChange={setTraitPage}
+                                onRowsPerPageChange={handleTraitRowsPerPageChange}
+                                onSort={handleTraitSort}
+                            />
+                        )}
                     </>
                 )}
 

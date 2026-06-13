@@ -15,7 +15,6 @@ import axios from 'axios';
 import DataBrowseSummary from '../components/DataBrowseSummary';
 import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload } from '../utils/download';
 import {
-    captionSx,
     controlFieldSx,
     DATA_PAGE_MAX_WIDTH,
     metricChipTone,
@@ -602,9 +601,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                             <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontWeight: 700 }}>
                                 Hover files or folders for details
                             </Typography>
-                            <Typography variant="caption" sx={{ display: 'block', color: theme.custom.chart.axisSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: { xs: 'normal', sm: 'nowrap' } }}>
-                                {filter ? 'Filtered items update here instantly as you move across the list.' : 'Full path and size metadata appear here while browsing.'}
-                            </Typography>
+
                         </Box>
                         <Chip size="small" label={`${totalCount} items`} sx={summaryChipSx(theme, { height: 22, ...metricChipTone(theme, 'neutral') })} />
                     </>
@@ -831,9 +828,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                     <Typography variant="subtitle1" sx={sectionTitleSx(theme, { mb: 0.3, fontSize: '1rem' })}>
                         Global Search Results
                     </Typography>
-                    <Typography variant="body2" sx={captionSx(theme)}>
-                        Search across all indexed files and folders without the column browser layout.
-                    </Typography>
+
                     <Box sx={{ display: 'flex', gap: 0.7, flexWrap: 'wrap', mt: 1 }}>
                         <Chip size="small" label={`${totalCount.toLocaleString()} matches`} sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
                         <Chip size="small" label={`${fileResults.length} page files`} sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
@@ -1092,9 +1087,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                         <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontWeight: 700 }}>
                                             Hover matches for details
                                         </Typography>
-                                        <Typography noWrap variant="caption" sx={{ display: 'block', color: theme.custom.chart.axisSoft }}>
-                                            Full path, file size, and quick folder context appear here while reviewing matches.
-                                        </Typography>
+
                                     </Box>
                                     <Chip size="small" label={`${totalCount} matches`} sx={summaryChipSx(theme, { height: 22, ...metricChipTone(theme, 'neutral') })} />
                                 </>
@@ -1300,13 +1293,8 @@ export default function DataBrowser() {
                     mb: showIntro ? 0 : 0,
                 }}>
                     <Box sx={{ pb: 2 }}>
-                        <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0.5 })}>
+                        <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0 })}>
                             {isGlobalSearch ? 'Global Search' : 'Data Browser'}
-                        </Typography>
-                        <Typography variant="body2" sx={captionSx(theme)}>
-                            {isGlobalSearch
-                                ? 'Search across all indexed files and folders with a flat results view.'
-                                : 'Browse and download pipeline output files'}
                         </Typography>
                     </Box>
                 </Box>

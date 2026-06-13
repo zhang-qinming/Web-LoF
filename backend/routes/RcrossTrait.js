@@ -10,17 +10,19 @@ const {
     buildCorrelationMatrix,
     buildEffectProfile,
 } = require('../lib/correlation');
+const { getTraitEffectNeighbors } = require('../lib/traitEffectNeighbors');
 
 const router = express.Router();
 
 const metaTraitsStore = createFileStore(`${config.paths.crossTraitHeatmapDir}/meta/traits`);
 const effectsStore = createFileStore(`${config.paths.crossTraitHeatmapDir}/tables/effects`);
 
-const DEFAULT_TOP_GENES = 80;
+const DEFAULT_TOP_GENES = 25;
 const MAX_TOP_GENES = 100;
-const MAX_TARGET_IDS = 25;
-const DEFAULT_COMPARISON_TARGETS = 24;
-const SIGNIFICANT_TARGET_CANDIDATE_LIMIT = 120;
+const MAX_TARGET_IDS = 100;
+const RECOMMENDED_TARGET_LIMIT = 100;
+const MIN_RECOMMENDED_SHARED_GENES = 1000;
+const SIGNIFICANT_TARGET_CANDIDATE_LIMIT = 200;
 const DEFAULT_SEARCH_LIMIT = 12;
 const MAX_SEARCH_LIMIT = 30;
 const EFFECT_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -94,6 +96,8 @@ function buildTraitOption(meta, fallbackId) {
         sample_size: toFiniteNumber(meta?.sample_size),
         selection_rank: toFiniteNumber(meta?.selection_rank),
         selection_basis: meta?.selection_basis || null,
+        correlation: toFiniteNumber(meta?.correlation),
+        shared_genes: toFiniteNumber(meta?.shared_genes),
     };
 }
 
@@ -312,12 +316,20 @@ async function getRecommendedTargets(sourceTraitId) {
 
     const availableIds = await getAvailableEffectTraitIds();
     const availableIdSet = new Set(availableIds);
-    const [sourceMetaMap, significantCandidates] = await Promise.all([
-        getTraitMetaMapByIds([safeSourceId]),
-        getSignificantTraitCandidates(),
-    ]);
+    const sourceMetaMap = await getTraitMetaMapByIds([safeSourceId]);
     const sourceMeta = sourceMetaMap.get(safeSourceId);
     const sourceIds = new Set(pickTraitIdCandidates(safeSourceId, sourceMeta));
+    let neighborResult = null;
+    try {
+        neighborResult = await getTraitEffectNeighbors(
+            config.paths.traitEffectNeighborsFile,
+            [...sourceIds],
+            RECOMMENDED_TARGET_LIMIT,
+        );
+    } catch (err) {
+        console.warn(`Failed to load Trait Effect neighbors: ${err.message}`);
+    }
+
     const recommendedIds = [];
     const recommendedMeta = new Map();
 
@@ -333,28 +345,39 @@ async function getRecommendedTargets(sourceTraitId) {
         });
     };
 
-    significantCandidates.forEach((row) => {
-        if (recommendedIds.length >= DEFAULT_COMPARISON_TARGETS) return;
-        addAvailableId(row.file_id || row.gwas_id, row, 'gwas_significant_loci');
+    (neighborResult?.rows || []).forEach((row) => {
+        if (recommendedIds.length >= RECOMMENDED_TARGET_LIMIT) return;
+        if ((row.shared_genes || 0) < MIN_RECOMMENDED_SHARED_GENES) return;
+        addAvailableId(row.target_id, {
+            correlation: row.correlation,
+            shared_genes: row.shared_genes,
+        }, 'trait_effect_similarity');
     });
 
-    if (recommendedIds.length < DEFAULT_COMPARISON_TARGETS) {
+    if (recommendedIds.length < RECOMMENDED_TARGET_LIMIT) {
+        const significantCandidates = await getSignificantTraitCandidates();
+        significantCandidates.forEach((row) => {
+            if (recommendedIds.length >= RECOMMENDED_TARGET_LIMIT) return;
+            addAvailableId(row.file_id || row.gwas_id, row, 'gwas_significant_loci_fallback');
+        });
+    }
+
+    if (recommendedIds.length < RECOMMENDED_TARGET_LIMIT) {
         const curatedMetaMap = await getTraitMetaMapByIds(CURATED_RECOMMENDED_TARGET_IDS);
         CURATED_RECOMMENDED_TARGET_IDS.forEach((traitId) => {
-            if (recommendedIds.length >= DEFAULT_COMPARISON_TARGETS) return;
+            if (recommendedIds.length >= RECOMMENDED_TARGET_LIMIT) return;
             addAvailableId(traitId, curatedMetaMap.get(traitId), 'curated_fallback');
         });
     }
 
-    if (recommendedIds.length < DEFAULT_COMPARISON_TARGETS) {
+    if (recommendedIds.length < RECOMMENDED_TARGET_LIMIT) {
         availableIds.forEach((traitId) => {
-            if (recommendedIds.length >= DEFAULT_COMPARISON_TARGETS) return;
-            if (sourceIds.has(traitId) || recommendedIds.includes(traitId)) return;
+            if (recommendedIds.length >= RECOMMENDED_TARGET_LIMIT) return;
             addAvailableId(traitId, null, 'available_fallback');
         });
     }
 
-    const limitedIds = recommendedIds.slice(0, DEFAULT_COMPARISON_TARGETS);
+    const limitedIds = recommendedIds.slice(0, RECOMMENDED_TARGET_LIMIT);
     const metaMap = await getTraitMetaMapByIds(limitedIds);
     const enriched = limitedIds.map((traitId) => buildTraitOption(
         {
@@ -425,11 +448,23 @@ router.get('/api/cross-trait/:fileId/targets', asyncRoute(async (req, res) => {
         break;
     }
     const targets = await getRecommendedTargets(resolvedSourceId);
+    const similarityTargetCount = targets.filter(
+        (target) => target.selection_basis === 'trait_effect_similarity',
+    ).length;
 
     res.json({
         fileId,
         resolvedTraitId: resolvedSourceId,
         targets,
+        recommendation: {
+            primaryBasis: similarityTargetCount > 0
+                ? 'trait_effect_similarity'
+                : targets[0]?.selection_basis || null,
+            similarityTargetCount,
+            fallbackTargetCount: targets.length - similarityTargetCount,
+            returnedTargetCount: targets.length,
+            minimumSharedGenes: MIN_RECOMMENDED_SHARED_GENES,
+        },
     });
 }));
 

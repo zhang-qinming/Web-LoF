@@ -48,7 +48,6 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
-    RESPONSIVE_PLOT_HEIGHT,
     summaryChipSx,
     toolbarSx,
 } from '../themeUtils';
@@ -57,6 +56,7 @@ const UNASSIGNED_COLOR = '#6f7d90';
 const FULL_BACKGROUND_CHROM_COLORS = ['#e58d2a', '#3b7fc4'];
 const DEFAULT_EXPORT_WIDTH = 1400;
 const DEFAULT_EXPORT_HEIGHT = 760;
+const MANHATTAN_PLOT_HEIGHT = 'clamp(620px, 72dvh, 980px)';
 const MIN_DEFAULT_HIT_ROWS = 20;
 const PROGRAM_COLORS = [
     '#5194D6', '#D66351', '#51D6AA', '#D69451', '#9851D6', '#D65187', '#51BCD6', '#63D651',
@@ -1016,7 +1016,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             <Box sx={plotFrameSx(theme, { position: 'relative' })}>
                 <Box sx={{ p: 0, position: 'relative' }}>
                     {(loading || shouldAutoSwitchToFull) && (
-                        <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box sx={{ minHeight: MANHATTAN_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
@@ -1066,7 +1066,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     )}
 
                     {!loading && !shouldAutoSwitchToFull && !error && processedRows.length > 0 && (
-                            <Box sx={{ position: 'relative', minHeight: RESPONSIVE_PLOT_HEIGHT }}>
+                            <Box sx={{ position: 'relative', minHeight: MANHATTAN_PLOT_HEIGHT }}>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}
                                 layout={layout}
@@ -1086,7 +1086,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                                     setTableOpen((prev) => (prev ? prev : true));
                                 }}
                                 useResizeHandler
-                                style={{ width: '100%', height: RESPONSIVE_PLOT_HEIGHT }}
+                                style={{ width: '100%', height: MANHATTAN_PLOT_HEIGHT }}
                             />
                             <TraitHitManhattanLegend
                                 items={legendItems}

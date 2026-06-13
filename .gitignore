@@ -45,7 +45,8 @@ CLAUDE.md
 
 # Data files (local only)
 backend/data/
-
+frontend/design
+frontend/dist
 # Windows
 Thumbs.db
 Desktop.ini
