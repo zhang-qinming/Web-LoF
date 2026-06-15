@@ -78,12 +78,12 @@ CREATE TABLE IF NOT EXISTS gwas_meta (
 CREATE TABLE IF NOT EXISTS lof_meta (
     id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     file_id     VARCHAR(100) DEFAULT NULL,
-    lof_id      VARCHAR(200) NOT NULL,
-    gwas_id     VARCHAR(100) NOT NULL,
+    burden_phenotype_id VARCHAR(200) NOT NULL,
+    trait_id    VARCHAR(100) NOT NULL,
     trait_name  VARCHAR(500) DEFAULT NULL,
     FOREIGN KEY (file_id) REFERENCES file_metadata(file_id) ON DELETE SET NULL,
-    UNIQUE KEY uk_lof (lof_id),
-    INDEX idx_gwas (gwas_id)
+    UNIQUE KEY uk_burden_phenotype (burden_phenotype_id),
+    INDEX idx_lof_meta_trait (trait_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `;
 
@@ -308,7 +308,7 @@ async function stepImportLofMeta(pool) {
         const n = batch.length;
         batch.length = 0;
         await pool.query(
-            `INSERT IGNORE INTO lof_meta (lof_id, gwas_id, trait_name) VALUES ${placeholders}`,
+            `INSERT IGNORE INTO lof_meta (burden_phenotype_id, trait_id, trait_name) VALUES ${placeholders}`,
             vals
         );
         return n;
@@ -333,7 +333,7 @@ async function stepLinkAndSync(pool) {
     // 6b. lof_meta → file_id_mapping → file_metadata
     const [b] = await pool.query(`
         UPDATE lof_meta lm
-        JOIN file_id_mapping fim ON fim.lof_id = lm.gwas_id
+        JOIN file_id_mapping fim ON fim.lof_id = lm.trait_id
         JOIN file_metadata fm ON fm.gwas_id = fim.gwas_id
         SET lm.file_id = fm.file_id
         WHERE lm.file_id IS NULL

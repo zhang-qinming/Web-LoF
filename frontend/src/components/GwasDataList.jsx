@@ -512,6 +512,17 @@ function LoadingSkeleton({ rows = 10, columns, theme }) {
     );
 }
 
+const TRAIT_PLACEHOLDERS = [
+    'e.g. GCST90081631',
+    'e.g. PA00638 (Self-reported illness)',
+    'e.g. Hypertension',
+    'e.g. Diabetes',
+    'e.g. PA00450 (Type 2 diabetes)',
+    'e.g. Alzheimer\'s disease',
+    'e.g. GCST90014269 (Coronary artery disease)',
+    'e.g. Body mass index'
+];
+
 export default function GwasDataList({
     title = 'GWAS Data',
     columns = [],
@@ -519,6 +530,15 @@ export default function GwasDataList({
     defaultOrder = 'ASC',
 }) {
     const theme = useTheme();
+    const [placeholderIndex, setPlaceholderIndex] = useState(0);
+    const searchPlaceholder = TRAIT_PLACEHOLDERS[placeholderIndex % TRAIT_PLACEHOLDERS.length];
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setPlaceholderIndex((index) => (index + 1) % TRAIT_PLACEHOLDERS.length);
+        }, 3600);
+        return () => clearInterval(timer);
+    }, []);
     const [searchParams, setSearchParams] = useSearchParams();
     const rootRef = useRef(null);
     const availableSortColumns = useMemo(() => new Set(columns.map((column) => column.id)), [columns]);
@@ -791,7 +811,7 @@ export default function GwasDataList({
                                                                 setSearch(event.target.value);
                                                                 setPage(1);
                                                             }}
-                                                            placeholder="e.g. GCST90081631"
+                                                            placeholder={searchPlaceholder}
                                                             sx={{
                                                                 width: '100%',
                                                                 maxWidth: { lg: 260 },

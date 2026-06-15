@@ -44,6 +44,7 @@ const paths = {
     traitProgramGenePanelDir: process.env.TRAIT_PROGRAM_GENE_PANEL_DIR || path.join(dataDir, 'trait_program_gene_panel', 'tables'),
     regulationDataDir: process.env.REGULATION_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/run_all/outputs/perturbseq/cnmf_genomewide/cNMF_regulation/K562GW',
     gwasManhattanDataDir: process.env.GWAS_MANHATTAN_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/gwas_manhattan/tables',
+    ldscDir: process.env.LDSC_DIR || process.env.HERITABILITY_DIR || path.join(dataDir, 'ldsc'),
     burdenVolcanoDir: process.env.BURDEN_VOLCANO_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/burden_volcano/tables',
     posteriorVolcanoDir: process.env.POSTERIOR_VOLCANO_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/posterior_volcano/tables',
     crossTraitHeatmapDir,

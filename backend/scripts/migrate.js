@@ -27,6 +27,21 @@ async function migrate() {
 
     try {
         await pool.query(sql);
+
+        const [ldscPColumns] = await pool.query(
+            `SELECT COLUMN_NAME
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = ?
+               AND TABLE_NAME = 'trait_ldsc'
+               AND COLUMN_NAME = 'enrichment_p'`,
+            [dbName]
+        );
+        if (ldscPColumns.length === 0) {
+            await pool.query(
+                'ALTER TABLE trait_ldsc ADD COLUMN enrichment_p DOUBLE DEFAULT NULL AFTER enrichment'
+            );
+        }
+
         console.log('Schema migration completed successfully.');
 
         const [tables] = await pool.query(

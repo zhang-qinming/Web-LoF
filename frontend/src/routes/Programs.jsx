@@ -372,8 +372,28 @@ function ProgramSummaryChips({ summary }) {
     );
 }
 
+const PROGRAM_PLACEHOLDERS = [
+    'e.g. P21',
+    'e.g. P1',
+    'e.g. P5',
+    'e.g. P10',
+    'e.g. P50',
+    'e.g. P80',
+    'e.g. P120',
+    'e.g. P150'
+];
+
 function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
     const theme = useTheme();
+    const [placeholderIndex, setPlaceholderIndex] = useState(0);
+    const searchPlaceholder = PROGRAM_PLACEHOLDERS[placeholderIndex % PROGRAM_PLACEHOLDERS.length];
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setPlaceholderIndex((index) => (index + 1) % PROGRAM_PLACEHOLDERS.length);
+        }, 3600);
+        return () => clearInterval(timer);
+    }, []);
     const [anchorEl, setAnchorEl] = useState(null);
     const [search, setSearch] = useState('');
     const interactive = programOptions.length > 0;
@@ -472,7 +492,7 @@ function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
                         size="small"
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder="e.g. P21"
+                        placeholder={searchPlaceholder}
                         InputProps={{
                             startAdornment: <Search fontSize="small" sx={{ color: theme.custom.chart.axisSoft, mr: 0.75 }} />,
                         }}
@@ -930,8 +950,30 @@ function ProgramGenesTable({ programId }) {
     );
 }
 
+const PROGRAM_GENE_PLACEHOLDERS = [
+    'e.g. PTMA',
+    'e.g. BRCA1',
+    'e.g. LDLR',
+    'e.g. TP53',
+    'e.g. APOE',
+    'e.g. EGFR',
+    'e.g. TNF',
+    'e.g. IL6',
+    'e.g. VEGFA',
+    'e.g. AKT1'
+];
+
 export default function Programs() {
     const theme = useTheme();
+    const [genePlaceholderIndex, setGenePlaceholderIndex] = useState(0);
+    const geneSearchPlaceholder = PROGRAM_GENE_PLACEHOLDERS[genePlaceholderIndex % PROGRAM_GENE_PLACEHOLDERS.length];
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setGenePlaceholderIndex((index) => (index + 1) % PROGRAM_GENE_PLACEHOLDERS.length);
+        }, 3600);
+        return () => clearInterval(timer);
+    }, []);
     const programTableTones = {
         identity: tableTone(theme, 'warning'),
         annotation: tableTone(theme, 'warning'),
@@ -1231,7 +1273,7 @@ export default function Programs() {
                             size="small"
                             value={programGeneInput}
                             onChange={(event) => setProgramGeneInput(event.target.value)}
-                            placeholder="e.g. PTMA"
+                            placeholder={geneSearchPlaceholder}
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">

@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS trait_ldsc (
     lof_id              VARCHAR(200) DEFAULT NULL,
     source_file         VARCHAR(255) DEFAULT NULL,
     enrichment          DOUBLE       DEFAULT NULL,
+    enrichment_p        DOUBLE       DEFAULT NULL,
     coefficient_z_score DOUBLE       DEFAULT NULL,
     imported_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_trait_ldsc_gwas (gwas_id),

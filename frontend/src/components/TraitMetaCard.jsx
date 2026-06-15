@@ -26,6 +26,13 @@ function formatMetric(value, digits = 4) {
     return Number.isFinite(number) ? number.toFixed(digits) : String(value);
 }
 
+function formatPValue(value) {
+    if (value == null || value === '') return EMPTY_VALUE;
+    const number = Number(value);
+    if (!Number.isFinite(number)) return String(value);
+    return number < 0.0001 ? number.toExponential(3) : number.toFixed(4);
+}
+
 function escapeCsvValue(value) {
     const text = value == null ? '' : String(value);
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -54,7 +61,7 @@ function buildMeshUrl(meshId, meshTerm) {
 }
 
 function buildLdscSourceFile(info, fallbackId) {
-    const id = String(info.heritability_lof_id || info.file_id || fallbackId || '').trim();
+    const id = String(info.heritability_trait_id || info.heritability_lof_id || info.file_id || fallbackId || '').trim();
     return id ? `${id}_k562_atac.results` : '';
 }
 
@@ -258,7 +265,7 @@ export default function TraitMetaCard({ fileId }) {
     const sourceUrl = String(info.url || '').trim();
 
     const traitRows = [
-        { label: 'LOF ID', value: fileIdentifier, mono: true, strong: true },
+        { label: 'Trait ID', value: fileIdentifier, mono: true, strong: true },
         { label: 'Reported Trait', value: traitName, strong: true },
         {
             label: 'MeSH Term',
@@ -306,22 +313,30 @@ export default function TraitMetaCard({ fileId }) {
         info.heritability_source_file,
         info.heritability_source_row,
         info.heritability_gwas_id,
+        info.heritability_trait_id,
         info.heritability_lof_id,
         info.enrichment,
+        info.enrichment_p,
         info.coefficient_z_score,
     ].some((value) => value != null && value !== '');
     const ldscSourceFile = hasLdscData ? buildLdscSourceFile(info, fileIdentifier) : '';
+
+    const burdenRows = [
+        { label: 'Burden phenotype', value: info.burden_phenotype_id || EMPTY_VALUE, mono: true, strong: true },
+    ];
 
     const ldscRows = [
         { label: 'LDSC file', value: ldscSourceFile || EMPTY_VALUE, mono: true },
         { label: 'LDSC row', value: hasLdscData ? (info.heritability_source_row || 'L2_0') : EMPTY_VALUE, mono: true, strong: true },
         { label: 'Enrichment', value: formatMetric(info.enrichment), mono: true, emphasis: true },
+        { label: 'Enrichment p-value', value: formatPValue(info.enrichment_p), mono: true, emphasis: true },
         { label: 'Coefficient Z-score', value: formatMetric(info.coefficient_z_score), mono: true, emphasis: true },
     ];
 
     const csvRows = [
         ...traitRows,
         ...studyRows,
+        ...burdenRows,
         ...ldscRows,
     ];
 
@@ -373,6 +388,7 @@ export default function TraitMetaCard({ fileId }) {
         >
             <TraitInfoTable title="Trait information" rows={traitRows} theme={theme} action={exportButton} />
             <TraitInfoTable title="Study information" rows={studyRows} theme={theme} />
+            <TraitInfoTable title="Burden information" rows={burdenRows} theme={theme} />
             <TraitInfoTable title="LDSC information" rows={ldscRows} theme={theme} />
         </Paper>
     );

@@ -1,7 +1,10 @@
+const fs = require('fs');
+const path = require('path');
 const pool = require('./db');
 const { config } = require('../lib/config');
 
 let hasTraitLdscTablePromise = null;
+const LDSC_ROW = 'L2_0';
 const SORT_COLUMN_MAP = {
     file_id: 'fm.file_id',
     trait_name: 'fm.trait_name',
@@ -30,6 +33,112 @@ function buildMetaOrderBy(sortBy, order) {
     return `ORDER BY ${column} ${direction}`;
 }
 
+function parseNumber(value) {
+    if (value == null) return null;
+    const text = String(value).trim();
+    if (!text || /^na$/i.test(text) || /^nan$/i.test(text)) return null;
+    const num = Number(text);
+    return Number.isFinite(num) ? num : null;
+}
+
+function splitLdscLine(line) {
+    const trimmed = String(line || '').trim();
+    return trimmed.indexOf('\t') >= 0
+        ? trimmed.split('\t').map((item) => item.trim())
+        : trimmed.split(/\s+/).map((item) => item.trim());
+}
+
+function normalizeKey(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function findHeaderIndex(indexByHeader, names) {
+    for (const name of names) {
+        const index = indexByHeader.get(normalizeKey(name));
+        if (index != null) return index;
+    }
+    return undefined;
+}
+
+function parseLdscText(text) {
+    const lines = String(text || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (lines.length < 2) return null;
+
+    const headers = splitLdscLine(lines[0]);
+    const indexByHeader = new Map(headers.map((header, index) => [normalizeKey(header), index]));
+    const resolvedCategoryIndex = findHeaderIndex(indexByHeader, ['category', 'annotation', 'ld_score']);
+    const categoryIndex = resolvedCategoryIndex == null ? 0 : resolvedCategoryIndex;
+    const enrichmentIndex = findHeaderIndex(indexByHeader, ['enrichment']);
+    const enrichmentPIndex = findHeaderIndex(indexByHeader, ['enrichment_p', 'enrichment-p', 'enrichment p']);
+    const zScoreIndex = findHeaderIndex(indexByHeader, ['coefficient_z-score', 'coefficient_z_score', 'coefficient z-score']);
+    const rows = lines.slice(1).map(splitLdscLine);
+    const values = rows.find((row) => normalizeKey(row[categoryIndex]) === normalizeKey(LDSC_ROW)) || null;
+
+    if (!values) return null;
+
+    return {
+        enrichment: enrichmentIndex != null ? parseNumber(values[enrichmentIndex]) : null,
+        enrichment_p: enrichmentPIndex != null ? parseNumber(values[enrichmentPIndex]) : null,
+        coefficient_z_score: zScoreIndex != null ? parseNumber(values[zScoreIndex]) : null,
+        rowName: values[categoryIndex] || LDSC_ROW,
+    };
+}
+
+function safeLdscId(value) {
+    const text = String(value || '').trim();
+    return /^[A-Za-z0-9_.-]+$/.test(text) ? text : '';
+}
+
+async function loadLdscFromFile(meta) {
+    const ids = [
+        meta && meta.heritability_lof_id,
+        meta && meta.ldsc_file_id,
+        meta && meta.file_id,
+        meta && meta.gwas_id,
+    ]
+        .map(safeLdscId)
+        .filter(Boolean);
+
+    for (const id of [...new Set(ids)]) {
+        const sourceFile = `${id}_k562_atac.results`;
+        const fullPath = path.join(config.paths.ldscDir, sourceFile);
+
+        try {
+            const text = await fs.promises.readFile(fullPath, 'utf8');
+            const parsed = parseLdscText(text);
+            if (!parsed) continue;
+            return {
+                heritability_source_row: parsed.rowName || LDSC_ROW,
+                heritability_gwas_id: (meta && meta.gwas_id) || null,
+                heritability_lof_id: id,
+                heritability_source_file: sourceFile,
+                enrichment: parsed.enrichment,
+                enrichment_p: parsed.enrichment_p,
+                coefficient_z_score: parsed.coefficient_z_score,
+            };
+        } catch (error) {
+            if (error && error.code === 'ENOENT') continue;
+            throw error;
+        }
+    }
+
+    return null;
+}
+
+async function fillMissingLdscFromFile(meta) {
+    if (!meta || (
+        meta.enrichment != null
+        && meta.enrichment_p != null
+        && meta.coefficient_z_score != null
+    )) return meta;
+    const fallback = await loadLdscFromFile(meta);
+    return fallback ? { ...meta, ...fallback } : meta;
+}
+
 async function hasTraitLdscTable() {
     if (!hasTraitLdscTablePromise) {
         hasTraitLdscTablePromise = pool.query(
@@ -44,6 +153,30 @@ async function hasTraitLdscTable() {
     }
 
     return hasTraitLdscTablePromise;
+}
+
+function quoteIdentifier(identifier) {
+    const allowed = new Set(['burden_phenotype_id', 'lof_id', 'trait_id', 'gwas_id']);
+    if (!allowed.has(identifier)) {
+        throw new Error(`Unsupported lof_meta column: ${identifier}`);
+    }
+    return `\`${identifier}\``;
+}
+
+async function getLofMetaColumns() {
+    const [rows] = await pool.query(
+        `SELECT COLUMN_NAME
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'lof_meta'
+           AND COLUMN_NAME IN ('burden_phenotype_id', 'lof_id', 'trait_id', 'gwas_id')`
+    );
+    const columns = new Set(rows.map((row) => row.COLUMN_NAME));
+
+    return {
+        burdenPhenotypeColumn: columns.has('burden_phenotype_id') ? 'burden_phenotype_id' : 'lof_id',
+        traitColumn: columns.has('trait_id') ? 'trait_id' : 'gwas_id',
+    };
 }
 
 async function getTraits({ page = 1, limit = 20, sortBy = 'trait_name', order = 'ASC', search = '' } = {}) {
@@ -117,17 +250,21 @@ async function getTraitMeta(fileId) {
     if (!safeFileId || safeFileId.length > 255) return null;
 
     const includeHeritability = await hasTraitLdscTable();
+    const lofMetaColumns = await getLofMetaColumns();
+    const burdenPhenotypeExpr = `lm.${quoteIdentifier(lofMetaColumns.burdenPhenotypeColumn)}`;
+    const burdenTraitExpr = `lm.${quoteIdentifier(lofMetaColumns.traitColumn)}`;
     const heritabilitySelect = includeHeritability ? `,
                 CASE WHEN tl.gwas_id IS NOT NULL THEN 'L2_0' ELSE NULL END AS heritability_source_row,
                 tl.gwas_id AS heritability_gwas_id,
+                tl.lof_id AS heritability_trait_id,
                 tl.lof_id AS heritability_lof_id,
                 tl.source_file AS heritability_source_file,
-                tl.enrichment, tl.coefficient_z_score` : '';
+                tl.enrichment, tl.enrichment_p, tl.coefficient_z_score` : '';
     const heritabilityJoin = includeHeritability
         ? `\n         LEFT JOIN trait_ldsc tl
              ON tl.file_id COLLATE utf8mb4_unicode_ci = fm.file_id COLLATE utf8mb4_unicode_ci
              OR tl.gwas_id COLLATE utf8mb4_unicode_ci = fm.gwas_id COLLATE utf8mb4_unicode_ci
-             OR tl.lof_id COLLATE utf8mb4_unicode_ci = lm.lof_id COLLATE utf8mb4_unicode_ci`
+             OR tl.lof_id COLLATE utf8mb4_unicode_ci = ${burdenTraitExpr} COLLATE utf8mb4_unicode_ci`
         : '';
 
     const [rows] = await pool.query(
@@ -137,16 +274,19 @@ async function getTraitMeta(fileId) {
                 gm.qc_score, gm.collect_date, gm.url,
                 gm.mesh_term, gm.mesh_id,
                 gm.source_batch AS gwas_source_batch,
-                lm.lof_id${heritabilitySelect}
+                fim.lof_id AS ldsc_file_id,
+                ${burdenTraitExpr} AS burden_trait_id,
+                ${burdenPhenotypeExpr} AS burden_phenotype_id${heritabilitySelect}
          FROM file_metadata fm
          LEFT JOIN gwas_meta gm ON gm.file_id = fm.file_id
          LEFT JOIN lof_meta lm ON lm.file_id = fm.file_id
+         LEFT JOIN file_id_mapping fim ON fim.gwas_id = fm.gwas_id
          ${heritabilityJoin}
          WHERE fm.file_id = ? OR fm.gwas_id = ?
          LIMIT 1`,
         [safeFileId, safeFileId]
     );
-    return rows[0] || null;
+    return fillMissingLdscFromFile(rows[0] || null);
 }
 
 async function getTraitCount() {
@@ -177,15 +317,15 @@ async function getHomeSummary() {
     const [[geneRow]] = await pool.query(`SELECT COUNT(*) AS genes FROM gene_info_hg37_matched`);
 
     return {
-        traits: Number(row?.traits) || 0,
-        variants: Number(row?.variants) || 0,
-        genes: Number(geneRow?.genes) || 0,
-        significantLoci: Number(row?.significantLoci) || 0,
-        minYear: row?.minYear ? Number(row.minYear) : null,
-        maxYear: row?.maxYear ? Number(row.maxYear) : null,
-        latestCollectDate: row?.latestCollectDate || null,
-        sourceBatches: Number(row?.sourceBatches) || 0,
-        populations: Number(row?.populations) || 0,
+        traits: Number(row && row.traits) || 0,
+        variants: Number(row && row.variants) || 0,
+        genes: Number(geneRow && geneRow.genes) || 0,
+        significantLoci: Number(row && row.significantLoci) || 0,
+        minYear: row && row.minYear ? Number(row.minYear) : null,
+        maxYear: row && row.maxYear ? Number(row.maxYear) : null,
+        latestCollectDate: row && row.latestCollectDate ? row.latestCollectDate : null,
+        sourceBatches: Number(row && row.sourceBatches) || 0,
+        populations: Number(row && row.populations) || 0,
     };
 }
 

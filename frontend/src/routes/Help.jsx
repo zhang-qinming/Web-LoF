@@ -80,7 +80,7 @@ const TEXT = {
         workflowCardsTitle: 'Choose A Starting Page',
         workflowCardsBody: 'Pick the first route from the object in hand, then use linked tables and exports to move across the rest of the browser.',
         workflowCards: [
-            { question: 'I have a trait, GCST, LoF ID, or GWAS ID', route: '/trait', page: 'Trait', action: 'Open the trait row, choose a figure tab, then use the table below the chart for exact values.' },
+            { question: 'I have a trait, GCST/Trait ID, burden phenotype, or GWAS ID', route: '/trait', page: 'Trait', action: 'Open the trait row, choose a figure tab, then use the table below the chart for exact values.' },
             { question: 'I have a gene symbol or Ensembl ID', route: '/genes', page: 'Genes', action: 'Review gene metadata, program relationships, and linked trait evidence before jumping back to Trait.' },
             { question: 'I have a cNMF program or regulator question', route: '/programs', page: 'Programs', action: 'Check annotation, program genes, and associated traits, then open trait-level graph views for context.' },
             { question: 'I have a filename, folder, or output keyword', route: '/data', page: 'Data', action: 'Use global search or column browsing, select files, then download individual files, batches, or ZIP archives.' },
@@ -171,7 +171,7 @@ const TEXT = {
                         route: '/trait',
                         role: 'Trait table browser with search and pagination.',
                         usage: [
-                            'Use the search box to filter by trait, LoF ID, or GWAS ID.',
+                            'Use the search box to filter by trait, Trait ID, burden phenotype, or GWAS ID.',
                             'Sort by clicking column headers, and manage result volume with per-page, paging, and jump controls.',
                             'Open a trait row to enter its detail page.',
                         ],
@@ -181,7 +181,7 @@ const TEXT = {
                         route: '/trait',
                         role: 'Top metadata block on the trait detail page.',
                         usage: [
-                            'Review trait name, LoF ID, GWAS ID, author, sample size, population, and variant summary fields.',
+                            'Review trait name, Trait ID, GWAS ID, burden phenotype, author, sample size, population, and variant summary fields.',
                             'PubMed and Source fields link to external references, while Program data chips indicate additional downstream views.',
                         ],
                     },
@@ -686,7 +686,7 @@ const TEXT = {
         workflowCardsTitle: '选择起始页面',
         workflowCardsBody: '先根据手头已有对象选择第一条路由，再通过联动表格和导出功能在其他页面之间切换。',
         workflowCards: [
-            { question: '我有 trait、GCST、LoF ID 或 GWAS ID', route: '/trait', page: 'Trait', action: '打开 trait 行，选择对应 figure tab，再用图下方表格核对精确数值。' },
+            { question: '我有 trait、GCST/Trait ID、burden phenotype 或 GWAS ID', route: '/trait', page: 'Trait', action: '打开 trait 行，选择对应 figure tab，再用图下方表格核对精确数值。' },
             { question: '我有 gene symbol 或 Ensembl ID', route: '/genes', page: 'Genes', action: '先看 gene metadata、program 关系和关联 trait 证据，再按需要回到 Trait。' },
             { question: '我有 cNMF program 或 regulator 问题', route: '/programs', page: 'Programs', action: '核查 annotation、program genes 和 associated traits，再打开 trait-level graph 补上下文。' },
             { question: '我有文件名、文件夹或输出关键词', route: '/data', page: 'Data', action: '使用全局搜索或列式目录浏览，选择文件后下载单文件、批量文件或 ZIP。' },
@@ -777,7 +777,7 @@ const TEXT = {
                         route: '/trait',
                         role: '支持搜索和分页的 trait 表格浏览器。',
                         usage: [
-                            '使用搜索框按 trait、LoF ID 或 GWAS ID 过滤结果。',
+                            '使用搜索框按 trait、Trait ID、burden phenotype 或 GWAS ID 过滤结果。',
                             '点击列表头排序，并用每页数量、分页和跳页控件管理结果量。',
                             '点击 trait 行进入详情页。',
                         ],
@@ -787,7 +787,7 @@ const TEXT = {
                         route: '/trait',
                         role: 'Trait 详情页顶部的元信息区块。',
                         usage: [
-                            '查看 trait 名称、LoF ID、GWAS ID、作者、样本量、population 和 variant 汇总信息。',
+                            '查看 trait 名称、Trait ID、GWAS ID、burden phenotype、作者、样本量、population 和 variant 汇总信息。',
                             'PubMed 和 Source 字段可跳转到外部参考来源，Program data 标签表示存在更多下游视图。',
                         ],
                     },

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS trait_ldsc (
     lof_id              VARCHAR(200) DEFAULT NULL,
     source_file         VARCHAR(255) DEFAULT NULL,
     enrichment          DOUBLE       DEFAULT NULL,
+    enrichment_p        DOUBLE       DEFAULT NULL,
     coefficient_z_score DOUBLE       DEFAULT NULL,
     imported_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_trait_ldsc_gwas (gwas_id),
@@ -70,11 +71,11 @@ CREATE TABLE IF NOT EXISTS gwas_meta (
 CREATE TABLE IF NOT EXISTS lof_meta (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     file_id         VARCHAR(100) DEFAULT NULL,
-    lof_id          VARCHAR(200) NOT NULL UNIQUE,
-    gwas_id         VARCHAR(100) NOT NULL,
+    burden_phenotype_id VARCHAR(200) NOT NULL UNIQUE,
+    trait_id        VARCHAR(100) NOT NULL,
     trait_name      VARCHAR(500) DEFAULT NULL,
     FOREIGN KEY (file_id) REFERENCES file_metadata(file_id) ON DELETE SET NULL,
-    INDEX idx_gwas (gwas_id)
+    INDEX idx_lof_meta_trait (trait_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS program_info (
@@ -129,6 +130,8 @@ CREATE TABLE IF NOT EXISTS trait_program_edge (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS gene_info_hg37_matched (
+    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    perturb_symbol      VARCHAR(100) NOT NULL,
     chromosome          VARCHAR(50)  DEFAULT NULL,
     begin_pos           BIGINT       DEFAULT NULL,
     end_pos             BIGINT       DEFAULT NULL,
@@ -138,13 +141,20 @@ CREATE TABLE IF NOT EXISTS gene_info_hg37_matched (
     gene_type           VARCHAR(100) DEFAULT NULL,
     synonyms            TEXT         DEFAULT NULL,
     hgnc                VARCHAR(50)  DEFAULT NULL,
-    ensembl             VARCHAR(30)  NOT NULL,
+    ensembl             VARCHAR(30)  DEFAULT NULL,
     description         TEXT         DEFAULT NULL,
-    PRIMARY KEY (ensembl),
+    perturb_tested      BOOLEAN      NOT NULL DEFAULT TRUE,
+    tested_program_count INT UNSIGNED NOT NULL DEFAULT 0,
+    mapping_status      VARCHAR(50)  NOT NULL,
+    annotation_source   VARCHAR(255) NOT NULL,
+    imported_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_gih37m_perturb_symbol (perturb_symbol),
     INDEX idx_gih37m_symbol (symbol),
+    INDEX idx_gih37m_ensembl (ensembl),
     INDEX idx_gih37m_gene_id (gene_id),
     INDEX idx_gih37m_gene_type (gene_type),
-    INDEX idx_gih37m_hgnc (hgnc)
+    INDEX idx_gih37m_hgnc (hgnc),
+    INDEX idx_gih37m_chromosome (chromosome)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS gene_program_trait_edge (

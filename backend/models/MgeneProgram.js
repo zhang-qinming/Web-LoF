@@ -1204,13 +1204,46 @@ async function getGeneOverview(geneId) {
             whereParams,
         );
 
+        const catalogQuery = includeGeneInfo
+            ? pool.query(
+                `SELECT
+                    perturb_symbol AS gene_symbol,
+                    ensembl AS ensg_id,
+                    COALESCE(NULLIF(symbol, ''), perturb_symbol) AS gene_label,
+                    chromosome,
+                    begin_pos,
+                    end_pos,
+                    gene_type,
+                    gene_name,
+                    gene_id,
+                    hgnc,
+                    synonyms,
+                    description,
+                    NULL AS trait_id,
+                    NULL AS file_id,
+                    NULL AS program,
+                    NULL AS role
+                 FROM ${GENE_INFO_TABLE}
+                 WHERE perturb_symbol = ?
+                    OR symbol = ?
+                    OR ensembl = ?
+                 ORDER BY
+                    (perturb_symbol = ?) DESC,
+                    (symbol = ?) DESC,
+                    (ensembl = ?) DESC
+                 LIMIT 1`,
+                [q, q, q, q, q, q],
+            )
+            : Promise.resolve([[]]);
+
         const [
             [[summaryRow]],
             [geneRows],
             [programRows],
-        ] = await Promise.all([summaryQuery, geneQuery, programRowsQuery]);
+            [catalogRows],
+        ] = await Promise.all([summaryQuery, geneQuery, programRowsQuery, catalogQuery]);
 
-        const gene = normalizeGeneFromRow(geneRows[0], q);
+        const gene = normalizeGeneFromRow(geneRows[0] || catalogRows[0], q);
         const summary = normalizeSummaryRow(summaryRow);
         const programs = programRows.map((row) => normalizeProgramAggregate(row, gene.geneSymbol || gene.ensgId || q));
 

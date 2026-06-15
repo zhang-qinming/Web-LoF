@@ -62,7 +62,7 @@ const COPY = {
                 bullets: [
                     'A Trait tab such as Manhattan, Program Scatter, Gene Evidence, Gene QQ, or Cross-trait Heatmap is missing a result file that should exist.',
                     'A Data Browser download fails repeatedly, returns the wrong artifact, or packages an unexpected folder.',
-                    'Trait metadata, GWAS IDs, LoF IDs, program IDs, gene symbols, or chart-linked table values look inconsistent.',
+                    'Trait metadata, Trait IDs, GWAS IDs, burden phenotypes, program IDs, gene symbols, or chart-linked table values look inconsistent.',
                     'A Programs or Genes drilldown cannot find records that are present in the indexed output files.',
                 ],
             },
@@ -72,7 +72,7 @@ const COPY = {
                 body: 'A short, concrete report makes the issue reproducible from the same page, route, and filter state.',
                 bullets: [
                     'The exact route, such as /trait/GCST90081631?tab=manhattan, /programs/P12, /genes?query=PTMA, or /data?mode=global.',
-                    'The trait name, LoF ID, GWAS ID, program ID, gene symbol, rsID, or file path involved.',
+                    'The trait name, Trait ID, GWAS ID, burden phenotype, program ID, gene symbol, rsID, or file path involved.',
                     'What you expected to see and what actually happened.',
                     'The visible filter state, active tab, selected download paths, browser screenshot, and approximate time of the issue.',
                 ],
@@ -141,7 +141,7 @@ const COPY = {
                 bullets: [
                     'Trait 页中的 Manhattan、Program Scatter、Gene Evidence、Gene QQ 或 Cross-trait Heatmap 等 tab 缺少本应存在的结果文件。',
                     'Data Browser 下载反复失败、返回错误文件，或打包了不符合预期的目录。',
-                    'Trait metadata、GWAS ID、LoF ID、program ID、gene symbol、rsID 或图表联动表格数值看起来不一致。',
+                    'Trait metadata、Trait ID、GWAS ID、burden phenotype、program ID、gene symbol、rsID 或图表联动表格数值看起来不一致。',
                     'Programs 或 Genes 钻取页找不到已存在于索引输出文件里的记录。',
                 ],
             },
@@ -151,7 +151,7 @@ const COPY = {
                 body: '简洁且具体的问题描述可以让维护者从同一页面、路由和筛选状态复现问题。',
                 bullets: [
                     '准确路由，例如 /trait/GCST90081631?tab=manhattan、/programs/P12、/genes?query=PTMA 或 /data?mode=global。',
-                    '涉及的 trait 名称、LoF ID、GWAS ID、program ID、gene symbol、rsID 或文件路径。',
+                    '涉及的 trait 名称、Trait ID、GWAS ID、burden phenotype、program ID、gene symbol、rsID 或文件路径。',
                     '你期望看到什么，以及实际发生了什么。',
                     '当前筛选条件、活动 tab、选中的下载路径、浏览器截图以及大致发生时间。',
                 ],

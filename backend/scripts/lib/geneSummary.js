@@ -18,25 +18,48 @@ INSERT INTO gene_summary (
     regulator_role_rows
 )
 SELECT
-    COALESCE(NULLIF(gpte.ensg_id, ''), NULLIF(gpte.gene_symbol, ''), NULLIF(gpte.gene_label, '')) AS gene_key,
-    MAX(COALESCE(NULLIF(gpte.gene_symbol, ''), NULLIF(gi.symbol, ''))) AS gene_symbol,
-    MAX(NULLIF(gpte.ensg_id, '')) AS ensg_id,
-    MAX(COALESCE(NULLIF(gpte.gene_label, ''), NULLIF(gpte.gene_symbol, ''), NULLIF(gi.symbol, ''), NULLIF(gpte.ensg_id, ''))) AS gene_label,
-    MAX(gi.chromosome) AS chromosome,
-    MAX(gi.begin_pos) AS begin_pos,
-    MAX(gi.end_pos) AS end_pos,
-    MAX(gi.gene_name) AS gene_name,
-    MAX(gi.gene_type) AS gene_type,
-    COUNT(*) AS total_rows,
-    COUNT(DISTINCT gpte.program) AS total_programs,
-    COUNT(DISTINCT gpte.trait_id) AS total_traits,
-    SUM(gpte.role = 'program') AS program_role_rows,
-    SUM(gpte.role = 'regulator') AS regulator_role_rows
-FROM gene_program_trait_edge gpte
-LEFT JOIN gene_info_hg37_matched gi
-    ON gi.ensembl = gpte.ensg_id
-WHERE COALESCE(NULLIF(gpte.ensg_id, ''), NULLIF(gpte.gene_symbol, ''), NULLIF(gpte.gene_label, '')) IS NOT NULL
-GROUP BY gene_key;
+    CONCAT('perturb:', gi.perturb_symbol) AS gene_key,
+    gi.perturb_symbol AS gene_symbol,
+    NULLIF(gi.ensembl, '') AS ensg_id,
+    COALESCE(NULLIF(gi.symbol, ''), gi.perturb_symbol) AS gene_label,
+    gi.chromosome,
+    gi.begin_pos,
+    gi.end_pos,
+    gi.gene_name,
+    gi.gene_type,
+    COALESCE(by_ensg.total_rows, by_symbol.total_rows, 0) AS total_rows,
+    COALESCE(by_ensg.total_programs, by_symbol.total_programs, 0) AS total_programs,
+    COALESCE(by_ensg.total_traits, by_symbol.total_traits, 0) AS total_traits,
+    COALESCE(by_ensg.program_role_rows, by_symbol.program_role_rows, 0) AS program_role_rows,
+    COALESCE(by_ensg.regulator_role_rows, by_symbol.regulator_role_rows, 0) AS regulator_role_rows
+FROM gene_info_hg37_matched gi
+LEFT JOIN (
+    SELECT
+        ensg_id,
+        COUNT(*) AS total_rows,
+        COUNT(DISTINCT program) AS total_programs,
+        COUNT(DISTINCT trait_id) AS total_traits,
+        SUM(role = 'program') AS program_role_rows,
+        SUM(role = 'regulator') AS regulator_role_rows
+    FROM gene_program_trait_edge
+    WHERE ensg_id IS NOT NULL AND ensg_id <> ''
+    GROUP BY ensg_id
+) by_ensg
+    ON BINARY by_ensg.ensg_id = BINARY gi.ensembl
+LEFT JOIN (
+    SELECT
+        gene_symbol,
+        COUNT(*) AS total_rows,
+        COUNT(DISTINCT program) AS total_programs,
+        COUNT(DISTINCT trait_id) AS total_traits,
+        SUM(role = 'program') AS program_role_rows,
+        SUM(role = 'regulator') AS regulator_role_rows
+    FROM gene_program_trait_edge
+    WHERE gene_symbol IS NOT NULL AND gene_symbol <> ''
+    GROUP BY gene_symbol
+) by_symbol
+    ON BINARY by_symbol.gene_symbol = BINARY gi.perturb_symbol
+WHERE gi.perturb_tested = TRUE;
 `;
 
 const REFRESH_GENE_SUMMARY_STATEMENTS = REFRESH_GENE_SUMMARY_SQL

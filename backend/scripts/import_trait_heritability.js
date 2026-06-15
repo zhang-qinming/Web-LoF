@@ -60,7 +60,7 @@ function parseLdscResult(text) {
         .filter(Boolean);
 
     if (lines.length < 2) {
-        return { enrichment: null, coefficient_z_score: null, rowName: null };
+        return { enrichment: null, enrichment_p: null, coefficient_z_score: null, rowName: null };
     }
 
     const headers = splitLdscLine(lines[0]);
@@ -68,6 +68,7 @@ function parseLdscResult(text) {
     const resolvedCategoryIndex = findHeaderIndex(indexByHeader, ['category', 'annotation', 'ld_score']);
     const categoryIndex = resolvedCategoryIndex == null ? 0 : resolvedCategoryIndex;
     const enrichmentIndex = findHeaderIndex(indexByHeader, ['enrichment']);
+    const enrichmentPIndex = findHeaderIndex(indexByHeader, ['enrichment_p', 'enrichment-p', 'enrichment p']);
     const zScoreIndex = findHeaderIndex(indexByHeader, ['coefficient_z-score', 'coefficient_z_score', 'coefficient z-score']);
 
     const dataRows = lines.slice(1).map(splitLdscLine);
@@ -75,6 +76,7 @@ function parseLdscResult(text) {
 
     return {
         enrichment: enrichmentIndex != null ? parseNumber(values[enrichmentIndex]) : null,
+        enrichment_p: enrichmentPIndex != null ? parseNumber(values[enrichmentPIndex]) : null,
         coefficient_z_score: zScoreIndex != null ? parseNumber(values[zScoreIndex]) : null,
         rowName: values[categoryIndex] || null,
     };
@@ -147,18 +149,20 @@ async function importDirectory() {
                 traitIds.lof_id || traitIds.file_id || null,
                 sourceFile,
                 parsed.enrichment,
+                parsed.enrichment_p,
                 parsed.coefficient_z_score,
             ];
 
             await pool.query(
                 `INSERT INTO trait_ldsc (
-                    gwas_id, file_id, lof_id, source_file, enrichment, coefficient_z_score
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    gwas_id, file_id, lof_id, source_file, enrichment, enrichment_p, coefficient_z_score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     file_id = VALUES(file_id),
                     lof_id = VALUES(lof_id),
                     source_file = VALUES(source_file),
                     enrichment = VALUES(enrichment),
+                    enrichment_p = VALUES(enrichment_p),
                     coefficient_z_score = VALUES(coefficient_z_score),
                     imported_at = CURRENT_TIMESTAMP`,
                 values

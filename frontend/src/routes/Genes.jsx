@@ -1172,6 +1172,20 @@ function GeneAssociationMeter({ value, maxValue, tone = 'primary', compact = tru
     );
 }
 
+const GENE_PLACEHOLDERS = [
+    'e.g. PTMA',
+    'e.g. BRCA1',
+    'e.g. LDLR',
+    'e.g. TP53',
+    'e.g. APOE',
+    'e.g. EGFR',
+    'e.g. TNF',
+    'e.g. IL6',
+    'e.g. VEGFA',
+    'e.g. AKT1',
+    'e.g. ENSG00000139618'
+];
+
 function GeneHomeTable({
     input,
     setInput,
@@ -1181,6 +1195,15 @@ function GeneHomeTable({
     onSelect,
 }) {
     const theme = useTheme();
+    const [placeholderIndex, setPlaceholderIndex] = React.useState(0);
+    const searchPlaceholder = GENE_PLACEHOLDERS[placeholderIndex % GENE_PLACEHOLDERS.length];
+
+    React.useEffect(() => {
+        const timer = setInterval(() => {
+            setPlaceholderIndex((index) => (index + 1) % GENE_PLACEHOLDERS.length);
+        }, 3600);
+        return () => clearInterval(timer);
+    }, []);
     const geneTone = {
         ...tableTone(theme, 'neutral'),
         headerBg: '#f5faf8',
@@ -1366,7 +1389,7 @@ function GeneHomeTable({
                         size="small"
                         value={input}
                         onChange={handleSearchInputChange}
-                        placeholder="e.g. PTMA"
+                        placeholder={searchPlaceholder}
                         sx={{
                             width: '100%',
                             maxWidth: { lg: 260 },
@@ -1782,6 +1805,15 @@ function GeneDiscoveryPanel({ recommended, onSelect }) {
 
 function GeneSwitcher({ gene, query, onSelect }) {
     const theme = useTheme();
+    const [placeholderIndex, setPlaceholderIndex] = React.useState(0);
+    const searchPlaceholder = GENE_PLACEHOLDERS[placeholderIndex % GENE_PLACEHOLDERS.length];
+
+    React.useEffect(() => {
+        const timer = setInterval(() => {
+            setPlaceholderIndex((index) => (index + 1) % GENE_PLACEHOLDERS.length);
+        }, 3600);
+        return () => clearInterval(timer);
+    }, []);
     const [anchorEl, setAnchorEl] = React.useState(null);
     const [search, setSearch] = React.useState('');
     const open = Boolean(anchorEl);
@@ -1877,7 +1909,7 @@ function GeneSwitcher({ gene, query, onSelect }) {
                         onKeyDown={(event) => {
                             if (event.key === 'Enter') handleSelect(search);
                         }}
-                        placeholder="e.g. PTMA"
+                        placeholder={searchPlaceholder}
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
