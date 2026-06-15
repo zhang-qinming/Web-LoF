@@ -53,6 +53,11 @@ function buildMeshUrl(meshId, meshTerm) {
     return '';
 }
 
+function buildLdscSourceFile(info, fallbackId) {
+    const id = String(info.heritability_lof_id || info.file_id || fallbackId || '').trim();
+    return id ? `${id}_k562_atac.results` : '';
+}
+
 function MetaSkeleton({ theme }) {
     return (
         <Paper elevation={0} sx={panelSx(theme, { mb: 3, overflow: 'hidden', p: { xs: 2, md: 3 } })}>
@@ -253,7 +258,7 @@ export default function TraitMetaCard({ fileId }) {
     const sourceUrl = String(info.url || '').trim();
 
     const traitRows = [
-        { label: 'File ID', value: fileIdentifier, mono: true, strong: true },
+        { label: 'LOF ID', value: fileIdentifier, mono: true, strong: true },
         { label: 'Reported Trait', value: traitName, strong: true },
         {
             label: 'MeSH Term',
@@ -297,9 +302,20 @@ export default function TraitMetaCard({ fileId }) {
         { label: 'QC score', value: formatCount(info.qc_score), mono: true },
     ];
 
+    const hasLdscData = [
+        info.heritability_source_file,
+        info.heritability_source_row,
+        info.heritability_gwas_id,
+        info.heritability_lof_id,
+        info.enrichment,
+        info.coefficient_z_score,
+    ].some((value) => value != null && value !== '');
+    const ldscSourceFile = hasLdscData ? buildLdscSourceFile(info, fileIdentifier) : '';
+
     const ldscRows = [
-        { label: 'LDSC source file', value: info.heritability_source_file || EMPTY_VALUE, mono: true },
-        { label: 'LDSC enrichment', value: formatMetric(info.enrichment), mono: true, emphasis: true },
+        { label: 'LDSC file', value: ldscSourceFile || EMPTY_VALUE, mono: true },
+        { label: 'LDSC row', value: hasLdscData ? (info.heritability_source_row || 'L2_0') : EMPTY_VALUE, mono: true, strong: true },
+        { label: 'Enrichment', value: formatMetric(info.enrichment), mono: true, emphasis: true },
         { label: 'Coefficient Z-score', value: formatMetric(info.coefficient_z_score), mono: true, emphasis: true },
     ];
 

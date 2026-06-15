@@ -118,6 +118,9 @@ async function getTraitMeta(fileId) {
 
     const includeHeritability = await hasTraitLdscTable();
     const heritabilitySelect = includeHeritability ? `,
+                CASE WHEN tl.gwas_id IS NOT NULL THEN 'L2_0' ELSE NULL END AS heritability_source_row,
+                tl.gwas_id AS heritability_gwas_id,
+                tl.lof_id AS heritability_lof_id,
                 tl.source_file AS heritability_source_file,
                 tl.enrichment, tl.coefficient_z_score` : '';
     const heritabilityJoin = includeHeritability
