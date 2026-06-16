@@ -3,7 +3,7 @@ const programModel = require('../models/Mprogram');
 const geneProgramModel = require('../models/MgeneProgram');
 const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
-const { asyncRoute } = require('../lib/http');
+const { asyncRoute, throwIfAborted } = require('../lib/http');
 const { normalizeSafeBaseName, normalizeSafeBaseNameList } = require('../lib/request');
 const { parseTsvStream } = require('../lib/tsv');
 const { findVariantFile } = require('../lib/variantFiles');
@@ -46,7 +46,8 @@ const GRAPH_ROLE_META = {
     },
 };
 
-async function parseTsvFromStore(store, relativeName) {
+async function parseTsvFromStore(store, relativeName, { maxRows = config.data.maxTsvRows, signal = null } = {}) {
+    throwIfAborted(signal);
     const fullPath = store.resolve(relativeName);
     if (!fullPath) return null;
 
@@ -59,8 +60,9 @@ async function parseTsvFromStore(store, relativeName) {
         throw err;
     }
 
+    throwIfAborted(signal);
     const stream = await store.createReadStream(fullPath);
-    return parseTsvStream(stream, { maxRows: config.data.maxTsvRows });
+    return parseTsvStream(stream, { maxRows, signal });
 }
 
 async function listAvailableTraitProgramGraphFiles() {
@@ -137,12 +139,16 @@ async function getGraphListFiles() {
     return graphListCachePromise;
 }
 
-async function getTsvVariant(store, fileIds, variant, suffix, { readRows = true } = {}) {
+async function getTsvVariant(store, fileIds, variant, suffix, { readRows = true, signal = null } = {}) {
+    throwIfAborted(signal);
     const { fileName } = await findVariantFile(store, fileIds, variant, { suffix, aliases: VOLCANO_VARIANT_ALIASES });
     if (fileName) {
         if (!readRows) return { exists: true, data: [], fileName };
 
-        const data = await parseTsvFromStore(store, fileName);
+        const data = await parseTsvFromStore(store, fileName, {
+            maxRows: variant === 'full' ? null : config.data.maxTsvRows,
+            signal,
+        });
         return { exists: true, data: data || [], fileName };
     }
 
@@ -176,26 +182,28 @@ function summarizeVolcanoRows(rows, effectField) {
 
 function createVolcanoRoute({ store, volcanoType, effectField }) {
     return asyncRoute(async (req, res) => {
+        const { abortSignal: signal } = req;
         const safeFileId = normalizeSafeBaseName(req.params.fileId);
         if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
 
         const variant = req.query.variant === 'full' ? 'full' : 'hits';
         const lookupIds = [safeFileId, ...normalizeSafeBaseNameList(req.query.aliasId)];
-        const current = await getTsvVariant(store, lookupIds, variant, '.tsv');
+        const current = await getTsvVariant(store, lookupIds, variant, '.tsv', { signal });
         const fallbackVariant = variant === 'full' ? 'hits' : 'full';
-        const fallback = await getTsvVariant(store, lookupIds, fallbackVariant, '.tsv');
-        const hitsResult = variant === 'hits'
-            ? (current.exists ? current : (fallbackVariant === 'hits' ? fallback : await getTsvVariant(store, lookupIds, 'hits', '.tsv', { readRows: false })))
-            : fallback || await getTsvVariant(store, lookupIds, 'hits', '.tsv');
-        const fullResult = variant === 'full'
-            ? (current.exists ? current : (fallbackVariant === 'full' ? fallback : await getTsvVariant(store, lookupIds, 'full', '.tsv', { readRows: false })))
-            : (fallbackVariant === 'full' ? (fallback.exists ? fallback : await getTsvVariant(store, lookupIds, 'full', '.tsv', { readRows: false })) : await getTsvVariant(store, lookupIds, 'full', '.tsv', { readRows: false }));
-        const effective = current.exists ? current : (fallback || current);
+        const fallback = await getTsvVariant(
+            store,
+            lookupIds,
+            fallbackVariant,
+            '.tsv',
+            { readRows: !current.exists, signal },
+        );
+        const effective = current.exists ? current : fallback;
         const usingFallback = !current.exists && Boolean(fallback?.exists);
         const resolvedVariant = current.exists ? variant : (usingFallback ? fallbackVariant : variant);
 
         if (!effective.exists) return res.status(404).json({ error: 'Not found' });
 
+        throwIfAborted(signal);
         res.json({
             fileId: safeFileId,
             volcanoType,
@@ -206,8 +214,8 @@ function createVolcanoRoute({ store, volcanoType, effectField }) {
             fallbackUsed: usingFallback,
             fileName: effective.fileName,
             availableVariants: {
-                hits: hitsResult.exists,
-                full: fullResult.exists,
+                hits: variant === 'hits' ? current.exists : fallback.exists,
+                full: variant === 'full' ? current.exists : fallback.exists,
             },
             hasData: effective.data.length > 0,
             data: effective.data,
@@ -471,12 +479,14 @@ router.get('/api/programs/graph-list', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/programs/:fileId', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
     const safeFileId = normalizeSafeBaseName(req.params.fileId);
     if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
 
-    const data = await parseTsvFromStore(programStore, `${safeFileId}.tsv`);
+    const data = await parseTsvFromStore(programStore, `${safeFileId}.tsv`, { signal });
     if (!data) return res.status(404).json({ error: 'Not found' });
 
+    throwIfAborted(signal);
     res.json({ data });
 }));
 
@@ -497,16 +507,18 @@ router.get('/api/programs/:programId/genes', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/programs/:fileId/graph', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
     const safeFileId = normalizeSafeBaseName(req.params.fileId);
     if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
 
-    const programRows = await parseTsvFromStore(traitProgramGenePanelStore, `${safeFileId}_programs.tsv`);
-    const geneRows = await parseTsvFromStore(traitProgramGenePanelStore, `${safeFileId}_long.tsv`);
+    const programRows = await parseTsvFromStore(traitProgramGenePanelStore, `${safeFileId}_programs.tsv`, { signal });
+    const geneRows = await parseTsvFromStore(traitProgramGenePanelStore, `${safeFileId}_long.tsv`, { signal });
 
     if (!programRows || !geneRows) {
         return res.status(404).json({ error: 'Graph data not found' });
     }
 
+    throwIfAborted(signal);
     res.json(buildGraphPayload(safeFileId, programRows, geneRows));
 }));
 

@@ -4,7 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { createFileStore, buildHttpError } = require('../lib/fileStore');
 const { config } = require('../lib/config');
-const { asyncRoute } = require('../lib/http');
+const { asyncRoute, throwIfAborted } = require('../lib/http');
 const { parsePositiveInt } = require('../lib/request');
 
 const router = express.Router();
@@ -494,6 +494,7 @@ router.get('/api/data/download-info', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/data/download', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
     const fullPath = resolveRelativePath(req.query.path || '');
     const stat = await dataStore.stat(fullPath);
     if (!stat) return res.status(404).send('Not found');
@@ -503,6 +504,7 @@ router.get('/api/data/download', asyncRoute(async (req, res) => {
 
     const baseName = dataStore.basename(fullPath);
     if (stat.isDirectory) {
+        throwIfAborted(signal);
         await estimateArchive(dataStore, fullPath);
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', encodeDownloadFilename(`${baseName}.zip`));
@@ -512,12 +514,19 @@ router.get('/api/data/download', asyncRoute(async (req, res) => {
             if (!res.headersSent) res.status(500).end();
             else res.end();
         });
+        signal?.addEventListener('abort', () => {
+            if (typeof archive.abort === 'function') archive.abort();
+            else if (typeof archive.destroy === 'function') archive.destroy();
+        }, { once: true });
         archive.pipe(res);
+        throwIfAborted(signal);
         await dataStore.appendToArchive(archive, fullPath, baseName);
+        throwIfAborted(signal);
         await archive.finalize();
         return;
     }
 
+    throwIfAborted(signal);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', encodeDownloadFilename(baseName));
     const stream = await dataStore.createReadStream(fullPath);
@@ -525,6 +534,7 @@ router.get('/api/data/download', asyncRoute(async (req, res) => {
         if (!res.headersSent) res.status(500).end();
         else res.end();
     });
+    signal?.addEventListener('abort', () => stream.destroy(), { once: true });
     stream.pipe(res);
 }));
 

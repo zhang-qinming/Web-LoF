@@ -895,9 +895,6 @@ export default function TraitProgramGraphCanvas({
                     <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: 23, lineHeight: 1.1 }}>
                         Trait-Program-Gene graph
                     </Typography>
-                    <Typography sx={{ mt: 0.35, fontSize: 12.5, color: '#667085', maxWidth: 880 }}>
-                        Program burden evidence connects programs to the trait; regulator evidence connects genes through programs.
-                    </Typography>
                 </Box>
 
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>

@@ -2,7 +2,7 @@ const express = require('express');
 const pool = require('../models/db');
 const { createFileStore, buildHttpError } = require('../lib/fileStore');
 const { config } = require('../lib/config');
-const { asyncRoute } = require('../lib/http');
+const { asyncRoute, throwIfAborted } = require('../lib/http');
 const { normalizeIdentifier, normalizeSafeBaseNameList, parsePositiveInt } = require('../lib/request');
 const { parseTsvStream } = require('../lib/tsv');
 const {
@@ -49,6 +49,8 @@ const CURATED_RECOMMENDED_TARGET_IDS = [
 ];
 
 const effectRowsCache = new Map();
+const effectIndexCache = new Map();
+const effectProfileCache = new Map();
 const recommendedTargetsCache = new Map();
 
 function isMissingStoreError(err) {
@@ -195,7 +197,8 @@ async function getTraitMetaMapByIds(ids) {
     return map;
 }
 
-async function readTsvRows(store, fileName) {
+async function readTsvRows(store, fileName, { signal = null } = {}) {
+    throwIfAborted(signal);
     const fullPath = store.resolve(fileName);
     if (!fullPath) return null;
 
@@ -205,25 +208,59 @@ async function readTsvRows(store, fileName) {
         throw buildHttpError(413, 'TSV file is too large');
     }
 
+    throwIfAborted(signal);
     const stream = await store.createReadStream(fullPath);
-    return parseTsvStream(stream, { maxRows: config.data.maxTsvRows });
+    return parseTsvStream(stream, { maxRows: config.data.maxTsvRows, signal });
 }
 
-async function readTraitMetaRow(traitId) {
-    return readTsvRows(metaTraitsStore, `${traitId}.tsv`);
+async function readTraitMetaRow(traitId, options = {}) {
+    return readTsvRows(metaTraitsStore, `${traitId}.tsv`, options);
 }
 
-async function getEffectRows(traitId) {
+async function getEffectRows(traitId, { signal = null } = {}) {
+    throwIfAborted(signal);
     const safeTraitId = normalizeTraitId(traitId);
     if (!safeTraitId) return null;
 
     const cached = getFreshCache(effectRowsCache, safeTraitId, EFFECT_CACHE_TTL_MS);
     if (cached) return cached;
 
-    const rows = await readTsvRows(effectsStore, `${safeTraitId}.tsv`);
+    const rows = await readTsvRows(effectsStore, `${safeTraitId}.tsv`, { signal });
     if (!rows) return null;
+    throwIfAborted(signal);
     setCache(effectRowsCache, safeTraitId, rows);
     return rows;
+}
+
+async function getEffectIndex(traitId, { signal = null } = {}) {
+    throwIfAborted(signal);
+    const safeTraitId = normalizeTraitId(traitId);
+    if (!safeTraitId) return null;
+
+    const cached = getFreshCache(effectIndexCache, safeTraitId, EFFECT_CACHE_TTL_MS);
+    if (cached) return cached;
+
+    const rows = await getEffectRows(safeTraitId, { signal });
+    if (!rows) return null;
+    throwIfAborted(signal);
+    const index = buildEffectIndex(rows);
+    setCache(effectIndexCache, safeTraitId, index);
+    return index;
+}
+
+async function getCachedEffectProfile(traitId, { signal = null } = {}) {
+    throwIfAborted(signal);
+    const safeTraitId = normalizeTraitId(traitId);
+    if (!safeTraitId) return null;
+
+    const cached = getFreshCache(effectProfileCache, safeTraitId, EFFECT_CACHE_TTL_MS);
+    if (cached) return cached;
+
+    const rows = await getEffectRows(safeTraitId, { signal });
+    if (!rows) return null;
+    const profile = buildEffectProfile(rows, { signal });
+    setCache(effectProfileCache, safeTraitId, profile);
+    return profile;
 }
 
 function toFiniteNumber(value) {
@@ -309,12 +346,14 @@ async function getSignificantTraitCandidates(limit = SIGNIFICANT_TARGET_CANDIDAT
     return rows;
 }
 
-async function getRecommendedTargets(sourceTraitId) {
+async function getRecommendedTargets(sourceTraitId, { signal = null } = {}) {
+    throwIfAborted(signal);
     const safeSourceId = normalizeTraitId(sourceTraitId);
     const cached = getFreshCache(recommendedTargetsCache, safeSourceId, TARGET_CACHE_TTL_MS);
     if (cached) return cached;
 
     const availableIds = await getAvailableEffectTraitIds();
+    throwIfAborted(signal);
     const availableIdSet = new Set(availableIds);
     const sourceMetaMap = await getTraitMetaMapByIds([safeSourceId]);
     const sourceMeta = sourceMetaMap.get(safeSourceId);
@@ -345,7 +384,8 @@ async function getRecommendedTargets(sourceTraitId) {
         });
     };
 
-    (neighborResult?.rows || []).forEach((row) => {
+    (neighborResult?.rows || []).forEach((row, index) => {
+        if (index % 100 === 0) throwIfAborted(signal);
         if (recommendedIds.length >= RECOMMENDED_TARGET_LIMIT) return;
         if ((row.shared_genes || 0) < MIN_RECOMMENDED_SHARED_GENES) return;
         addAvailableId(row.target_id, {
@@ -356,7 +396,8 @@ async function getRecommendedTargets(sourceTraitId) {
 
     if (recommendedIds.length < RECOMMENDED_TARGET_LIMIT) {
         const significantCandidates = await getSignificantTraitCandidates();
-        significantCandidates.forEach((row) => {
+        significantCandidates.forEach((row, index) => {
+            if (index % 100 === 0) throwIfAborted(signal);
             if (recommendedIds.length >= RECOMMENDED_TARGET_LIMIT) return;
             addAvailableId(row.file_id || row.gwas_id, row, 'gwas_significant_loci_fallback');
         });
@@ -364,20 +405,23 @@ async function getRecommendedTargets(sourceTraitId) {
 
     if (recommendedIds.length < RECOMMENDED_TARGET_LIMIT) {
         const curatedMetaMap = await getTraitMetaMapByIds(CURATED_RECOMMENDED_TARGET_IDS);
-        CURATED_RECOMMENDED_TARGET_IDS.forEach((traitId) => {
+        CURATED_RECOMMENDED_TARGET_IDS.forEach((traitId, index) => {
+            if (index % 100 === 0) throwIfAborted(signal);
             if (recommendedIds.length >= RECOMMENDED_TARGET_LIMIT) return;
             addAvailableId(traitId, curatedMetaMap.get(traitId), 'curated_fallback');
         });
     }
 
     if (recommendedIds.length < RECOMMENDED_TARGET_LIMIT) {
-        availableIds.forEach((traitId) => {
+        availableIds.forEach((traitId, index) => {
+            if (index % 100 === 0) throwIfAborted(signal);
             if (recommendedIds.length >= RECOMMENDED_TARGET_LIMIT) return;
             addAvailableId(traitId, null, 'available_fallback');
         });
     }
 
     const limitedIds = recommendedIds.slice(0, RECOMMENDED_TARGET_LIMIT);
+    throwIfAborted(signal);
     const metaMap = await getTraitMetaMapByIds(limitedIds);
     const enriched = limitedIds.map((traitId) => buildTraitOption(
         {
@@ -405,6 +449,7 @@ router.get('/api/cross-trait/search', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/cross-trait/:fileId/status', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
     const fileId = normalizeTraitId(req.params.fileId);
     if (!fileId) return res.status(400).json({ error: 'Invalid fileId' });
 
@@ -415,9 +460,10 @@ router.get('/api/cross-trait/:fileId/status', asyncRoute(async (req, res) => {
     let hasEffects = false;
 
     for (const candidate of candidates) {
+        throwIfAborted(signal);
         const [metaRow, effectRows] = await Promise.all([
-            readTraitMetaRow(candidate),
-            getEffectRows(candidate),
+            readTraitMetaRow(candidate, { signal }),
+            getEffectRows(candidate, { signal }),
         ]);
         if (!resolvedTraitId && (metaRow || effectRows)) resolvedTraitId = candidate;
         if (metaRow) hasMeta = true;
@@ -425,6 +471,7 @@ router.get('/api/cross-trait/:fileId/status', asyncRoute(async (req, res) => {
         if (hasMeta && hasEffects) break;
     }
 
+    throwIfAborted(signal);
     res.json({
         fileId,
         resolvedTraitId: resolvedTraitId || candidates[0] || fileId,
@@ -435,6 +482,7 @@ router.get('/api/cross-trait/:fileId/status', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/cross-trait/:fileId/targets', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
     const fileId = normalizeTraitId(req.params.fileId);
     if (!fileId) return res.status(400).json({ error: 'Invalid fileId' });
 
@@ -442,16 +490,19 @@ router.get('/api/cross-trait/:fileId/targets', asyncRoute(async (req, res) => {
     const candidates = pickTraitIdCandidates(fileId, meta);
     let resolvedSourceId = candidates[0] || fileId;
     for (const candidate of candidates) {
-        const rows = await getEffectRows(candidate);
+        throwIfAborted(signal);
+        const rows = await getEffectRows(candidate, { signal });
         if (!rows) continue;
         resolvedSourceId = candidate;
         break;
     }
-    const targets = await getRecommendedTargets(resolvedSourceId);
+    throwIfAborted(signal);
+    const targets = await getRecommendedTargets(resolvedSourceId, { signal });
     const similarityTargetCount = targets.filter(
         (target) => target.selection_basis === 'trait_effect_similarity',
     ).length;
 
+    throwIfAborted(signal);
     res.json({
         fileId,
         resolvedTraitId: resolvedSourceId,
@@ -469,6 +520,7 @@ router.get('/api/cross-trait/:fileId/targets', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/cross-trait/:fileId/matrix', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
     const fileId = normalizeTraitId(req.params.fileId);
     if (!fileId) return res.status(400).json({ error: 'Invalid fileId' });
 
@@ -496,7 +548,8 @@ router.get('/api/cross-trait/:fileId/matrix', asyncRoute(async (req, res) => {
     let sourceTraitId = sourceCandidates[0] || fileId;
     let sourceRows = null;
     for (const candidate of sourceCandidates) {
-        sourceRows = await getEffectRows(candidate);
+        throwIfAborted(signal);
+        sourceRows = await getEffectRows(candidate, { signal });
         if (sourceRows) {
             sourceTraitId = candidate;
             break;
@@ -512,28 +565,31 @@ router.get('/api/cross-trait/:fileId/matrix', asyncRoute(async (req, res) => {
     let skippedTargets = 0;
 
     for (const targetId of targetIds) {
+        throwIfAborted(signal);
         const metaRow = targetMetaMap.get(targetId);
         const candidates = pickTraitIdCandidates(targetId, metaRow);
-        let rows = null;
+        let targetIndex = null;
         let resolvedTargetId = candidates[0] || targetId;
 
         for (const candidate of candidates) {
-            rows = await getEffectRows(candidate);
-            if (rows) {
+            throwIfAborted(signal);
+            targetIndex = await getEffectIndex(candidate, { signal });
+            if (targetIndex) {
                 resolvedTargetId = candidate;
                 break;
             }
         }
 
-        if (!rows) {
+        if (!targetIndex) {
             skippedTargets += 1;
             continue;
         }
-        targetIndexes.push(buildEffectIndex(rows));
+        targetIndexes.push(targetIndex);
         targetMetaRows.push(buildTraitOption(targetMetaMap.get(resolvedTargetId) || metaRow, resolvedTargetId));
     }
 
     const matrix = topGeneRows.map((geneRow) => targetIndexes.map((index) => {
+        throwIfAborted(signal);
         const targetGene = index.get(geneRow.geneKey);
         return targetGene ? targetGene.postMean : null;
     }));
@@ -541,6 +597,7 @@ router.get('/api/cross-trait/:fileId/matrix', asyncRoute(async (req, res) => {
     const valueSummary = summarizeMatrix(matrix);
     const sourceTrait = buildTraitOption(sourceMeta, sourceTraitId);
 
+    throwIfAborted(signal);
     res.json({
         sourceTrait,
         targets: targetMetaRows,
@@ -556,6 +613,7 @@ router.get('/api/cross-trait/:fileId/matrix', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/cross-trait/:fileId/correlation', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
     const fileId = normalizeTraitId(req.params.fileId);
     if (!fileId) return res.status(400).json({ error: 'Invalid fileId' });
 
@@ -569,11 +627,14 @@ router.get('/api/cross-trait/:fileId/correlation', asyncRoute(async (req, res) =
     const sourceCandidates = pickTraitIdCandidates(fileId, sourceMeta);
     let sourceTraitId = sourceCandidates[0] || fileId;
     let sourceRows = null;
+    let sourceProfile = null;
 
     for (const candidate of sourceCandidates) {
-        sourceRows = await getEffectRows(candidate);
+        throwIfAborted(signal);
+        sourceRows = await getEffectRows(candidate, { signal });
         if (!sourceRows) continue;
         sourceTraitId = candidate;
+        sourceProfile = await getCachedEffectProfile(candidate, { signal });
         break;
     }
 
@@ -591,12 +652,13 @@ router.get('/api/cross-trait/:fileId/correlation', asyncRoute(async (req, res) =
 
     const loadedTargets = await Promise.all(targetRequests.map(async ({ metaRow, candidates }) => {
         for (const candidate of candidates) {
-            const rows = await getEffectRows(candidate);
-            if (!rows) continue;
+            throwIfAborted(signal);
+            const profile = await getCachedEffectProfile(candidate, { signal });
+            if (!profile) continue;
             return {
                 resolvedTraitId: candidate,
                 meta: metaRow,
-                rows,
+                profile,
             };
         }
         return null;
@@ -605,7 +667,7 @@ router.get('/api/cross-trait/:fileId/correlation', asyncRoute(async (req, res) =
     const entries = [{
         resolvedTraitId: sourceTraitId,
         meta: sourceMeta,
-        rows: sourceRows,
+        profile: sourceProfile || buildEffectProfile(sourceRows, { signal }),
     }];
     const seenIds = new Set(sourceIdentity);
 
@@ -619,10 +681,11 @@ router.get('/api/cross-trait/:fileId/correlation', asyncRoute(async (req, res) =
     });
 
     const traits = entries.map((entry) => buildTraitOption(entry.meta, entry.resolvedTraitId));
-    const profiles = entries.map((entry) => buildEffectProfile(entry.rows));
-    const correlation = buildCorrelationMatrix(profiles, method, DEFAULT_MIN_SHARED_GENES);
+    const profiles = entries.map((entry) => entry.profile);
+    const correlation = buildCorrelationMatrix(profiles, method, DEFAULT_MIN_SHARED_GENES, { signal });
     const geneCounts = profiles.map((profile) => profile.geneCount);
 
+    throwIfAborted(signal);
     res.json({
         sourceTrait: traits[0],
         traits,

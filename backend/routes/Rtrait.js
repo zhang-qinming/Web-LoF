@@ -1,15 +1,20 @@
 const express = require('express');
 const { createFileStore, buildHttpError } = require('../lib/fileStore');
+const { ByteLruCache } = require('../lib/byteLruCache');
 const { config } = require('../lib/config');
-const { asyncRoute } = require('../lib/http');
-const { normalizeSafeBaseNameList } = require('../lib/request');
-const { parseTsvStream } = require('../lib/tsv');
+const { asyncRoute, throwIfAborted } = require('../lib/http');
+const { normalizeSafeBaseNameList, parsePositiveInt } = require('../lib/request');
+const { forEachTsvRow } = require('../lib/tsv');
 const { findVariantFile } = require('../lib/variantFiles');
 
 const router = express.Router();
 
 const manhattanStore = createFileStore(config.paths.gwasManhattanDataDir);
-const TSV_CACHE = new Map();
+const TSV_CACHE = new ByteLruCache({
+    maxBytes: config.data.manhattanCacheMaxBytes,
+    maxEntries: config.data.manhattanCacheMaxEntries,
+});
+const chromosomeCollator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 
 function normalizeTraitFileId(traitName) {
     const cleaned = String(traitName || '').trim();
@@ -20,6 +25,91 @@ function parseOptionalNumber(value) {
     if (value == null || value === '') return null;
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
+}
+
+function parseNonNegativeNumber(value) {
+    const parsed = parseOptionalNumber(value);
+    return parsed != null && parsed >= 0 ? parsed : null;
+}
+
+function normalizeFilterList(value, { maxItems = 50, maxLength = 120 } = {}) {
+    const values = Array.isArray(value) ? value : [value];
+    const normalized = [];
+
+    for (const item of values) {
+        String(item || '')
+            .split(',')
+            .map((part) => part.trim())
+            .filter((part) => part && part.length <= maxLength)
+            .forEach((part) => {
+                if (normalized.length < maxItems && !normalized.includes(part)) {
+                    normalized.push(part);
+                }
+            });
+    }
+
+    return normalized;
+}
+
+function normalizeChromosome(value) {
+    return String(value || '').trim().replace(/^chr/i, '').toUpperCase();
+}
+
+function parseManhattanReadOptions(query, variant) {
+    return {
+        rowLimit: variant === 'full'
+            ? null
+            : parsePositiveInt(query.maxPoints, config.data.maxTsvRows, config.data.maxTsvRows),
+        sample: false,
+        chromosomes: normalizeFilterList(query.chr, { maxItems: 30, maxLength: 8 })
+            .map(normalizeChromosome)
+            .filter(Boolean),
+        minLogP: parseNonNegativeNumber(query.minLogP),
+        programs: normalizeFilterList(query.program),
+        genesets: normalizeFilterList(query.geneset),
+    };
+}
+
+function createSeededRandom(seedValue) {
+    let seed = 2166136261;
+    const text = String(seedValue || '');
+    for (let index = 0; index < text.length; index += 1) {
+        seed ^= text.charCodeAt(index);
+        seed = Math.imul(seed, 16777619);
+    }
+
+    return () => {
+        seed += 0x6D2B79F5;
+        let value = seed;
+        value = Math.imul(value ^ (value >>> 15), value | 1);
+        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function matchesManhattanFilters(row, options) {
+    if (
+        options.chromosomes.length > 0
+        && !options.chromosomes.includes(normalizeChromosome(row.chr))
+    ) {
+        return false;
+    }
+    if (options.minLogP != null && (row.logp == null || row.logp < options.minLogP)) {
+        return false;
+    }
+    if (
+        options.programs.length > 0
+        && !row.programs.some((program) => options.programs.includes(program))
+    ) {
+        return false;
+    }
+    if (
+        options.genesets.length > 0
+        && !row.genesets.some((geneset) => options.genesets.includes(geneset))
+    ) {
+        return false;
+    }
+    return true;
 }
 
 function distanceBucket(distance) {
@@ -67,38 +157,71 @@ function toTsvRow(row) {
     };
 }
 
-async function readDelimitedTsv(fullPath) {
+async function readDelimitedTsv(fullPath, options, { signal = null } = {}) {
+    throwIfAborted(signal);
     const stat = await manhattanStore.stat(fullPath);
     if (!stat || !stat.isFile) return { rows: [], truncated: false, fileSize: 0 };
     if (stat.size > config.data.maxManhattanFileBytes) {
         throw buildHttpError(413, 'Manhattan TSV file is too large to load through the API');
     }
 
-    const cacheKey = `${fullPath}:all`;
+    const cacheKey = JSON.stringify([fullPath, stat.mtimeMs, options]);
     const cached = TSV_CACHE.get(cacheKey);
-    if (cached && cached.mtimeMs === stat.mtimeMs) return cached.result;
+    if (cached) return cached;
 
+    throwIfAborted(signal);
     const stream = await manhattanStore.createReadStream(fullPath);
-    const rawRows = await parseTsvStream(stream);
-    const rows = rawRows
-        .map(toTsvRow)
-        .filter((row) => row.chr && row.bp != null && row.p != null);
+    const rows = [];
+    let filteredRowCount = 0;
+    const random = createSeededRandom(cacheKey);
+    const iteration = await forEachTsvRow(stream, (rawRow) => {
+        const row = toTsvRow(rawRow);
+        if (!row.chr || row.bp == null || row.p == null) return;
+        if (!matchesManhattanFilters(row, options)) return;
+
+        filteredRowCount += 1;
+        if (options.rowLimit == null || rows.length < options.rowLimit) {
+            rows.push(row);
+            return;
+        }
+
+        const replacementIndex = Math.floor(random() * filteredRowCount);
+        if (replacementIndex < options.rowLimit) {
+            rows[replacementIndex] = row;
+        }
+    }, { signal });
+    throwIfAborted(signal);
+    const truncated = options.rowLimit != null && filteredRowCount > options.rowLimit;
+    rows.sort((a, b) => (
+        chromosomeCollator.compare(normalizeChromosome(a.chr), normalizeChromosome(b.chr))
+        || a.bp - b.bp
+        || String(a.snp || '').localeCompare(String(b.snp || ''))
+    ));
     const result = {
         rows,
-        truncated: false,
-        rowLimit: null,
+        truncated,
+        rowLimit: options.rowLimit,
         fileSize: stat.size,
-        sampling: 'all',
-        sourceRowCount: rawRows.length,
+        sampling: truncated && options.sample ? 'reservoir' : (truncated ? 'bounded' : 'all'),
+        sourceRowCount: iteration.rowCount,
+        filteredRowCount,
+        filters: {
+            chromosomes: options.chromosomes,
+            minLogP: options.minLogP,
+            programs: options.programs,
+            genesets: options.genesets,
+        },
     };
 
-    TSV_CACHE.set(cacheKey, { mtimeMs: stat.mtimeMs, result });
+    TSV_CACHE.set(cacheKey, result);
     return result;
 }
 
-async function getManhattanRows(fileIds, variant = 'hits', { readRows = true } = {}) {
+async function getManhattanRows(fileIds, variant = 'hits', { readRows = true, readOptions = null, signal = null } = {}) {
+    throwIfAborted(signal);
     const { filePath, fileName } = await findVariantFile(manhattanStore, fileIds, variant);
     if (filePath) {
+        throwIfAborted(signal);
         if (!readRows) {
             const stat = await manhattanStore.stat(filePath);
             return {
@@ -111,14 +234,28 @@ async function getManhattanRows(fileIds, variant = 'hits', { readRows = true } =
                 fileSize: (stat && stat.size) || 0,
                 sampling: null,
                 sourceRowCount: null,
+                filteredRowCount: null,
+                filters: null,
             };
         }
 
-        const result = await readDelimitedTsv(filePath);
+        const result = await readDelimitedTsv(filePath, readOptions, { signal });
         return { filePath, fileName, exists: true, ...result };
     }
 
-    return { filePath: null, fileName: null, rows: [], exists: false, truncated: false, rowLimit: null, fileSize: 0, sampling: null, sourceRowCount: null };
+    return {
+        filePath: null,
+        fileName: null,
+        rows: [],
+        exists: false,
+        truncated: false,
+        rowLimit: null,
+        fileSize: 0,
+        sampling: null,
+        sourceRowCount: null,
+        filteredRowCount: null,
+        filters: null,
+    };
 }
 
 function mergeManhattanRows(rows, hitRows) {
@@ -180,20 +317,32 @@ function buildManhattanSummary(rows) {
 }
 
 router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
     const fileId = normalizeTraitFileId(req.params.traitName);
     if (!fileId) return res.status(400).json({ error: 'Invalid traitName' });
 
     const variant = req.query.variant === 'full' ? 'full' : 'hits';
     const lookupIds = [fileId, ...normalizeSafeBaseNameList(req.query.aliasId)];
-    const current = await getManhattanRows(lookupIds, variant);
-    const fallback = variant === 'full' ? await getManhattanRows(lookupIds, 'hits') : null;
-    const hitsResult = variant === 'hits' ? current : fallback || await getManhattanRows(lookupIds, 'hits');
-    const fullResult = variant === 'full' ? current : await getManhattanRows(lookupIds, 'full', { readRows: false });
+    const readOptions = parseManhattanReadOptions(req.query, variant);
+    const current = await getManhattanRows(lookupIds, variant, { readOptions, signal });
+    const fallback = variant === 'full'
+        ? await getManhattanRows(lookupIds, 'hits', {
+            signal,
+            readOptions: {
+                ...readOptions,
+                rowLimit: config.data.maxTsvRows,
+                sample: false,
+            },
+        })
+        : null;
+    const hitsResult = variant === 'hits' ? current : fallback || await getManhattanRows(lookupIds, 'hits', { signal });
+    const fullResult = variant === 'full' ? current : await getManhattanRows(lookupIds, 'full', { readRows: false, signal });
     const effectiveRows = current.exists
         ? mergeManhattanRows(current.rows, variant === 'full' ? (fallback?.rows || []) : [])
         : (fallback?.rows || []);
     const usingFallback = !current.exists && variant === 'full' && Boolean(fallback?.exists);
 
+    throwIfAborted(signal);
     res.json({
         fileId,
         variant,
@@ -211,11 +360,14 @@ router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
         fileSize: current.exists ? current.fileSize : (fallback?.fileSize || 0),
         sampling: current.exists ? current.sampling : (fallback?.sampling || null),
         sourceRowCount: current.exists ? current.sourceRowCount : (fallback?.sourceRowCount || null),
+        filteredRowCount: current.exists ? current.filteredRowCount : (fallback?.filteredRowCount || null),
+        returnedRowCount: effectiveRows.length,
+        filters: current.exists ? current.filters : (fallback?.filters || null),
         data: effectiveRows,
         summary: buildManhattanSummary(effectiveRows),
         notes: {
             distance_to_gene: '0 means the variant falls within the gene body; hundreds to thousands of bp is usually near; tens of thousands of bp or more is relatively distal.',
-            variant: 'Use variant=hits for significant loci or variant=full for all loci when a full TSV is available.',
+            variant: 'Use variant=hits for significant loci. Full mode applies server-side filters and returns all matching rows unless blocked by file-size limits.',
         },
     });
 }));

@@ -637,6 +637,67 @@ function buildGeneInfoJoin(includeGeneInfo) {
                 ON BINARY gi.ensembl = BINARY gpte.ensg_id` : '';
 }
 
+async function getGeneCatalogMatch(query, includeGeneInfo) {
+    if (!includeGeneInfo) return null;
+    const [rows] = await pool.query(
+        `SELECT
+            perturb_symbol,
+            symbol,
+            ensembl,
+            chromosome,
+            begin_pos,
+            end_pos,
+            gene_type,
+            gene_name,
+            gene_id,
+            hgnc,
+            synonyms,
+            description
+         FROM ${GENE_INFO_TABLE}
+         WHERE perturb_symbol = ?
+            OR symbol = ?
+            OR ensembl = ?
+         ORDER BY
+            (perturb_symbol = ?) DESC,
+            (symbol = ?) DESC,
+            (ensembl = ?) DESC
+         LIMIT 1`,
+        [query, query, query, query, query, query],
+    );
+    return rows[0] || null;
+}
+
+function buildGeneLookup(catalogRow, query, tableAlias = 'gpte') {
+    const symbols = [...new Set([
+        query,
+        catalogRow?.perturb_symbol,
+        catalogRow?.symbol,
+    ].map((value) => normalizeGeneQuery(value)).filter(Boolean))];
+    const ensemblIds = [...new Set([
+        /^ENSG/i.test(query) ? query : '',
+        catalogRow?.ensembl,
+    ].map((value) => normalizeGeneQuery(value)).filter(Boolean))];
+    const clauses = [
+        ...symbols.map(() => `${tableAlias}.gene_symbol = ?`),
+        ...ensemblIds.map(() => `${tableAlias}.ensg_id = ?`),
+    ];
+
+    return {
+        whereSql: clauses.length ? `WHERE (${clauses.join(' OR ')})` : 'WHERE 1 = 0',
+        whereParams: [...symbols, ...ensemblIds],
+    };
+}
+
+function catalogRowToGeneRecord(row) {
+    if (!row) return null;
+    return {
+        ...row,
+        gene_symbol: row.perturb_symbol || row.symbol || '',
+        ensg_id: row.ensembl || '',
+        gene_label: row.symbol || row.perturb_symbol || row.ensembl || '',
+    };
+}
+
 function buildGeneOverviewPayload(gene, summary, programs, query) {
     return {
         query,
@@ -1127,8 +1188,8 @@ async function getGeneOverview(geneId) {
     }
 
     const includeGeneInfo = await hasGeneInfoTable();
-    const whereSql = 'WHERE gpte.gene_symbol = ? OR gpte.ensg_id = ?';
-    const whereParams = [q, q];
+    const catalogRow = await getGeneCatalogMatch(q, includeGeneInfo);
+    const { whereSql, whereParams } = buildGeneLookup(catalogRow, q);
     const geneInfoSelect = buildGeneInfoSelect(includeGeneInfo);
     const geneInfoJoin = buildGeneInfoJoin(includeGeneInfo);
 
@@ -1161,12 +1222,10 @@ async function getGeneOverview(geneId) {
              ${geneInfoJoin}
              ${whereSql}
              ORDER BY
-                (gpte.gene_symbol = ?) DESC,
-                (gpte.ensg_id = ?) DESC,
                 gpte.gene_symbol ASC,
                 gpte.ensg_id ASC
              LIMIT 1`,
-            [...whereParams, q, q],
+            whereParams,
         );
 
         const programRowsQuery = pool.query(
@@ -1204,46 +1263,13 @@ async function getGeneOverview(geneId) {
             whereParams,
         );
 
-        const catalogQuery = includeGeneInfo
-            ? pool.query(
-                `SELECT
-                    perturb_symbol AS gene_symbol,
-                    ensembl AS ensg_id,
-                    COALESCE(NULLIF(symbol, ''), perturb_symbol) AS gene_label,
-                    chromosome,
-                    begin_pos,
-                    end_pos,
-                    gene_type,
-                    gene_name,
-                    gene_id,
-                    hgnc,
-                    synonyms,
-                    description,
-                    NULL AS trait_id,
-                    NULL AS file_id,
-                    NULL AS program,
-                    NULL AS role
-                 FROM ${GENE_INFO_TABLE}
-                 WHERE perturb_symbol = ?
-                    OR symbol = ?
-                    OR ensembl = ?
-                 ORDER BY
-                    (perturb_symbol = ?) DESC,
-                    (symbol = ?) DESC,
-                    (ensembl = ?) DESC
-                 LIMIT 1`,
-                [q, q, q, q, q, q],
-            )
-            : Promise.resolve([[]]);
-
         const [
             [[summaryRow]],
             [geneRows],
             [programRows],
-            [catalogRows],
-        ] = await Promise.all([summaryQuery, geneQuery, programRowsQuery, catalogQuery]);
+        ] = await Promise.all([summaryQuery, geneQuery, programRowsQuery]);
 
-        const gene = normalizeGeneFromRow(geneRows[0] || catalogRows[0], q);
+        const gene = normalizeGeneFromRow(catalogRowToGeneRecord(catalogRow) || geneRows[0], q);
         const summary = normalizeSummaryRow(summaryRow);
         const programs = programRows.map((row) => normalizeProgramAggregate(row, gene.geneSymbol || gene.ensgId || q));
 
@@ -1291,8 +1317,8 @@ async function getGeneProgramRecords(geneId, {
     }
 
     const includeGeneInfo = await hasGeneInfoTable();
-    const whereSql = 'WHERE gpte.gene_symbol = ? OR gpte.ensg_id = ?';
-    const whereParams = [q, q];
+    const catalogRow = await getGeneCatalogMatch(q, includeGeneInfo);
+    const { whereSql, whereParams } = buildGeneLookup(catalogRow, q);
     const orderBySql = buildGeneRecordOrderBy(sortBy, order);
     const geneInfoSelect = buildGeneInfoSelect(includeGeneInfo);
     const geneInfoJoin = buildGeneInfoJoin(includeGeneInfo);

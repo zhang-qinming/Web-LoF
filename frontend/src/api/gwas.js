@@ -3,21 +3,27 @@ import qs from 'qs';
 
 const API_BASE = '/api';
 
+export function isCanceledRequest(error) {
+    return axios.isCancel(error) || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError';
+}
+
 export async function fetcher(url, params) {
     const res = await axios.get(url, { params });
     return res.data;
 }
 
-export async function getTraitManhattanHits(traitName, { variant = 'hits', aliasId } = {}) {
+export async function getTraitManhattanHits(traitName, { variant = 'hits', aliasId, signal } = {}) {
     const res = await axios.get(`${API_BASE}/trait/manhattan/${encodeURIComponent(traitName)}`, {
         params: { variant, aliasId },
+        signal,
     });
     return res.data;
 }
 
-async function getVolcano(endpoint, fileId, { variant = 'hits', aliasId } = {}) {
+async function getVolcano(endpoint, fileId, { variant = 'hits', aliasId, signal } = {}) {
     const res = await axios.get(`${API_BASE}/${endpoint}/${encodeURIComponent(fileId)}`, {
         params: { variant, aliasId },
+        signal,
     });
     return res.data;
 }
@@ -30,11 +36,12 @@ export async function getPosteriorVolcano(fileId, opts = {}) {
     return getVolcano('posterior-volcano', fileId, opts);
 }
 
-export async function getDataFileText(path) {
+export async function getDataFileText(path, { signal } = {}) {
     const res = await axios.get(`${API_BASE}/data/download`, {
         params: { path },
         responseType: 'text',
         transformResponse: [(data) => data],
+        signal,
     });
     return res.data;
 }
@@ -99,18 +106,28 @@ export async function getProgramTraits(programId) {
     return res.data;
 }
 
+export async function getProgramScatterData(fileId, { signal } = {}) {
+    const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(fileId)}`, { signal });
+    return res.data;
+}
+
+export async function getTraitProgramGraph(fileId, { signal } = {}) {
+    const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(fileId)}/graph`, { signal });
+    return res.data;
+}
+
 export async function getProgramGenes(programId) {
     const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/genes`);
     return res.data;
 }
 
-export async function getCrossTraitStatus(fileId) {
-    const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/status`);
+export async function getCrossTraitStatus(fileId, { signal } = {}) {
+    const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/status`, { signal });
     return res.data;
 }
 
-export async function getCrossTraitTargets(fileId) {
-    const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/targets`);
+export async function getCrossTraitTargets(fileId, { signal } = {}) {
+    const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/targets`, { signal });
     return res.data;
 }
 
@@ -122,18 +139,20 @@ export async function searchCrossTraits(query, { limit = 12, excludeId = [] } = 
     return res.data;
 }
 
-export async function getCrossTraitMatrix(fileId, { targetIds = [], topGenes = 25 } = {}) {
+export async function getCrossTraitMatrix(fileId, { targetIds = [], topGenes = 25, signal } = {}) {
     const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/matrix`, {
         params: { targetIds, topGenes },
         paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),
+        signal,
     });
     return res.data;
 }
 
-export async function getTraitCorrelation(fileId, { targetIds = [], method = 'spearman' } = {}) {
+export async function getTraitCorrelation(fileId, { targetIds = [], method = 'spearman', signal } = {}) {
     const res = await axios.get(`${API_BASE}/cross-trait/${encodeURIComponent(fileId)}/correlation`, {
         params: { targetIds, method },
         paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),
+        signal,
     });
     return res.data;
 }

@@ -1,9 +1,10 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const { config } = require('./lib/config');
-const { sendError } = require('./lib/http');
+const { requestAbortSignal, requestMetrics, sendError } = require('./lib/http');
 const browse = require('./routes/Rbrowse');
 const trait = require('./routes/Rtrait');
 const program = require('./routes/Rprogram');
@@ -15,6 +16,9 @@ const geneProgramModel = require('./models/MgeneProgram');
 
 const app = express();
 
+app.use(requestAbortSignal);
+app.use(requestMetrics);
+app.use(compression({ threshold: config.server.compressionThreshold }));
 app.use(cors({
     origin: config.server.corsOrigin === '*' ? true : config.server.corsOrigin,
     exposedHeaders: ['Content-Disposition', 'Content-Length', 'Content-Type'],

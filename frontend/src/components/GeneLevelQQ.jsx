@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Plot from 'react-plotly.js';
-import Plotly from 'plotly.js-basic-dist';
+import Plot, { Plotly } from '../lib/plotly';
 import {
     Alert,
-    Autocomplete,
     Box,
     Button,
     Card,
@@ -31,7 +29,7 @@ import {
     RestartAlt,
     Timeline,
 } from '@mui/icons-material';
-import { getCrossTraitTargets, getDataFileText, searchCrossTraits } from '../api/gwas';
+import { getCrossTraitTargets, getDataFileText, isCanceledRequest } from '../api/gwas';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
@@ -110,14 +108,8 @@ function uniqueTraitOptions(items = []) {
     return list;
 }
 
-function buildTraitStamp(selectedTraits = [], fallback = '') {
-    const labels = selectedTraits
-        .map((trait) => String(trait?.trait_name || trait?.file_id || trait?.gwas_id || '').trim())
-        .filter(Boolean);
-    if (!labels.length) return fallback;
-    if (labels.length === 1) return labels[0];
-    if (labels.length === 2) return `${labels[0]} + ${labels[1]}`;
-    return `${labels[0]} + ${labels.length - 1} more`;
+function traitListKey(items = []) {
+    return items.map((item) => item?.file_id || '').filter(Boolean).join('|');
 }
 
 function toFiniteNumber(value) {
@@ -449,6 +441,13 @@ function buildEnvelope(rows) {
 export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = [] }) {
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
+    const toolbarPanelSx = useMemo(() => ({
+        px: 1.2,
+        py: 0.95,
+        borderRadius: 2,
+        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+        backgroundColor: alpha(theme.palette.background.paper, 0.82),
+    }), [theme.palette.background.paper, theme.palette.divider]);
     const plotRef = useRef(null);
     const plotElRef = useRef(null);
     const tableRowRefs = useRef({});
@@ -477,14 +476,11 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
-    const [showTraitStamp, setShowTraitStamp] = useState(false);
-    const [traitStampText, setTraitStampText] = useState('');
     const [availableTraits, setAvailableTraits] = useState([]);
     const [selectedTraits, setSelectedTraits] = useState([]);
+    const [appliedTraits, setAppliedTraits] = useState([]);
+    const [renderVersion, setRenderVersion] = useState(0);
     const [comparisonTraitCount, setComparisonTraitCount] = useState(DEFAULT_COMPARE_TRAITS);
-    const [searchInput, setSearchInput] = useState('');
-    const [searchOptions, setSearchOptions] = useState([]);
-    const [searchLoading, setSearchLoading] = useState(false);
 
     const primaryTrait = useMemo(() => normalizeTraitOption({
         file_id: fileId,
@@ -496,11 +492,12 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         if (!primaryTrait) return;
         setComparisonTraitCount(DEFAULT_COMPARE_TRAITS);
         setSelectedTraits([primaryTrait]);
+        setAppliedTraits([]);
+        setRenderVersion(0);
+        setPayload({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits: [] });
+        setError(null);
+        setIsLoading(false);
     }, [primaryTrait]);
-
-    useEffect(() => {
-        setTraitStampText(buildTraitStamp(selectedTraits, String(traitLabel || fileId || gwasId || '').trim()));
-    }, [fileId, gwasId, selectedTraits, traitLabel]);
 
     const candidateIds = useMemo(() => (
         [...new Set([...(lookupIds || []), fileId, gwasId].filter(Boolean))]
@@ -511,66 +508,39 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             setAvailableTraits([]);
             return undefined;
         }
+        const controller = new AbortController();
         let cancelled = false;
-        getCrossTraitTargets(primaryTrait.file_id)
+        getCrossTraitTargets(primaryTrait.file_id, { signal: controller.signal })
             .then((res) => {
-                if (cancelled) return;
+                if (cancelled || controller.signal.aborted) return;
                 const next = uniqueTraitOptions([primaryTrait, ...(res?.targets || [])]);
                 setAvailableTraits(next);
             })
-            .catch(() => {
-                if (!cancelled) setAvailableTraits(primaryTrait ? [primaryTrait] : []);
+            .catch((error) => {
+                if (isCanceledRequest(error)) return;
+                if (!cancelled && !controller.signal.aborted) setAvailableTraits(primaryTrait ? [primaryTrait] : []);
             });
         return () => {
             cancelled = true;
+            controller.abort();
         };
     }, [primaryTrait]);
 
     useEffect(() => {
-        const trimmed = searchInput.trim();
-        if (trimmed.length < 2) {
-            setSearchOptions([]);
-            return undefined;
-        }
-        let cancelled = false;
-        setSearchLoading(true);
-        const timeoutId = window.setTimeout(() => {
-            searchCrossTraits(trimmed, {
-                limit: 12,
-                excludeId: [
-                    ...selectedTraits.map((item) => item.file_id),
-                    ...candidateIds,
-                ],
-            }).then((res) => {
-                if (!cancelled) setSearchOptions(uniqueTraitOptions(res?.traits || []));
-            }).catch(() => {
-                if (!cancelled) setSearchOptions([]);
-            }).finally(() => {
-                if (!cancelled) setSearchLoading(false);
-            });
-        }, 220);
-
-        return () => {
-            cancelled = true;
-            window.clearTimeout(timeoutId);
-        };
-    }, [candidateIds, searchInput, selectedTraits]);
-
-    useEffect(() => {
-        if (!selectedTraits.length && !candidateIds.length) {
+        if (!appliedTraits.length || renderVersion === 0) {
             setPayload({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits });
+            setError(null);
+            setIsLoading(false);
             return undefined;
         }
 
+        const controller = new AbortController();
         let cancelled = false;
         setIsLoading(true);
         setError(null);
 
         (async () => {
-            const chosenTraits = uniqueTraitOptions([
-                ...selectedTraits,
-                ...(selectedTraits.length ? [] : (primaryTrait ? [primaryTrait] : [])),
-            ]).slice(0, MAX_COMPARE_TRAITS);
+            const chosenTraits = uniqueTraitOptions(appliedTraits).slice(0, MAX_COMPARE_TRAITS);
             const loadedTraits = [];
             let lastError = null;
 
@@ -585,7 +555,8 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 for (const candidate of loadCandidates) {
                     const path = getDataPath(candidate);
                     try {
-                        const text = await getDataFileText(path);
+                        const text = await getDataFileText(path, { signal: controller.signal });
+                        if (cancelled || controller.signal.aborted) return;
                         const parsedRows = addFdr(parseTsv(text)).map((row) => ({
                             ...row,
                             rowKey: `${trait.file_id}::${row.rowKey}`,
@@ -602,13 +573,14 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                         });
                         break;
                     } catch (err) {
+                        if (isCanceledRequest(err)) return;
                         lastError = err;
                     }
                 }
             }
 
             const mergedRows = loadedTraits.flatMap((item) => item.rows);
-            if (!cancelled) {
+            if (!cancelled && !controller.signal.aborted) {
                 setPayload({
                     rows: mergedRows,
                     fileId: loadedTraits[0]?.resolved_file_id || chosenTraits[0]?.file_id || candidateIds[0] || '',
@@ -627,13 +599,14 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 }
             }
         })().finally(() => {
-            if (!cancelled) setIsLoading(false);
+            if (!cancelled && !controller.signal.aborted) setIsLoading(false);
         });
 
         return () => {
             cancelled = true;
+            controller.abort();
         };
-    }, [availableTraits, candidateIds, primaryTrait, selectedTraits]);
+    }, [appliedTraits, availableTraits, candidateIds, primaryTrait, renderVersion]);
 
     const rows = payload.rows;
 
@@ -670,6 +643,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const activeTraits = useMemo(() => (
         payload.selectedTraits?.length ? payload.selectedTraits : selectedTraits
     ), [payload.selectedTraits, selectedTraits]);
+    const hasRenderedQQ = renderVersion > 0 && appliedTraits.length > 0;
 
     const traitColorMap = useMemo(() => {
         const map = new Map();
@@ -680,19 +654,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     }, [activeTraits]);
 
     const useTailColors = activeTraits.length <= 1;
-
-    const groupedTraitOptions = useMemo(() => {
-        const availableIds = new Set(availableTraits.map((item) => item.file_id));
-        return uniqueTraitOptions([
-            ...availableTraits.map((item) => ({
-                ...item,
-                group: item.file_id === primaryTrait?.file_id ? 'Current' : 'Nearest effect profiles',
-            })),
-            ...searchOptions
-                .filter((item) => !availableIds.has(item.file_id))
-                .map((item) => ({ ...item, group: 'Search' })),
-        ]);
-    }, [availableTraits, primaryTrait, searchOptions]);
 
     const relatedTraitSliderMax = useMemo(
         () => Math.max(DEFAULT_COMPARE_TRAITS, Math.min(MAX_COMPARE_TRAITS, availableTraits.length || MAX_COMPARE_TRAITS)),
@@ -707,6 +668,23 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setComparisonTraitCount(nextCount);
         setSelectedTraits(uniqueTraitOptions([primaryTrait, ...availableTraits]).slice(0, nextCount));
     }, [availableTraits, primaryTrait, relatedTraitSliderMax]);
+
+    useEffect(() => {
+        if (!primaryTrait) return;
+        const nextTraits = uniqueTraitOptions([primaryTrait, ...selectedTraits]).slice(0, MAX_COMPARE_TRAITS);
+        if (!nextTraits.length) return;
+        const nextTraitKey = traitListKey(nextTraits);
+        if (traitListKey(selectedTraits) !== nextTraitKey) {
+            setSelectedTraits(nextTraits);
+            return;
+        }
+        if (renderVersion > 0 && traitListKey(appliedTraits) === nextTraitKey) {
+            return;
+        }
+        setAppliedTraits(nextTraits);
+        setError(null);
+        setRenderVersion((value) => value + 1);
+    }, [appliedTraits, primaryTrait, renderVersion, selectedTraits]);
 
     const comparisonTraitCountMarks = useMemo(() => (
         [...new Set([DEFAULT_COMPARE_TRAITS, relatedTraitSliderMax])]
@@ -931,24 +909,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             );
         }
 
-        if (showTraitStamp && traitStampText.trim()) {
-            annotations.push({
-                xref: 'paper',
-                yref: 'paper',
-                x: 0.985,
-                y: 0.045,
-                xanchor: 'right',
-                yanchor: 'bottom',
-                align: 'right',
-                showarrow: false,
-                text: `<b>${traitStampText.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>`,
-                font: { size: 10.5, color: theme.palette.text.secondary, family: theme.typography.fontFamily },
-                bgcolor: alpha(theme.palette.background.paper, 0.86),
-                bordercolor: alpha(theme.palette.text.secondary, 0.18),
-                borderpad: 4,
-            });
-        }
-
         if (showExpectedLine) {
             shapes.push({
                 type: 'line',
@@ -1057,7 +1017,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             annotations,
             transition: { duration: 220, easing: 'cubic-in-out' },
         };
-    }, [axisRange, axisStyle, chartTokens.plotBg, chartTokens.threshold, fdrGuide, fileId, payload.fileId, showExpectedLine, showFdrLine, showNominalLine, showTraitStamp, theme, traitLabel, traitStampText]);
+    }, [axisRange, axisStyle, chartTokens.plotBg, chartTokens.threshold, fdrGuide, fileId, payload.fileId, showExpectedLine, showFdrLine, showNominalLine, theme, traitLabel]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -1130,15 +1090,18 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setShowFdrLine(true);
         setShowEnvelope(true);
         setShowTopLabels(true);
-        setShowTraitStamp(false);
         setComparisonTraitCount(DEFAULT_COMPARE_TRAITS);
         setSelectedTraits(primaryTrait ? [primaryTrait] : []);
-        setTraitStampText(buildTraitStamp(primaryTrait ? [primaryTrait] : [], String(traitLabel || fileId || gwasId || '').trim()));
+        setAppliedTraits([]);
+        setRenderVersion(0);
+        setPayload({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits });
+        setError(null);
+        setIsLoading(false);
         setPointSize(DEFAULT_POINT_SIZE);
         setLabelLimit(DEFAULT_LABEL_LIMIT);
         setHighlight({ rowKey: '', key: 0 });
         setTablePage(0);
-    }, [fileId, gwasId, primaryTrait, traitLabel]);
+    }, [availableTraits, primaryTrait]);
 
     const handleExport = useCallback(() => {
         const gd = plotRef.current;
@@ -1209,9 +1172,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
                         Signed deviation from expectation
                     </Typography>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        Signed QQ plot of perturb-seq gene-level P values. One trait uses cool/warm colors for negative and positive tails; trait overlays switch color to trait identity.
-                    </Typography>
                 </Box>
 
                 <ToggleButtonGroup
@@ -1244,139 +1204,133 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 <Chip icon={<FilterAlt />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.negative.color, 0.08), color: TAIL_META.negative.color, border: `1px solid ${alpha(TAIL_META.negative.color, 0.2)}` })} />
             </Box>
 
-            <Box sx={toolbarSx(theme)}>
-                <Autocomplete
-                    multiple
-                    size="small"
-                    options={groupedTraitOptions}
-                    loading={searchLoading}
-                    value={activeTraits}
-                    groupBy={(option) => option.group || 'Traits'}
-                    isOptionEqualToValue={(option, value) => option.file_id === value.file_id}
-                    getOptionLabel={(option) => option.trait_name || option.file_id || option.gwas_id}
-                    onChange={(_, value) => {
-                        const nextTraits = uniqueTraitOptions(value).slice(0, MAX_COMPARE_TRAITS);
-                        setSelectedTraits(nextTraits);
-                        setComparisonTraitCount(Math.min(relatedTraitSliderMax, Math.max(DEFAULT_COMPARE_TRAITS, nextTraits.length)));
-                    }}
-                    onInputChange={(_, value) => setSearchInput(value)}
-                    renderInput={(params) => (
-                        <TextField
-                            {...params}
-                            label="Compare traits"
-                            placeholder="e.g. GCST90081631"
-                            helperText={`Current trait is shown by default; use the slider for nearest overlays, up to ${MAX_COMPARE_TRAITS} traits.`}
-                        />
-                    )}
-                    sx={{ minWidth: 360, maxWidth: 720, flex: 1 }}
-                />
-
+            <Box sx={toolbarSx(theme, { alignItems: 'stretch' })}>
                 <Box
                     sx={{
-                        width: 230,
-                        minWidth: 230,
-                        px: 1.2,
-                        py: 0.85,
-                        borderRadius: 2,
-                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                        display: 'grid',
+                        gridTemplateColumns: {
+                            xs: '1fr',
+                            lg: 'minmax(220px, 240px) minmax(320px, 1fr)',
+                            xl: 'minmax(220px, 240px) minmax(340px, 1.15fr) minmax(260px, 320px) auto',
+                        },
+                        gap: 1.15,
+                        alignItems: 'stretch',
+                        width: '100%',
                     }}
                 >
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
-                        Trait overlays
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
-                        <Slider
-                            size="small"
-                            value={Math.min(comparisonTraitCount, relatedTraitSliderMax)}
-                            min={DEFAULT_COMPARE_TRAITS}
-                            max={relatedTraitSliderMax}
-                            step={1}
-                            marks={comparisonTraitCountMarks}
-                            onChange={(_, value) => applyComparisonTraitCount(Array.isArray(value) ? value[0] : value)}
-                            sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
-                        />
-                        <TextField
-                            size="small"
-                            value={Math.min(comparisonTraitCount, relatedTraitSliderMax)}
-                            onChange={(event) => applyComparisonTraitCount(event.target.value)}
-                            slotProps={{
-                                htmlInput: {
-                                    min: DEFAULT_COMPARE_TRAITS,
-                                    max: relatedTraitSliderMax,
-                                    step: 1,
-                                    inputMode: 'numeric',
-                                },
-                            }}
+                    <Box sx={toolbarPanelSx}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
+                            Trait overlays
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                            <Slider
+                                size="small"
+                                value={Math.min(comparisonTraitCount, relatedTraitSliderMax)}
+                                min={DEFAULT_COMPARE_TRAITS}
+                                max={relatedTraitSliderMax}
+                                step={1}
+                                marks={comparisonTraitCountMarks}
+                                onChange={(_, value) => applyComparisonTraitCount(Array.isArray(value) ? value[0] : value)}
+                                sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                            />
+                            <TextField
+                                size="small"
+                                value={Math.min(comparisonTraitCount, relatedTraitSliderMax)}
+                                onChange={(event) => applyComparisonTraitCount(event.target.value)}
+                                slotProps={{
+                                    htmlInput: {
+                                        min: DEFAULT_COMPARE_TRAITS,
+                                        max: relatedTraitSliderMax,
+                                        step: 1,
+                                        inputMode: 'numeric',
+                                    },
+                                }}
+                                sx={{
+                                    width: 64,
+                                    '& .MuiInputBase-input': {
+                                        textAlign: 'center',
+                                        fontWeight: 700,
+                                    },
+                                }}
+                            />
+                        </Box>
+                    </Box>
+
+                    <Box sx={toolbarPanelSx}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.55 }}>
+                            Guides
+                        </Typography>
+                        <Box
                             sx={{
-                                width: 64,
-                                '& .MuiInputBase-input': {
-                                    textAlign: 'center',
-                                    fontWeight: 700,
-                                },
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
+                                gap: 0.2,
                             }}
-                        />
+                        >
+                            <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showExpectedLine} onChange={(event) => setShowExpectedLine(event.target.checked)} size="small" />} label="Expected line" />
+                            <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showFdrLine} onChange={(event) => setShowFdrLine(event.target.checked)} size="small" />} label="FDR guide" />
+                            <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showNominalLine} onChange={(event) => setShowNominalLine(event.target.checked)} size="small" />} label="P=0.05" />
+                            <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showEnvelope} onChange={(event) => setShowEnvelope(event.target.checked)} size="small" />} label="95% envelope" />
+                            <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showTopLabels} onChange={(event) => setShowTopLabels(event.target.checked)} size="small" />} label="Top labels" />
+                        </Box>
+                    </Box>
+
+                    <Box sx={toolbarPanelSx}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.65 }}>
+                            Density
+                        </Typography>
+                        <Stack spacing={1.1}>
+                            <Stack direction="row" spacing={1.2} alignItems="center">
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none', minWidth: 42 }}>
+                                    Point
+                                </Typography>
+                                <Slider
+                                    value={pointSize}
+                                    min={3}
+                                    max={14}
+                                    step={1}
+                                    onChange={(_, value) => setPointSize(Number(value))}
+                                    sx={{ flex: 1, color: theme.palette.primary.main, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
+                                />
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20, textAlign: 'right' }}>{pointSize}</Typography>
+                            </Stack>
+
+                            <Stack direction="row" spacing={1.2} alignItems="center">
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none', minWidth: 42 }}>
+                                    Labels
+                                </Typography>
+                                <Slider
+                                    value={labelLimit}
+                                    min={0}
+                                    max={30}
+                                    step={1}
+                                    onChange={(_, value) => setLabelLimit(Number(value))}
+                                    disabled={!showTopLabels}
+                                    sx={{ flex: 1, color: theme.palette.text.secondary, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
+                                />
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 24, textAlign: 'right' }}>{labelLimit}</Typography>
+                            </Stack>
+                        </Stack>
+                    </Box>
+
+                    <Box
+                        sx={{
+                            ...toolbarPanelSx,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: { xs: 'flex-start', xl: 'flex-end' },
+                        }}
+                    >
+                        <Stack direction={{ xs: 'row', xl: 'column' }} spacing={1} sx={{ width: { xs: '100%', xl: 'auto' } }}>
+                            <Button variant="text" startIcon={<RestartAlt />} onClick={resetControls} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38, justifyContent: { xs: 'center', xl: 'flex-start' } }}>
+                                Reset
+                            </Button>
+                            <Button variant="text" startIcon={<Download />} onClick={downloadCSV} disabled={!rows.length} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38, justifyContent: { xs: 'center', xl: 'flex-start' } }}>
+                                CSV
+                            </Button>
+                        </Stack>
                     </Box>
                 </Box>
-
-                <Stack direction="row" spacing={0.4} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                    <FormControlLabel control={<Checkbox checked={showExpectedLine} onChange={(event) => setShowExpectedLine(event.target.checked)} size="small" />} label="Expected line" />
-                    <FormControlLabel control={<Checkbox checked={showFdrLine} onChange={(event) => setShowFdrLine(event.target.checked)} size="small" />} label="FDR guide" />
-                    <FormControlLabel control={<Checkbox checked={showNominalLine} onChange={(event) => setShowNominalLine(event.target.checked)} size="small" />} label="P=0.05" />
-                    <FormControlLabel control={<Checkbox checked={showEnvelope} onChange={(event) => setShowEnvelope(event.target.checked)} size="small" />} label="95% envelope" />
-                    <FormControlLabel control={<Checkbox checked={showTopLabels} onChange={(event) => setShowTopLabels(event.target.checked)} size="small" />} label="Top labels" />
-                    <FormControlLabel control={<Checkbox checked={showTraitStamp} onChange={(event) => setShowTraitStamp(event.target.checked)} size="small" />} label="Trait stamp" />
-                </Stack>
-
-                <TextField
-                    size="small"
-                    label="Trait stamp"
-                    value={traitStampText}
-                    onChange={(event) => setTraitStampText(event.target.value)}
-                    disabled={!showTraitStamp}
-                    sx={controlFieldSx(theme, { width: 260 })}
-                />
-
-                <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 240 }}>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
-                        Point
-                    </Typography>
-                    <Slider
-                        value={pointSize}
-                        min={3}
-                        max={14}
-                        step={1}
-                        onChange={(_, value) => setPointSize(Number(value))}
-                        sx={{ width: 108, color: theme.palette.primary.main, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
-                    />
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20 }}>{pointSize}</Typography>
-                </Stack>
-
-                <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 240 }}>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
-                        Labels
-                    </Typography>
-                    <Slider
-                        value={labelLimit}
-                        min={0}
-                        max={30}
-                        step={1}
-                        onChange={(_, value) => setLabelLimit(Number(value))}
-                        disabled={!showTopLabels}
-                        sx={{ width: 108, color: theme.palette.text.secondary, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
-                    />
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 24 }}>{labelLimit}</Typography>
-                </Stack>
-
-                <Button variant="text" startIcon={<RestartAlt />} onClick={resetControls} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}>
-                    Reset
-                </Button>
-                <Button variant="text" startIcon={<Download />} onClick={downloadCSV} disabled={!rows.length} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}>
-                    CSV
-                </Button>
-                <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    Enable trait stamp when exported images need an in-plot trait label. Single-trait color separates tails; multi-trait overlays use color for trait identity.
-                </Typography>
             </Box>
 
             <Card elevation={0} sx={plotFrameSx(theme)}>
@@ -1392,7 +1346,15 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                         </Box>
                     )}
 
-                    {!isLoading && rows.length === 0 && (
+                    {!isLoading && rows.length === 0 && !hasRenderedQQ && (
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                            <Alert severity="info" sx={{ maxWidth: 760 }}>
+                                <Typography variant="body2">Preparing the QQ plot for the selected traits.</Typography>
+                            </Alert>
+                        </Box>
+                    )}
+
+                    {!isLoading && rows.length === 0 && hasRenderedQQ && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No gene-level QQ rows are available for this trait.</Typography>
@@ -1440,8 +1402,8 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                                 title="Traits"
                                 width={{ expanded: 260, collapsed: 118 }}
                                 defaultPlacement="left"
-                                defaultTop={34}
-                                defaultSideOffset={12}
+                                defaultTop={64}
+                                defaultSideOffset={52}
                                 anchorPlotRef={plotElRef}
                                 showScale={false}
                                 sx={{

@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import Plot from 'react-plotly.js';
+import Plot from '../lib/plotly';
 import {
     Alert,
-    Autocomplete,
     Box,
     Button,
     Card,
@@ -20,7 +19,7 @@ import {
     getCrossTraitMatrix,
     getCrossTraitStatus,
     getCrossTraitTargets,
-    searchCrossTraits,
+    isCanceledRequest,
 } from '../api/gwas';
 import {
     buildPlotHoverTone,
@@ -42,8 +41,6 @@ const MAX_TOP_GENES = 100;
 const DEFAULT_TARGET_LIMIT = 25;
 const MIN_TARGET_LIMIT = 2;
 const MAX_TARGET_LIMIT = 100;
-const RECENT_STORAGE_KEY = 'cross-trait-heatmap-recent';
-const MAX_RECENT = 12;
 
 function truncateLabel(value, maxLength = 28) {
     const text = String(value || '').trim();
@@ -89,27 +86,21 @@ function prependPinnedTrait(items = [], pinnedTrait) {
     return uniqueTraitOptions([pinnedTrait, ...items]);
 }
 
-function readRecentTraits() {
-    if (typeof window === 'undefined') return [];
-    try {
-        const raw = window.localStorage.getItem(RECENT_STORAGE_KEY);
-        const parsed = JSON.parse(raw || '[]');
-        if (!Array.isArray(parsed)) return [];
-        return uniqueTraitOptions(parsed).slice(0, MAX_RECENT);
-    } catch {
-        return [];
-    }
-}
-
-function writeRecentTraits(items) {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(uniqueTraitOptions(items).slice(0, MAX_RECENT)));
+function traitListKey(items = []) {
+    return items.map((item) => item?.file_id || '').filter(Boolean).join('|');
 }
 
 export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const theme = useTheme();
     const navigate = useNavigate();
     const chartTokens = chartLayoutTokens(theme);
+    const toolbarPanelSx = useMemo(() => ({
+        px: 1.2,
+        py: 0.95,
+        borderRadius: 2,
+        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+        backgroundColor: alpha(theme.palette.background.paper, 0.82),
+    }), [theme.palette.background.paper, theme.palette.divider]);
     const currentTrait = useMemo(() => normalizeTraitOption({
         file_id: fileId,
         gwas_id: gwasId,
@@ -121,132 +112,102 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const [selectedTargets, setSelectedTargets] = useState([]);
     const [targetTraitCount, setTargetTraitCount] = useState(DEFAULT_TARGET_LIMIT);
     const [topGeneCount, setTopGeneCount] = useState(DEFAULT_TOP_GENES);
-    const [recentTargets, setRecentTargets] = useState(() => readRecentTraits());
-    const [searchOptions, setSearchOptions] = useState([]);
-    const [searchInput, setSearchInput] = useState('');
-    const [searchLoading, setSearchLoading] = useState(false);
+    const [appliedTargets, setAppliedTargets] = useState([]);
+    const [appliedTopGeneCount, setAppliedTopGeneCount] = useState(DEFAULT_TOP_GENES);
+    const [renderVersion, setRenderVersion] = useState(0);
     const [matrixPayload, setMatrixPayload] = useState(null);
     const [matrixLoading, setMatrixLoading] = useState(false);
     const [matrixError, setMatrixError] = useState(null);
-    const selectedTargetIds = useMemo(
-        () => selectedTargets.map((item) => item.file_id).filter(Boolean),
-        [selectedTargets],
+    const appliedTargetIds = useMemo(
+        () => appliedTargets.map((item) => item.file_id).filter(Boolean),
+        [appliedTargets],
     );
+    const hasRenderedMatrix = renderVersion > 0 && appliedTargets.length > 0;
 
     useEffect(() => {
+        const controller = new AbortController();
         let cancelled = false;
         setStatusLoading(true);
         setStatus(null);
         setTopGeneCount(DEFAULT_TOP_GENES);
         setTargetTraitCount(DEFAULT_TARGET_LIMIT);
-        getCrossTraitStatus(fileId)
+        setAppliedTargets([]);
+        setAppliedTopGeneCount(DEFAULT_TOP_GENES);
+        setRenderVersion(0);
+        setMatrixPayload(null);
+        setMatrixError(null);
+        setMatrixLoading(false);
+        getCrossTraitStatus(fileId, { signal: controller.signal })
             .then((res) => {
-                if (!cancelled) setStatus(res);
+                if (!cancelled && !controller.signal.aborted) setStatus(res);
             })
-            .catch(() => {
-                if (!cancelled) setStatus({ available: false });
+            .catch((error) => {
+                if (isCanceledRequest(error)) return;
+                if (!cancelled && !controller.signal.aborted) setStatus({ available: false });
             })
             .finally(() => {
-                if (!cancelled) setStatusLoading(false);
+                if (!cancelled && !controller.signal.aborted) setStatusLoading(false);
             });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
     }, [fileId]);
 
     useEffect(() => {
         if (!status?.available) return undefined;
+        const controller = new AbortController();
         let cancelled = false;
-        getCrossTraitTargets(fileId).then((res) => {
-            if (cancelled) return;
+        getCrossTraitTargets(fileId, { signal: controller.signal }).then((res) => {
+            if (cancelled || controller.signal.aborted) return;
             const nextTargets = prependPinnedTrait(res?.targets || [], currentTrait);
             const nextCount = Math.min(DEFAULT_TARGET_LIMIT, Math.max(MIN_TARGET_LIMIT, nextTargets.length));
             setRecommended(nextTargets);
             setTargetTraitCount(nextCount);
             setSelectedTargets(nextTargets.slice(0, nextCount));
-        }).catch(() => {
-            if (!cancelled) setRecommended([]);
+        }).catch((error) => {
+            if (isCanceledRequest(error)) return;
+            if (!cancelled && !controller.signal.aborted) setRecommended([]);
         });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
     }, [currentTrait, fileId, status?.available]);
 
     useEffect(() => {
-        const trimmed = searchInput.trim();
-        if (trimmed.length < 2) {
-            setSearchOptions([]);
-            return undefined;
-        }
-
-        let cancelled = false;
-        setSearchLoading(true);
-        const timeoutId = window.setTimeout(() => {
-            searchCrossTraits(trimmed, {
-                limit: 12,
-                excludeId: [fileId, gwasId, ...selectedTargetIds],
-            }).then((res) => {
-                if (!cancelled) setSearchOptions(uniqueTraitOptions(res?.traits || []));
-            }).catch(() => {
-                if (!cancelled) setSearchOptions([]);
-            }).finally(() => {
-                if (!cancelled) setSearchLoading(false);
-            });
-        }, 240);
-
-        return () => {
-            cancelled = true;
-            window.clearTimeout(timeoutId);
-        };
-    }, [fileId, gwasId, searchInput, selectedTargetIds]);
-
-    useEffect(() => {
-        if (!status?.available || !selectedTargets.length) {
+        if (!status?.available || !appliedTargets.length || renderVersion === 0) {
             setMatrixPayload(null);
             setMatrixError(null);
             return undefined;
         }
 
+        const controller = new AbortController();
         let cancelled = false;
         setMatrixLoading(true);
         setMatrixError(null);
         getCrossTraitMatrix(fileId, {
-            targetIds: selectedTargetIds,
-            topGenes: topGeneCount,
+            targetIds: appliedTargetIds,
+            topGenes: appliedTopGeneCount,
+            signal: controller.signal,
         }).then((res) => {
-            if (!cancelled) {
+            if (!cancelled && !controller.signal.aborted) {
                 setMatrixPayload(res);
-                setRecentTargets((prev) => {
-                    const nextRecent = uniqueTraitOptions([...selectedTargets, ...prev]);
-                    writeRecentTraits(nextRecent);
-                    return nextRecent;
-                });
             }
         }).catch((error) => {
+            if (isCanceledRequest(error)) return;
             if (!cancelled) {
                 setMatrixPayload(null);
                 setMatrixError(error);
             }
         }).finally(() => {
-            if (!cancelled) setMatrixLoading(false);
+            if (!cancelled && !controller.signal.aborted) setMatrixLoading(false);
         });
-        return () => { cancelled = true; };
-    }, [fileId, selectedTargetIds, selectedTargets, status?.available, topGeneCount]);
-
-    const groupedOptions = useMemo(() => {
-        const recommendIds = new Set(recommended.map((item) => item.file_id));
-        const recentIds = new Set(recentTargets.map((item) => item.file_id));
-        return prependPinnedTrait([
-            ...recommended.map((item) => ({
-                ...item,
-                group: item.selection_basis === 'trait_effect_similarity'
-                    ? 'Nearest effect profiles'
-                    : 'Fallback recommendations',
-            })),
-            ...recentTargets
-                .filter((item) => !recommendIds.has(item.file_id))
-                .map((item) => ({ ...item, group: 'Recent' })),
-            ...searchOptions
-                .filter((item) => !recommendIds.has(item.file_id) && !recentIds.has(item.file_id))
-                .map((item) => ({ ...item, group: 'Search' })),
-        ], currentTrait);
-    }, [currentTrait, recommended, recentTargets, searchOptions]);
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, [appliedTargetIds, appliedTargets, appliedTopGeneCount, fileId, renderVersion, status?.available]);
 
     const relatedTraitSliderMax = useMemo(
         () => Math.max(MIN_TARGET_LIMIT, Math.min(MAX_TARGET_LIMIT, recommended.length || MAX_TARGET_LIMIT)),
@@ -267,6 +228,36 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             .filter((value) => value >= MIN_TARGET_LIMIT && value <= relatedTraitSliderMax)
             .map((value) => ({ value, label: String(value) }))
     ), [relatedTraitSliderMax]);
+
+    useEffect(() => {
+        if (!status?.available) return;
+        const nextTargets = prependPinnedTrait(selectedTargets, currentTrait).slice(0, MAX_TARGET_LIMIT);
+        if (!nextTargets.length) return;
+        const nextTargetKey = traitListKey(nextTargets);
+        if (traitListKey(selectedTargets) !== nextTargetKey) {
+            setSelectedTargets(nextTargets);
+            return;
+        }
+        if (
+            renderVersion > 0
+            && traitListKey(appliedTargets) === nextTargetKey
+            && topGeneCount === appliedTopGeneCount
+        ) {
+            return;
+        }
+        setAppliedTargets(nextTargets);
+        setAppliedTopGeneCount(topGeneCount);
+        setMatrixError(null);
+        setRenderVersion((value) => value + 1);
+    }, [
+        appliedTargets,
+        appliedTopGeneCount,
+        currentTrait,
+        renderVersion,
+        selectedTargets,
+        status?.available,
+        topGeneCount,
+    ]);
 
     const plotData = useMemo(() => {
         if (!matrixPayload?.targets?.length || !matrixPayload?.genes?.length || !matrixPayload?.matrix?.length) return [];
@@ -360,12 +351,12 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     }), [chartTokens.paperBg, chartTokens.plotBg, theme.palette.text.secondary, yTickLabels, yTickValues]);
 
     const plotHeight = useMemo(() => {
-        const geneRows = matrixPayload?.genes?.length || topGeneCount;
+        const geneRows = matrixPayload?.genes?.length || appliedTopGeneCount || topGeneCount;
         return Math.max(560, 180 + (geneRows * 18));
-    }, [matrixPayload?.genes?.length, topGeneCount]);
+    }, [appliedTopGeneCount, matrixPayload?.genes?.length, topGeneCount]);
     const plotMinWidth = useMemo(
-        () => Math.max(960, 260 + ((matrixPayload?.targets?.length || selectedTargets.length) * 56)),
-        [matrixPayload?.targets?.length, selectedTargets.length],
+        () => Math.max(960, 260 + ((matrixPayload?.targets?.length || appliedTargets.length || selectedTargets.length) * 56)),
+        [appliedTargets.length, matrixPayload?.targets?.length, selectedTargets.length],
     );
 
     const plotConfig = useMemo(() => ({
@@ -395,183 +386,143 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={toolbarSx(theme)}>
-                <Box sx={{ minWidth: 220, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
-                        Cross-trait Heatmap
-                    </Typography>
-                    <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
-                        Shared gene effects across selected traits
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        Rows are top genes from the current trait. The first column is always the current trait, followed by selected comparison traits.
-                    </Typography>
-                </Box>
-
-                <Chip icon={<Timeline />} label={`${matrixPayload?.summary?.topGenes || topGeneCount} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                <Chip icon={<Hub />} label={`${selectedTargets.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
-                <Chip icon={<Search />} label={`${matrixPayload?.summary?.missingCells?.toLocaleString?.() || 0} missing`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
-            </Box>
-
-            <Box sx={toolbarSx(theme, { alignItems: 'flex-start' })}>
-                <Autocomplete
-                    multiple
-                    size="small"
-                    options={groupedOptions}
-                    filterSelectedOptions
-                    limitTags={4}
-                    loading={searchLoading}
-                    value={selectedTargets}
-                    groupBy={(option) => option.group || 'Selected'}
-                    isOptionEqualToValue={(option, value) => option.file_id === value.file_id}
-                    getOptionLabel={(option) => option.trait_name || option.file_id}
-                    onChange={(_, value) => {
-                        const nextTargets = prependPinnedTrait(value, currentTrait).slice(0, MAX_TARGET_LIMIT);
-                        setSelectedTargets(nextTargets);
-                        setTargetTraitCount(Math.min(relatedTraitSliderMax, Math.max(MIN_TARGET_LIMIT, nextTargets.length)));
-                    }}
-                    onInputChange={(_, value) => setSearchInput(value)}
-                    renderInput={(params) => (
-                        <TextField
-                            {...params}
-                            label="Target traits"
-                            placeholder="e.g. GCST90081631"
-                            helperText={recommended.some((item) => item.selection_basis === 'trait_effect_similarity')
-                                ? 'Defaults use the 24 nearest robust Trait Effect profiles. Up to 100 candidates remain available in this selector.'
-                                : 'No robust precomputed neighbors are available; defaults use high-signal fallback traits.'}
-                        />
-                    )}
+            <Box sx={toolbarSx(theme, { alignItems: 'stretch' })}>
+                <Box
                     sx={{
-                        minWidth: { xs: '100%', md: 420 },
-                        maxWidth: { xs: '100%', md: 720 },
-                        flex: '1 1 520px',
-                        '& .MuiAutocomplete-inputRoot': {
-                            alignItems: 'flex-start',
-                            maxHeight: 168,
-                            overflowY: 'auto',
+                        display: 'grid',
+                        gridTemplateColumns: {
+                            xs: '1fr',
+                            lg: 'minmax(260px, 1.1fr) minmax(240px, 280px) minmax(220px, 260px) auto',
                         },
-                    }}
-                />
-
-                <Box
-                    sx={{
-                        width: 250,
-                        minWidth: 250,
-                        px: 1.2,
-                        py: 0.85,
-                        borderRadius: 2,
-                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
+                        gap: 1.15,
+                        alignItems: 'stretch',
+                        width: '100%',
                     }}
                 >
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
-                        Top related traits
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
-                        <Slider
-                            size="small"
-                            value={Math.min(targetTraitCount, relatedTraitSliderMax)}
-                            min={MIN_TARGET_LIMIT}
-                            max={relatedTraitSliderMax}
-                            step={1}
-                            marks={relatedTraitCountMarks}
-                            onChange={(_, value) => applyTopRelatedTraitCount(Array.isArray(value) ? value[0] : value)}
-                            sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
-                        />
-                        <TextField
-                            size="small"
-                            value={Math.min(targetTraitCount, relatedTraitSliderMax)}
-                            onChange={(event) => applyTopRelatedTraitCount(event.target.value)}
-                            slotProps={{
-                                htmlInput: {
-                                    min: MIN_TARGET_LIMIT,
-                                    max: relatedTraitSliderMax,
-                                    step: 1,
-                                    inputMode: 'numeric',
-                                },
+                    <Box sx={{ ...toolbarPanelSx, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 1 }}>
+                        <Box>
+                            <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
+                                Cross-trait Heatmap
+                            </Typography>
+                            <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
+                                Shared gene effects across selected traits
+                            </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                            <Chip icon={<Timeline />} label={`${matrixPayload?.summary?.topGenes || topGeneCount} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                            <Chip icon={<Hub />} label={`${selectedTargets.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                            <Chip icon={<Search />} label={`${matrixPayload?.summary?.missingCells?.toLocaleString?.() || 0} missing`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
+                        </Box>
+                    </Box>
+
+                    <Box sx={toolbarPanelSx}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
+                            Top related traits
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                            <Slider
+                                size="small"
+                                value={Math.min(targetTraitCount, relatedTraitSliderMax)}
+                                min={MIN_TARGET_LIMIT}
+                                max={relatedTraitSliderMax}
+                                step={1}
+                                marks={relatedTraitCountMarks}
+                                onChange={(_, value) => applyTopRelatedTraitCount(Array.isArray(value) ? value[0] : value)}
+                                sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                            />
+                            <TextField
+                                size="small"
+                                value={Math.min(targetTraitCount, relatedTraitSliderMax)}
+                                onChange={(event) => applyTopRelatedTraitCount(event.target.value)}
+                                slotProps={{
+                                    htmlInput: {
+                                        min: MIN_TARGET_LIMIT,
+                                        max: relatedTraitSliderMax,
+                                        step: 1,
+                                        inputMode: 'numeric',
+                                    },
+                                }}
+                                sx={{
+                                    width: 72,
+                                    '& .MuiInputBase-input': {
+                                        textAlign: 'center',
+                                        fontWeight: 700,
+                                    },
+                                }}
+                            />
+                        </Box>
+                    </Box>
+
+                    <Box sx={toolbarPanelSx}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
+                            Gene rows
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                            <Slider
+                                size="small"
+                                value={topGeneCount}
+                                min={MIN_TOP_GENES}
+                                max={MAX_TOP_GENES}
+                                step={5}
+                                marks={[
+                                    { value: MIN_TOP_GENES, label: String(MIN_TOP_GENES) },
+                                    { value: 50, label: '50' },
+                                    { value: MAX_TOP_GENES, label: String(MAX_TOP_GENES) },
+                                ]}
+                                onChange={(_, value) => setTopGeneCount(Array.isArray(value) ? value[0] : value)}
+                                sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                            />
+                            <TextField
+                                size="small"
+                                value={topGeneCount}
+                                onChange={(event) => {
+                                    const raw = Number.parseInt(event.target.value, 10);
+                                    if (Number.isNaN(raw)) {
+                                        setTopGeneCount(MIN_TOP_GENES);
+                                        return;
+                                    }
+                                    setTopGeneCount(Math.min(MAX_TOP_GENES, Math.max(MIN_TOP_GENES, raw)));
+                                }}
+                                slotProps={{
+                                    htmlInput: {
+                                        min: MIN_TOP_GENES,
+                                        max: MAX_TOP_GENES,
+                                        step: 5,
+                                        inputMode: 'numeric',
+                                    },
+                                }}
+                                sx={{
+                                    width: 72,
+                                    '& .MuiInputBase-input': {
+                                        textAlign: 'center',
+                                        fontWeight: 700,
+                                    },
+                                }}
+                            />
+                        </Box>
+                    </Box>
+
+                    <Box sx={{ ...toolbarPanelSx, display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'center' } }}>
+                        <Button
+                            variant="text"
+                            startIcon={<RestartAlt />}
+                            onClick={() => {
+                                setTargetTraitCount(DEFAULT_TARGET_LIMIT);
+                                setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT));
+                                setTopGeneCount(DEFAULT_TOP_GENES);
+                                setAppliedTargets([]);
+                                setAppliedTopGeneCount(DEFAULT_TOP_GENES);
+                                setRenderVersion(0);
+                                setMatrixPayload(null);
+                                setMatrixError(null);
+                                setMatrixLoading(false);
                             }}
-                            sx={{
-                                width: 72,
-                                '& .MuiInputBase-input': {
-                                    textAlign: 'center',
-                                    fontWeight: 700,
-                                },
-                            }}
-                        />
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38, justifyContent: { xs: 'center', lg: 'flex-start' } }}
+                        >
+                            Reset
+                        </Button>
                     </Box>
                 </Box>
-
-                <Box
-                    sx={{
-                        width: 220,
-                        minWidth: 220,
-                        px: 1.2,
-                        py: 0.85,
-                        borderRadius: 2,
-                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                    }}
-                >
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
-                        Gene rows
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
-                        <Slider
-                            size="small"
-                            value={topGeneCount}
-                            min={MIN_TOP_GENES}
-                            max={MAX_TOP_GENES}
-                            step={5}
-                            marks={[
-                                { value: MIN_TOP_GENES, label: String(MIN_TOP_GENES) },
-                                { value: 50, label: '50' },
-                                { value: MAX_TOP_GENES, label: String(MAX_TOP_GENES) },
-                            ]}
-                            onChange={(_, value) => setTopGeneCount(Array.isArray(value) ? value[0] : value)}
-                            sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
-                        />
-                        <TextField
-                            size="small"
-                            value={topGeneCount}
-                            onChange={(event) => {
-                                const raw = Number.parseInt(event.target.value, 10);
-                                if (Number.isNaN(raw)) {
-                                    setTopGeneCount(MIN_TOP_GENES);
-                                    return;
-                                }
-                                setTopGeneCount(Math.min(MAX_TOP_GENES, Math.max(MIN_TOP_GENES, raw)));
-                            }}
-                            slotProps={{
-                                htmlInput: {
-                                    min: MIN_TOP_GENES,
-                                    max: MAX_TOP_GENES,
-                                    step: 5,
-                                    inputMode: 'numeric',
-                                },
-                            }}
-                            sx={{
-                                width: 72,
-                                '& .MuiInputBase-input': {
-                                    textAlign: 'center',
-                                    fontWeight: 700,
-                                },
-                            }}
-                        />
-                    </Box>
-                </Box>
-
-                <Button
-                    variant="text"
-                    startIcon={<RestartAlt />}
-                    onClick={() => {
-                        setTargetTraitCount(DEFAULT_TARGET_LIMIT);
-                        setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT));
-                        setTopGeneCount(DEFAULT_TOP_GENES);
-                    }}
-                    sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}
-                >
-                    Reset
-                </Button>
             </Box>
 
             {!selectedTargets.length && (
@@ -599,10 +550,18 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                         </Box>
                     )}
 
-                    {!matrixLoading && selectedTargets.length > 0 && plotData.length === 0 && (
+                    {!matrixLoading && hasRenderedMatrix && plotData.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No heatmap values are available for the current target trait selection.</Typography>
+                            </Alert>
+                        </Box>
+                    )}
+
+                    {!matrixLoading && !hasRenderedMatrix && plotData.length === 0 && (
+                        <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+                            <Alert severity="info" sx={{ maxWidth: 760 }}>
+                                <Typography variant="body2">Select target traits above to view the heatmap.</Typography>
                             </Alert>
                         </Box>
                     )}

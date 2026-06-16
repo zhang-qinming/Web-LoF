@@ -8,8 +8,7 @@ import {
     Typography,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import useSWR from 'swr';
-import { fetcher } from '../api/gwas';
+import { getTraitProgramGraph, isCanceledRequest } from '../api/gwas';
 import TraitProgramGraphSummary from './TraitProgramGraphSummary';
 import TraitProgramGraphCanvas from './traitProgramGraph/TraitProgramGraphCanvas';
 import {
@@ -49,10 +48,9 @@ function geneQueryCandidates(gene) {
 
 export default function TraitProgramGraph({ fileId, traitLabel }) {
     const navigate = useNavigate();
-    const { data, error, isLoading } = useSWR(
-        fileId ? `/api/programs/${fileId}/graph` : null,
-        fetcher,
-    );
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
     const graph = data;
     const svgRef = useRef(null);
 
@@ -60,6 +58,40 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
     const [selectedGene, setSelectedGene] = useState(null);
     const [expandedPrograms, setExpandedPrograms] = useState(() => new Set());
     const [graphViewMode, setGraphViewMode] = useState(GRAPH_VIEW_MODES.compact);
+
+    useEffect(() => {
+        if (!fileId) {
+            setData(null);
+            setError(null);
+            setIsLoading(false);
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        let cancelled = false;
+        setIsLoading(true);
+        setError(null);
+        setData(null);
+        getTraitProgramGraph(fileId, { signal: controller.signal })
+            .then((result) => {
+                if (!cancelled && !controller.signal.aborted) setData(result);
+            })
+            .catch((err) => {
+                if (isCanceledRequest(err)) return;
+                if (!cancelled && !controller.signal.aborted) {
+                    setData(null);
+                    setError(err);
+                }
+            })
+            .finally(() => {
+                if (!cancelled && !controller.signal.aborted) setIsLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, [fileId]);
 
     const {
         transform,
@@ -294,9 +326,6 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: 'rgba(15,23,42,0.10)' }}>
                     <Typography sx={{ fontWeight: 700, color: '#0f172a', mb: 0.5 }}>
                         Module summary
-                    </Typography>
-                    <Typography sx={{ fontSize: 13, color: '#667085', mb: 1.5 }}>
-                        Select programs, compare scores, check filtered gene counts, and expand crowded modules.
                     </Typography>
                     <TraitProgramGraphSummary
                         title="Visible modules"

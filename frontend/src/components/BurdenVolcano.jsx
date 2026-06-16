@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Plot from 'react-plotly.js';
-import Plotly from 'plotly.js-basic-dist';
+import Plot, { Plotly } from '../lib/plotly';
 import {
     Alert,
     Box,
@@ -29,7 +28,7 @@ import {
     Science,
     Timeline,
 } from '@mui/icons-material';
-import { getBurdenVolcano, getPosteriorVolcano } from '../api/gwas';
+import { getBurdenVolcano, getPosteriorVolcano, isCanceledRequest } from '../api/gwas';
 import BurdenVolcanoTable from './BurdenVolcanoTable';
 import FloatingLegend from './FloatingLegend';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
@@ -65,7 +64,7 @@ const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 800;
 const DEFAULT_POINT_SIZE = 8;
 const VOLCANO_PLOT_HEIGHT = 'clamp(620px, 72dvh, 960px)';
-const MIN_DEFAULT_HIT_ROWS = 20;
+const AUTO_FULL_MIN_POINTS = 20;
 
 const VOLCANO_CONFIGS = {
     burden: {
@@ -156,8 +155,6 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         title,
         fullTitle,
         hitsTitle,
-        fullDescription,
-        hitsDescription,
         emptyMessage,
         guideText,
         exportPrefix,
@@ -168,7 +165,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const plotRef = useRef(null);
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
-    const hasAutoSelectedDefaultVariant = useRef(false);
+    const autoVariantHandledRef = useRef(false);
 
     const [payload, setPayload] = useState(null);
     const [error, setError] = useState(null);
@@ -199,30 +196,37 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     }, []);
 
     useEffect(() => {
+        autoVariantHandledRef.current = false;
+    }, [fileId, gwasId, retryKey, volcanoType]);
+
+    useEffect(() => {
         if (!gwasId && !fileId) {
             setPayload(null);
             return undefined;
         }
 
+        const controller = new AbortController();
         let cancelled = false;
         setIsLoading(true);
         setError(null);
-        fetchVolcano(fileId || gwasId, { variant, aliasId: gwasId })
+        fetchVolcano(fileId || gwasId, { variant, aliasId: gwasId, signal: controller.signal })
             .then((res) => {
-                if (!cancelled) setPayload(res);
+                if (!cancelled && !controller.signal.aborted) setPayload(res);
             })
             .catch((err) => {
+                if (isCanceledRequest(err)) return;
                 if (!cancelled) {
                     setError(err);
                     setPayload(null);
                 }
             })
             .finally(() => {
-                if (!cancelled) setIsLoading(false);
+                if (!cancelled && !controller.signal.aborted) setIsLoading(false);
             });
 
         return () => {
             cancelled = true;
+            controller.abort();
         };
     }, [fetchVolcano, fileId, gwasId, retryKey, variant]);
 
@@ -265,28 +269,20 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const resolvedVariant = payload?.resolvedVariant || variant;
     const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
     const variantControlValue = resolvedVariant === 'full' && variant === 'hits' ? 'full' : variant;
-    const shouldAutoSwitchToFull = (
-        !isLoading
-        && variant === 'hits'
-        && Boolean(availableVariants.full)
-        && !hasAutoSelectedDefaultVariant.current
-        && rows.length < MIN_DEFAULT_HIT_ROWS
-    );
 
     useEffect(() => {
-        if (!shouldAutoSwitchToFull) return;
+        if (autoVariantHandledRef.current) return;
+        if (variant !== 'hits') return;
+        if (isLoading || !payload || error) return;
 
-        hasAutoSelectedDefaultVariant.current = true;
+        if (resolvedVariant === 'full' || rows.length >= AUTO_FULL_MIN_POINTS || !availableVariants.full) {
+            autoVariantHandledRef.current = true;
+            return;
+        }
+
+        autoVariantHandledRef.current = true;
         setVariant('full');
-        setEffectMode(EFFECT_MODES.ALL);
-        setSignificantOnly(false);
-        setHighlight({ rowKey: '', key: 0 });
-        setTablePage(0);
-    }, [shouldAutoSwitchToFull]);
-
-    useEffect(() => {
-        hasAutoSelectedDefaultVariant.current = false;
-    }, [fileId, gwasId, volcanoType]);
+    }, [availableVariants.full, error, isLoading, payload, resolvedVariant, rows.length, variant]);
 
     const filteredRows = useMemo(() => rows.filter((row) => {
         if (effectMode === EFFECT_MODES.POSITIVE && row.effect < 0) return false;
@@ -647,6 +643,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
 
     const handleVariantChange = (_, value) => {
         if (!value || value === variant) return;
+        autoVariantHandledRef.current = true;
         setVariant(value);
         setEffectMode(EFFECT_MODES.ALL);
         setSignificantOnly(false);
@@ -727,9 +724,6 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                     </Typography>
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
                         {variantLabel === 'full' ? fullTitle : hitsTitle}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        {variantLabel === 'full' ? fullDescription : hitsDescription}
                     </Typography>
                 </Box>
 
@@ -839,18 +833,18 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
 
             <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
-                    {(isLoading || shouldAutoSwitchToFull) && (
+                    {isLoading && (
                         <Box sx={{ minHeight: VOLCANO_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    {shouldAutoSwitchToFull ? `Hits TSV has fewer than ${MIN_DEFAULT_HIT_ROWS} rows; loading Full TSV...` : `Loading ${title.toLowerCase()} data...`}
+                                    Loading {title.toLowerCase()} data...
                                 </Typography>
                             </Box>
                         </Box>
                     )}
 
-                    {!isLoading && !shouldAutoSwitchToFull && rows.length === 0 && (
+                    {!isLoading && rows.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">{emptyMessage}</Typography>
@@ -858,7 +852,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                         </Box>
                     )}
 
-                    {!isLoading && !shouldAutoSwitchToFull && rows.length > 0 && !hasVisiblePoints && (
+                    {!isLoading && rows.length > 0 && !hasVisiblePoints && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No genes match the current volcano filters.</Typography>
@@ -866,7 +860,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                         </Box>
                     )}
 
-                    {!isLoading && !shouldAutoSwitchToFull && hasVisiblePoints && (
+                    {!isLoading && hasVisiblePoints && (
                         <>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}

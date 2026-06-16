@@ -58,6 +58,8 @@ const config = {
         port: parseInteger(process.env.PORT || process.env.BACKEND_PORT, 4000, { min: 1, max: 65535 }),
         corsOrigin: process.env.CORS_ORIGIN || '*',
         jsonLimit: process.env.JSON_BODY_LIMIT || '1mb',
+        compressionThreshold: parseBytes(process.env.COMPRESSION_THRESHOLD, 1024),
+        logRequestMetrics: parseBoolean(process.env.LOG_REQUEST_METRICS, true),
     },
     db: {
         host: process.env.DB_HOST || '127.0.0.1',
@@ -89,6 +91,10 @@ const config = {
         maxTsvFileBytes: parseBytes(process.env.DATA_MAX_TSV_FILE_BYTES, 100 * 1024 ** 2),
         maxTsvRows: parseInteger(process.env.DATA_MAX_TSV_ROWS, 200000, { min: 1000 }),
         maxManhattanFileBytes: parseBytes(process.env.MANHATTAN_MAX_FILE_BYTES, 200 * 1024 ** 2),
+        defaultManhattanMaxPoints: parseInteger(process.env.MANHATTAN_DEFAULT_MAX_POINTS, 30000, { min: 1000, max: 100000 }),
+        maxManhattanMaxPoints: parseInteger(process.env.MANHATTAN_MAX_POINTS, 100000, { min: 1000, max: 250000 }),
+        manhattanCacheMaxBytes: parseBytes(process.env.MANHATTAN_CACHE_MAX_BYTES, 64 * 1024 ** 2),
+        manhattanCacheMaxEntries: parseInteger(process.env.MANHATTAN_CACHE_MAX_ENTRIES, 16, { min: 1, max: 100 }),
     },
 };
 

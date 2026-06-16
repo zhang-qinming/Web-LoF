@@ -1,7 +1,6 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Plot from 'react-plotly.js';
-import Plotly from 'plotly.js-basic-dist';
+import Plot, { Plotly } from '../lib/plotly';
 import {
     Alert,
     Box,
@@ -34,7 +33,7 @@ import {
     ScatterPlot,
     Timeline,
 } from '@mui/icons-material';
-import { getTraitManhattanHits } from '../api/gwas';
+import { getTraitManhattanHits, isCanceledRequest } from '../api/gwas';
 import TraitHitManhattanLegend from './TraitHitManhattanLegend';
 import TraitHitManhattanTable from './TraitHitManhattanTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
@@ -57,7 +56,6 @@ const FULL_BACKGROUND_CHROM_COLORS = ['#e58d2a', '#3b7fc4'];
 const DEFAULT_EXPORT_WIDTH = 1400;
 const DEFAULT_EXPORT_HEIGHT = 760;
 const MANHATTAN_PLOT_HEIGHT = 'clamp(620px, 72dvh, 980px)';
-const MIN_DEFAULT_HIT_ROWS = 20;
 const PROGRAM_COLORS = [
     '#5194D6', '#D66351', '#51D6AA', '#D69451', '#9851D6', '#D65187', '#51BCD6', '#63D651',
     '#6351D6', '#D67E51', '#51D689', '#D651D6', '#51D6CD', '#D6C551', '#5175D6', '#D65168',
@@ -113,6 +111,7 @@ const CHROM_LENGTHS = {
 
 const CHROM_GAP = 3000000;
 const GWAS_HIT_LOGP = -Math.log10(5e-8);
+const AUTO_FULL_MIN_POINTS = 20;
 
 function sanitizeFileNamePart(value) {
     return String(value || 'plot').replace(/[\\/:*?"<>|]+/g, '_');
@@ -200,7 +199,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const tableRowRefs = useRef({});
     const plotRef = useRef(null);
     const tableSectionRef = useRef(null);
-    const hasAutoSelectedDefaultVariant = useRef(false);
+    const autoVariantHandledRef = useRef(false);
     const exportBaseName = useMemo(() => sanitizeFileNamePart(fileId || gwasId || 'trait'), [fileId, gwasId]);
 
     const [loading, setLoading] = useState(true);
@@ -237,25 +236,32 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }, []);
 
     useEffect(() => {
+        autoVariantHandledRef.current = false;
+    }, [fileId, gwasId, retryKey]);
+
+    useEffect(() => {
         if (!fileId) return undefined;
+        const controller = new AbortController();
         let cancelled = false;
         setLoading(true);
         setError(null);
-        getTraitManhattanHits(fileId, { variant, aliasId: gwasId })
+        getTraitManhattanHits(fileId, { variant, aliasId: gwasId, signal: controller.signal })
             .then((res) => {
-                if (!cancelled) setPayload(res);
+                if (!cancelled && !controller.signal.aborted) setPayload(res);
             })
             .catch((err) => {
+                if (isCanceledRequest(err)) return;
                 if (!cancelled) {
                     setError(err);
                     setPayload(null);
                 }
             })
             .finally(() => {
-                if (!cancelled) setLoading(false);
+                if (!cancelled && !controller.signal.aborted) setLoading(false);
             });
         return () => {
             cancelled = true;
+            controller.abort();
         };
     }, [fileId, gwasId, retryKey, variant]);
 
@@ -263,32 +269,6 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const resolvedVariant = payload?.resolvedVariant || variant;
     const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
     const isTruncated = Boolean(payload?.truncated);
-    const shouldAutoSwitchToFull = (
-        !loading
-        && variant === 'hits'
-        && Boolean(payload?.availableVariants?.full)
-        && !hasAutoSelectedDefaultVariant.current
-        && rows.length < MIN_DEFAULT_HIT_ROWS
-    );
-
-    useEffect(() => {
-        if (!shouldAutoSwitchToFull) return;
-
-        hasAutoSelectedDefaultVariant.current = true;
-        setVariant('full');
-        setProgramOnly(false);
-        setSelectedGenesets([]);
-        setDistanceMode('all');
-        setSelectedChromosomes([]);
-        setSelectedPrograms([]);
-        setGeneQuery('');
-        setHighlight({ rowKey: '', key: 0 });
-        setTablePage(0);
-    }, [shouldAutoSwitchToFull]);
-
-    useEffect(() => {
-        hasAutoSelectedDefaultVariant.current = false;
-    }, [fileId, gwasId]);
 
     const summary = payload?.summary || {
         totalRows: 0,
@@ -296,6 +276,21 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         withGeneset: 0,
         distanceBuckets: { in_gene: 0, near: 0, moderate: 0, distal: 0, unknown: 0 },
     };
+
+    useEffect(() => {
+        if (autoVariantHandledRef.current) return;
+        if (variant !== 'hits') return;
+        if (loading || !payload || error) return;
+
+        const rawPointCount = payload?.returnedRowCount ?? rows.length;
+        if (resolvedVariant === 'full' || rawPointCount >= AUTO_FULL_MIN_POINTS || !payload?.availableVariants?.full) {
+            autoVariantHandledRef.current = true;
+            return;
+        }
+
+        autoVariantHandledRef.current = true;
+        setVariant('full');
+    }, [error, loading, payload, resolvedVariant, rows.length, variant]);
 
     const genesetOptions = useMemo(() => {
         const genesetSet = new Set();
@@ -731,7 +726,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
 
     const handleVariantChange = (_, value) => {
         if (!value || value === variant) return;
-        hasAutoSelectedDefaultVariant.current = true;
+        autoVariantHandledRef.current = true;
         setVariant(value);
         setProgramOnly(false);
         setSelectedGenesets([]);
@@ -844,11 +839,6 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     </Typography>
                     <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.25 }}>
                         {variantLabel === 'full' ? 'All GWAS Loci Overview' : 'GWAS Hit Loci Overview'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        {variantLabel === 'full'
-                            ? 'Program / Geneset coloring across the full GWAS TSV. Click a point to focus its table row.'
-                            : 'Program / Geneset coloring for trait-associated loci. Click a point to focus its table row.'}
                     </Typography>
                 </Box>
 
@@ -1015,18 +1005,18 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
 
             <Box sx={plotFrameSx(theme, { position: 'relative' })}>
                 <Box sx={{ p: 0, position: 'relative' }}>
-                    {(loading || shouldAutoSwitchToFull) && (
+                    {loading && (
                         <Box sx={{ minHeight: MANHATTAN_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    {shouldAutoSwitchToFull ? `Hits TSV has fewer than ${MIN_DEFAULT_HIT_ROWS} rows; loading Full TSV...` : 'Loading Manhattan data from GWAS TSV...'}
+                                    Loading Manhattan data from GWAS TSV...
                                 </Typography>
                             </Box>
                         </Box>
                     )}
 
-                    {!loading && !shouldAutoSwitchToFull && error && (
+                    {!loading && error && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert
                                 severity="error"
@@ -1049,7 +1039,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !shouldAutoSwitchToFull && !error && rows.length === 0 && (
+                    {!loading && !error && rows.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No Manhattan rows are currently available for this trait.</Typography>
@@ -1057,7 +1047,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !shouldAutoSwitchToFull && !error && rows.length > 0 && processedRows.length === 0 && (
+                    {!loading && !error && rows.length > 0 && processedRows.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No loci match the current filters.</Typography>
@@ -1065,7 +1055,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !shouldAutoSwitchToFull && !error && processedRows.length > 0 && (
+                    {!loading && !error && processedRows.length > 0 && (
                             <Box sx={{ position: 'relative', minHeight: MANHATTAN_PLOT_HEIGHT }}>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}

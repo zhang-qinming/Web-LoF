@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Plot from 'react-plotly.js';
-import Plotly from 'plotly.js-basic-dist';
+import Plot, { Plotly } from '../lib/plotly';
 import {
     Box, Typography, Alert, CircularProgress, ToggleButtonGroup, ToggleButton,
     Slider, FormControlLabel, Switch, Button, Dialog, DialogTitle,
@@ -9,7 +8,7 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
-import { fetcher } from '../api/gwas';
+import { fetcher, getProgramScatterData, isCanceledRequest } from '../api/gwas';
 import FloatingLegend from './FloatingLegend';
 import ProgramScatterTable from './ProgramScatterTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
@@ -355,10 +354,9 @@ export default function ProgramScatter({ fileId }) {
         '& .MuiSlider-rail': { opacity: 0.25 },
     }), [theme.palette.primary.main]);
     const navigate = useNavigate();
-    const { data, error, isLoading } = useSWR(
-        fileId ? `/api/programs/${fileId}` : null,
-        fetcher,
-    );
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
     const { data: infoData } = useSWR('/api/programs/info', fetcher);
     const programInfo = useMemo(() => infoData || {}, [infoData]);
 
@@ -384,6 +382,40 @@ export default function ProgramScatter({ fileId }) {
     const pendingAnimationRef = useRef(null);
     const animationIdRef = useRef(0);
     const [displayPlotData, setDisplayPlotData] = useState([]);
+
+    useEffect(() => {
+        if (!fileId) {
+            setData(null);
+            setError(null);
+            setIsLoading(false);
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        let cancelled = false;
+        setIsLoading(true);
+        setError(null);
+        setData(null);
+        getProgramScatterData(fileId, { signal: controller.signal })
+            .then((result) => {
+                if (!cancelled && !controller.signal.aborted) setData(result);
+            })
+            .catch((err) => {
+                if (isCanceledRequest(err)) return;
+                if (!cancelled && !controller.signal.aborted) {
+                    setData(null);
+                    setError(err);
+                }
+            })
+            .finally(() => {
+                if (!cancelled && !controller.signal.aborted) setIsLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, [fileId]);
 
     const startPendingAnimation = useCallback((graphDiv) => {
         const pending = pendingAnimationRef.current;

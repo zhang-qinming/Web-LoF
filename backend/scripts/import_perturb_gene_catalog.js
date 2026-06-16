@@ -497,18 +497,22 @@ async function fetchEnsemblFallback(symbol) {
     try {
         const payload = await fetchJson(url);
         if (payload?.object_type !== 'Gene' || payload?.assembly_name !== 'GRCh37') return null;
+        const displaySymbol = cleanText(payload.display_name, symbol);
+        const geneType = normalizeGeneType(payload.biotype);
+        const sourceDescription = cleanText(payload.description).replace(/\s*\[Source:.*$/i, '');
+        const fallbackDescription = `${displaySymbol} ${geneType || 'gene'}`.trim();
         return {
             chromosome: cleanText(payload.seq_region_name),
             begin_pos: Number(payload.start) || null,
             end_pos: Number(payload.end) || null,
-            symbol: cleanText(payload.display_name, symbol),
-            gene_name: cleanText(payload.description).replace(/\s*\[Source:.*$/i, ''),
+            symbol: displaySymbol,
+            gene_name: sourceDescription || fallbackDescription,
             gene_id: '',
-            gene_type: normalizeGeneType(payload.biotype),
+            gene_type: geneType,
             synonyms: '',
             hgnc: '',
             ensembl: normalizeEnsembl(payload.id) || null,
-            description: cleanText(payload.description).replace(/\s*\[Source:.*$/i, ''),
+            description: sourceDescription || fallbackDescription,
         };
     } catch {
         return null;

@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import Plot from 'react-plotly.js';
-import Plotly from 'plotly.js-basic-dist';
+import Plot, { Plotly } from '../lib/plotly';
 import {
     Box, Typography, Alert, CircularProgress, Button, Select, MenuItem,
     Chip, Paper,

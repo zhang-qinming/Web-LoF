@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Plot from 'react-plotly.js';
-import Plotly from 'plotly.js-basic-dist';
+import Plot, { Plotly } from '../lib/plotly';
 import {
     Alert,
     Box,
@@ -29,7 +28,7 @@ import {
     RestartAlt,
     Science,
 } from '@mui/icons-material';
-import { getDataFileText } from '../api/gwas';
+import { getDataFileText, isCanceledRequest } from '../api/gwas';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import {
@@ -344,6 +343,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             return undefined;
         }
 
+        const controller = new AbortController();
         let cancelled = false;
         setIsLoading(true);
         setError(null);
@@ -353,28 +353,31 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             for (const candidate of candidateIds) {
                 const path = getDataPath(candidate);
                 try {
-                    const text = await getDataFileText(path);
+                    const text = await getDataFileText(path, { signal: controller.signal });
+                    if (cancelled || controller.signal.aborted) return;
                     const rows = parseTsv(text);
-                    if (!cancelled) {
+                    if (!cancelled && !controller.signal.aborted) {
                         setPayload({ rows, fileId: candidate, path });
                         setHighlight({ rowKey: '', key: 0 });
                         setTablePage(0);
                     }
                     return;
                 } catch (err) {
+                    if (isCanceledRequest(err)) return;
                     lastError = err;
                 }
             }
-            if (!cancelled) {
+            if (!cancelled && !controller.signal.aborted) {
                 setPayload({ rows: [], fileId: candidateIds[0], path: getDataPath(candidateIds[0]) });
                 setError(lastError || new Error('Gene-level scatter TSV not found'));
             }
         })().finally(() => {
-            if (!cancelled) setIsLoading(false);
+            if (!cancelled && !controller.signal.aborted) setIsLoading(false);
         });
 
         return () => {
             cancelled = true;
+            controller.abort();
         };
     }, [candidateIds]);
 
@@ -813,9 +816,6 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
                         Posterior effect vs regulation evidence
                     </Typography>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.79rem', lineHeight: 1.45, mt: 0.25 }}>
-                        Each point is a gene. X is GeneBayes post_mean; Y is signed -log10(P_withShet), with sign from beta_withShet.
-                    </Typography>
                 </Box>
 
                 <ToggleButtonGroup
@@ -895,9 +895,6 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                 <Button variant="text" startIcon={<Download />} onClick={downloadCSV} disabled={!rows.length} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}>
                     CSV
                 </Button>
-                <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    Rose markers highlight posterior-high genes; warm and cool markers distinguish concordant and discordant regulation support, while pale points remain low-support background.
-                </Typography>
             </Box>
 
             <Card elevation={0} sx={plotFrameSx(theme)}>

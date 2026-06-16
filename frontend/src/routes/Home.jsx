@@ -1617,14 +1617,14 @@ function HeroSection({ stats, statsLoading, theme }) {
                         }}
                     >
                         {[
-                            { label: 'Traits', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.traits ? stats.traits.toLocaleString() : '...'), color: '#2563eb', href: '/trait', icon: (
-                                <Box component="img" src={traitsIcon} alt="Traits" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
-                            )},
                             { label: 'Genes', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.genes ? stats.genes.toLocaleString() : '...'), color: '#0f766e', href: '/genes', icon: (
                                 <Box component="img" src={variantsIcon} alt="Genes" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
                             )},
                             { label: 'Programs', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.programs ? stats.programs.toLocaleString() : '...'), color: '#7c3aed', href: '/programs', icon: (
                                 <Box component="img" src={programsIcon} alt="Programs" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
+                            )},
+                            { label: 'Traits', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.traits ? stats.traits.toLocaleString() : '...'), color: '#2563eb', href: '/trait', icon: (
+                                <Box component="img" src={traitsIcon} alt="Traits" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
                             )},
                         ].map((metric) => (
                             <Box

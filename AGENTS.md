@@ -28,12 +28,30 @@ cp backend/.env.example backend/.env
 ```bash
 bash scripts/setup_cluster.sh
 
-cd backend  && conda activate gwas-browser && npm run dev
-cd frontend && conda activate gwas-browser && npm run dev
+conda activate Web-LoF
 
-ssh -N -L 5173:localhost:5173 -L 4000:localhost:4000 qinminzhang@101.76.96.10
+cd backend
+npm install
+npm run dev
+
+cd frontend
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+
+ssh -N -L 5173:127.0.0.1:5173 -L 4000:127.0.0.1:4000 qinminzhang@101.76.96.10
 # 浏览器打开 http://localhost:5173
 ```
+
+当前服务器实际使用 `Web-LoF` conda 环境。代码或依赖更新后，先在对应的 `backend/` 或 `frontend/` 目录执行 `npm install`，避免服务器仍使用旧依赖。
+
+当前集群上运行的是开发/调试模式：前端为 Vite dev server，后端为 `npm run dev`/nodemon，二者监听服务器本机 `127.0.0.1`，本地通过 SSH 隧道访问。这不是 production 部署；生产部署应改用进程管理器（如 systemd/pm2）和前端静态构建产物。
+
+分析 bug 时，如需查看运行日志，可读取以下集群日志文件：
+
+- 后端：`/gpfs/chencao/qinminzhang/workflow/Web-LoF/.runtime/logs/backend.log`
+- 前端：`/gpfs/chencao/qinminzhang/workflow/Web-LoF/.runtime/logs/frontend.log`
+
+注意日志以尾部为最新内容。排查问题时优先查看尾部最新若干行，而不是从文件开头读取；推荐使用只读命令，例如 `tail -n 200`、`tail -n 500`、`tail -f`（仅在确有必要时）或等价方式。
 
 ### 数据库迁移
 
@@ -90,7 +108,7 @@ backend (Express 5 + MySQL2, port 4000)
 - `GET /api/browse`：分页获取 Trait 元数据。
 - `GET /api/meta/:fileId`：获取 Trait 元信息，可包含 `trait_ldsc`。
 - `GET /api/home/stats`：首页统计，可能扫描文件系统并使用内存缓存。
-- `GET /api/trait/manhattan/:traitName`：读取 Manhattan TSV。请求失败应向前端暴露为 error，不应伪装为空数据。接口会检查 `MANHATTAN_MAX_FILE_BYTES`，但不限制行数；未超限时完整读取并返回 `sourceRowCount`，超过大小返回 413。
+- `GET /api/trait/manhattan/:traitName`：读取 Manhattan TSV。请求失败应向前端暴露为 error，不应伪装为空数据。接口会检查 `MANHATTAN_MAX_FILE_BYTES`；full 模式支持服务端过滤和采样返回，响应包含 `sourceRowCount`、`filteredRowCount`、`returnedRowCount` 等计数，超过大小返回 413。
 - `GET /api/burden-volcano/:fileId`、`GET /api/posterior-volcano/:fileId`：Volcano TSV 数据。前端应显式渲染错误和重试入口。
 - `GET /api/data/search`：Data Browser 全局搜索。后端默认强制分页，前端应传 `page` 和 `limit`，不要一次性拉取所有匹配结果。
 - `GET /api/cross-trait/:fileId/matrix`：Cross-trait heatmap matrix。`topGenes` 默认 80，最大 100；target 文件按 LOF `file_id` 命名。
@@ -149,7 +167,7 @@ backend (Express 5 + MySQL2, port 4000)
 ## 实现注意事项
 
 - 文件型图表接口要明确区分“真实无数据”和“请求失败”。前端组件应显示错误状态和重试按钮。
-- 大 TSV 路径优先做文件大小检查；是否限制行数需要按具体业务确认。
+- 大 TSV 路径优先做文件大小检查；默认返回 hits/summary，full 模式应使用服务端过滤、采样或分页，避免整文件解析后完整 JSON 返回。
 - Data Browser 全局搜索必须服务端分页；不要把全部匹配结果一次性发给前端再本地分页。
 - Cross-trait target 文件当前按 LOF `file_id` 命名；不要在没有数据确认的情况下改成只按 `gwas_id` 查找。
 - `topGenes` 默认 80，最大 100。如果实际返回少于请求数，优先检查源 TSV 中是否有足够的 `gene/ensg` 且 `post_mean` 可解析的行。
