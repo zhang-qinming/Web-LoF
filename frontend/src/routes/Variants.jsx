@@ -14,6 +14,7 @@ import {
 import axios from 'axios';
 import DataBrowseSummary from '../components/DataBrowseSummary';
 import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload } from '../utils/download';
+import { createTtlCache } from '../utils/cache';
 import {
     controlFieldSx,
     DATA_PAGE_MAX_WIDTH,
@@ -48,8 +49,9 @@ const SelectionCtx = createContext({
     checked: new Set(), toggleFile: () => {}, toggleDirAll: () => {}, clearAll: () => {},
 });
 
-const LIST_CACHE = new Map();
-const FILE_PATHS_CACHE = new Map();
+const DATA_BROWSER_CACHE_TTL_MS = 10 * 60 * 1000;
+const LIST_CACHE = createTtlCache({ ttlMs: DATA_BROWSER_CACHE_TTL_MS, maxEntries: 120 });
+const FILE_PATHS_CACHE = createTtlCache({ ttlMs: DATA_BROWSER_CACHE_TTL_MS, maxEntries: 40 });
 
 function LoadingStripe({ theme, width = '100%', height = 14, tone = 'neutral', radius = 1, delayIndex = 0 }) {
     return (
@@ -1279,6 +1281,9 @@ export default function DataBrowser() {
                 mx: 'auto',
                 px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
                 py: { xs: 1.5, md: 2, xl: 2.5 },
+                '@media (min-width: 2200px)': {
+                    px: 5,
+                },
                 height: { xs: 'auto', md: 'calc(100dvh - 96px)' },
                 minHeight: { xs: 'calc(100dvh - 88px)', md: 560 },
                 display: 'flex',

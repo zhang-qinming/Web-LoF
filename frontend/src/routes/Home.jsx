@@ -34,9 +34,12 @@ import {
     TableChart,
 } from '@mui/icons-material';
 import axios from 'axios';
+import useSWR from 'swr';
 import ReleaseLogSection from '../components/ReleaseLogSection';
 import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
+import { getHomeStats } from '../api/gwas';
 import { downloadDataPaths } from '../utils/download';
+import { createTtlCache } from '../utils/cache';
 import { APP_SHELL_MAX_WIDTH, captionSx, panelSx, summaryChipSx } from '../themeUtils';
 import homeFigureBurdenVolcano from '../assets/home/home-figure-burden-volcano.svg';
 import homeFigureCrossTraitHeatmap from '../assets/home/home-figure-cross-trait-heatmap.svg';
@@ -57,13 +60,11 @@ import homeFigureVariantDetail from '../assets/home/home-figure-variant-detail.s
 const accent = '#ff6b4a';
 const siteName = 'Gene-Program-Trait Atlas';
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
-const SEARCH_CACHE = new Map();
 const EMPTY_ENTITY_RESULTS = { traits: [], genes: [], programs: [] };
 const EMPTY_ENTITY_META = { traits: 0, genes: 0, programs: 0 };
 const SEARCH_DEBOUNCE_MS = 220;
 const SEARCH_CACHE_TTL_MS = 90 * 1000;
-const HOME_STATS_CACHE_KEY = 'traitvista.homeStats.v2';
-const HOME_STATS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SEARCH_CACHE = createTtlCache({ ttlMs: SEARCH_CACHE_TTL_MS, maxEntries: 80 });
 const FEATURED_TRAIT = {
     fileId: 'GCST90081631',
     gwasId: 'PA00638',
@@ -76,7 +77,6 @@ const compactNumberFormatter = new Intl.NumberFormat('en-US', {
     notation: 'compact',
     maximumFractionDigits: 2,
 });
-let homeStatsMemoryCache = null;
 
 const quickSearchSeeds = [
     { label: 'Trait GCST', query: 'GCST90081631' },
@@ -297,13 +297,7 @@ function getRequestErrorMessage(err, fallback) {
 }
 
 function getCachedSearchResult(query) {
-    const cached = SEARCH_CACHE.get(query);
-    if (!cached) return null;
-    if (Date.now() - cached.cachedAt > SEARCH_CACHE_TTL_MS) {
-        SEARCH_CACHE.delete(query);
-        return null;
-    }
-    return cached;
+    return SEARCH_CACHE.get(query) || null;
 }
 
 function buildDataBrowserHref({ path = '', search = '' } = {}) {
@@ -342,50 +336,6 @@ function normalizeHomeEntitySearchPayload(payload = {}) {
         },
         entityErrors: payload.errors || {},
     };
-}
-
-function readHomeStatsCache({ allowStale = false } = {}) {
-    const readCachedEntry = (cached) => {
-        if (!cached?.stats || !cached.cachedAt) return null;
-        const fresh = Date.now() - cached.cachedAt < HOME_STATS_CACHE_TTL_MS;
-        if (!fresh && !allowStale) return null;
-        return { stats: cached.stats, fresh };
-    };
-
-    const memoryEntry = readCachedEntry(homeStatsMemoryCache);
-    if (memoryEntry) return memoryEntry;
-    if (typeof window === 'undefined') return null;
-
-    try {
-        const storage = window.localStorage;
-        if (!storage) return null;
-        const raw = storage.getItem(HOME_STATS_CACHE_KEY);
-        if (!raw) return null;
-        const cached = JSON.parse(raw);
-        const storageEntry = readCachedEntry(cached);
-        if (storageEntry) homeStatsMemoryCache = cached;
-        return storageEntry;
-    } catch {
-        return null;
-    }
-}
-
-function writeHomeStatsCache(stats) {
-    if (!stats) return;
-
-    homeStatsMemoryCache = {
-        stats,
-        cachedAt: Date.now(),
-    };
-    if (typeof window === 'undefined') return;
-
-    try {
-        const storage = window.localStorage;
-        if (!storage) return;
-        storage.setItem(HOME_STATS_CACHE_KEY, JSON.stringify(homeStatsMemoryCache));
-    } catch {
-        // Cache failure should not affect the home page.
-    }
 }
 
 function EntityResultSection({ title, totalCount, shownCount, children, theme }) {
@@ -895,7 +845,7 @@ function HomeSearch({
                     },
                     ...entityData,
                 };
-                SEARCH_CACHE.set(searchKey, { ...payload, cachedAt: Date.now() });
+                SEARCH_CACHE.set(searchKey, payload);
                 setResults(payload.results);
                 setMeta(payload.meta);
                 setEntityResults(payload.entityResults);
@@ -1518,7 +1468,19 @@ function HeroBackground() {
 
             </Box>
 
-
+            {/* Smooth transition mask to blend with the main content background */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: '240px',
+                    background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #f5f7fb 100%)',
+                    pointerEvents: 'none',
+                    zIndex: 2,
+                }}
+            />
         </Box>
     );
 }
@@ -1732,39 +1694,18 @@ function HeroSection({ stats, statsLoading, theme }) {
 
 function Home() {
     const theme = useTheme();
-    const [homeStats, setHomeStats] = useState(() => readHomeStatsCache({ allowStale: true })?.stats || null);
-    const [homeStatsError, setHomeStatsError] = useState('');
-    const homeStatsLoading = !homeStats && !homeStatsError;
-
-    useEffect(() => {
-        const cached = readHomeStatsCache();
-        if (cached?.fresh) return undefined;
-
-        let cancelled = false;
-
-        axios.get('/api/home/stats')
-            .then((response) => {
-                if (cancelled) return;
-                const stats = response.data || {};
-                setHomeStats(stats);
-                setHomeStatsError('');
-                writeHomeStatsCache(stats);
-            })
-            .catch((err) => {
-                if (cancelled) return;
-                const stale = readHomeStatsCache({ allowStale: true });
-                if (stale?.stats) setHomeStats(stale.stats);
-                else setHomeStats(null);
-                setHomeStatsError(getRequestErrorMessage(err, 'Stats failed'));
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    const { data: homeStats, error: homeStatsError, isLoading: homeStatsIsLoading } = useSWR(
+        '/api/home/stats',
+        getHomeStats,
+        {
+            keepPreviousData: true,
+            shouldRetryOnError: false,
+        },
+    );
+    const homeStatsLoading = homeStatsIsLoading && !homeStats && !homeStatsError;
 
     return (
-        <Box sx={{ width: '100%', minHeight: '100%', color: '#1f2933', bgcolor: '#f7fafc', mx: 'auto' }}>
+        <Box sx={{ width: '100%', minHeight: '100%', color: '#1f2933', bgcolor: '#f5f7fb', mx: 'auto' }}>
             <HeroSection stats={homeStats} statsLoading={homeStatsLoading} theme={theme} />
 
             <FigureGateway items={traitFigureCards} />

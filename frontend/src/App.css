@@ -16,12 +16,14 @@
     --text: #0f1724;
     --accent: #2563eb;
     --radius: 6px;
-    --app-shell-max-width: 1760px;
-    --app-data-max-width: 1760px;
+    --app-shell-max-width: 2400px;
+    --app-data-max-width: 2400px;
+    --app-figure-max-width: 2400px;
+    --app-content-max-width: 1600px;
     --app-text-max-width: 1120px;
     --max-width: var(--app-shell-max-width);
-    --page-pad-x: clamp(12px, 1.8vw, 36px);
-    --page-pad-y: clamp(8px, 1.2dvh, 18px);
+    --page-pad-x: clamp(12px, 1.6vw, 48px);
+    --page-pad-y: clamp(8px, 1.2dvh, 20px);
     --transition: background 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s, opacity 0.2s;
     --focus: rgba(37, 99, 235, 0.14);
 }

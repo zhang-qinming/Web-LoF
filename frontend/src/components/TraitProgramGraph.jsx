@@ -207,20 +207,24 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         });
     }, []);
 
-    const handleSelectProgram = useCallback((program) => {
+    const handleSelectProgram = useCallback((program, side = null) => {
         if (shouldSuppressClick()) return;
-        setSelectedProgram((current) => (current === program ? null : program));
+        setSelectedProgram(program);
         setSelectedGene(null);
+        setExpandedPrograms((current) => {
+            const next = new Set(current);
+            const sides = side ? [side] : ['program', 'regulator'];
+            sides.forEach((item) => next.add(`${program}:${item}`));
+            return next;
+        });
     }, [shouldSuppressClick]);
 
     const handleSelectGene = useCallback((gene) => {
         if (shouldSuppressClick()) return;
 
-        const nextKey = selectedGeneKey === gene.highlightKey ? null : gene.highlightKey;
+        const nextKey = gene.highlightKey;
         setSelectedProgram(null);
-        setSelectedGene((current) => (current?.highlightKey === gene.highlightKey ? null : gene));
-
-        if (!nextKey) return;
+        setSelectedGene(gene);
 
         setExpandedPrograms((current) => {
             const next = new Set(current);
@@ -233,7 +237,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
             });
             return next;
         });
-    }, [graph, selectedGeneKey, shouldSuppressClick]);
+    }, [graph, shouldSuppressClick]);
 
     const clearSelection = useCallback(() => {
         setSelectedProgram(null);
@@ -334,6 +338,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         selectedProgram={selectedProgram}
                         selectedGeneKey={selectedGeneKey}
                         onSelectProgram={handleSelectProgram}
+                        onSelectGene={handleSelectGene}
                         onToggleExpanded={toggleExpanded}
                         onOpenProgram={openProgram}
                         onOpenGene={openGene}

@@ -27,6 +27,7 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_PLOT_MAX_HEIGHT,
     RESPONSIVE_PLOT_HEIGHT,
     sectionTitleSx,
     summaryChipSx,
@@ -352,7 +353,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
 
     const plotHeight = useMemo(() => {
         const geneRows = matrixPayload?.genes?.length || appliedTopGeneCount || topGeneCount;
-        return Math.max(560, 180 + (geneRows * 18));
+        return Math.min(RESPONSIVE_PLOT_MAX_HEIGHT, Math.max(560, 180 + (geneRows * 18)));
     }, [appliedTopGeneCount, matrixPayload?.genes?.length, topGeneCount]);
     const plotMinWidth = useMemo(
         () => Math.max(960, 260 + ((matrixPayload?.targets?.length || appliedTargets.length || selectedTargets.length) * 56)),

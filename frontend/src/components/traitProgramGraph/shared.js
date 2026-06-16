@@ -50,6 +50,10 @@ export const GRAPH_VIEW_MODES = {
 };
 
 export const SVG_WIDTH = 1680;
+export const GRAPH_RENDER_MAX_WIDTH = {
+    compact: 1880,
+    full: 1960,
+};
 export const GRAPH_LAYOUTS = {
     compact: {
         mode: GRAPH_VIEW_MODES.compact,
@@ -82,10 +86,10 @@ export const GRAPH_LAYOUTS = {
         moduleGap: 20,
         regulatorGroupGap: 12,
         regulatorEdgeTargetSpacing: 24,
-        graphTopPadding: 80,
-        graphBottomPadding: 40,
+        graphTopPadding: 64,
+        graphBottomPadding: 32,
         minContentHeight: 400,
-        minSvgHeight: 680,
+        minSvgHeight: 620,
         geneSubcolumnThreshold: Number.POSITIVE_INFINITY,
         regulatorGroupLayout: 'vertical',
         regulatorGeneLayout: 'effectColumns',
@@ -682,7 +686,6 @@ export function useGraphTransform() {
 
     const onWheel = useCallback((event) => {
         if (!event.ctrlKey && !event.metaKey) return;
-        event.preventDefault();
         const factor = event.deltaY < 0 ? 1.08 : 0.92;
         setTransform((current) => ({
             ...current,

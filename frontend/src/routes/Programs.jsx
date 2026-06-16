@@ -1129,6 +1129,9 @@ export default function Programs() {
                 mx: 'auto',
                 px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
                 py: { xs: 1.5, md: 2.5, xl: 3 },
+                '@media (min-width: 2200px)': {
+                    px: 5,
+                },
             }}>
                 <Paper
                     elevation={0}
@@ -1169,20 +1172,56 @@ export default function Programs() {
                 )}
 
                 <Stack spacing={1.5}>
-                    <ProgramInfoTable
-                        row={detailInfoRow}
-                        loading={loading}
-                        loadingCounts={traitLoading || geneLoading}
-                    />
-                    <React.Suspense fallback={<ProgramDetailFallback />}>
-                        <GeneRegulation programId={programNumber} />
-                    </React.Suspense>
-                    <ProgramGenesTable programId={normalizedProgramId} />
-                    <React.Suspense fallback={<ProgramDetailFallback />}>
-                        <ProgramAssociatedTraits
-                            programId={normalizedProgramId}
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: {
+                                xs: 'minmax(0, 1fr)',
+                            },
+                            gap: 1.5,
+                            alignItems: 'start',
+                            minWidth: 0,
+                            '& > *': {
+                                minWidth: 0,
+                            },
+                            '@media (min-width: 2200px)': {
+                                gridTemplateColumns: 'minmax(620px, 0.78fr) minmax(0, 1.22fr)',
+                            },
+                        }}
+                    >
+                        <ProgramInfoTable
+                            row={detailInfoRow}
+                            loading={loading}
+                            loadingCounts={traitLoading || geneLoading}
                         />
-                    </React.Suspense>
+                        <React.Suspense fallback={<ProgramDetailFallback />}>
+                            <GeneRegulation programId={programNumber} />
+                        </React.Suspense>
+                    </Box>
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: {
+                                xs: 'minmax(0, 1fr)',
+                            },
+                            gap: 1.5,
+                            alignItems: 'start',
+                            minWidth: 0,
+                            '& > *': {
+                                minWidth: 0,
+                            },
+                            '@media (min-width: 2200px)': {
+                                gridTemplateColumns: 'minmax(0, 0.85fr) minmax(0, 1.15fr)',
+                            },
+                        }}
+                    >
+                        <ProgramGenesTable programId={normalizedProgramId} />
+                        <React.Suspense fallback={<ProgramDetailFallback />}>
+                            <ProgramAssociatedTraits
+                                programId={normalizedProgramId}
+                            />
+                        </React.Suspense>
+                    </Box>
                 </Stack>
             </Box>
         );
@@ -1284,6 +1323,9 @@ export default function Programs() {
                             sx={{
                                 width: '100%',
                                 maxWidth: { lg: 320 },
+                                '@media (min-width: 2200px)': {
+                                    maxWidth: 420,
+                                },
                                 '& .MuiInputBase-root': {
                                     height: 32,
                                     bgcolor: theme.palette.background.paper,

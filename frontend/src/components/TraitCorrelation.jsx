@@ -47,6 +47,7 @@ import {
     panelSx,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_PLOT_MAX_HEIGHT,
     RESPONSIVE_PLOT_HEIGHT,
     sectionTitleSx,
     stickyTableContainerSx,
@@ -437,7 +438,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
     }), [displayedMethod, fileId]);
 
     const plotHeight = useMemo(
-        () => Math.max(620, 320 + ((payload?.traits?.length || DEFAULT_TRAIT_LIMIT) * 30)),
+        () => Math.min(RESPONSIVE_PLOT_MAX_HEIGHT, Math.max(620, 320 + ((payload?.traits?.length || DEFAULT_TRAIT_LIMIT) * 30))),
         [payload?.traits?.length],
     );
     const plotMinWidth = useMemo(

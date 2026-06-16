@@ -41,6 +41,7 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_TALL_PLOT_HEIGHT,
     sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
@@ -63,7 +64,7 @@ const SIGNIFICANCE_LOGP = -Math.log10(0.05);
 const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 800;
 const DEFAULT_POINT_SIZE = 8;
-const VOLCANO_PLOT_HEIGHT = 'clamp(620px, 72dvh, 960px)';
+const VOLCANO_PLOT_HEIGHT = RESPONSIVE_TALL_PLOT_HEIGHT;
 const AUTO_FULL_MIN_POINTS = 20;
 
 const VOLCANO_CONFIGS = {

@@ -38,6 +38,7 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_TALL_PLOT_HEIGHT,
     sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
@@ -51,7 +52,7 @@ const DEFAULT_EXPORT_WIDTH = 1280;
 const DEFAULT_EXPORT_HEIGHT = 820;
 const DEFAULT_POINT_SIZE = 7;
 const DEFAULT_LABEL_LIMIT = 10;
-const GENE_EVIDENCE_PLOT_HEIGHT = 'clamp(640px, 74dvh, 1000px)';
+const GENE_EVIDENCE_PLOT_HEIGHT = RESPONSIVE_TALL_PLOT_HEIGHT;
 
 const EVIDENCE_CLASSES = {
     background: {

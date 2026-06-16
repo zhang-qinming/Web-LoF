@@ -47,6 +47,7 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_TALL_PLOT_HEIGHT,
     summaryChipSx,
     toolbarSx,
 } from '../themeUtils';
@@ -55,7 +56,7 @@ const UNASSIGNED_COLOR = '#6f7d90';
 const FULL_BACKGROUND_CHROM_COLORS = ['#e58d2a', '#3b7fc4'];
 const DEFAULT_EXPORT_WIDTH = 1400;
 const DEFAULT_EXPORT_HEIGHT = 760;
-const MANHATTAN_PLOT_HEIGHT = 'clamp(620px, 72dvh, 980px)';
+const MANHATTAN_PLOT_HEIGHT = RESPONSIVE_TALL_PLOT_HEIGHT;
 const PROGRAM_COLORS = [
     '#5194D6', '#D66351', '#51D6AA', '#D69451', '#9851D6', '#D65187', '#51BCD6', '#63D651',
     '#6351D6', '#D67E51', '#51D689', '#D651D6', '#51D6CD', '#D6C551', '#5175D6', '#D65168',

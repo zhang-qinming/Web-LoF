@@ -2939,8 +2939,26 @@ export default function Genes() {
                             summary={summary}
                             onSelect={(gene) => runSearch(gene)}
                         />
-                        <GeneInfoTable gene={overviewGene} summary={summary} />
-                        <GeneProgramTable gene={overviewGene} records={records} programRows={programRows} />
+                        <Box
+                            sx={{
+                                display: 'grid',
+                                gridTemplateColumns: {
+                                    xs: 'minmax(0, 1fr)',
+                                },
+                                gap: 1.5,
+                                alignItems: 'start',
+                                minWidth: 0,
+                                '& > *': {
+                                    minWidth: 0,
+                                },
+                                '@media (min-width: 2200px)': {
+                                    gridTemplateColumns: 'minmax(760px, 0.9fr) minmax(1056px, 1.1fr)',
+                                },
+                            }}
+                        >
+                            <GeneInfoTable gene={overviewGene} summary={summary} />
+                            <GeneProgramTable gene={overviewGene} records={records} programRows={programRows} />
+                        </Box>
                         {recordsError ? (
                             <StatePanel
                                 severity="error"

@@ -24,7 +24,7 @@ import { PageFrame } from '../components/PageScaffold';
 import AboutDataStatistics from '../components/AboutDataStatistics';
 import ReleaseLogSection from '../components/ReleaseLogSection';
 import { RELEASE_LOG_ANCHOR, releaseEntriesByLocale } from '../components/releaseLogData';
-import { captionSx, metricChipTone, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
+import { CONTENT_PAGE_MAX_WIDTH, captionSx, metricChipTone, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
 
 const COPY = {
     en: {
@@ -394,7 +394,7 @@ export default function About() {
     return (
         <PageFrame
             title={copy.title}
-            maxWidth={1080}
+            maxWidth={CONTENT_PAGE_MAX_WIDTH}
             compact
             actions={(
                 <Stack direction="row" spacing={1} alignItems="center">

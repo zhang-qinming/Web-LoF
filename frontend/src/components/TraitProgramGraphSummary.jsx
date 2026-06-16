@@ -3,6 +3,7 @@ import {
     Box,
     Button,
     Chip,
+    IconButton,
     Paper,
     Stack,
     Table,
@@ -15,6 +16,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { OpenInNew } from '@mui/icons-material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { stickyTableContainerSx, stickyTableHeaderCellSx, stickyTableSx, tableRowRevealSx, tableTone } from '../themeUtils';
 
@@ -25,6 +27,7 @@ export default function TraitProgramGraphSummary({
     selectedProgram,
     selectedGeneKey,
     onSelectProgram,
+    onSelectGene,
     onToggleExpanded,
     sideMeta,
     sideMetaMap,
@@ -203,6 +206,7 @@ export default function TraitProgramGraphSummary({
                             const scoreField = rowSide === 'program' ? 'programScore' : 'regulatorScore';
                             const totalField = rowSide === 'program' ? 'loadingTotalCount' : 'regulatorTotalCount';
                             const selected = selectedProgram === module.program;
+                            const geneFocused = Boolean(selectedGeneKey) && module.filteredGeneKeys?.includes(selectedGeneKey);
                             const selectionColor = programColor(module);
                             const selectionLabel = programSelectionLabel(module);
                             const positiveCount = module.visibleGenes?.filter((gene) => effectSignFromGene(gene) === 'positive').length || 0;
@@ -224,12 +228,20 @@ export default function TraitProgramGraphSummary({
                                     }}
                                     hover
                                     selected={selected}
-                                    onClick={() => onSelectProgram(module.program)}
+                                    onClick={() => onSelectProgram(module.program, rowSide)}
                                     sx={{
                                         ...tableRowRevealSx(theme, index),
                                         cursor: 'pointer',
+                                        bgcolor: geneFocused && !selected ? alpha(effectColors.positive, 0.06) : undefined,
                                         '&.Mui-selected': { bgcolor: rowMeta.softBg },
                                         '&.Mui-selected:hover': { bgcolor: rowMeta.softBg },
+                                        '&:hover': {
+                                            bgcolor: selected
+                                                ? rowMeta.softBg
+                                                : geneFocused
+                                                    ? alpha(effectColors.positive, 0.10)
+                                                    : undefined,
+                                        },
                                     }}
                                 >
                                     <TableCell>
@@ -248,27 +260,42 @@ export default function TraitProgramGraphSummary({
                                     </TableCell>
                                     <TableCell>
                                         <Stack spacing={0.35}>
-                                            <Tooltip title={`Open ${module.program}`}>
-                                                <Button
-                                                    size="small"
-                                                    variant="text"
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        onOpenProgram?.(module.program);
-                                                    }}
-                                                    sx={{
-                                                        justifyContent: 'flex-start',
-                                                        minWidth: 0,
-                                                        p: 0,
-                                                        color: '#245089',
-                                                        fontWeight: 740,
-                                                        lineHeight: 1,
-                                                        textTransform: 'none',
-                                                    }}
-                                                >
-                                                    {module.program}
-                                                </Button>
-                                            </Tooltip>
+                                            <Stack direction="row" spacing={0.25} alignItems="center">
+                                                <Tooltip title={`Focus ${module.program} in graph and table`}>
+                                                    <Button
+                                                        size="small"
+                                                        variant="text"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            onSelectProgram(module.program, rowSide);
+                                                        }}
+                                                        sx={{
+                                                            justifyContent: 'flex-start',
+                                                            minWidth: 0,
+                                                            p: 0,
+                                                            color: '#245089',
+                                                            fontWeight: 740,
+                                                            lineHeight: 1,
+                                                            textTransform: 'none',
+                                                        }}
+                                                    >
+                                                        {module.program}
+                                                    </Button>
+                                                </Tooltip>
+                                                <Tooltip title={`Open ${module.program}`}>
+                                                    <IconButton
+                                                        size="small"
+                                                        aria-label={`Open ${module.program}`}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            onOpenProgram?.(module.program);
+                                                        }}
+                                                        sx={{ width: 24, height: 24, color: '#667085' }}
+                                                    >
+                                                        <OpenInNew sx={{ fontSize: 15 }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Stack>
                                             <Typography sx={{ fontSize: 11.5, color: '#667085', lineHeight: 1.2 }}>
                                                 {rowSide === 'program' ? 'program burden' : 'regulator-program'}
                                             </Typography>
@@ -336,6 +363,7 @@ export default function TraitProgramGraphSummary({
                                             {uniqueGenes.length ? uniqueGenes.slice(0, 10).map((gene) => {
                                                 const geneLabel = gene.geneLabel || gene.gene || gene.ensg || 'gene';
                                                 const sign = effectSignFromGene(gene);
+                                                const geneSelected = selectedGeneKey === gene.highlightKey;
                                                 return (
                                                     <Chip
                                                         key={gene.highlightKey || `${module.program}:${geneLabel}`}
@@ -343,25 +371,41 @@ export default function TraitProgramGraphSummary({
                                                         size="small"
                                                         onClick={(event) => {
                                                             event.stopPropagation();
+                                                            onSelectGene?.(gene);
+                                                        }}
+                                                        onDelete={(event) => {
+                                                            event.stopPropagation();
                                                             onOpenGene?.(gene);
                                                         }}
+                                                        deleteIcon={<OpenInNew sx={{ fontSize: 14 }} />}
                                                         sx={{
                                                             height: 22,
                                                             borderRadius: 1,
                                                             fontSize: 11,
                                                             fontWeight: 680,
-                                                            color: effectColors[sign] || '#475467',
-                                                            bgcolor: sign === 'negative'
+                                                            color: geneSelected ? '#fff' : (effectColors[sign] || '#475467'),
+                                                            bgcolor: geneSelected
+                                                                ? (effectColors[sign] || '#475467')
+                                                                : sign === 'negative'
                                                                 ? alpha(effectColors.negative, 0.10)
                                                                 : sign === 'positive'
                                                                     ? alpha(effectColors.positive, 0.10)
                                                                     : 'rgba(15,23,42,0.06)',
-                                                            border: `1px solid ${sign === 'negative'
+                                                            border: `1px solid ${geneSelected
+                                                                ? (effectColors[sign] || '#475467')
+                                                                : sign === 'negative'
                                                                 ? alpha(effectColors.negative, 0.24)
                                                                 : sign === 'positive'
                                                                     ? alpha(effectColors.positive, 0.24)
                                                                     : 'rgba(15,23,42,0.10)'}`,
                                                             cursor: 'pointer',
+                                                            '& .MuiChip-deleteIcon': {
+                                                                color: geneSelected ? 'rgba(255,255,255,0.92)' : '#667085',
+                                                                mr: 0.35,
+                                                                '&:hover': {
+                                                                    color: geneSelected ? '#fff' : '#245089',
+                                                                },
+                                                            },
                                                         }}
                                                     />
                                                 );

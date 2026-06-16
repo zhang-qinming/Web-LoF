@@ -32,6 +32,7 @@ import {
 import { PageFrame } from '../components/PageScaffold';
 import {
     captionSx,
+    CONTENT_PAGE_MAX_WIDTH,
     metricChipTone,
     panelSx,
     sectionTitleSx,
@@ -1497,7 +1498,7 @@ export default function Help() {
     return (
         <PageFrame
             title={copy.pageTitle}
-            maxWidth={1480}
+            maxWidth={CONTENT_PAGE_MAX_WIDTH}
             compact
         >
             <Stack

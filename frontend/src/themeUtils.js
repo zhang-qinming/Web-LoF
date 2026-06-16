@@ -2,12 +2,16 @@ import { alpha } from '@mui/material/styles';
 
 const RECT_RADIUS = 1;
 
-export const APP_SHELL_MAX_WIDTH = 1760;
-export const DATA_PAGE_MAX_WIDTH = 1760;
-export const RESPONSIVE_PLOT_HEIGHT = 'clamp(500px, 64dvh, 820px)';
-export const RESPONSIVE_TALL_PLOT_HEIGHT = 'clamp(520px, 66dvh, 860px)';
-export const RESPONSIVE_COMPACT_PLOT_HEIGHT = 'clamp(420px, 58dvh, 700px)';
-export const RESPONSIVE_EMPTY_PLOT_HEIGHT = 'clamp(300px, 44dvh, 520px)';
+export const APP_SHELL_MAX_WIDTH = 2400;
+export const DATA_PAGE_MAX_WIDTH = 2400;
+export const FIGURE_PAGE_MAX_WIDTH = 2400;
+export const CONTENT_PAGE_MAX_WIDTH = 1600;
+export const APP_TEXT_MAX_WIDTH = 1120;
+export const RESPONSIVE_PLOT_MAX_HEIGHT = 980;
+export const RESPONSIVE_PLOT_HEIGHT = 'clamp(560px, min(64dvh, 38vw), 980px)';
+export const RESPONSIVE_TALL_PLOT_HEIGHT = 'clamp(600px, min(68dvh, 40vw), 980px)';
+export const RESPONSIVE_COMPACT_PLOT_HEIGHT = 'clamp(400px, min(56dvh, 28vw), 740px)';
+export const RESPONSIVE_EMPTY_PLOT_HEIGHT = 'clamp(280px, min(40dvh, 24vw), 500px)';
 
 function normalizeRectRadius(value) {
     if (value === 0 || value === '0' || value === '0px') {

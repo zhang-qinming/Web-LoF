@@ -20,6 +20,7 @@ import {
     compactToggleGroupSx,
     metricChipTone,
     plotFrameSx,
+    RESPONSIVE_TALL_PLOT_HEIGHT,
     summaryChipSx,
     tableTone,
     toolbarSx,
@@ -58,7 +59,7 @@ const DEFAULT_EXPORT_WIDTH = 1200;
 const DEFAULT_EXPORT_HEIGHT = 800;
 const PLOT_TRANSITION_DURATION = 450;
 const TRACE_INDICES = TRACE_ORDER.map((_, index) => index);
-const PROGRAM_SCATTER_PLOT_HEIGHT = 'clamp(620px, 74dvh, 980px)';
+const PROGRAM_SCATTER_PLOT_HEIGHT = RESPONSIVE_TALL_PLOT_HEIGHT;
 
 function toFiniteNumber(value) {
     const num = Number(value);

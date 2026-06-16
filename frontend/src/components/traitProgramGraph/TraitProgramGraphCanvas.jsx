@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Box, Button, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import {
     CloseFullscreen,
@@ -19,6 +19,7 @@ import {
     exportSvg,
     formatGeneTooltip,
     formatProgramTooltip,
+    GRAPH_RENDER_MAX_WIDTH,
     INLINE_LEGEND_GROUPS,
     programColor,
     programDisplayLines,
@@ -191,6 +192,7 @@ function ZoomToolbar({ scale, zoomIn, zoomOut, resetView }) {
 }
 
 function SelectionActions({
+    clearSelection,
     onOpenGene,
     onOpenProgram,
     selectedGene,
@@ -269,6 +271,14 @@ function SelectionActions({
                         </Button>
                     </Stack>
                 )}
+                <Button
+                    size="small"
+                    variant="text"
+                    onClick={clearSelection}
+                    sx={{ textTransform: 'none', fontWeight: 680, whiteSpace: 'nowrap' }}
+                >
+                    Clear focus
+                </Button>
             </Stack>
         </Box>
     );
@@ -307,9 +317,26 @@ export default function TraitProgramGraphCanvas({
     zoomIn,
     zoomOut,
 }) {
+    const graphViewportRef = useRef(null);
     const layout = graphLayout;
     const exportStem = sanitizeFileNamePart(exportFileName || 'trait-program-gene');
     const exportSuffix = isFullGraph ? 'full' : 'compact';
+    const renderMaxWidth = isFullGraph ? GRAPH_RENDER_MAX_WIDTH.full : GRAPH_RENDER_MAX_WIDTH.compact;
+
+    useEffect(() => {
+        const element = graphViewportRef.current;
+        if (!element) return undefined;
+
+        const handleWheel = (event) => {
+            if (!event.ctrlKey && !event.metaKey) return;
+            if (event.cancelable) event.preventDefault();
+        };
+
+        element.addEventListener('wheel', handleWheel, { passive: false });
+        return () => {
+            element.removeEventListener('wheel', handleWheel);
+        };
+    }, []);
 
     const renderGeneColumns = useCallback(({
         columns,
@@ -503,7 +530,7 @@ export default function TraitProgramGraphCanvas({
 
                 <g
                     data-graph-clickable="true"
-                    onClick={() => onSelectProgram(module.program)}
+                    onClick={() => onSelectProgram(module.program, module.side)}
                     onDoubleClick={(event) => {
                         event.stopPropagation();
                         onOpenProgram?.(module.program);
@@ -793,7 +820,7 @@ export default function TraitProgramGraphCanvas({
 
                 <g
                     data-graph-clickable="true"
-                    onClick={() => onSelectProgram(module.program)}
+                    onClick={() => onSelectProgram(module.program, module.side)}
                     onDoubleClick={(event) => {
                         event.stopPropagation();
                         onOpenProgram?.(module.program);
@@ -979,6 +1006,7 @@ export default function TraitProgramGraphCanvas({
             </Box>
 
             <Box
+                ref={graphViewportRef}
                 sx={{
                     px: { xs: 0.5, md: 1 },
                     py: 0.5,
@@ -1003,6 +1031,7 @@ export default function TraitProgramGraphCanvas({
                     resetView={resetView}
                 />
                 <SelectionActions
+                    clearSelection={clearSelection}
                     onOpenGene={onOpenGene}
                     onOpenProgram={onOpenProgram}
                     selectedGene={selectedGene}
@@ -1014,7 +1043,12 @@ export default function TraitProgramGraphCanvas({
                     width="100%"
                     viewBox={`0 0 ${SVG_WIDTH} ${svgHeight}`}
                     preserveAspectRatio="xMidYMid meet"
-                    style={{ display: 'block', width: '100%', height: 'auto' }}
+                    style={{
+                        display: 'block',
+                        width: `min(100%, ${renderMaxWidth}px)`,
+                        height: 'auto',
+                        margin: '0 auto',
+                    }}
                 >
                     <defs>
                         <style>

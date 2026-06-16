@@ -784,6 +784,9 @@ export default function GwasDataList({
                                                             gap: 0.65,
                                                             flexWrap: 'wrap',
                                                             maxWidth: { lg: 280 },
+                                                            '@media (min-width: 2200px)': {
+                                                                maxWidth: 420,
+                                                            },
                                                         }}
                                                     >
                                                         <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b5f', lineHeight: 1.15 })}>
@@ -815,6 +818,9 @@ export default function GwasDataList({
                                                             sx={{
                                                                 width: '100%',
                                                                 maxWidth: { lg: 260 },
+                                                                '@media (min-width: 2200px)': {
+                                                                    maxWidth: 360,
+                                                                },
                                                                 '& .MuiOutlinedInput-root': {
                                                                     height: 32,
                                                                     bgcolor: theme.palette.background.paper,

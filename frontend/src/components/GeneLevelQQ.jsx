@@ -39,6 +39,7 @@ import {
     metricChipTone,
     plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
+    RESPONSIVE_TALL_PLOT_HEIGHT,
     sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
@@ -54,7 +55,7 @@ const DEFAULT_POINT_SIZE = 7;
 const DEFAULT_LABEL_LIMIT = 4;
 const DEFAULT_COMPARE_TRAITS = 1;
 const MAX_COMPARE_TRAITS = 12;
-const GENE_QQ_PLOT_HEIGHT = 'clamp(640px, 74dvh, 1000px)';
+const GENE_QQ_PLOT_HEIGHT = RESPONSIVE_TALL_PLOT_HEIGHT;
 const MAX_ENVELOPE_POINTS = 360;
 const NOMINAL_LOGP = -Math.log10(0.05);
 const BASE_POINT_COLOR = '#53677f';

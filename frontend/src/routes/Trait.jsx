@@ -292,6 +292,9 @@ export default function Trait() {
             mx: 'auto',
             px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
             py: { xs: 2, md: 3, xl: 3.5 },
+            '@media (min-width: 2200px)': {
+                px: 5,
+            },
         }}>
             <TraitMetaCard fileId={fileId} />
 

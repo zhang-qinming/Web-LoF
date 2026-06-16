@@ -25,6 +25,9 @@ export function PageFrame({
                 mx: 'auto',
                 px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
                 py: compact ? { xs: 1.5, md: 2.5, xl: 3 } : { xs: 2.5, md: 3.5, xl: 4 },
+                '@media (min-width: 2200px)': {
+                    px: 5,
+                },
                 ...fadeUpKeyframes(),
                 animation: `appFadeUp ${theme.custom.motion.smooth} both`,
                 ...sx,

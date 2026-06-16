@@ -386,10 +386,31 @@ export default function TraitMetaCard({ fileId }) {
                 animation: 'traitMetaReveal 420ms cubic-bezier(0.22, 1, 0.36, 1) both',
             }}
         >
-            <TraitInfoTable title="Trait information" rows={traitRows} theme={theme} action={exportButton} />
-            <TraitInfoTable title="Study information" rows={studyRows} theme={theme} />
-            <TraitInfoTable title="Burden information" rows={burdenRows} theme={theme} />
-            <TraitInfoTable title="LDSC information" rows={ldscRows} theme={theme} />
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: {
+                        xs: 'minmax(0, 1fr)',
+                    },
+                    gap: { xs: 0 },
+                    alignItems: 'start',
+                    '& > *': {
+                        minWidth: 0,
+                    },
+                    '@media (min-width: 2200px)': {
+                        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                        gap: 3,
+                        '& > *': {
+                            mt: '0 !important',
+                        },
+                    },
+                }}
+            >
+                <TraitInfoTable title="Trait information" rows={traitRows} theme={theme} action={exportButton} />
+                <TraitInfoTable title="Study information" rows={studyRows} theme={theme} />
+                <TraitInfoTable title="Burden information" rows={burdenRows} theme={theme} />
+                <TraitInfoTable title="LDSC information" rows={ldscRows} theme={theme} />
+            </Box>
         </Paper>
     );
 }
