@@ -1,16 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-    Alert,
-    Box,
-    CircularProgress,
-    Paper,
-    Stack,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import { useNavigate } from 'react-router-dom';
-import { getTraitProgramGraph, isCanceledRequest } from '../api/gwas';
+import useSWR from 'swr';
+import { getTraitProgramGraph } from '../api/gwas';
+import { UpdatingStatus } from './PageScaffold';
 import TraitProgramGraphSummary from './TraitProgramGraphSummary';
 import TraitProgramGraphCanvas from './traitProgramGraph/TraitProgramGraphCanvas';
+import { figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     buildModuleBlueprints,
     EFFECT_COLORS,
@@ -48,9 +51,13 @@ function geneQueryCandidates(gene) {
 
 export default function TraitProgramGraph({ fileId, traitLabel }) {
     const navigate = useNavigate();
-    const [data, setData] = useState(null);
-    const [error, setError] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const graphKey = fileId ? ['trait-program-graph', fileId] : null;
+    const graphResource = useCachedResourceState(
+        useSWR(graphKey, ([, id]) => getTraitProgramGraph(id), figureResourceSWRConfig),
+        { cacheKey: graphKey, retainData: false },
+    );
+    const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = graphResource;
+    const afterFirstPaint = useAfterFirstPaint(graphKey || 'trait-program-graph-empty');
     const graph = data;
     const svgRef = useRef(null);
 
@@ -58,40 +65,6 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
     const [selectedGene, setSelectedGene] = useState(null);
     const [expandedPrograms, setExpandedPrograms] = useState(() => new Set());
     const [graphViewMode, setGraphViewMode] = useState(GRAPH_VIEW_MODES.compact);
-
-    useEffect(() => {
-        if (!fileId) {
-            setData(null);
-            setError(null);
-            setIsLoading(false);
-            return undefined;
-        }
-
-        const controller = new AbortController();
-        let cancelled = false;
-        setIsLoading(true);
-        setError(null);
-        setData(null);
-        getTraitProgramGraph(fileId, { signal: controller.signal })
-            .then((result) => {
-                if (!cancelled && !controller.signal.aborted) setData(result);
-            })
-            .catch((err) => {
-                if (isCanceledRequest(err)) return;
-                if (!cancelled && !controller.signal.aborted) {
-                    setData(null);
-                    setError(err);
-                }
-            })
-            .finally(() => {
-                if (!cancelled && !controller.signal.aborted) setIsLoading(false);
-            });
-
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [fileId]);
 
     const {
         transform,
@@ -282,7 +255,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         );
     }
 
-    if (error) {
+    if (error && !graph) {
         return <Alert severity="error">Failed to load trait program graph.</Alert>;
     }
 
@@ -290,8 +263,13 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         return <Alert severity="info">No trait program graph data available.</Alert>;
     }
 
+    if (!afterFirstPaint) {
+        return <Box sx={{ minHeight: 360 }} />;
+    }
+
     return (
         <Stack spacing={2.5}>
+            <UpdatingStatus active={isRefreshing} />
             <TraitProgramGraphCanvas
                 clearSelection={clearSelection}
                 exportFileName={fileId}

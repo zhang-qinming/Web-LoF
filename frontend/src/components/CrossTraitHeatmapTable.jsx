@@ -1,19 +1,17 @@
 import React, { useMemo } from 'react';
-import {
-    Box,
-    Button,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Paper from '@mui/material/Paper';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { DownloadOutlined } from '@mui/icons-material';
+import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import { useNavigate } from 'react-router-dom';
 import {
     panelSx,

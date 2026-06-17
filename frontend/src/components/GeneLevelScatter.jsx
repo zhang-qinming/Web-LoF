@@ -1,36 +1,37 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Plot, { Plotly } from '../lib/plotly';
-import {
-    Alert,
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Slider,
-    Stack,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Slider from '@mui/material/Slider';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    Biotech,
-    Download,
-    FilterAlt,
-    Insights,
-    RestartAlt,
-    Science,
-} from '@mui/icons-material';
-import { getDataFileText, isCanceledRequest } from '../api/gwas';
+import Biotech from '@mui/icons-material/Biotech';
+import Download from '@mui/icons-material/Download';
+import FilterAlt from '@mui/icons-material/FilterAlt';
+import Insights from '@mui/icons-material/Insights';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import Science from '@mui/icons-material/Science';
+import useSWR from 'swr';
+import { getDataFileText } from '../api/gwas';
+import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -306,6 +307,20 @@ function getDataPath(fileId) {
     return `${DATA_DIR}/${encodeURIComponent(fileId)}.tsv`;
 }
 
+async function loadGeneLevelScatterPayload(candidateIds) {
+    let lastError = null;
+    for (const candidate of candidateIds) {
+        const path = getDataPath(candidate);
+        try {
+            const text = await getDataFileText(path);
+            return { rows: parseTsv(text), fileId: candidate, path };
+        } catch (err) {
+            lastError = err;
+        }
+    }
+    throw lastError || new Error('Gene-level scatter TSV not found');
+}
+
 export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds = [] }) {
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
@@ -314,9 +329,6 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
 
-    const [payload, setPayload] = useState({ rows: [], fileId: '', path: '' });
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [viewMode, setViewMode] = useState(VIEW_MODES.ALL);
     const [directionMode, setDirectionMode] = useState(DIRECTION_MODES.ALL);
     const [geneQuery, setGeneQuery] = useState('');
@@ -338,49 +350,24 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
         [...new Set([...(Array.isArray(lookupIds) ? lookupIds : []), fileId, gwasId].filter(Boolean))]
     ), [fileId, gwasId, lookupIds]);
 
+    const scatterKey = candidateIds.length ? ['gene-level-scatter', ...candidateIds] : null;
+    const scatterResource = useCachedResourceState(
+        useSWR(scatterKey, ([, ...ids]) => loadGeneLevelScatterPayload(ids), figureResourceSWRConfig),
+        { cacheKey: scatterKey, retainData: false },
+    );
+    const {
+        displayData: cachedPayload,
+        error,
+        isInitialLoading: isLoading,
+        isRefreshing,
+    } = scatterResource;
+    const payload = cachedPayload || { rows: [], fileId: candidateIds[0] || '', path: candidateIds[0] ? getDataPath(candidateIds[0]) : '' };
+    const afterFirstPaint = useAfterFirstPaint(scatterKey || 'gene-level-scatter-empty');
+
     useEffect(() => {
-        if (!candidateIds.length) {
-            setPayload({ rows: [], fileId: '', path: '' });
-            return undefined;
-        }
-
-        const controller = new AbortController();
-        let cancelled = false;
-        setIsLoading(true);
-        setError(null);
-
-        (async () => {
-            let lastError = null;
-            for (const candidate of candidateIds) {
-                const path = getDataPath(candidate);
-                try {
-                    const text = await getDataFileText(path, { signal: controller.signal });
-                    if (cancelled || controller.signal.aborted) return;
-                    const rows = parseTsv(text);
-                    if (!cancelled && !controller.signal.aborted) {
-                        setPayload({ rows, fileId: candidate, path });
-                        setHighlight({ rowKey: '', key: 0 });
-                        setTablePage(0);
-                    }
-                    return;
-                } catch (err) {
-                    if (isCanceledRequest(err)) return;
-                    lastError = err;
-                }
-            }
-            if (!cancelled && !controller.signal.aborted) {
-                setPayload({ rows: [], fileId: candidateIds[0], path: getDataPath(candidateIds[0]) });
-                setError(lastError || new Error('Gene-level scatter TSV not found'));
-            }
-        })().finally(() => {
-            if (!cancelled && !controller.signal.aborted) setIsLoading(false);
-        });
-
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [candidateIds]);
+        setHighlight({ rowKey: '', key: 0 });
+        setTablePage(0);
+    }, [payload.fileId]);
 
     const rows = payload.rows;
 
@@ -859,6 +846,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                 <Chip icon={<Insights />} label={`${counts.supported.toLocaleString()} supported`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'regulation_supported'))} />
                 <Chip icon={<FilterAlt />} label={`${counts.discordant.toLocaleString()} discordant`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'direction_discordant'))} />
                 <Chip icon={<Science />} label={`${counts.posteriorHigh.toLocaleString()} high posterior`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'posterior_high', 0.1, 0.24))} />
+                <UpdatingStatus active={isRefreshing} />
             </Box>
 
             <Box sx={toolbarSx(theme)}>
@@ -927,7 +915,11 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                         </Box>
                     )}
 
-                    {!isLoading && hasVisiblePoints && (
+                    {!isLoading && hasVisiblePoints && !afterFirstPaint && (
+                        <Box sx={{ minHeight: GENE_EVIDENCE_PLOT_HEIGHT }} />
+                    )}
+
+                    {!isLoading && hasVisiblePoints && afterFirstPaint && (
                         <>
                             <Plot
                                 data={[...plotData, ...labelTrace, ...highlightedPoint]}
@@ -967,24 +959,26 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                 </CardContent>
             </Card>
 
-            <GeneLevelScatterTable
-                tableSectionRef={tableSectionRef}
-                rows={rows}
-                sortedRows={sortedRows}
-                pagedRows={pagedRows}
-                tableOpen={tableOpen}
-                setTableOpen={setTableOpen}
-                tablePage={tablePage}
-                setTablePage={setTablePage}
-                tableRowsPerPage={tableRowsPerPage}
-                setTableRowsPerPage={setTableRowsPerPage}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                handleSort={handleSort}
-                downloadCSV={downloadCSV}
-                highlight={highlight}
-                tableRowRefs={tableRowRefs}
-            />
+            {!isLoading && afterFirstPaint && (
+                <GeneLevelScatterTable
+                    tableSectionRef={tableSectionRef}
+                    rows={rows}
+                    sortedRows={sortedRows}
+                    pagedRows={pagedRows}
+                    tableOpen={tableOpen}
+                    setTableOpen={setTableOpen}
+                    tablePage={tablePage}
+                    setTablePage={setTablePage}
+                    tableRowsPerPage={tableRowsPerPage}
+                    setTableRowsPerPage={setTableRowsPerPage}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    handleSort={handleSort}
+                    downloadCSV={downloadCSV}
+                    highlight={highlight}
+                    tableRowRefs={tableRowRefs}
+                />
+            )}
 
             <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
                 <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>

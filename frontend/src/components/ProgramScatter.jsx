@@ -1,18 +1,34 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Plot, { Plotly } from '../lib/plotly';
-import {
-    Box, Typography, Alert, CircularProgress, ToggleButtonGroup, ToggleButton,
-    Slider, FormControlLabel, Switch, Button, Dialog, DialogTitle,
-    DialogContent, DialogActions, TextField, Chip, Paper,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import ToggleButton from '@mui/material/ToggleButton';
+import Slider from '@mui/material/Slider';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
 import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
-import { fetcher, getProgramScatterData, isCanceledRequest } from '../api/gwas';
+import { fetcher, getProgramScatterData } from '../api/gwas';
 import FloatingLegend from './FloatingLegend';
+import { UpdatingStatus } from './PageScaffold';
 import ProgramScatterTable from './ProgramScatterTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneNeutral,
@@ -355,11 +371,19 @@ export default function ProgramScatter({ fileId }) {
         '& .MuiSlider-rail': { opacity: 0.25 },
     }), [theme.palette.primary.main]);
     const navigate = useNavigate();
-    const [data, setData] = useState(null);
-    const [error, setError] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const { data: infoData } = useSWR('/api/programs/info', fetcher);
+    const scatterKey = fileId ? ['program-scatter', fileId] : null;
+    const scatterResource = useCachedResourceState(
+        useSWR(scatterKey, ([, id]) => getProgramScatterData(id), figureResourceSWRConfig),
+        { cacheKey: scatterKey, retainData: false },
+    );
+    const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = scatterResource;
+    const infoResource = useCachedResourceState(
+        useSWR('/api/programs/info', fetcher, detailSummarySWRConfig),
+        { cacheKey: '/api/programs/info' },
+    );
+    const infoData = infoResource.displayData;
     const programInfo = useMemo(() => infoData || {}, [infoData]);
+    const afterFirstPaint = useAfterFirstPaint(scatterKey || 'program-scatter-empty');
 
     const [mode, setMode] = useState(MODES.SCATTER);
     const [topN, setTopN] = useState(DEFAULT_TOP_N);
@@ -383,40 +407,6 @@ export default function ProgramScatter({ fileId }) {
     const pendingAnimationRef = useRef(null);
     const animationIdRef = useRef(0);
     const [displayPlotData, setDisplayPlotData] = useState([]);
-
-    useEffect(() => {
-        if (!fileId) {
-            setData(null);
-            setError(null);
-            setIsLoading(false);
-            return undefined;
-        }
-
-        const controller = new AbortController();
-        let cancelled = false;
-        setIsLoading(true);
-        setError(null);
-        setData(null);
-        getProgramScatterData(fileId, { signal: controller.signal })
-            .then((result) => {
-                if (!cancelled && !controller.signal.aborted) setData(result);
-            })
-            .catch((err) => {
-                if (isCanceledRequest(err)) return;
-                if (!cancelled && !controller.signal.aborted) {
-                    setData(null);
-                    setError(err);
-                }
-            })
-            .finally(() => {
-                if (!cancelled && !controller.signal.aborted) setIsLoading(false);
-            });
-
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [fileId]);
 
     const startPendingAnimation = useCallback((graphDiv) => {
         const pending = pendingAnimationRef.current;
@@ -923,7 +913,7 @@ export default function ProgramScatter({ fileId }) {
         );
     }
 
-    if (error) {
+    if (error && !data) {
         return <Alert severity="error" sx={{ m: 2 }}>{error.message}</Alert>;
     }
 
@@ -1021,6 +1011,7 @@ export default function ProgramScatter({ fileId }) {
                                 })}
                             />
                         ))}
+                        <UpdatingStatus active={isRefreshing} />
                     </Box>
                 </Box>
             )}
@@ -1055,7 +1046,11 @@ export default function ProgramScatter({ fileId }) {
                         </Box>
                     )}
 
-                    {hasVisiblePoints && (
+                    {hasVisiblePoints && !afterFirstPaint && (
+                        <Box sx={{ minHeight: PROGRAM_SCATTER_PLOT_HEIGHT }} />
+                    )}
+
+                    {hasVisiblePoints && afterFirstPaint && (
                         <>
                             <Plot
                                 onInitialized={onInitialized}
@@ -1112,26 +1107,28 @@ export default function ProgramScatter({ fileId }) {
                 </DialogActions>
             </Dialog>
 
-            <ProgramScatterTable
-                rows={rows}
-                tableOpen={tableOpen}
-                setTableOpen={setTableOpen}
-                setHighlight={setHighlight}
-                downloadCSV={downloadCSV}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                handleSort={handleSort}
-                sortedRows={sortedRows}
-                highlight={highlight}
-                tableRowRefs={tableRowRefs}
-                tableSectionRef={tableSectionRef}
-                COLORS={COLORS}
-                LEGEND_LABELS={LEGEND_LABELS}
-                TABLE_TONES={tableTones}
-                thSx={thSx}
-                tdSx={tdSx}
-                navigate={navigate}
-            />
+            {!isLoading && afterFirstPaint && (
+                <ProgramScatterTable
+                    rows={rows}
+                    tableOpen={tableOpen}
+                    setTableOpen={setTableOpen}
+                    setHighlight={setHighlight}
+                    downloadCSV={downloadCSV}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    handleSort={handleSort}
+                    sortedRows={sortedRows}
+                    highlight={highlight}
+                    tableRowRefs={tableRowRefs}
+                    tableSectionRef={tableSectionRef}
+                    COLORS={COLORS}
+                    LEGEND_LABELS={LEGEND_LABELS}
+                    TABLE_TONES={tableTones}
+                    thSx={thSx}
+                    tdSx={tdSx}
+                    navigate={navigate}
+                />
+            )}
         </Box>
     );
 }

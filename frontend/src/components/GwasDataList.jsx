@@ -4,38 +4,38 @@ import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
 import { fetcher } from '../api/gwas';
 import { downloadBlob } from '../utils/download';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Paper,
-    FormControl,
-    Select,
-    MenuItem,
-    Box,
-    Typography,
-    Pagination,
-    TableSortLabel,
-    Link,
-    TextField,
-    Card,
-    CardContent,
-    Alert,
-    Button,
-    IconButton,
-    InputAdornment,
-    Chip,
-} from '@mui/material';
-import {
-    Clear,
-    DownloadOutlined,
-    KeyboardArrowLeft,
-    KeyboardArrowRight,
-    Search,
-} from '@mui/icons-material';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { stableListSWRConfig } from '../utils/swrOptions';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { UpdatingStatus } from './PageScaffold';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Paper from '@mui/material/Paper';
+import FormControl from '@mui/material/FormControl';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Pagination from '@mui/material/Pagination';
+import TableSortLabel from '@mui/material/TableSortLabel';
+import Link from '@mui/material/Link';
+import TextField from '@mui/material/TextField';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import Chip from '@mui/material/Chip';
+import Clear from '@mui/icons-material/Clear';
+import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
+import Search from '@mui/icons-material/Search';
 import {
     panelSx,
     sectionTitleSx,
@@ -512,6 +512,21 @@ function LoadingSkeleton({ rows = 10, columns, theme }) {
     );
 }
 
+function QuietTableRowsPlaceholder({ columns, rows = 10 }) {
+    return (
+        <TableRow aria-hidden="true">
+            <TableCell
+                colSpan={Math.max(columns.length, 1)}
+                sx={{
+                    height: Math.max(180, rows * 48),
+                    py: 0,
+                    borderBottom: 0,
+                }}
+            />
+        </TableRow>
+    );
+}
+
 const TRAIT_PLACEHOLDERS = [
     'e.g. GCST90081631',
     'e.g. PA00638 (Self-reported illness)',
@@ -569,14 +584,11 @@ export default function GwasDataList({
         return `/api/browse?${params.toString()}`;
     }, [limit, normalizedSearch, order, page, sortBy]);
 
-    const { data, error, isLoading } = useSWR(apiUrl, fetcher, {
-        keepPreviousData: true,
-        revalidateOnFocus: false,
-        revalidateOnReconnect: false,
-        revalidateIfStale: false,
-        refreshInterval: 0,
-        shouldRetryOnError: false,
-    });
+    const traitResource = useCachedResourceState(
+        useSWR(apiUrl, fetcher, stableListSWRConfig),
+        { cacheKey: apiUrl },
+    );
+    const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = traitResource;
 
     const handleSort = useCallback((column) => {
         const isAsc = sortBy === column && order === 'ASC';
@@ -636,6 +648,8 @@ export default function GwasDataList({
     const visibleRows = useMemo(() => (
         previewingSearch ? rows.filter((row) => matchesTraitRow(row, columns, liveSearch)) : rows
     ), [columns, liveSearch, previewingSearch, rows]);
+    const rowsReady = useAfterFirstPaint('trait-browser-table');
+    const showPreparingRows = !isLoading && visibleRows.length > 0 && !rowsReady;
     const totalPages = data?.totalPages || 1;
     const totalCount = data?.totalCount || 0;
     const shouldPaginate = totalCount > TABLE_PAGINATION_THRESHOLD;
@@ -877,6 +891,7 @@ export default function GwasDataList({
                                                                 </Select>
                                                             </FormControl>
                                                         )}
+                                                        <UpdatingStatus active={isRefreshing} />
                                                         <Button
                                                             size="small"
                                                             startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
@@ -961,6 +976,8 @@ export default function GwasDataList({
                                 <TableBody>
                                     {isLoading ? (
                                         <LoadingSkeleton columns={columns} rows={Math.min(limit, 20)} theme={theme} />
+                                    ) : showPreparingRows ? (
+                                        <QuietTableRowsPlaceholder columns={columns} rows={Math.min(limit, 12)} />
                                     ) : (
                                         <>
                                             {visibleRows.map((row, index) => (

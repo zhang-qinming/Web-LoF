@@ -1,26 +1,28 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import {
-    Box,
-    Button,
-    Chip,
-    Collapse,
-    FormControl,
-    MenuItem,
-    Paper,
-    Select,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    TableSortLabel,
-    TextField,
-    Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
+import FormControl from '@mui/material/FormControl';
+import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
+import Select from '@mui/material/Select';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { Download, ExpandLess, ExpandMore, KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
+import Download from '@mui/icons-material/Download';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
 import {
     highlightedRowSx,
     metricChipTone,

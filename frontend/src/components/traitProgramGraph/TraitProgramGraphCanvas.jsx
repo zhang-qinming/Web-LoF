@@ -1,14 +1,19 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Box, Button, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
-import {
-    CloseFullscreen,
-    Download,
-    OpenInNew,
-    OpenInFull,
-    RestartAlt,
-    ZoomIn,
-    ZoomOut,
-} from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import CloseFullscreen from '@mui/icons-material/CloseFullscreen';
+import Download from '@mui/icons-material/Download';
+import OpenInNew from '@mui/icons-material/OpenInNew';
+import OpenInFull from '@mui/icons-material/OpenInFull';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import ZoomIn from '@mui/icons-material/ZoomIn';
+import ZoomOut from '@mui/icons-material/ZoomOut';
 import {
     computeEdgeStyle,
     directionFromSign,

@@ -1,17 +1,10 @@
 import './App.css';
 import React, { Suspense } from 'react';
 import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
-import {
-    FaDna,
-    FaEnvelope,
-    FaFolderOpen,
-    FaHome,
-    FaInfoCircle,
-    FaListAlt,
-    FaProjectDiagram,
-    FaQuestionCircle,
-} from 'react-icons/fa';
+import { useSWRConfig } from 'swr';
+import { fetcher, getGenes, getHomeStats } from './api/gwas.js';
 import MobileNavDrawer from './components/MobileNavDrawer.jsx';
+import NavIcon from './components/NavIcons.jsx';
 import { StatePanel } from './components/PageScaffold.jsx';
 
 import Home from './routes/Home.jsx';
@@ -24,15 +17,40 @@ const Variants = React.lazy(() => import('./routes/Variants.jsx'));
 const Programs = React.lazy(() => import('./routes/Programs.jsx'));
 
 const navLinks = [
-    { to: '/', icon: <FaHome />, label: 'Home' },
-    { to: '/genes', icon: <FaDna />, label: 'Genes' },
-    { to: '/programs', icon: <FaProjectDiagram />, label: 'Programs' },
-    { to: '/trait', icon: <FaListAlt />, label: 'Trait' },
-    { to: '/data', icon: <FaFolderOpen />, label: 'Data' },
-    { to: '/help', icon: <FaQuestionCircle />, label: 'Guide' },
-    { to: '/contact', icon: <FaEnvelope />, label: 'Contact' },
-    { to: '/about', icon: <FaInfoCircle />, label: 'About' },
+    { to: '/', icon: <NavIcon name="home" />, label: 'Home' },
+    { to: '/genes', icon: <NavIcon name="genes" />, label: 'Genes' },
+    { to: '/programs', icon: <NavIcon name="programs" />, label: 'Programs' },
+    { to: '/trait', icon: <NavIcon name="trait" />, label: 'Trait' },
+    { to: '/data', icon: <NavIcon name="data" />, label: 'Data' },
+    { to: '/help', icon: <NavIcon name="guide" />, label: 'Guide' },
+    { to: '/contact', icon: <NavIcon name="contact" />, label: 'Contact' },
+    { to: '/about', icon: <NavIcon name="about" />, label: 'About' },
 ];
+
+const routePreloaders = {
+    '/about': () => import('./routes/About.jsx'),
+    '/contact': () => import('./routes/Contact.jsx'),
+    '/help': () => import('./routes/Help.jsx'),
+    '/trait': loadTraitRoute,
+    '/genes': loadGenesRoute,
+    '/data': loadVariantsRoute,
+    '/programs': loadProgramsRoute,
+};
+const preloadedRoutes = new Set();
+
+function loadTraitRoute() { return import('./routes/Trait.jsx'); }
+function loadGenesRoute() { return import('./routes/Genes.jsx'); }
+function loadVariantsRoute() { return import('./routes/Variants.jsx'); }
+function loadProgramsRoute() { return import('./routes/Programs.jsx'); }
+
+function preloadRoute(path) {
+    const loader = routePreloaders[path];
+    if (!loader || preloadedRoutes.has(path)) return;
+    preloadedRoutes.add(path);
+    loader().catch(() => {
+        preloadedRoutes.delete(path);
+    });
+}
 
 function NotFound() {
     return (
@@ -48,8 +66,12 @@ function NotFound() {
 function ScrollToTopOnPathChange() {
     const { pathname } = useLocation();
 
-    React.useLayoutEffect(() => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    React.useEffect(() => {
+        const frameId = window.requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
     }, [pathname]);
 
     return null;
@@ -88,7 +110,43 @@ function AnimatedRoutes() {
     );
 }
 
+function scheduleIdleTask(callback, timeout = 1600) {
+    if (typeof window === 'undefined') return () => {};
+    if ('requestIdleCallback' in window) {
+        const idleId = window.requestIdleCallback(callback, { timeout });
+        return () => window.cancelIdleCallback(idleId);
+    }
+    const timerId = window.setTimeout(callback, Math.min(timeout, 600));
+    return () => window.clearTimeout(timerId);
+}
+
 function App() {
+    const { mutate } = useSWRConfig();
+
+    React.useEffect(() => {
+        const queue = [
+            () => mutate('/api/home/stats', getHomeStats(), { revalidate: false, populateCache: true }),
+            () => mutate('/api/programs/info', fetcher('/api/programs/info'), { revalidate: false, populateCache: true }),
+            () => mutate('/api/browse?page=1&limit=25&sortBy=trait_name&order=ASC', fetcher('/api/browse?page=1&limit=25&sortBy=trait_name&order=ASC'), { revalidate: false, populateCache: true }),
+            () => mutate(['gene-index', 0, 25, 'totalTraits', 'desc', ''], getGenes({ page: 1, limit: 25, sortBy: 'totalTraits', order: 'desc', search: '' }), { revalidate: false, populateCache: true }),
+        ];
+        let cancelled = false;
+        let cancelIdle = () => {};
+        const preloadNext = () => {
+            if (cancelled || queue.length === 0) return;
+            cancelIdle = scheduleIdleTask(() => {
+                const task = queue.shift();
+                task?.().catch(() => {});
+                preloadNext();
+            });
+        };
+        preloadNext();
+        return () => {
+            cancelled = true;
+            cancelIdle();
+        };
+    }, [mutate]);
+
     return (
         <BrowserRouter>
             <ScrollToTopOnPathChange />
@@ -96,7 +154,13 @@ function App() {
                 <header className="header hidden-mobile">
                     <nav className="nav">
                         {navLinks.map((link) => (
-                            <NavLink key={link.to} to={link.to} className="nav-link">
+                            <NavLink
+                                key={link.to}
+                                to={link.to}
+                                className="nav-link"
+                                onMouseEnter={() => preloadRoute(link.to)}
+                                onFocus={() => preloadRoute(link.to)}
+                            >
                                 {link.icon} {link.label}
                             </NavLink>
                         ))}

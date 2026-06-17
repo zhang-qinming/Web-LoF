@@ -1,29 +1,28 @@
 import React from 'react';
 import Plot from '../lib/plotly';
-import {
-    Alert,
-    Box,
-    Chip,
-    Paper,
-    Skeleton,
-    Stack,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    CalendarMonthOutlined,
-    DatasetOutlined,
-    DifferenceOutlined,
-    FolderOutlined,
-    GroupsOutlined,
-    HubOutlined,
-    InsightsOutlined,
-    PercentOutlined,
-    ScienceOutlined,
-    StorageOutlined,
-} from '@mui/icons-material';
+import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
+import DatasetOutlined from '@mui/icons-material/DatasetOutlined';
+import DifferenceOutlined from '@mui/icons-material/DifferenceOutlined';
+import FolderOutlined from '@mui/icons-material/FolderOutlined';
+import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
+import HubOutlined from '@mui/icons-material/HubOutlined';
+import InsightsOutlined from '@mui/icons-material/InsightsOutlined';
+import PercentOutlined from '@mui/icons-material/PercentOutlined';
+import ScienceOutlined from '@mui/icons-material/ScienceOutlined';
+import StorageOutlined from '@mui/icons-material/StorageOutlined';
+import useSWR from 'swr';
 import { getHomeStats } from '../api/gwas';
 import { StatePanel } from './PageScaffold';
+import { detailSummarySWRConfig } from '../utils/swrOptions';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     captionSx,
     chartLayoutTokens,
@@ -894,33 +893,15 @@ function CoverageChart({ copy, stats, locale }) {
 
 export default function AboutDataStatistics({ copy, locale = 'en' }) {
     const theme = useTheme();
-    const [stats, setStats] = React.useState(null);
-    const [loading, setLoading] = React.useState(true);
-    const [error, setError] = React.useState(null);
-
-    React.useEffect(() => {
-        let cancelled = false;
-        setLoading(true);
-        setError(null);
-
-        getHomeStats()
-            .then((payload) => {
-                if (cancelled) return;
-                setStats(payload || {});
-            })
-            .catch((err) => {
-                if (cancelled) return;
-                setError(err);
-                setStats(null);
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    const statsResource = useCachedResourceState(
+        useSWR('/api/home/stats', getHomeStats, detailSummarySWRConfig),
+        { cacheKey: '/api/home/stats' },
+    );
+    const {
+        displayData: stats = null,
+        isInitialLoading: loading,
+        error,
+    } = statsResource;
 
     const metricItems = METRIC_KEYS.map((key) => ({
         ...copy.metrics[key],

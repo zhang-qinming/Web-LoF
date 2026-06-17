@@ -1,38 +1,34 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    ClickAwayListener,
-    IconButton,
-    InputAdornment,
-    LinearProgress,
-    List,
-    ListItemButton,
-    ListItemIcon,
-    ListItemText,
-    Paper,
-    Skeleton,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import LinearProgress from '@mui/material/LinearProgress';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Paper from '@mui/material/Paper';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    ArrowForward,
-    Biotech,
-    Close,
-    FileDownload,
-    Folder,
-    Hub,
-    InsertDriveFile,
-    Search,
-    TableChart,
-} from '@mui/icons-material';
+import ArrowForward from '@mui/icons-material/ArrowForward';
+import Biotech from '@mui/icons-material/Biotech';
+import Close from '@mui/icons-material/Close';
+import FileDownload from '@mui/icons-material/FileDownload';
+import Folder from '@mui/icons-material/Folder';
+import Hub from '@mui/icons-material/Hub';
+import InsertDriveFile from '@mui/icons-material/InsertDriveFile';
+import Search from '@mui/icons-material/Search';
+import TableChart from '@mui/icons-material/TableChart';
 import axios from 'axios';
 import useSWR from 'swr';
 import ReleaseLogSection from '../components/ReleaseLogSection';
@@ -40,6 +36,8 @@ import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
 import { getHomeStats } from '../api/gwas';
 import { downloadDataPaths } from '../utils/download';
 import { createTtlCache } from '../utils/cache';
+import { detailSummarySWRConfig } from '../utils/swrOptions';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { APP_SHELL_MAX_WIDTH, captionSx, panelSx, summaryChipSx } from '../themeUtils';
 import homeFigureBurdenVolcano from '../assets/home/home-figure-burden-volcano.svg';
 import homeFigureCrossTraitHeatmap from '../assets/home/home-figure-cross-trait-heatmap.svg';
@@ -525,7 +523,7 @@ function SearchResultsPanel({
                 </Alert>
             )}
 
-            {loading ? (
+            {loading && !hasAnyResults ? (
                 <Box sx={{ px: 2, py: 1.6 }}>
                     {[0, 1, 2, 3].map((item) => (
                         <Box key={item} sx={{ display: 'flex', alignItems: 'center', gap: 1.2, px: 0.5, py: 1 }}>
@@ -799,16 +797,16 @@ function HomeSearch({
             setEntityErrors(cached.entityErrors || {});
             setLoading(false);
             setError('');
-            return undefined;
+        } else {
+            setResults([]);
+            setMeta({ totalCount: 0, truncated: false });
+            setEntityResults(EMPTY_ENTITY_RESULTS);
+            setEntityMeta(EMPTY_ENTITY_META);
+            setEntityErrors({});
         }
 
         let cancelled = false;
         const controller = new AbortController();
-        setResults([]);
-        setMeta({ totalCount: 0, truncated: false });
-        setEntityResults(EMPTY_ENTITY_RESULTS);
-        setEntityMeta(EMPTY_ENTITY_META);
-        setEntityErrors({});
         setError('');
         const timer = window.setTimeout(async () => {
             setLoading(true);
@@ -855,11 +853,13 @@ function HomeSearch({
             } catch (err) {
                 if (cancelled || axios.isCancel?.(err) || err.code === 'ERR_CANCELED') return;
                 if (!cancelled) {
-                    setResults([]);
-                    setMeta({ totalCount: 0, truncated: false });
-                    setEntityResults(EMPTY_ENTITY_RESULTS);
-                    setEntityMeta(EMPTY_ENTITY_META);
-                    setEntityErrors({});
+                    if (!cached) {
+                        setResults([]);
+                        setMeta({ totalCount: 0, truncated: false });
+                        setEntityResults(EMPTY_ENTITY_RESULTS);
+                        setEntityMeta(EMPTY_ENTITY_META);
+                        setEntityErrors({});
+                    }
                     setError(getRequestErrorMessage(err, 'Search failed'));
                 }
             } finally {
@@ -1318,6 +1318,8 @@ function FigureGateway({ items }) {
         <Box
             component="section"
             sx={{
+                position: 'relative',
+                zIndex: 1,
                 maxWidth: APP_SHELL_MAX_WIDTH,
                 mx: 'auto',
                 px: { xs: 2, sm: 3, lg: 4, xl: 5 },
@@ -1496,7 +1498,6 @@ function HeroSection({ stats, statsLoading, theme }) {
                 ml: 'calc(var(--page-pad-x) * -1)',
                 mt: 'calc(var(--page-pad-y) * -1)',
                 overflow: 'visible',
-                zIndex: 10,
             }}
         >
             <HeroBackground />
@@ -1504,7 +1505,7 @@ function HeroSection({ stats, statsLoading, theme }) {
             <Box
                 sx={{
                     position: 'relative',
-                    zIndex: 1,
+                    zIndex: 2,
                     maxWidth: APP_SHELL_MAX_WIDTH,
                     mx: 'auto',
                     px: { xs: 2, sm: 3, lg: 4, xl: 5 },
@@ -1694,14 +1695,11 @@ function HeroSection({ stats, statsLoading, theme }) {
 
 function Home() {
     const theme = useTheme();
-    const { data: homeStats, error: homeStatsError, isLoading: homeStatsIsLoading } = useSWR(
-        '/api/home/stats',
-        getHomeStats,
-        {
-            keepPreviousData: true,
-            shouldRetryOnError: false,
-        },
+    const homeStatsResource = useCachedResourceState(
+        useSWR('/api/home/stats', getHomeStats, detailSummarySWRConfig),
+        { cacheKey: '/api/home/stats' },
     );
+    const { displayData: homeStats, error: homeStatsError, isInitialLoading: homeStatsIsLoading } = homeStatsResource;
     const homeStatsLoading = homeStatsIsLoading && !homeStats && !homeStatsError;
 
     return (

@@ -1,7 +1,12 @@
 import React from 'react';
-import { Box, Chip, Divider, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CheckBoxOutlineBlank, FolderOpen, InsertDriveFile } from '@mui/icons-material';
+import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
+import FolderOpen from '@mui/icons-material/FolderOpen';
+import InsertDriveFile from '@mui/icons-material/InsertDriveFile';
 import { captionSx, metricChipTone, summaryChipSx } from '../themeUtils';
 
 function truncatePath(path, maxLength = 58) {

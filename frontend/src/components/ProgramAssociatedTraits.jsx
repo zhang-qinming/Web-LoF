@@ -1,30 +1,32 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import {
-    Alert,
-    Box,
-    Button,
-    Chip,
-    Paper,
-    Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TablePagination,
-    TableRow,
-    TableSortLabel,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
+import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { AccountTreeOutlined, DownloadOutlined, OpenInNew } from '@mui/icons-material';
+import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
+import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import OpenInNew from '@mui/icons-material/OpenInNew';
 import useSWR from 'swr';
 import { getProgramTraits } from '../api/gwas';
-import { StatePanel } from './PageScaffold';
+import { StatePanel, UpdatingStatus } from './PageScaffold';
 import { downloadBlob } from '../utils/download';
+import { stableListSWRConfig } from '../utils/swrOptions';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     compactToggleGroupSx,
     groupedTableColumnHeaderCellSx,
@@ -206,11 +208,16 @@ export default function ProgramAssociatedTraits({
     const [filter, setFilter] = React.useState('all');
     const [sortBy, setSortBy] = React.useState('programScore');
     const [sortDir, setSortDir] = React.useState('desc');
-    const { data, error, isLoading } = useSWR(
-        programId ? ['program-traits', programId] : null,
-        ([, id]) => getProgramTraits(id),
-        { keepPreviousData: true, revalidateOnFocus: false },
+    const traitKey = programId ? ['program-traits', programId] : null;
+    const traitResource = useCachedResourceState(
+        useSWR(
+            traitKey,
+            ([, id]) => getProgramTraits(id),
+            stableListSWRConfig,
+        ),
+        { cacheKey: traitKey },
     );
+    const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = traitResource;
 
     React.useEffect(() => {
         setPage(0);
@@ -295,6 +302,7 @@ export default function ProgramAssociatedTraits({
                                         </Typography>
                                     </Box>
                                     <Stack direction="row" spacing={0.8} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                                        <UpdatingStatus active={isRefreshing} />
                                         <ToggleButtonGroup
                                             size="small"
                                             exclusive

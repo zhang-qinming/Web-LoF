@@ -1,17 +1,31 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import Plot, { Plotly } from '../lib/plotly';
-import {
-    Box, Typography, Alert, CircularProgress, Button, Select, MenuItem,
-    Chip, Paper,
-    TextField, Dialog, DialogTitle, DialogContent, DialogActions,
-    ToggleButtonGroup, ToggleButton,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import Button from '@mui/material/Button';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import TextField from '@mui/material/TextField';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import ToggleButton from '@mui/material/ToggleButton';
 import { useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import FloatingLegend from './FloatingLegend';
+import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import GeneRegulationTable from './GeneRegulationTable';
 import {
     buildPlotHoverTone,
@@ -73,11 +87,19 @@ export default function GeneRegulation({ programId }) {
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
     const compactToggleStyles = useMemo(() => compactToggleGroupSx(theme), [theme]);
-    const { data, error, isLoading } = useSWR(
-        programId ? `/api/regulation/${programId}` : null, fetcher,
+    const regulationKey = programId ? `/api/regulation/${programId}` : null;
+    const regulationResource = useCachedResourceState(
+        useSWR(regulationKey, fetcher, figureResourceSWRConfig),
+        { cacheKey: regulationKey, retainData: false },
     );
-    const { data: infoData } = useSWR('/api/programs/info', fetcher);
+    const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = regulationResource;
+    const infoResource = useCachedResourceState(
+        useSWR('/api/programs/info', fetcher, detailSummarySWRConfig),
+        { cacheKey: '/api/programs/info' },
+    );
+    const infoData = infoResource.displayData;
     const pinfo = (infoData && programId) ? (infoData[`P${programId}`] || infoData[programId]) : null;
+    const afterFirstPaint = useAfterFirstPaint(regulationKey || 'gene-regulation-empty');
 
     const plotElRef = useRef(null);
 
@@ -488,60 +510,67 @@ export default function GeneRegulation({ programId }) {
                                         Volcano plot
                                     </Typography>
                                 </Box>
+                                <UpdatingStatus active={isRefreshing} />
                             </Box>
-                            <Plot
-                                onInitialized={onInitialized}
-                                onClick={(evt) => {
-                                    if (!evt?.points?.length) return;
-                                    const gene = evt.points[0].customdata?.[0];
-                                    if (gene) {
-                                        setHighlightGene(prev => ({ gene, key: prev.key + 1 }));
-                                        setTableOpen(true);
-                                    }
-                                }}
-                                data={plotData}
-                                layout={layout}
-                                config={plotConfig}
-                                useResizeHandler
-                                style={{ width: '100%', height: PLOT_HEIGHT }}
-                            />
-                            <FloatingLegend
-                                items={legendItems}
-                                collapsed={legendCollapsed}
-                                onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
-                                title="Signals"
-                                width={{ expanded: 192, collapsed: 118 }}
-                                defaultPlacement="right"
-                                defaultTop={78}
-                                defaultSideOffset={10}
-                                anchorPlotRef={plotElRef}
-                            />
-                            <GeneRegulationTable
-                                rows={rows}
-                                pagedRows={pagedRows}
-                                tableOpen={tableOpen}
-                                setTableOpen={setTableOpen}
-                                sortBy={sortBy}
-                                sortDir={sortDir}
-                                handleSort={handleSort}
-                                highlightGene={highlightGene}
-                                setHighlightGene={setHighlightGene}
-                                page={page}
-                                setPage={setPage}
-                                rowsPerPage={rowsPerPage}
-                                setRowsPerPage={setRowsPerPage}
-                                totalPages={totalPages}
-                                shouldPaginate={shouldPaginateTable}
-                                jumpInput={jumpInput}
-                                setJumpInput={setJumpInput}
-                                handleJumpToPage={handleJumpToPage}
-                                tablePaperRef={tablePaperRef}
-                                tableRowRefs={tableRowRefs}
-                                downloadCSV={downloadCSV}
-                                stats={stats}
-                                annotation={pinfo?.curated_annotation}
-                                embedded
-                            />
+                            {afterFirstPaint ? (
+                                <>
+                                    <Plot
+                                        onInitialized={onInitialized}
+                                        onClick={(evt) => {
+                                            if (!evt?.points?.length) return;
+                                            const gene = evt.points[0].customdata?.[0];
+                                            if (gene) {
+                                                setHighlightGene(prev => ({ gene, key: prev.key + 1 }));
+                                                setTableOpen(true);
+                                            }
+                                        }}
+                                        data={plotData}
+                                        layout={layout}
+                                        config={plotConfig}
+                                        useResizeHandler
+                                        style={{ width: '100%', height: PLOT_HEIGHT }}
+                                    />
+                                    <FloatingLegend
+                                        items={legendItems}
+                                        collapsed={legendCollapsed}
+                                        onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
+                                        title="Signals"
+                                        width={{ expanded: 192, collapsed: 118 }}
+                                        defaultPlacement="right"
+                                        defaultTop={78}
+                                        defaultSideOffset={10}
+                                        anchorPlotRef={plotElRef}
+                                    />
+                                    <GeneRegulationTable
+                                        rows={rows}
+                                        pagedRows={pagedRows}
+                                        tableOpen={tableOpen}
+                                        setTableOpen={setTableOpen}
+                                        sortBy={sortBy}
+                                        sortDir={sortDir}
+                                        handleSort={handleSort}
+                                        highlightGene={highlightGene}
+                                        setHighlightGene={setHighlightGene}
+                                        page={page}
+                                        setPage={setPage}
+                                        rowsPerPage={rowsPerPage}
+                                        setRowsPerPage={setRowsPerPage}
+                                        totalPages={totalPages}
+                                        shouldPaginate={shouldPaginateTable}
+                                        jumpInput={jumpInput}
+                                        setJumpInput={setJumpInput}
+                                        handleJumpToPage={handleJumpToPage}
+                                        tablePaperRef={tablePaperRef}
+                                        tableRowRefs={tableRowRefs}
+                                        downloadCSV={downloadCSV}
+                                        stats={stats}
+                                        annotation={pinfo?.curated_annotation}
+                                        embedded
+                                    />
+                                </>
+                            ) : (
+                                <Box sx={{ height: PLOT_HEIGHT }} />
+                            )}
                         </>
                     )}
                 </Paper>

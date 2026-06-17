@@ -1,34 +1,30 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import {
-    Box,
-    Button,
-    Chip,
-    Divider,
-    Link,
-    Paper,
-    Stack,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
+import Link from '@mui/material/Link';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    ArticleOutlined,
-    BiotechOutlined,
-    ChevronRightRounded,
-    DataObjectOutlined,
-    DownloadOutlined,
-    FolderOpenOutlined,
-    HubOutlined,
-    InfoOutlined,
-    InsightsOutlined,
-    LanguageOutlined,
-    ManageSearchOutlined,
-    NavigationOutlined,
-    ScienceOutlined,
-    TableChartOutlined,
-} from '@mui/icons-material';
+import ArticleOutlined from '@mui/icons-material/ArticleOutlined';
+import BiotechOutlined from '@mui/icons-material/BiotechOutlined';
+import ChevronRightRounded from '@mui/icons-material/ChevronRightRounded';
+import DataObjectOutlined from '@mui/icons-material/DataObjectOutlined';
+import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import FolderOpenOutlined from '@mui/icons-material/FolderOpenOutlined';
+import HubOutlined from '@mui/icons-material/HubOutlined';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import InsightsOutlined from '@mui/icons-material/InsightsOutlined';
+import LanguageOutlined from '@mui/icons-material/LanguageOutlined';
+import ManageSearchOutlined from '@mui/icons-material/ManageSearchOutlined';
+import NavigationOutlined from '@mui/icons-material/NavigationOutlined';
+import ScienceOutlined from '@mui/icons-material/ScienceOutlined';
+import TableChartOutlined from '@mui/icons-material/TableChartOutlined';
 import { PageFrame } from '../components/PageScaffold';
 import {
     captionSx,

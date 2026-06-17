@@ -1,11 +1,9 @@
-import {
-    Biotech,
-    FileDownload,
-    Hub,
-    QueryStats,
-    Search,
-    Storage,
-} from '@mui/icons-material';
+import Biotech from '@mui/icons-material/Biotech';
+import FileDownload from '@mui/icons-material/FileDownload';
+import Hub from '@mui/icons-material/Hub';
+import QueryStats from '@mui/icons-material/QueryStats';
+import Search from '@mui/icons-material/Search';
+import Storage from '@mui/icons-material/Storage';
 
 export const RELEASE_LOG_ANCHOR = 'release-log';
 

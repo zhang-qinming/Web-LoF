@@ -1,6 +1,8 @@
+import { alpha, useTheme } from '@mui/material/styles';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { alpha } from '@mui/material/styles';
-import { Box, Button, Typography, useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 
 const DEFAULT_OFFSET = 12;
 const SAFE_MARGIN = 8;

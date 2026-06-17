@@ -504,19 +504,22 @@ export function highlightedRowSx(theme, isHighlighted, even, animationNameA, ani
 }
 
 export function tableRowRevealSx(theme, index = 0, overrides = {}) {
+    const { disableReveal = false, ...rest } = overrides;
     const delay = Math.min(index, 24) * 16;
     return {
-        '@keyframes tableRowReveal': {
-            from: {
-                opacity: 0,
+        ...(disableReveal ? {} : {
+            '@keyframes tableRowReveal': {
+                from: {
+                    opacity: 0,
+                },
+                to: {
+                    opacity: 1,
+                },
             },
-            to: {
-                opacity: 1,
-            },
-        },
-        animation: `tableRowReveal 260ms ${delay}ms cubic-bezier(0.22, 1, 0.36, 1) backwards`,
+            animation: `tableRowReveal 260ms ${delay}ms cubic-bezier(0.22, 1, 0.36, 1) backwards`,
+        }),
         transition: `background-color ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
-        ...overrides,
+        ...rest,
     };
 }
 

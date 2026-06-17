@@ -1,37 +1,38 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Plot, { Plotly } from '../lib/plotly';
-import {
-    Alert,
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FormControlLabel,
-    Slider,
-    Stack,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Slider from '@mui/material/Slider';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    Download,
-    FilterAlt,
-    Insights,
-    RestartAlt,
-    Timeline,
-} from '@mui/icons-material';
-import { getCrossTraitTargets, getDataFileText, isCanceledRequest } from '../api/gwas';
+import Download from '@mui/icons-material/Download';
+import FilterAlt from '@mui/icons-material/FilterAlt';
+import Insights from '@mui/icons-material/Insights';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import Timeline from '@mui/icons-material/Timeline';
+import useSWR from 'swr';
+import { getCrossTraitTargets, getDataFileText } from '../api/gwas';
+import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -198,6 +199,60 @@ function addFdr(rows) {
     }
 
     return rows.map((row, index) => ({ ...row, fdr: adjusted[index] }));
+}
+
+async function loadGeneLevelQQPayload({ appliedTraits, availableTraits, candidateIds, primaryTrait }) {
+    const chosenTraits = uniqueTraitOptions(appliedTraits).slice(0, MAX_COMPARE_TRAITS);
+    const loadedTraits = [];
+    let lastError = null;
+
+    for (let traitIndex = 0; traitIndex < chosenTraits.length; traitIndex += 1) {
+        const trait = chosenTraits[traitIndex];
+        const loadCandidates = [...new Set([
+            trait.file_id,
+            trait.gwas_id,
+            ...(trait.file_id === primaryTrait?.file_id ? candidateIds : []),
+        ].filter(Boolean))];
+
+        for (const candidate of loadCandidates) {
+            const path = getDataPath(candidate);
+            try {
+                const text = await getDataFileText(path);
+                const parsedRows = addFdr(parseTsv(text)).map((row) => ({
+                    ...row,
+                    rowKey: `${trait.file_id}::${row.rowKey}`,
+                    sourceFileId: trait.file_id,
+                    sourceGwasId: trait.gwas_id,
+                    sourceTraitName: trait.trait_name,
+                    traitIndex,
+                }));
+                loadedTraits.push({
+                    ...trait,
+                    resolved_file_id: candidate,
+                    path,
+                    rows: parsedRows,
+                });
+                break;
+            } catch (err) {
+                lastError = err;
+            }
+        }
+    }
+
+    const mergedRows = loadedTraits.flatMap((item) => item.rows);
+    if (!mergedRows.length && lastError) throw lastError;
+
+    return {
+        rows: mergedRows,
+        fileId: loadedTraits[0]?.resolved_file_id || chosenTraits[0]?.file_id || candidateIds[0] || '',
+        path: loadedTraits[0]?.path || '',
+        selectedTraits: loadedTraits.map((item) => {
+            const { rows, ...rest } = item;
+            void rows;
+            return rest;
+        }),
+        availableTraits,
+    };
 }
 
 function computeAxisRange(rows, extraValues = []) {
@@ -454,9 +509,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
 
-    const [payload, setPayload] = useState({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits: [] });
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [tailMode, setTailMode] = useState(TAIL_MODES.BOTH);
     const [geneQuery, setGeneQuery] = useState('');
     const [showExpectedLine, setShowExpectedLine] = useState(true);
@@ -477,7 +529,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
-    const [availableTraits, setAvailableTraits] = useState([]);
     const [selectedTraits, setSelectedTraits] = useState([]);
     const [appliedTraits, setAppliedTraits] = useState([]);
     const [renderVersion, setRenderVersion] = useState(0);
@@ -495,119 +546,53 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setSelectedTraits([primaryTrait]);
         setAppliedTraits([]);
         setRenderVersion(0);
-        setPayload({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits: [] });
-        setError(null);
-        setIsLoading(false);
     }, [primaryTrait]);
 
     const candidateIds = useMemo(() => (
         [...new Set([...(lookupIds || []), fileId, gwasId].filter(Boolean))]
     ), [fileId, gwasId, lookupIds]);
 
-    useEffect(() => {
-        if (!primaryTrait?.file_id) {
-            setAvailableTraits([]);
-            return undefined;
-        }
-        const controller = new AbortController();
-        let cancelled = false;
-        getCrossTraitTargets(primaryTrait.file_id, { signal: controller.signal })
-            .then((res) => {
-                if (cancelled || controller.signal.aborted) return;
-                const next = uniqueTraitOptions([primaryTrait, ...(res?.targets || [])]);
-                setAvailableTraits(next);
-            })
-            .catch((error) => {
-                if (isCanceledRequest(error)) return;
-                if (!cancelled && !controller.signal.aborted) setAvailableTraits(primaryTrait ? [primaryTrait] : []);
-            });
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [primaryTrait]);
+    const targetsKey = primaryTrait?.file_id ? ['gene-level-qq-targets', primaryTrait.file_id] : null;
+    const targetsResource = useCachedResourceState(
+        useSWR(targetsKey, ([, id]) => getCrossTraitTargets(id), detailSummarySWRConfig),
+        { cacheKey: targetsKey, retainData: false },
+    );
+    const { displayData: targetsData, isRefreshing: targetsRefreshing } = targetsResource;
+    const availableTraits = useMemo(
+        () => uniqueTraitOptions([primaryTrait, ...(targetsData?.targets || [])]),
+        [primaryTrait, targetsData],
+    );
+    const hasRenderedQQ = renderVersion > 0 && appliedTraits.length > 0;
+    const qqKey = hasRenderedQQ
+        ? ['gene-level-qq', traitListKey(appliedTraits), candidateIds.join('|'), primaryTrait?.file_id || '']
+        : null;
+    const qqResource = useCachedResourceState(
+        useSWR(
+            qqKey,
+            () => loadGeneLevelQQPayload({
+                appliedTraits,
+                availableTraits,
+                candidateIds,
+                primaryTrait,
+            }),
+            figureResourceSWRConfig,
+        ),
+        { cacheKey: qqKey, retainData: false },
+    );
+    const {
+        displayData: cachedPayload,
+        error,
+        isInitialLoading: isLoading,
+        isRefreshing,
+    } = qqResource;
+    const payload = cachedPayload || { rows: [], fileId: '', path: '', selectedTraits: [], availableTraits };
+    const afterFirstPaint = useAfterFirstPaint(qqKey || 'gene-level-qq-empty');
+    const payloadTraitKey = useMemo(() => traitListKey(payload.selectedTraits), [payload.selectedTraits]);
 
     useEffect(() => {
-        if (!appliedTraits.length || renderVersion === 0) {
-            setPayload({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits });
-            setError(null);
-            setIsLoading(false);
-            return undefined;
-        }
-
-        const controller = new AbortController();
-        let cancelled = false;
-        setIsLoading(true);
-        setError(null);
-
-        (async () => {
-            const chosenTraits = uniqueTraitOptions(appliedTraits).slice(0, MAX_COMPARE_TRAITS);
-            const loadedTraits = [];
-            let lastError = null;
-
-            for (let traitIndex = 0; traitIndex < chosenTraits.length; traitIndex += 1) {
-                const trait = chosenTraits[traitIndex];
-                const loadCandidates = [...new Set([
-                    trait.file_id,
-                    trait.gwas_id,
-                    ...(trait.file_id === primaryTrait?.file_id ? candidateIds : []),
-                ].filter(Boolean))];
-
-                for (const candidate of loadCandidates) {
-                    const path = getDataPath(candidate);
-                    try {
-                        const text = await getDataFileText(path, { signal: controller.signal });
-                        if (cancelled || controller.signal.aborted) return;
-                        const parsedRows = addFdr(parseTsv(text)).map((row) => ({
-                            ...row,
-                            rowKey: `${trait.file_id}::${row.rowKey}`,
-                            sourceFileId: trait.file_id,
-                            sourceGwasId: trait.gwas_id,
-                            sourceTraitName: trait.trait_name,
-                            traitIndex,
-                        }));
-                        loadedTraits.push({
-                            ...trait,
-                            resolved_file_id: candidate,
-                            path,
-                            rows: parsedRows,
-                        });
-                        break;
-                    } catch (err) {
-                        if (isCanceledRequest(err)) return;
-                        lastError = err;
-                    }
-                }
-            }
-
-            const mergedRows = loadedTraits.flatMap((item) => item.rows);
-            if (!cancelled && !controller.signal.aborted) {
-                setPayload({
-                    rows: mergedRows,
-                    fileId: loadedTraits[0]?.resolved_file_id || chosenTraits[0]?.file_id || candidateIds[0] || '',
-                    path: loadedTraits[0]?.path || '',
-                    selectedTraits: loadedTraits.map((item) => {
-                        const { rows, ...rest } = item;
-                        void rows;
-                        return rest;
-                    }),
-                    availableTraits,
-                });
-                setHighlight({ rowKey: '', key: 0 });
-                setTablePage(0);
-                if (!mergedRows.length && lastError) {
-                    setError(lastError);
-                }
-            }
-        })().finally(() => {
-            if (!cancelled && !controller.signal.aborted) setIsLoading(false);
-        });
-
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [appliedTraits, availableTraits, candidateIds, primaryTrait, renderVersion]);
+        setHighlight({ rowKey: '', key: 0 });
+        setTablePage(0);
+    }, [payload.fileId, payloadTraitKey]);
 
     const rows = payload.rows;
 
@@ -644,7 +629,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const activeTraits = useMemo(() => (
         payload.selectedTraits?.length ? payload.selectedTraits : selectedTraits
     ), [payload.selectedTraits, selectedTraits]);
-    const hasRenderedQQ = renderVersion > 0 && appliedTraits.length > 0;
 
     const traitColorMap = useMemo(() => {
         const map = new Map();
@@ -683,7 +667,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             return;
         }
         setAppliedTraits(nextTraits);
-        setError(null);
         setRenderVersion((value) => value + 1);
     }, [appliedTraits, primaryTrait, renderVersion, selectedTraits]);
 
@@ -1095,14 +1078,11 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setSelectedTraits(primaryTrait ? [primaryTrait] : []);
         setAppliedTraits([]);
         setRenderVersion(0);
-        setPayload({ rows: [], fileId: '', path: '', selectedTraits: [], availableTraits });
-        setError(null);
-        setIsLoading(false);
         setPointSize(DEFAULT_POINT_SIZE);
         setLabelLimit(DEFAULT_LABEL_LIMIT);
         setHighlight({ rowKey: '', key: 0 });
         setTablePage(0);
-    }, [availableTraits, primaryTrait]);
+    }, [primaryTrait]);
 
     const handleExport = useCallback(() => {
         const gd = plotRef.current;
@@ -1203,6 +1183,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 <Chip icon={<Insights />} label={`${counts.fdr.toLocaleString()} FDR hits`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(chartTokens.threshold, 0.08), color: chartTokens.threshold, border: `1px solid ${alpha(chartTokens.threshold, 0.22)}` })} />
                 <Chip icon={<FilterAlt />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.positive.color, 0.08), color: TAIL_META.positive.color, border: `1px solid ${alpha(TAIL_META.positive.color, 0.2)}` })} />
                 <Chip icon={<FilterAlt />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.negative.color, 0.08), color: TAIL_META.negative.color, border: `1px solid ${alpha(TAIL_META.negative.color, 0.2)}` })} />
+                <UpdatingStatus active={targetsRefreshing || isRefreshing} />
             </Box>
 
             <Box sx={toolbarSx(theme, { alignItems: 'stretch' })}>
@@ -1371,7 +1352,11 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                         </Box>
                     )}
 
-                    {!isLoading && hasVisiblePoints && (
+                    {!isLoading && hasVisiblePoints && !afterFirstPaint && (
+                        <Box sx={{ minHeight: GENE_QQ_PLOT_HEIGHT }} />
+                    )}
+
+                    {!isLoading && hasVisiblePoints && afterFirstPaint && (
                         <>
                             <Plot
                                 key={plotKey}
@@ -1429,24 +1414,26 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 </CardContent>
             </Card>
 
-            <GeneLevelQQTable
-                tableSectionRef={tableSectionRef}
-                rows={rows}
-                sortedRows={sortedRows}
-                pagedRows={pagedRows}
-                tableOpen={tableOpen}
-                setTableOpen={setTableOpen}
-                tablePage={tablePage}
-                setTablePage={setTablePage}
-                tableRowsPerPage={tableRowsPerPage}
-                setTableRowsPerPage={setTableRowsPerPage}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                handleSort={handleSort}
-                downloadCSV={downloadCSV}
-                highlight={highlight}
-                tableRowRefs={tableRowRefs}
-            />
+            {!isLoading && afterFirstPaint && (
+                <GeneLevelQQTable
+                    tableSectionRef={tableSectionRef}
+                    rows={rows}
+                    sortedRows={sortedRows}
+                    pagedRows={pagedRows}
+                    tableOpen={tableOpen}
+                    setTableOpen={setTableOpen}
+                    tablePage={tablePage}
+                    setTablePage={setTablePage}
+                    tableRowsPerPage={tableRowsPerPage}
+                    setTableRowsPerPage={setTableRowsPerPage}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    handleSort={handleSort}
+                    downloadCSV={downloadCSV}
+                    highlight={highlight}
+                    tableRowRefs={tableRowRefs}
+                />
+            )}
 
             <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
                 <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>

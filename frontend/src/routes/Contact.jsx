@@ -1,25 +1,21 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import {
-    Box,
-    Button,
-    Chip,
-    Paper,
-    Stack,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    BugReportOutlined,
-    ContactSupportOutlined,
-    DescriptionOutlined,
-    LanguageOutlined,
-    LinkOutlined,
-    MailOutline,
-    SearchOutlined,
-} from '@mui/icons-material';
+import BugReportOutlined from '@mui/icons-material/BugReportOutlined';
+import ContactSupportOutlined from '@mui/icons-material/ContactSupportOutlined';
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
+import LanguageOutlined from '@mui/icons-material/LanguageOutlined';
+import LinkOutlined from '@mui/icons-material/LinkOutlined';
+import MailOutline from '@mui/icons-material/MailOutline';
+import SearchOutlined from '@mui/icons-material/SearchOutlined';
 import { PageFrame } from '../components/PageScaffold';
 import { CONTENT_PAGE_MAX_WIDTH, captionSx, metricChipTone, panelSx, sectionTitleSx, summaryChipSx } from '../themeUtils';
 

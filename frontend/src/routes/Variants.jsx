@@ -1,16 +1,35 @@
 import React, { startTransition, useEffect, useState, useMemo, useCallback, useRef, createContext, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-    Box, Typography, TextField, IconButton, Checkbox,
-    Chip, Pagination, Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, Paper, InputAdornment, Tooltip, Button,
-    Alert, LinearProgress,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
+import Pagination from '@mui/material/Pagination';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Paper from '@mui/material/Paper';
+import InputAdornment from '@mui/material/InputAdornment';
+import Tooltip from '@mui/material/Tooltip';
+import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
+import LinearProgress from '@mui/material/LinearProgress';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    Download, Folder, InsertDriveFile, Search, FolderOpen, ChevronRight, Close,
-    FileDownload, CheckBoxOutlineBlank, CheckBox,
-} from '@mui/icons-material';
+import Download from '@mui/icons-material/Download';
+import Folder from '@mui/icons-material/Folder';
+import InsertDriveFile from '@mui/icons-material/InsertDriveFile';
+import Search from '@mui/icons-material/Search';
+import FolderOpen from '@mui/icons-material/FolderOpen';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import Close from '@mui/icons-material/Close';
+import FileDownload from '@mui/icons-material/FileDownload';
+import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
+import CheckBox from '@mui/icons-material/CheckBox';
 import axios from 'axios';
 import DataBrowseSummary from '../components/DataBrowseSummary';
 import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload } from '../utils/download';
@@ -52,6 +71,7 @@ const SelectionCtx = createContext({
 const DATA_BROWSER_CACHE_TTL_MS = 10 * 60 * 1000;
 const LIST_CACHE = createTtlCache({ ttlMs: DATA_BROWSER_CACHE_TTL_MS, maxEntries: 120 });
 const FILE_PATHS_CACHE = createTtlCache({ ttlMs: DATA_BROWSER_CACHE_TTL_MS, maxEntries: 40 });
+const GLOBAL_SEARCH_CACHE = createTtlCache({ ttlMs: DATA_BROWSER_CACHE_TTL_MS, maxEntries: 80 });
 
 function LoadingStripe({ theme, width = '100%', height = 14, tone = 'neutral', radius = 1, delayIndex = 0 }) {
     return (
@@ -232,6 +252,10 @@ function getListCacheKey(dir, page, filter) {
 
 function getFilePathsCacheKey(dir, filter) {
     return `${dir}::${filter || ''}`;
+}
+
+function getGlobalSearchCacheKey(query, page) {
+    return `${query}::${page}`;
 }
 
 function getRequestErrorMessage(err, fallback) {
@@ -729,21 +753,43 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
             return () => { cancelled = true; };
         }
 
+        const cacheKey = getGlobalSearchCacheKey(trimmedQuery, page);
+        const cached = GLOBAL_SEARCH_CACHE.get(cacheKey);
+
+        if (cached) {
+            setResults(cached.results);
+            setTotalCount(cached.totalCount);
+            setTotalPages(cached.totalPages);
+        } else {
+            setResults([]);
+            setTotalCount(0);
+            setTotalPages(1);
+        }
+
         setLoading(true);
         setError('');
         API.get('/search', { params: { q: trimmedQuery, page, limit: GLOBAL_PAGE_SIZE } })
             .then(({ data }) => {
                 if (cancelled) return;
                 const nextResults = data.results || [];
+                const nextTotalCount = data.totalCount ?? nextResults.length;
+                const nextTotalPages = data.totalPages || Math.max(1, Math.ceil(nextTotalCount / GLOBAL_PAGE_SIZE));
+                GLOBAL_SEARCH_CACHE.set(cacheKey, {
+                    results: nextResults,
+                    totalCount: nextTotalCount,
+                    totalPages: nextTotalPages,
+                });
                 setResults(nextResults);
-                setTotalCount(data.totalCount ?? nextResults.length);
-                setTotalPages(data.totalPages || Math.max(1, Math.ceil((data.totalCount ?? nextResults.length) / GLOBAL_PAGE_SIZE)));
+                setTotalCount(nextTotalCount);
+                setTotalPages(nextTotalPages);
             })
             .catch((err) => {
                 if (cancelled) return;
-                setResults([]);
-                setTotalCount(0);
-                setTotalPages(1);
+                if (!cached) {
+                    setResults([]);
+                    setTotalCount(0);
+                    setTotalPages(1);
+                }
                 setError(getRequestErrorMessage(err, 'Search failed'));
             })
             .finally(() => {
@@ -892,7 +938,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                         {loading && (
                             <Box sx={{ px: 2, py: 1, bgcolor: theme.custom.surface.raised, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
                                 <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700 }}>
-                                    Searching server files. The first global search may build the index and take longer.
+                                    {visibleResults.length > 0 ? 'Updating cached results.' : 'Searching server files. The first global search may build the index and take longer.'}
                                 </Typography>
                             </Box>
                         )}
@@ -916,7 +962,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {loading ? (
+                                    {loading && visibleResults.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={5} sx={{ p: 0, borderBottom: 0, height: 0 }}>
                                                 <GlobalSearchSkeleton theme={theme} />

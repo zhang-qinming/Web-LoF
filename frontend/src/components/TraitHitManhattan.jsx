@@ -1,43 +1,44 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Plot, { Plotly } from '../lib/plotly';
-import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FormControl,
-    InputLabel,
-    ListItemText,
-    MenuItem,
-    OutlinedInput,
-    Select,
-    Stack,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import ListItemText from '@mui/material/ListItemText';
+import MenuItem from '@mui/material/MenuItem';
+import OutlinedInput from '@mui/material/OutlinedInput';
+import Select from '@mui/material/Select';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    Insights,
-    Place,
-    Refresh,
-    RestartAlt,
-    ScatterPlot,
-    Timeline,
-} from '@mui/icons-material';
-import { getTraitManhattanHits, isCanceledRequest } from '../api/gwas';
+import Insights from '@mui/icons-material/Insights';
+import Place from '@mui/icons-material/Place';
+import Refresh from '@mui/icons-material/Refresh';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import ScatterPlot from '@mui/icons-material/ScatterPlot';
+import Timeline from '@mui/icons-material/Timeline';
+import useSWR from 'swr';
+import { getTraitManhattanHits } from '../api/gwas';
+import { UpdatingStatus } from './PageScaffold';
 import TraitHitManhattanLegend from './TraitHitManhattanLegend';
 import TraitHitManhattanTable from './TraitHitManhattanTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneArray,
@@ -203,8 +204,6 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const autoVariantHandledRef = useRef(false);
     const exportBaseName = useMemo(() => sanitizeFileNamePart(fileId || gwasId || 'trait'), [fileId, gwasId]);
 
-    const [loading, setLoading] = useState(true);
-    const [payload, setPayload] = useState(null);
     const [variant, setVariant] = useState('hits');
     const [programOnly, setProgramOnly] = useState(false);
     const [selectedGenesets, setSelectedGenesets] = useState([]);
@@ -224,9 +223,22 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const [legendCollapsed, setLegendCollapsed] = useState(false);
     const [tablePage, setTablePage] = useState(0);
     const [tableRowsPerPage, setTableRowsPerPage] = useState(25);
-    const [error, setError] = useState(null);
     const [retryKey, setRetryKey] = useState(0);
     const deferredGeneQuery = useDeferredValue(geneQuery);
+    const manhattanKey = fileId ? ['trait-manhattan', fileId, gwasId || '', variant, retryKey] : null;
+    const manhattanResource = useCachedResourceState(
+        useSWR(
+            manhattanKey,
+            ([, traitName, aliasId, requestedVariant]) => getTraitManhattanHits(traitName, {
+                variant: requestedVariant,
+                aliasId: aliasId || undefined,
+            }),
+            figureResourceSWRConfig,
+        ),
+        { cacheKey: manhattanKey, retainData: false },
+    );
+    const { displayData: payload, error, isInitialLoading: loading, isRefreshing } = manhattanResource;
+    const afterFirstPaint = useAfterFirstPaint(manhattanKey || 'trait-manhattan-empty');
 
     const onInitialized = useCallback((_figure, graphDiv) => {
         plotRef.current = graphDiv;
@@ -239,32 +251,6 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     useEffect(() => {
         autoVariantHandledRef.current = false;
     }, [fileId, gwasId, retryKey]);
-
-    useEffect(() => {
-        if (!fileId) return undefined;
-        const controller = new AbortController();
-        let cancelled = false;
-        setLoading(true);
-        setError(null);
-        getTraitManhattanHits(fileId, { variant, aliasId: gwasId, signal: controller.signal })
-            .then((res) => {
-                if (!cancelled && !controller.signal.aborted) setPayload(res);
-            })
-            .catch((err) => {
-                if (isCanceledRequest(err)) return;
-                if (!cancelled) {
-                    setError(err);
-                    setPayload(null);
-                }
-            })
-            .finally(() => {
-                if (!cancelled && !controller.signal.aborted) setLoading(false);
-            });
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [fileId, gwasId, retryKey, variant]);
 
     const rows = useMemo(() => payload?.data || [], [payload]);
     const resolvedVariant = payload?.resolvedVariant || variant;
@@ -889,6 +875,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     size="small"
                     sx={baseChipSx('success')}
                 />
+                <UpdatingStatus active={isRefreshing} />
             </Box>
 
             <Box sx={toolbarStyles}>
@@ -1056,7 +1043,11 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !error && processedRows.length > 0 && (
+                    {!loading && !error && processedRows.length > 0 && !afterFirstPaint && (
+                        <Box sx={{ minHeight: MANHATTAN_PLOT_HEIGHT }} />
+                    )}
+
+                    {!loading && !error && processedRows.length > 0 && afterFirstPaint && (
                             <Box sx={{ position: 'relative', minHeight: MANHATTAN_PLOT_HEIGHT }}>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}
@@ -1090,31 +1081,33 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     )}
                 </Box>
             </Box>
-            <TraitHitManhattanTable
-                tableSectionRef={tableSectionRef}
-                processedRows={processedRows}
-                sortedRows={sortedRows}
-                pagedRows={pagedRows}
-                highlight={highlight}
-                setHighlight={setHighlight}
-                tableOpen={tableOpen}
-                setTableOpen={setTableOpen}
-                tablePage={tablePage}
-                setTablePage={setTablePage}
-                tableRowsPerPage={tableRowsPerPage}
-                setTableRowsPerPage={setTableRowsPerPage}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                handleSort={handleSort}
-                downloadCSV={downloadCSV}
-                tableRowRefs={tableRowRefs}
-                navigate={navigate}
-                getProgramRoute={getProgramRoute}
-                programColorMap={colorMap}
-                formatDistance={formatDistance}
-                formatP={formatP}
-                gwasHitLogp={GWAS_HIT_LOGP}
-            />
+            {!loading && !error && afterFirstPaint && (
+                <TraitHitManhattanTable
+                    tableSectionRef={tableSectionRef}
+                    processedRows={processedRows}
+                    sortedRows={sortedRows}
+                    pagedRows={pagedRows}
+                    highlight={highlight}
+                    setHighlight={setHighlight}
+                    tableOpen={tableOpen}
+                    setTableOpen={setTableOpen}
+                    tablePage={tablePage}
+                    setTablePage={setTablePage}
+                    tableRowsPerPage={tableRowsPerPage}
+                    setTableRowsPerPage={setTableRowsPerPage}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    handleSort={handleSort}
+                    downloadCSV={downloadCSV}
+                    tableRowRefs={tableRowRefs}
+                    navigate={navigate}
+                    getProgramRoute={getProgramRoute}
+                    programColorMap={colorMap}
+                    formatDistance={formatDistance}
+                    formatP={formatP}
+                    gwasHitLogp={GWAS_HIT_LOGP}
+                />
+            )}
 
             <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
                 <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>

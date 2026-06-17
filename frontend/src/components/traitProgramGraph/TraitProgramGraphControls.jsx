@@ -1,24 +1,20 @@
 import React from 'react';
-import {
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    Divider,
-    FormControl,
-    FormControlLabel,
-    InputLabel,
-    MenuItem,
-    Select,
-    Slider,
-    Stack,
-    Switch,
-    Typography,
-    Box,
-} from '@mui/material';
-import {
-    Download,
-} from '@mui/icons-material';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
+import FormControl from '@mui/material/FormControl';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import Slider from '@mui/material/Slider';
+import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Download from '@mui/icons-material/Download';
 import {
     SIDE_META,
     exportPng,

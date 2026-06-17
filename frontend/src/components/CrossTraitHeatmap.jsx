@@ -1,26 +1,30 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Plot from '../lib/plotly';
-import {
-    Alert,
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    CircularProgress,
-    TextField,
-    Typography,
-    Slider,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import Slider from '@mui/material/Slider';
 import { alpha, useTheme } from '@mui/material/styles';
-import { RestartAlt, Hub, Search, Timeline } from '@mui/icons-material';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import Hub from '@mui/icons-material/Hub';
+import Search from '@mui/icons-material/Search';
+import Timeline from '@mui/icons-material/Timeline';
 import { useNavigate } from 'react-router-dom';
+import useSWR from 'swr';
 import {
     getCrossTraitMatrix,
     getCrossTraitStatus,
     getCrossTraitTargets,
-    isCanceledRequest,
 } from '../api/gwas';
+import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -33,7 +37,7 @@ import {
     summaryChipSx,
     toolbarSx,
 } from '../themeUtils';
-import { StatePanel } from './PageScaffold';
+import { StatePanel, UpdatingStatus } from './PageScaffold';
 import CrossTraitHeatmapTable from './CrossTraitHeatmapTable';
 
 const DEFAULT_TOP_GENES = 25;
@@ -107,8 +111,6 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         gwas_id: gwasId,
         trait_name: traitLabel,
     }), [fileId, gwasId, traitLabel]);
-    const [status, setStatus] = useState(null);
-    const [statusLoading, setStatusLoading] = useState(true);
     const [recommended, setRecommended] = useState([]);
     const [selectedTargets, setSelectedTargets] = useState([]);
     const [targetTraitCount, setTargetTraitCount] = useState(DEFAULT_TARGET_LIMIT);
@@ -116,99 +118,67 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const [appliedTargets, setAppliedTargets] = useState([]);
     const [appliedTopGeneCount, setAppliedTopGeneCount] = useState(DEFAULT_TOP_GENES);
     const [renderVersion, setRenderVersion] = useState(0);
-    const [matrixPayload, setMatrixPayload] = useState(null);
-    const [matrixLoading, setMatrixLoading] = useState(false);
-    const [matrixError, setMatrixError] = useState(null);
     const appliedTargetIds = useMemo(
         () => appliedTargets.map((item) => item.file_id).filter(Boolean),
         [appliedTargets],
     );
     const hasRenderedMatrix = renderVersion > 0 && appliedTargets.length > 0;
+    const statusKey = fileId ? ['cross-trait-status', fileId] : null;
+    const statusResource = useCachedResourceState(
+        useSWR(statusKey, ([, id]) => getCrossTraitStatus(id), detailSummarySWRConfig),
+        { cacheKey: statusKey, retainData: false },
+    );
+    const {
+        displayData: statusData,
+        isInitialLoading: statusLoading,
+        isRefreshing: statusRefreshing,
+    } = statusResource;
+    const status = statusData || { available: false };
+    const targetsKey = status?.available && fileId ? ['cross-trait-targets', fileId] : null;
+    const targetsResource = useCachedResourceState(
+        useSWR(targetsKey, ([, id]) => getCrossTraitTargets(id), detailSummarySWRConfig),
+        { cacheKey: targetsKey, retainData: false },
+    );
+    const { displayData: targetsData, isRefreshing: targetsRefreshing } = targetsResource;
+    const matrixTargetKey = appliedTargetIds.join('|');
+    const matrixKey = status?.available && hasRenderedMatrix
+        ? ['cross-trait-matrix', fileId, matrixTargetKey, appliedTopGeneCount]
+        : null;
+    const matrixResource = useCachedResourceState(
+        useSWR(
+            matrixKey,
+            ([, id, targetKey, topGenes]) => getCrossTraitMatrix(id, {
+                targetIds: targetKey.split('|').filter(Boolean),
+                topGenes,
+            }),
+            figureResourceSWRConfig,
+        ),
+        { cacheKey: matrixKey, retainData: false },
+    );
+    const {
+        displayData: matrixPayload,
+        error: matrixError,
+        isInitialLoading: matrixLoading,
+        isRefreshing: matrixRefreshing,
+    } = matrixResource;
+    const afterFirstPaint = useAfterFirstPaint(matrixKey || 'cross-trait-heatmap-empty');
 
     useEffect(() => {
-        const controller = new AbortController();
-        let cancelled = false;
-        setStatusLoading(true);
-        setStatus(null);
         setTopGeneCount(DEFAULT_TOP_GENES);
         setTargetTraitCount(DEFAULT_TARGET_LIMIT);
         setAppliedTargets([]);
         setAppliedTopGeneCount(DEFAULT_TOP_GENES);
         setRenderVersion(0);
-        setMatrixPayload(null);
-        setMatrixError(null);
-        setMatrixLoading(false);
-        getCrossTraitStatus(fileId, { signal: controller.signal })
-            .then((res) => {
-                if (!cancelled && !controller.signal.aborted) setStatus(res);
-            })
-            .catch((error) => {
-                if (isCanceledRequest(error)) return;
-                if (!cancelled && !controller.signal.aborted) setStatus({ available: false });
-            })
-            .finally(() => {
-                if (!cancelled && !controller.signal.aborted) setStatusLoading(false);
-            });
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
     }, [fileId]);
 
     useEffect(() => {
-        if (!status?.available) return undefined;
-        const controller = new AbortController();
-        let cancelled = false;
-        getCrossTraitTargets(fileId, { signal: controller.signal }).then((res) => {
-            if (cancelled || controller.signal.aborted) return;
-            const nextTargets = prependPinnedTrait(res?.targets || [], currentTrait);
-            const nextCount = Math.min(DEFAULT_TARGET_LIMIT, Math.max(MIN_TARGET_LIMIT, nextTargets.length));
-            setRecommended(nextTargets);
-            setTargetTraitCount(nextCount);
-            setSelectedTargets(nextTargets.slice(0, nextCount));
-        }).catch((error) => {
-            if (isCanceledRequest(error)) return;
-            if (!cancelled && !controller.signal.aborted) setRecommended([]);
-        });
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [currentTrait, fileId, status?.available]);
-
-    useEffect(() => {
-        if (!status?.available || !appliedTargets.length || renderVersion === 0) {
-            setMatrixPayload(null);
-            setMatrixError(null);
-            return undefined;
-        }
-
-        const controller = new AbortController();
-        let cancelled = false;
-        setMatrixLoading(true);
-        setMatrixError(null);
-        getCrossTraitMatrix(fileId, {
-            targetIds: appliedTargetIds,
-            topGenes: appliedTopGeneCount,
-            signal: controller.signal,
-        }).then((res) => {
-            if (!cancelled && !controller.signal.aborted) {
-                setMatrixPayload(res);
-            }
-        }).catch((error) => {
-            if (isCanceledRequest(error)) return;
-            if (!cancelled) {
-                setMatrixPayload(null);
-                setMatrixError(error);
-            }
-        }).finally(() => {
-            if (!cancelled && !controller.signal.aborted) setMatrixLoading(false);
-        });
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [appliedTargetIds, appliedTargets, appliedTopGeneCount, fileId, renderVersion, status?.available]);
+        if (!status?.available || !targetsData) return;
+        const nextTargets = prependPinnedTrait(targetsData?.targets || [], currentTrait);
+        const nextCount = Math.min(DEFAULT_TARGET_LIMIT, Math.max(MIN_TARGET_LIMIT, nextTargets.length));
+        setRecommended(nextTargets);
+        setTargetTraitCount(nextCount);
+        setSelectedTargets(nextTargets.slice(0, nextCount));
+    }, [currentTrait, status?.available, targetsData]);
 
     const relatedTraitSliderMax = useMemo(
         () => Math.max(MIN_TARGET_LIMIT, Math.min(MAX_TARGET_LIMIT, recommended.length || MAX_TARGET_LIMIT)),
@@ -248,7 +218,6 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         }
         setAppliedTargets(nextTargets);
         setAppliedTopGeneCount(topGeneCount);
-        setMatrixError(null);
         setRenderVersion((value) => value + 1);
     }, [
         appliedTargets,
@@ -413,6 +382,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                             <Chip icon={<Timeline />} label={`${matrixPayload?.summary?.topGenes || topGeneCount} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
                             <Chip icon={<Hub />} label={`${selectedTargets.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
                             <Chip icon={<Search />} label={`${matrixPayload?.summary?.missingCells?.toLocaleString?.() || 0} missing`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
+                            <UpdatingStatus active={statusRefreshing || targetsRefreshing || matrixRefreshing} />
                         </Box>
                     </Box>
 
@@ -514,9 +484,6 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                                 setAppliedTargets([]);
                                 setAppliedTopGeneCount(DEFAULT_TOP_GENES);
                                 setRenderVersion(0);
-                                setMatrixPayload(null);
-                                setMatrixError(null);
-                                setMatrixLoading(false);
                             }}
                             sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38, justifyContent: { xs: 'center', lg: 'flex-start' } }}
                         >
@@ -567,7 +534,11 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                         </Box>
                     )}
 
-                    {!matrixLoading && plotData.length > 0 && (
+                    {!matrixLoading && plotData.length > 0 && !afterFirstPaint && (
+                        <Box sx={{ minHeight: plotHeight }} />
+                    )}
+
+                    {!matrixLoading && plotData.length > 0 && afterFirstPaint && (
                         <Box sx={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' }}>
                             <Box sx={{ minWidth: { xs: `${plotMinWidth}px`, xl: '100%' } }}>
                                 <Plot
@@ -588,7 +559,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                 </CardContent>
             </Card>
 
-            <CrossTraitHeatmapTable payload={matrixPayload} fileId={fileId} />
+            {!matrixLoading && afterFirstPaint && <CrossTraitHeatmapTable payload={matrixPayload} fileId={fileId} />}
         </Box>
     );
 }

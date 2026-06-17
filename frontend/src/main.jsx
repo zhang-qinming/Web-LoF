@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { CssBaseline, ThemeProvider } from '@mui/material';
+import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider } from '@mui/material/styles';
 import { SWRConfig } from 'swr';
 import App from './App.jsx';
 import theme from './theme.js';

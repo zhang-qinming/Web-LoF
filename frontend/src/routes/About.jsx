@@ -1,25 +1,21 @@
 import React from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
-import {
-    Box,
-    Button,
-    Chip,
-    Paper,
-    Stack,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    AccountTreeOutlined,
-    BiotechOutlined,
-    DataObjectOutlined,
-    InsightsOutlined,
-    LanguageOutlined,
-    LaunchOutlined,
-    StorageOutlined,
-} from '@mui/icons-material';
+import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
+import BiotechOutlined from '@mui/icons-material/BiotechOutlined';
+import DataObjectOutlined from '@mui/icons-material/DataObjectOutlined';
+import InsightsOutlined from '@mui/icons-material/InsightsOutlined';
+import LanguageOutlined from '@mui/icons-material/LanguageOutlined';
+import LaunchOutlined from '@mui/icons-material/LaunchOutlined';
+import StorageOutlined from '@mui/icons-material/StorageOutlined';
 import { PageFrame } from '../components/PageScaffold';
 import AboutDataStatistics from '../components/AboutDataStatistics';
 import ReleaseLogSection from '../components/ReleaseLogSection';

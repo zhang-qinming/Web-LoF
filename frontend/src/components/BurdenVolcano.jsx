@@ -1,38 +1,39 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Plot, { Plotly } from '../lib/plotly';
-import {
-    Alert,
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Slider,
-    Stack,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Slider from '@mui/material/Slider';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    Insights,
-    Refresh,
-    RestartAlt,
-    Science,
-    Timeline,
-} from '@mui/icons-material';
-import { getBurdenVolcano, getPosteriorVolcano, isCanceledRequest } from '../api/gwas';
+import Insights from '@mui/icons-material/Insights';
+import Refresh from '@mui/icons-material/Refresh';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import Science from '@mui/icons-material/Science';
+import Timeline from '@mui/icons-material/Timeline';
+import useSWR from 'swr';
+import { getBurdenVolcano, getPosteriorVolcano } from '../api/gwas';
 import BurdenVolcanoTable from './BurdenVolcanoTable';
 import FloatingLegend from './FloatingLegend';
+import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneNeutral,
@@ -168,9 +169,6 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const tableSectionRef = useRef(null);
     const autoVariantHandledRef = useRef(false);
 
-    const [payload, setPayload] = useState(null);
-    const [error, setError] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
     const [variant, setVariant] = useState('hits');
     const [effectMode, setEffectMode] = useState(EFFECT_MODES.ALL);
     const [significantOnly, setSignificantOnly] = useState(false);
@@ -187,6 +185,21 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const [exportFmt, setExportFmt] = useState('svg');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
     const [retryKey, setRetryKey] = useState(0);
+    const volcanoResourceId = fileId || gwasId || '';
+    const volcanoKey = volcanoResourceId ? ['volcano', volcanoType, volcanoResourceId, gwasId || '', variant, retryKey] : null;
+    const volcanoResource = useCachedResourceState(
+        useSWR(
+            volcanoKey,
+            ([, , resourceId, aliasId, requestedVariant]) => fetchVolcano(resourceId, {
+                variant: requestedVariant,
+                aliasId: aliasId || undefined,
+            }),
+            figureResourceSWRConfig,
+        ),
+        { cacheKey: volcanoKey, retainData: false },
+    );
+    const { displayData: payload, error, isInitialLoading: isLoading, isRefreshing } = volcanoResource;
+    const afterFirstPaint = useAfterFirstPaint(volcanoKey || 'volcano-empty');
 
     const onInitialized = useCallback((_figure, graphDiv) => {
         plotRef.current = graphDiv;
@@ -199,37 +212,6 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     useEffect(() => {
         autoVariantHandledRef.current = false;
     }, [fileId, gwasId, retryKey, volcanoType]);
-
-    useEffect(() => {
-        if (!gwasId && !fileId) {
-            setPayload(null);
-            return undefined;
-        }
-
-        const controller = new AbortController();
-        let cancelled = false;
-        setIsLoading(true);
-        setError(null);
-        fetchVolcano(fileId || gwasId, { variant, aliasId: gwasId, signal: controller.signal })
-            .then((res) => {
-                if (!cancelled && !controller.signal.aborted) setPayload(res);
-            })
-            .catch((err) => {
-                if (isCanceledRequest(err)) return;
-                if (!cancelled) {
-                    setError(err);
-                    setPayload(null);
-                }
-            })
-            .finally(() => {
-                if (!cancelled && !controller.signal.aborted) setIsLoading(false);
-            });
-
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [fetchVolcano, fileId, gwasId, retryKey, variant]);
 
     const rows = useMemo(() => {
         if (!Array.isArray(payload?.data)) return [];
@@ -686,7 +668,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         downloadBlob(blob, `${exportPrefix}_${variantLabel}_${sanitizeFileNamePart(fileId || gwasId)}.csv`);
     }, [effectLabel, exportPrefix, fileId, gwasId, includePosteriorColumns, rows, variantLabel]);
 
-    if (error) {
+    if (error && !payload) {
         return (
             <Alert
                 severity="error"
@@ -741,6 +723,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                     <Chip icon={<Insights />} label={`${counts.significant.toLocaleString()} highlighted`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
                     <Chip icon={<Science />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.positive.color, 0.1), color: VOLCANO_STYLE.positive.strong, border: `1px solid ${alpha(VOLCANO_STYLE.positive.strong, 0.2)}` })} />
                     <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.negative.color, 0.1), color: VOLCANO_STYLE.negative.strong, border: `1px solid ${alpha(VOLCANO_STYLE.negative.strong, 0.2)}` })} />
+                    <UpdatingStatus active={isRefreshing} />
                 </Box>
 
                 <Box
@@ -861,7 +844,11 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                         </Box>
                     )}
 
-                    {!isLoading && hasVisiblePoints && (
+                    {!isLoading && hasVisiblePoints && !afterFirstPaint && (
+                        <Box sx={{ minHeight: VOLCANO_PLOT_HEIGHT }} />
+                    )}
+
+                    {!isLoading && hasVisiblePoints && afterFirstPaint && (
                         <>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}
@@ -896,28 +883,30 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 </CardContent>
             </Card>
 
-            <BurdenVolcanoTable
-                tableSectionRef={tableSectionRef}
-                rows={rows}
-                sortedRows={sortedRows}
-                pagedRows={pagedRows}
-                tableOpen={tableOpen}
-                setTableOpen={setTableOpen}
-                tablePage={tablePage}
-                setTablePage={setTablePage}
-                tableRowsPerPage={tableRowsPerPage}
-                setTableRowsPerPage={setTableRowsPerPage}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                handleSort={handleSort}
-                downloadCSV={downloadCSV}
-                highlight={highlight}
-                tableRowRefs={tableRowRefs}
-                navigate={navigate}
-                getProgramRoute={getProgramRoute}
-                effectLabel={effectLabel}
-                includePosteriorColumns={includePosteriorColumns}
-            />
+            {!isLoading && afterFirstPaint && (
+                <BurdenVolcanoTable
+                    tableSectionRef={tableSectionRef}
+                    rows={rows}
+                    sortedRows={sortedRows}
+                    pagedRows={pagedRows}
+                    tableOpen={tableOpen}
+                    setTableOpen={setTableOpen}
+                    tablePage={tablePage}
+                    setTablePage={setTablePage}
+                    tableRowsPerPage={tableRowsPerPage}
+                    setTableRowsPerPage={setTableRowsPerPage}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    handleSort={handleSort}
+                    downloadCSV={downloadCSV}
+                    highlight={highlight}
+                    tableRowRefs={tableRowRefs}
+                    navigate={navigate}
+                    getProgramRoute={getProgramRoute}
+                    effectLabel={effectLabel}
+                    includePosteriorColumns={includePosteriorColumns}
+                />
+            )}
 
             <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
                 <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary, fontFamily: theme.typography.fontFamily }}>Export Plot</DialogTitle>

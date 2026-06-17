@@ -1,13 +1,20 @@
 import React from 'react';
 import { useLocation, useParams, useSearchParams } from 'react-router-dom';
-import { Box, Button, Typography, Tabs, Tab } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import { useTheme } from '@mui/material/styles';
-import { Refresh, Timeline } from '@mui/icons-material';
+import Refresh from '@mui/icons-material/Refresh';
+import Timeline from '@mui/icons-material/Timeline';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import TraitMetaCard from '../components/TraitMetaCard';
 import { DATA_PAGE_MAX_WIDTH, sectionTitleSx } from '../themeUtils';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
+import { stableSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 
 const loadGwasDataList = () => import('../components/GwasDataList');
 const loadProgramScatter = () => import('../components/ProgramScatter');
@@ -122,6 +129,18 @@ function TraitFigureFallback() {
     );
 }
 
+function TraitFigureDeferredPlaceholder() {
+    return (
+        <Box
+            aria-hidden="true"
+            sx={{
+                minHeight: 400,
+                width: '100%',
+            }}
+        />
+    );
+}
+
 export default function Trait() {
     const theme = useTheme();
     const { traitName } = useParams();
@@ -138,13 +157,13 @@ export default function Trait() {
         data: scatterListData,
         error: scatterListError,
         mutate: retryScatterList,
-    } = useSWR('/api/programs/list', fetcher);
+    } = useSWR('/api/programs/list', fetcher, stableSWRConfig);
     const {
         data: graphListData,
         error: graphListError,
         mutate: retryGraphList,
-    } = useSWR('/api/programs/graph-list', fetcher);
-    const { data: metaData } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
+    } = useSWR('/api/programs/graph-list', fetcher, stableSWRConfig);
+    const { data: metaData } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher, stableSWRConfig);
     const availabilityError = scatterListError || graphListError;
     const availabilityReady = (
         (scatterListData !== undefined || scatterListError)
@@ -170,6 +189,7 @@ export default function Trait() {
         else if (tab === 2 && !userSelectedTabRef.current && !hasExplicitTab) displayedTab = preferredTab;
     }
     const shouldDeferFigureTab = Boolean(fileId && !hasExplicitTab && !availabilityReady);
+    const figureReady = useAfterFirstPaint(fileId ? `trait-figure-${fileId}-${displayedTab}-${resolvedFileId}-${gwasId}` : 'trait-browser');
 
     const syncTabParam = React.useCallback((nextTab, options = {}) => {
         const tabKey = TAB_INDEX_TO_KEY[nextTab] || TAB_INDEX_TO_KEY[2];
@@ -363,6 +383,8 @@ export default function Trait() {
                     </StatePanel>
                 ) : shouldDeferFigureTab ? (
                     <TraitFigureFallback />
+                ) : !figureReady ? (
+                    <TraitFigureDeferredPlaceholder />
                 ) : (
                     <React.Suspense fallback={<TraitFigureFallback />}>
                         {displayedTab === 0 && hasProgramScatter && <ProgramScatter key={scatterFileId} fileId={scatterFileId} />}

@@ -1,22 +1,20 @@
 import React from 'react';
-import {
-    Box,
-    Button,
-    Chip,
-    IconButton,
-    Paper,
-    Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TablePagination,
-    TableRow,
-    Tooltip,
-    Typography,
-} from '@mui/material';
-import { OpenInNew } from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
+import TableRow from '@mui/material/TableRow';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import OpenInNew from '@mui/icons-material/OpenInNew';
 import { alpha, useTheme } from '@mui/material/styles';
 import { stickyTableContainerSx, stickyTableHeaderCellSx, stickyTableSx, tableRowRevealSx, tableTone } from '../themeUtils';
 

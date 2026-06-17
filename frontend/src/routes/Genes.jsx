@@ -1,49 +1,48 @@
 import React from 'react';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
-import {
-    Alert,
-    Box,
-    Button,
-    ButtonBase,
-    Chip,
-    FormControl,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Pagination,
-    Popover,
-    Select,
-    Skeleton,
-    Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TablePagination,
-    TableRow,
-    TableSortLabel,
-    TextField,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import Chip from '@mui/material/Chip';
+import FormControl from '@mui/material/FormControl';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
+import Pagination from '@mui/material/Pagination';
+import Popover from '@mui/material/Popover';
+import Select from '@mui/material/Select';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
+import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    AccountTreeOutlined,
-    DownloadOutlined,
-    ExpandMore,
-    KeyboardArrowLeft,
-    KeyboardArrowRight,
-    ManageSearchOutlined,
-    OpenInNew,
-    ScienceOutlined,
-    SearchOutlined,
-    TableChartOutlined,
-} from '@mui/icons-material';
+import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
+import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
+import ManageSearchOutlined from '@mui/icons-material/ManageSearchOutlined';
+import OpenInNew from '@mui/icons-material/OpenInNew';
+import ScienceOutlined from '@mui/icons-material/ScienceOutlined';
+import SearchOutlined from '@mui/icons-material/SearchOutlined';
+import TableChartOutlined from '@mui/icons-material/TableChartOutlined';
 import useSWR from 'swr';
 import { getGeneOverview, getGeneProgramRecords, getGenes, getRecommendedGenes, searchGenes } from '../api/gwas';
-import { PageFrame, StatePanel } from '../components/PageScaffold';
+import { PageFrame, StatePanel, UpdatingStatus } from '../components/PageScaffold';
 import { downloadBlob } from '../utils/download';
+import { detailSummarySWRConfig, interactiveSearchSWRConfig, stableKeepPreviousSWRConfig, stableListSWRConfig } from '../utils/swrOptions';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import {
     captionSx,
     DATA_PAGE_MAX_WIDTH,
@@ -366,6 +365,37 @@ function GenePagerTools({
     );
 }
 
+function QuietGeneTableRowsPlaceholder({ colSpan, rows = 25 }) {
+    return (
+        <TableRow aria-hidden="true">
+            <TableCell
+                colSpan={colSpan}
+                sx={{
+                    height: Math.max(220, Math.min(rows, 12) * 48),
+                    py: 0,
+                    borderBottom: 0,
+                }}
+            />
+        </TableRow>
+    );
+}
+
+function QuietDeferredPanel({ minHeight = 260 }) {
+    const theme = useTheme();
+
+    return (
+        <Paper
+            elevation={0}
+            aria-hidden="true"
+            sx={panelSx(theme, {
+                minHeight,
+                bgcolor: theme.palette.background.paper,
+                boxShadow: 'none',
+            })}
+        />
+    );
+}
+
 const GENE_TABLE_COLUMNS = [
     { key: 'geneSymbol', label: 'Gene Symbol', align: 'center', width: 138 },
     { key: 'ensgId', label: 'Ensembl ID', align: 'center', width: 170 },
@@ -528,7 +558,7 @@ function embeddedColumnHeaderSx(theme, tone, align) {
     });
 }
 
-function EmbeddedTableTitleRow({ title, caption, colSpan, onDownload }) {
+function EmbeddedTableTitleRow({ title, caption, colSpan, onDownload, action = null }) {
     const theme = useTheme();
     return (
         <TableRow>
@@ -544,14 +574,17 @@ function EmbeddedTableTitleRow({ title, caption, colSpan, onDownload }) {
                             </Typography>
                         ) : null}
                     </Box>
-                    <Button
-                        size="small"
-                        startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
-                        onClick={onDownload}
-                        sx={{ textTransform: 'none', fontSize: '0.72rem', color: theme.palette.text.secondary, flexShrink: 0 }}
-                    >
-                        CSV
-                    </Button>
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
+                        {action}
+                        <Button
+                            size="small"
+                            startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
+                            onClick={onDownload}
+                            sx={{ textTransform: 'none', fontSize: '0.72rem', color: theme.palette.text.secondary, flexShrink: 0 }}
+                        >
+                            CSV
+                        </Button>
+                    </Stack>
                 </Stack>
             </TableCell>
         </TableRow>
@@ -1219,24 +1252,27 @@ function GeneHomeTable({
     const searchInput = input.trim();
     const activeSearch = useDebouncedValue(searchInput);
     const isSearching = searchInput.length >= 2;
+    const rowsReady = useAfterFirstPaint('gene-home-table');
 
-    const { data, isLoading, error } = useSWR(
-        ['gene-index', page, rowsPerPage, sortBy, sortDir, activeSearch],
-        ([, pageIndex, limit, sortKey, direction, search]) => getGenes({
+    const geneIndexKey = ['gene-index', page, rowsPerPage, sortBy, sortDir, activeSearch];
+    const geneIndexResource = useCachedResourceState(
+        useSWR(geneIndexKey, ([, pageIndex, limit, sortKey, direction, search]) => getGenes({
             page: pageIndex + 1,
             limit,
             sortBy: sortKey,
             order: direction,
             search,
-        }),
-        { keepPreviousData: true, revalidateOnFocus: false },
+        }), stableListSWRConfig),
+        { cacheKey: geneIndexKey },
     );
+    const { displayData: data, isInitialLoading: isLoading, isRefreshing, error } = geneIndexResource;
 
     const rows = data?.genes || EMPTY_GENE_ROWS;
     const previewingSearch = Boolean(searchInput) && (searchInput !== activeSearch || isLoading);
     const visibleRows = React.useMemo(() => (
         previewingSearch ? rows.filter((gene) => matchesGeneIndexRow(gene, searchInput)) : rows
     ), [previewingSearch, rows, searchInput]);
+    const showPreparingRows = !isLoading && visibleRows.length > 0 && !rowsReady;
     const totalCount = Number(data?.totalCount) || rows.length;
     const shouldPaginate = totalCount > TABLE_PAGINATION_THRESHOLD;
     const pageCount = shouldPaginate ? Math.max(1, Math.ceil(totalCount / rowsPerPage)) : 1;
@@ -1437,6 +1473,7 @@ function GeneHomeTable({
                 >
                     {shouldPaginate && <GeneHeaderPageControl totalPages={pageCount} page={currentPage} onChange={handlePageChange} />}
                     {shouldPaginate && <GeneRowsControl rowsPerPage={rowsPerPage} onChange={handleRowsPerPageChange} showLabel={false} />}
+                    <UpdatingStatus active={isRefreshing} />
                     <Button
                         size="small"
                         startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
@@ -1556,7 +1593,10 @@ function GeneHomeTable({
                                 </TableCell>
                             </TableRow>
                         )}
-                        {visibleRows.map((gene, index) => {
+                        {showPreparingRows && (
+                            <QuietGeneTableRowsPlaceholder colSpan={GENE_TABLE_COLUMNS.length} rows={rowsPerPage} />
+                        )}
+                        {rowsReady && visibleRows.map((gene, index) => {
                             const label = gene.geneSymbol || gene.ensgId || gene.geneLabel || '';
                             return (
                                 <TableRow
@@ -1825,7 +1865,7 @@ function GeneSwitcher({ gene, query, onSelect }) {
     const { data, isLoading } = useSWR(
         open && debouncedSearchTerm.length >= 2 ? ['gene-switcher-search', debouncedSearchTerm] : null,
         ([, q]) => searchGenes(q, { limit: 12 }),
-        { keepPreviousData: true, revalidateOnFocus: false },
+        interactiveSearchSWRConfig,
     );
 
     const rows = data?.genes || EMPTY_GENE_ROWS;
@@ -2557,6 +2597,7 @@ function GeneProgramTraitTable({
     onPageChange,
     onRowsPerPageChange,
     onSort,
+    isRefreshing = false,
 }) {
     const theme = useTheme();
     const rows = records || EMPTY_RECORDS;
@@ -2605,6 +2646,7 @@ function GeneProgramTraitTable({
                             title="Gene - Program - Trait evidence"
                             colSpan={GENE_TRAIT_COLUMNS.length}
                             onDownload={handleDownload}
+                            action={<UpdatingStatus active={isRefreshing} />}
                         />
                         <TableRow>
                             {GENE_TRAIT_GROUPS.map((group) => {
@@ -2798,6 +2840,7 @@ export default function Genes() {
     const debouncedInput = useDebouncedValue(input.trim());
     const suggestionQuery = !query ? debouncedInput : '';
     const suggestionsPending = !query && input.trim().length >= 2 && suggestionQuery !== input.trim();
+    const detailTablesReady = useAfterFirstPaint(query ? `gene-detail-${query}` : 'gene-home');
 
     React.useEffect(() => {
         setInput(queryParam);
@@ -2812,20 +2855,21 @@ export default function Genes() {
     const { data: suggestions, isLoading: suggestionsLoading } = useSWR(
         suggestionQuery.length >= 2 ? ['gene-search', suggestionQuery] : null,
         ([, q]) => searchGenes(q, { limit: 12 }),
-        { keepPreviousData: true, revalidateOnFocus: false },
+        interactiveSearchSWRConfig,
     );
 
     const { data: recommended } = useSWR(
         !query ? ['recommended-genes'] : null,
         () => getRecommendedGenes({ limit: 12 }),
-        { keepPreviousData: true, revalidateOnFocus: false },
+        stableKeepPreviousSWRConfig,
     );
 
-    const { data: overview, isLoading: overviewLoading, error: overviewError } = useSWR(
-        query ? ['gene-overview', query] : null,
-        ([, q]) => getGeneOverview(q),
-        { revalidateOnFocus: false },
+    const overviewKey = query ? ['gene-overview', query] : null;
+    const overviewResource = useCachedResourceState(
+        useSWR(overviewKey, ([, q]) => getGeneOverview(q), detailSummarySWRConfig),
+        { cacheKey: overviewKey, retainData: false },
     );
+    const { displayData: overview, isInitialLoading: overviewLoading, error: overviewError } = overviewResource;
 
     const runSearch = React.useCallback((value = input) => {
         const next = value.trim();
@@ -2850,18 +2894,19 @@ export default function Genes() {
     const summary = overview?.summary || {};
     const totalOverviewCount = Number(summary.totalRows) || 0;
 
-    const { data: recordData, isLoading: recordsLoading, error: recordsError } = useSWR(
-        query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount > 0
+    const recordKey = query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount > 0
             ? ['gene-records', query, traitPage, traitRowsPerPage, traitSortBy, traitSortDir]
-            : null,
-        ([, q, pageIndex, limit, sortKey, direction]) => getGeneProgramRecords(q, {
+            : null;
+    const recordResource = useCachedResourceState(
+        useSWR(recordKey, ([, q, pageIndex, limit, sortKey, direction]) => getGeneProgramRecords(q, {
             page: pageIndex + 1,
             limit,
             sortBy: sortKey,
             order: direction,
-        }),
-        { revalidateOnFocus: false },
+        }), stableListSWRConfig),
+        { cacheKey: recordKey },
     );
+    const { displayData: recordData, isInitialLoading: recordsLoading, isRefreshing: recordsRefreshing, error: recordsError } = recordResource;
 
     const recordPage = recordData?.recordPage || {};
     const hasFreshRecordPage = Boolean(
@@ -2957,7 +3002,11 @@ export default function Genes() {
                             }}
                         >
                             <GeneInfoTable gene={overviewGene} summary={summary} />
-                            <GeneProgramTable gene={overviewGene} records={records} programRows={programRows} />
+                            {detailTablesReady ? (
+                                <GeneProgramTable gene={overviewGene} records={records} programRows={programRows} />
+                            ) : (
+                                <QuietDeferredPanel minHeight={220} />
+                            )}
                         </Box>
                         {recordsError ? (
                             <StatePanel
@@ -2972,6 +3021,8 @@ export default function Genes() {
                                 message={`Querying ${query} trait evidence`}
                                 minHeight={300}
                             />
+                        ) : !detailTablesReady ? (
+                            <QuietDeferredPanel minHeight={300} />
                         ) : (
                             <GeneProgramTraitTable
                                 gene={overviewGene}
@@ -2984,6 +3035,7 @@ export default function Genes() {
                                 onPageChange={setTraitPage}
                                 onRowsPerPageChange={handleTraitRowsPerPageChange}
                                 onSort={handleTraitSort}
+                                isRefreshing={recordsRefreshing}
                             />
                         )}
                     </>

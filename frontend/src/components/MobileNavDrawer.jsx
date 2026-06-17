@@ -1,18 +1,17 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import {
-    Box,
-    Divider,
-    Drawer,
-    IconButton,
-    List,
-    ListItemButton,
-    ListItemIcon,
-    ListItemText,
-    Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import Drawer from '@mui/material/Drawer';
+import IconButton from '@mui/material/IconButton';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { CloseRounded, MenuRounded } from '@mui/icons-material';
+import CloseRounded from '@mui/icons-material/CloseRounded';
+import MenuRounded from '@mui/icons-material/MenuRounded';
 
 const drawerWidth = 280;
 const buttonSize = 42;

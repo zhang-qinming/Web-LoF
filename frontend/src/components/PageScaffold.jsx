@@ -1,7 +1,11 @@
 import React from 'react';
-import { Alert, Box, CircularProgress, Paper, Typography } from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { InfoOutlined } from '@mui/icons-material';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import { captionSx, fadeUpKeyframes, panelSx, sectionTitleSx } from '../themeUtils';
 
 export function PageFrame({
@@ -64,6 +68,36 @@ export function PageFrame({
                 </Box>
             )}
             {children}
+        </Box>
+    );
+}
+
+export function UpdatingStatus({ active, label = 'Updating', sx }) {
+    const theme = useTheme();
+    if (!active) return null;
+
+    return (
+        <Box
+            component="span"
+            sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.55,
+                height: 22,
+                px: 0.75,
+                borderRadius: 1,
+                color: theme.palette.text.secondary,
+                bgcolor: alpha(theme.palette.primary.main, 0.055),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+                fontSize: '0.68rem',
+                fontWeight: 680,
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+                ...sx,
+            }}
+        >
+            <CircularProgress size={10} thickness={5} />
+            {label}
         </Box>
     );
 }

@@ -1,8 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
+import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
     plugins: [react()],
+    define: {
+        global: 'globalThis',
+    },
+    resolve: {
+        alias: {
+            buffer: fileURLToPath(new URL('./src/lib/bufferShim.js', import.meta.url)),
+        },
+    },
     server: {
         host: process.env.VITE_HOST || '127.0.0.1',
         port: parseInt(process.env.VITE_PORT) || 5173,

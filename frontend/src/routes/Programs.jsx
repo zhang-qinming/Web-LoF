@@ -1,16 +1,35 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
-import {
-    Box, Button, ButtonBase, Chip, InputAdornment, Paper, Popover, Skeleton, Stack, Table, TableBody, TableCell, TableContainer,
-    TablePagination,
-    TableHead, TableRow, TableSortLabel, TextField, Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import Chip from '@mui/material/Chip';
+import InputAdornment from '@mui/material/InputAdornment';
+import Paper from '@mui/material/Paper';
+import Popover from '@mui/material/Popover';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TablePagination from '@mui/material/TablePagination';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { DownloadOutlined, ExpandMore, OpenInNew, Search } from '@mui/icons-material';
+import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import OpenInNew from '@mui/icons-material/OpenInNew';
+import Search from '@mui/icons-material/Search';
 import useSWR from 'swr';
 import { fetcher, getProgramGenes, getProgramTraits } from '../api/gwas';
-import { PageFrame, StatePanel } from '../components/PageScaffold';
+import { PageFrame, StatePanel, UpdatingStatus } from '../components/PageScaffold';
 import { downloadBlob } from '../utils/download';
+import { detailSummarySWRConfig, stableListSWRConfig } from '../utils/swrOptions';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     DATA_PAGE_MAX_WIDTH,
     groupedTableColumnHeaderCellSx,
@@ -730,11 +749,12 @@ function ProgramGenesTable({ programId }) {
     const [sortDir, setSortDir] = useState('desc');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
-    const { data, error, isLoading } = useSWR(
-        programId ? ['program-genes', programId] : null,
-        ([, id]) => getProgramGenes(id),
-        { keepPreviousData: true, revalidateOnFocus: false },
+    const geneKey = programId ? ['program-genes', programId] : null;
+    const geneResource = useCachedResourceState(
+        useSWR(geneKey, ([, id]) => getProgramGenes(id), stableListSWRConfig),
+        { cacheKey: geneKey },
     );
+    const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = geneResource;
 
     const rows = useMemo(() => {
         const source = data?.genes || [];
@@ -808,6 +828,7 @@ function ProgramGenesTable({ programId }) {
                                             size="small"
                                             sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))}
                                         />
+                                        <UpdatingStatus active={isRefreshing} />
                                         <Button
                                             size="small"
                                             startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
@@ -982,9 +1003,11 @@ export default function Programs() {
     };
     const { programId } = useParams();
     const navigate = useNavigate();
-    const { data: info, isLoading: loading } = useSWR('/api/programs/info', fetcher, {
-        keepPreviousData: true, revalidateOnFocus: false, revalidateOnReconnect: false,
-    });
+    const infoResource = useCachedResourceState(
+        useSWR('/api/programs/info', fetcher, detailSummarySWRConfig),
+        { cacheKey: '/api/programs/info' },
+    );
+    const { displayData: info, isInitialLoading: loading } = infoResource;
     const [programs, setPrograms] = useState([]);
     const [programGeneInput, setProgramGeneInput] = useState('');
     const [sortBy, setSortBy] = useState('program');
@@ -994,16 +1017,18 @@ export default function Programs() {
         ? (/^P/i.test(programId) ? programId : `P${programId}`)
         : null;
     const programNumber = normalizedProgramId ? normalizedProgramId.replace(/^P/i, '') : '';
-    const { data: traitData, error: traitError, isLoading: traitLoading } = useSWR(
-        normalizedProgramId ? ['program-traits', normalizedProgramId] : null,
-        ([, id]) => getProgramTraits(id),
-        { keepPreviousData: true, revalidateOnFocus: false },
+    const traitKey = normalizedProgramId ? ['program-traits', normalizedProgramId] : null;
+    const traitResource = useCachedResourceState(
+        useSWR(traitKey, ([, id]) => getProgramTraits(id), stableListSWRConfig),
+        { cacheKey: traitKey },
     );
-    const { data: geneData, isLoading: geneLoading } = useSWR(
-        normalizedProgramId ? ['program-genes', normalizedProgramId] : null,
-        ([, id]) => getProgramGenes(id),
-        { keepPreviousData: true, revalidateOnFocus: false },
+    const { displayData: traitData, error: traitError, isInitialLoading: traitLoading, isRefreshing: traitRefreshing } = traitResource;
+    const detailGeneKey = normalizedProgramId ? ['program-genes', normalizedProgramId] : null;
+    const detailGeneResource = useCachedResourceState(
+        useSWR(detailGeneKey, ([, id]) => getProgramGenes(id), stableListSWRConfig),
+        { cacheKey: detailGeneKey },
     );
+    const { displayData: geneData, isInitialLoading: geneLoading, isRefreshing: geneRefreshing } = detailGeneResource;
 
     useEffect(() => {
         fetch('/api/regulation/list').then(r => r.json()).then(res => setPrograms(res.programs || [])).catch(() => {});
@@ -1161,7 +1186,10 @@ export default function Programs() {
                                 onSelect={handleProgramSelect}
                             />
                         </Box>
-                        <ProgramSummaryChips summary={detailSummary} />
+                        <Stack direction="row" spacing={0.8} alignItems="center" sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+                            <ProgramSummaryChips summary={detailSummary} />
+                            <UpdatingStatus active={traitRefreshing || geneRefreshing} />
+                        </Stack>
                     </Stack>
                 </Paper>
 

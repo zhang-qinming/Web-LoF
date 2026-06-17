@@ -1,44 +1,43 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Plot from '../lib/plotly';
-import {
-    Alert,
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    CircularProgress,
-    IconButton,
-    Paper,
-    Slider,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
+import Slider from '@mui/material/Slider';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-    CompareArrows,
-    DownloadOutlined,
-    Hub,
-    Refresh,
-    RestartAlt,
-    Search,
-} from '@mui/icons-material';
+import CompareArrows from '@mui/icons-material/CompareArrows';
+import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import Hub from '@mui/icons-material/Hub';
+import Refresh from '@mui/icons-material/Refresh';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import Search from '@mui/icons-material/Search';
 import { useNavigate } from 'react-router-dom';
+import useSWR from 'swr';
 import {
     getCrossTraitStatus,
     getCrossTraitTargets,
     getTraitCorrelation,
-    isCanceledRequest,
 } from '../api/gwas';
+import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
+import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
+import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -58,7 +57,7 @@ import {
     tableTone,
     toolbarSx,
 } from '../themeUtils';
-import { StatePanel } from './PageScaffold';
+import { StatePanel, UpdatingStatus } from './PageScaffold';
 import { downloadBlob } from '../utils/download';
 
 const DEFAULT_TRAIT_LIMIT = 12;
@@ -157,9 +156,6 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
         gwas_id: gwasId,
         trait_name: traitLabel,
     }), [fileId, gwasId, traitLabel]);
-    const [status, setStatus] = useState(null);
-    const [statusLoading, setStatusLoading] = useState(true);
-    const [statusError, setStatusError] = useState(null);
     const [statusAttempt, setStatusAttempt] = useState(0);
     const [recommended, setRecommended] = useState([]);
     const [selectedTraits, setSelectedTraits] = useState([]);
@@ -168,101 +164,66 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
     const [appliedTraits, setAppliedTraits] = useState([]);
     const [appliedMethod, setAppliedMethod] = useState('spearman');
     const [renderVersion, setRenderVersion] = useState(0);
-    const [payload, setPayload] = useState(null);
-    const [correlationLoading, setCorrelationLoading] = useState(false);
-    const [correlationError, setCorrelationError] = useState(null);
     const appliedTraitIds = useMemo(
         () => appliedTraits.map((item) => item.file_id).filter(Boolean),
         [appliedTraits],
     );
     const hasRenderedCorrelation = renderVersion > 0 && appliedTraits.length >= 2;
+    const statusKey = fileId ? ['trait-correlation-status', fileId, statusAttempt] : null;
+    const statusResource = useCachedResourceState(
+        useSWR(statusKey, ([, id]) => getCrossTraitStatus(id), detailSummarySWRConfig),
+        { cacheKey: statusKey, retainData: false },
+    );
+    const {
+        displayData: status,
+        error: statusError,
+        isInitialLoading: statusLoading,
+        isRefreshing: statusRefreshing,
+    } = statusResource;
+    const targetsKey = status?.available && fileId ? ['trait-correlation-targets', fileId] : null;
+    const targetsResource = useCachedResourceState(
+        useSWR(targetsKey, ([, id]) => getCrossTraitTargets(id), detailSummarySWRConfig),
+        { cacheKey: targetsKey, retainData: false },
+    );
+    const { displayData: targetsData, isRefreshing: targetsRefreshing } = targetsResource;
+    const correlationTraitKey = appliedTraitIds.join('|');
+    const correlationKey = status?.available && hasRenderedCorrelation
+        ? ['trait-correlation', fileId, correlationTraitKey, appliedMethod]
+        : null;
+    const correlationResource = useCachedResourceState(
+        useSWR(
+            correlationKey,
+            ([, id, targetKey, selectedMethod]) => getTraitCorrelation(id, {
+                targetIds: targetKey.split('|').filter(Boolean),
+                method: selectedMethod,
+            }),
+            figureResourceSWRConfig,
+        ),
+        { cacheKey: correlationKey, retainData: false },
+    );
+    const {
+        displayData: payload,
+        error: correlationError,
+        isInitialLoading: correlationLoading,
+        isRefreshing: correlationRefreshing,
+    } = correlationResource;
+    const afterFirstPaint = useAfterFirstPaint(correlationKey || 'trait-correlation-empty');
 
     useEffect(() => {
-        const controller = new AbortController();
-        let cancelled = false;
-        setStatusLoading(true);
-        setStatusError(null);
-        setStatus(null);
         setTargetTraitCount(DEFAULT_TRAIT_LIMIT);
         setAppliedTraits([]);
         setAppliedMethod('spearman');
         setRenderVersion(0);
-        setPayload(null);
-        setCorrelationError(null);
-        setCorrelationLoading(false);
-        getCrossTraitStatus(fileId, { signal: controller.signal })
-            .then((result) => {
-                if (!cancelled && !controller.signal.aborted) setStatus(result);
-            })
-            .catch((error) => {
-                if (isCanceledRequest(error)) return;
-                if (!cancelled && !controller.signal.aborted) setStatusError(error);
-            })
-            .finally(() => {
-                if (!cancelled && !controller.signal.aborted) setStatusLoading(false);
-            });
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [fileId, statusAttempt]);
+    }, [fileId]);
 
     useEffect(() => {
-        if (!status?.available) return undefined;
-        const controller = new AbortController();
-        let cancelled = false;
-        getCrossTraitTargets(fileId, { signal: controller.signal })
-            .then((result) => {
-                if (cancelled || controller.signal.aborted) return;
-                const nextRecommended = prependPinnedTrait(result?.targets || [], currentTrait);
-                const nextCount = Math.min(DEFAULT_TRAIT_LIMIT, Math.max(MIN_TRAIT_LIMIT, nextRecommended.length));
-                setRecommended(nextRecommended);
-                setTargetTraitCount(nextCount);
-                setSelectedTraits(nextRecommended.slice(0, nextCount));
-            })
-            .catch((error) => {
-                if (isCanceledRequest(error)) return;
-                if (!cancelled && !controller.signal.aborted) setRecommended(prependPinnedTrait([], currentTrait));
-            });
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [currentTrait, fileId, status?.available]);
-
-    useEffect(() => {
-        if (!status?.available || appliedTraitIds.length < 2 || renderVersion === 0) {
-            setPayload(null);
-            setCorrelationError(null);
-            return undefined;
-        }
-
-        const controller = new AbortController();
-        let cancelled = false;
-        setCorrelationLoading(true);
-        setCorrelationError(null);
-        getTraitCorrelation(fileId, {
-            targetIds: appliedTraitIds,
-            method: appliedMethod,
-            signal: controller.signal,
-        }).then((result) => {
-            if (cancelled || controller.signal.aborted) return;
-            setPayload(result);
-        }).catch((error) => {
-            if (isCanceledRequest(error)) return;
-            if (!cancelled) {
-                setPayload(null);
-                setCorrelationError(error);
-            }
-        }).finally(() => {
-            if (!cancelled && !controller.signal.aborted) setCorrelationLoading(false);
-        });
-
-        return () => {
-            cancelled = true;
-            controller.abort();
-        };
-    }, [appliedMethod, appliedTraitIds, appliedTraits, fileId, renderVersion, status?.available]);
+        if (!status?.available || !targetsData) return;
+        const nextRecommended = prependPinnedTrait(targetsData?.targets || [], currentTrait);
+        const nextCount = Math.min(DEFAULT_TRAIT_LIMIT, Math.max(MIN_TRAIT_LIMIT, nextRecommended.length));
+        setRecommended(nextRecommended);
+        setTargetTraitCount(nextCount);
+        setSelectedTraits(nextRecommended.slice(0, nextCount));
+    }, [currentTrait, status?.available, targetsData]);
 
     const relatedTraitSliderMax = useMemo(
         () => Math.max(MIN_TRAIT_LIMIT, Math.min(MAX_TRAIT_LIMIT, recommended.length || MAX_TRAIT_LIMIT)),
@@ -302,7 +263,6 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
         }
         setAppliedTraits(nextTraits);
         setAppliedMethod(method);
-        setCorrelationError(null);
         setRenderVersion((value) => value + 1);
     }, [
         appliedMethod,
@@ -531,6 +491,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                                     sx={summaryChipSx(theme, correlationTone(theme, strongestSourceCorrelation.correlation))}
                                 />
                             )}
+                            <UpdatingStatus active={statusRefreshing || targetsRefreshing || correlationRefreshing} />
                         </Box>
                     </Box>
 
@@ -600,9 +561,6 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                                     setAppliedTraits([]);
                                     setAppliedMethod('spearman');
                                     setRenderVersion(0);
-                                    setPayload(null);
-                                    setCorrelationError(null);
-                                    setCorrelationLoading(false);
                                 }}
                                 sx={{ border: `1px solid ${theme.custom.border.soft}`, borderRadius: 1 }}
                             >
@@ -617,7 +575,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                 <Alert
                     severity="error"
                     action={(
-                        <Button color="inherit" size="small" onClick={() => setRenderVersion((value) => value + 1)}>
+                        <Button color="inherit" size="small" onClick={() => { void correlationResource.mutate(); }}>
                             Retry
                         </Button>
                     )}
@@ -651,7 +609,11 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                         </Box>
                     )}
 
-                    {!correlationLoading && !correlationError && plotData.length > 0 && (
+                    {!correlationLoading && !correlationError && plotData.length > 0 && !afterFirstPaint && (
+                        <Box sx={{ minHeight: plotHeight }} />
+                    )}
+
+                    {!correlationLoading && !correlationError && plotData.length > 0 && afterFirstPaint && (
                         <Box sx={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' }}>
                             <Box sx={{ minWidth: { xs: `${plotMinWidth}px`, md: '100%' } }}>
                                 <Plot
@@ -673,7 +635,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                 </CardContent>
             </Card>
 
-            {sourceCorrelationRows.length > 0 && (
+            {sourceCorrelationRows.length > 0 && afterFirstPaint && (
                 <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
                     <Box sx={{
                         px: 1.75,

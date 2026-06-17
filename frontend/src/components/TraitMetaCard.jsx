@@ -1,9 +1,23 @@
-import { Box, Button, Link, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableRow, Typography } from '@mui/material';
-import { DownloadOutlined, OpenInNew, Refresh } from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Link from '@mui/material/Link';
+import Paper from '@mui/material/Paper';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableRow from '@mui/material/TableRow';
+import Typography from '@mui/material/Typography';
+import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import OpenInNew from '@mui/icons-material/OpenInNew';
+import Refresh from '@mui/icons-material/Refresh';
 import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import { downloadBlob } from '../utils/download';
+import { stableSWRConfig } from '../utils/swrOptions';
 import { panelSx } from '../themeUtils';
 import { StatePanel } from './PageScaffold';
 
@@ -233,7 +247,7 @@ function TraitInfoTable({ title, rows, theme, action }) {
 
 export default function TraitMetaCard({ fileId }) {
     const theme = useTheme();
-    const { data, error, mutate } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher);
+    const { data, error, mutate } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher, stableSWRConfig);
     const info = (data && !data.error) ? data : null;
 
     if (error) {
