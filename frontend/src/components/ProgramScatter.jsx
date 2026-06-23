@@ -25,10 +25,12 @@ import FloatingLegend from './FloatingLegend';
 import { UpdatingStatus } from './PageScaffold';
 import ProgramScatterTable from './ProgramScatterTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
+import { parseNullableNumber } from '../utils/numbers';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useDebouncedControlValue, useIdleRenderGate } from '../utils/renderScheduling';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneNeutral,
@@ -78,8 +80,7 @@ const TRACE_INDICES = TRACE_ORDER.map((_, index) => index);
 const PROGRAM_SCATTER_PLOT_HEIGHT = RESPONSIVE_TALL_PLOT_HEIGHT;
 
 function toFiniteNumber(value) {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
+    return parseNullableNumber(value);
 }
 
 function clamp(value, min, max) {
@@ -289,12 +290,12 @@ function buildHoverText(item, key, info) {
         '<b>Program burden</b>',
         `Score: ${formatFixed(item.progScore, 3)}`,
         `Rank: ${formatRank(item.rankProg)} | P: ${formatPValue(item.progP)}`,
-        `Gamma: ${formatFixed(item.progGamma, 4)}`,
+        `Mean gamma: ${formatFixed(item.progGamma, 4)}`,
         '',
-        '<b>Regulator burden</b>',
+        '<b>Regulator-burden correlation</b>',
         `Score: ${formatFixed(item.regScore, 3)}`,
         `Rank: ${formatRank(item.rankReg)} | P: ${formatPValue(item.regP)}`,
-        `Beta: ${formatFixed(item.regBeta, 4)}`,
+        `Regulator beta: ${formatFixed(item.regBeta, 4)}`,
     ];
 
     if (representativeGo) {
@@ -374,7 +375,7 @@ export default function ProgramScatter({ fileId }) {
     const scatterKey = fileId ? ['program-scatter', fileId] : null;
     const scatterResource = useCachedResourceState(
         useSWR(scatterKey, ([, id]) => getProgramScatterData(id), figureResourceSWRConfig),
-        { cacheKey: scatterKey, retainData: false },
+        { cacheKey: scatterKey, retainPreviousData: false },
     );
     const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = scatterResource;
     const infoResource = useCachedResourceState(
@@ -512,6 +513,32 @@ export default function ProgramScatter({ fileId }) {
                 : safe;
         });
     }, [maxTopN]);
+    const commitTopN = useCallback((value) => {
+        setTopN(clamp(Number(value) || DEFAULT_TOP_N, 1, maxTopN));
+    }, [maxTopN]);
+    const [topNDraft, setTopNDraft, commitTopNDraft] = useDebouncedControlValue(
+        effectiveTopN,
+        commitTopN,
+        { delay: 250 },
+    );
+    const topNDraftValue = clamp(Number(topNDraft) || 1, 1, maxTopN);
+    const sizeControlValue = mode === MODES.SCATTER ? markerSize : bubbleScale;
+    const commitSizeControl = useCallback((value) => {
+        const nextValue = Number(value);
+        if (mode === MODES.SCATTER) {
+            setMarkerSize(clamp(nextValue || 10, 3, 25));
+            return;
+        }
+        setBubbleScale(clamp(nextValue || 1, 0.5, 2));
+    }, [mode]);
+    const [sizeDraft, setSizeDraft, commitSizeDraft] = useDebouncedControlValue(
+        sizeControlValue,
+        commitSizeControl,
+        { delay: 250 },
+    );
+    const sizeDraftValue = mode === MODES.SCATTER
+        ? clamp(Number(sizeDraft) || 10, 3, 25)
+        : clamp(Number(sizeDraft) || 1, 0.5, 2);
 
     useEffect(() => {
         if (!highlight.program || !tableOpen) return;
@@ -585,9 +612,14 @@ export default function ProgramScatter({ fileId }) {
             return na > nb ? dir : -dir;
         });
     }, [rows, sortBy, sortDir, collator]);
+    const shouldRenderTable = useIdleRenderGate(
+        !isLoading && afterFirstPaint,
+        `${scatterKey || 'program-scatter-empty'}:${rows.length}:${sortedRows.length}`,
+        { delay: sortedRows.length > 1000 ? 450 : 180, timeout: 1600 },
+    );
 
     const downloadCSV = useCallback(() => {
-        const cols = ['Program', 'Category', 'Prog Score', 'Rank (Prog)', 'Prog P', 'Gamma', 'Reg Score', 'Rank (Reg)', 'Reg P', 'Beta'];
+        const cols = ['Program', 'Class', 'Program Burden Score', 'Rank (Program)', 'Program Burden P', 'Mean Gamma', 'Regulator-Burden Score', 'Rank (Regulator)', 'Regulator-Burden P', 'Regulator Beta'];
         const keys = ['program', 'color', 'progScore', 'rankProg', 'progP', 'progGamma', 'regScore', 'rankReg', 'regP', 'regBeta'];
         const header = cols.join(',');
         const body = rows.map((row) => keys.map((k) => {
@@ -957,15 +989,16 @@ export default function ProgramScatter({ fileId }) {
                                 Top N
                             </Typography>
                             <Slider
-                                value={effectiveTopN}
+                                value={topNDraftValue}
                                 min={1}
                                 max={maxTopN}
                                 step={1}
-                                onChange={(_, value) => setTopN(Number(value))}
+                                onChange={(_, value) => setTopNDraft(Number(value))}
+                                onChangeCommitted={(_, value) => commitTopNDraft(Number(value))}
                                 sx={{ ...sliderSx, width: 110 }}
                             />
                             <Chip
-                                label={`${effectiveTopN}/${maxTopN}`}
+                                label={`${topNDraftValue}/${maxTopN}`}
                                 size="small"
                                 sx={summaryChipSx(theme, { minWidth: 52, height: 22, ...metricChipTone(theme, 'neutral') })}
                             />
@@ -980,17 +1013,16 @@ export default function ProgramScatter({ fileId }) {
                             Size
                         </Typography>
                         <Slider
-                            value={mode === MODES.SCATTER ? markerSize : bubbleScale}
+                            value={sizeDraftValue}
                             min={mode === MODES.SCATTER ? 3 : 0.5}
                             max={mode === MODES.SCATTER ? 25 : 2}
                             step={mode === MODES.SCATTER ? 1 : 0.1}
-                            onChange={(_, value) => mode === MODES.SCATTER
-                                ? setMarkerSize(Number(value))
-                                : setBubbleScale(Number(value))}
+                            onChange={(_, value) => setSizeDraft(Number(value))}
+                            onChangeCommitted={(_, value) => commitSizeDraft(Number(value))}
                             sx={{ ...sliderSx, width: 90 }}
                         />
                         <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.72rem', minWidth: 28 }}>
-                            {mode === MODES.SCATTER ? markerSize : `${bubbleScale.toFixed(1)}x`}
+                            {mode === MODES.SCATTER ? sizeDraftValue : `${sizeDraftValue.toFixed(1)}x`}
                         </Typography>
                     </Box>
 
@@ -1107,7 +1139,7 @@ export default function ProgramScatter({ fileId }) {
                 </DialogActions>
             </Dialog>
 
-            {!isLoading && afterFirstPaint && (
+            {shouldRenderTable && (
                 <ProgramScatterTable
                     rows={rows}
                     tableOpen={tableOpen}

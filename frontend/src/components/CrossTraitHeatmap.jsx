@@ -25,6 +25,7 @@ import {
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useDebouncedControlValue, useIdleRenderGate } from '../utils/renderScheduling';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -100,8 +101,8 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const navigate = useNavigate();
     const chartTokens = chartLayoutTokens(theme);
     const toolbarPanelSx = useMemo(() => ({
-        px: 1.2,
-        py: 0.95,
+        px: 1,
+        py: 0.7,
         borderRadius: 2,
         border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
         backgroundColor: alpha(theme.palette.background.paper, 0.82),
@@ -126,7 +127,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const statusKey = fileId ? ['cross-trait-status', fileId] : null;
     const statusResource = useCachedResourceState(
         useSWR(statusKey, ([, id]) => getCrossTraitStatus(id), detailSummarySWRConfig),
-        { cacheKey: statusKey, retainData: false },
+        { cacheKey: statusKey, retainPreviousData: true },
     );
     const {
         displayData: statusData,
@@ -137,13 +138,15 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const targetsKey = status?.available && fileId ? ['cross-trait-targets', fileId] : null;
     const targetsResource = useCachedResourceState(
         useSWR(targetsKey, ([, id]) => getCrossTraitTargets(id), detailSummarySWRConfig),
-        { cacheKey: targetsKey, retainData: false },
+        { cacheKey: targetsKey, retainPreviousData: true },
     );
     const { displayData: targetsData, isRefreshing: targetsRefreshing } = targetsResource;
     const matrixTargetKey = appliedTargetIds.join('|');
-    const matrixKey = status?.available && hasRenderedMatrix
-        ? ['cross-trait-matrix', fileId, matrixTargetKey, appliedTopGeneCount]
-        : null;
+    const matrixKey = useMemo(() => (
+        status?.available && hasRenderedMatrix
+            ? ['cross-trait-matrix', fileId, matrixTargetKey, appliedTopGeneCount]
+            : null
+    ), [appliedTopGeneCount, fileId, hasRenderedMatrix, matrixTargetKey, status?.available]);
     const matrixResource = useCachedResourceState(
         useSWR(
             matrixKey,
@@ -153,7 +156,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             }),
             figureResourceSWRConfig,
         ),
-        { cacheKey: matrixKey, retainData: false },
+        { cacheKey: matrixKey, retainPreviousData: false },
     );
     const {
         displayData: matrixPayload,
@@ -164,6 +167,8 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const afterFirstPaint = useAfterFirstPaint(matrixKey || 'cross-trait-heatmap-empty');
 
     useEffect(() => {
+        setRecommended([]);
+        setSelectedTargets([]);
         setTopGeneCount(DEFAULT_TOP_GENES);
         setTargetTraitCount(DEFAULT_TARGET_LIMIT);
         setAppliedTargets([]);
@@ -200,8 +205,35 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             .map((value) => ({ value, label: String(value) }))
     ), [relatedTraitSliderMax]);
 
+    const commitTopGeneCount = useCallback((value) => {
+        const nextValue = Math.min(
+            MAX_TOP_GENES,
+            Math.max(MIN_TOP_GENES, Number(value) || DEFAULT_TOP_GENES),
+        );
+        setTopGeneCount(nextValue);
+    }, []);
+    const [targetTraitCountDraft, setTargetTraitCountDraft, commitTargetTraitCount] = useDebouncedControlValue(
+        targetTraitCount,
+        applyTopRelatedTraitCount,
+        { delay: 350 },
+    );
+    const [topGeneCountDraft, setTopGeneCountDraft, commitTopGeneCountDraft] = useDebouncedControlValue(
+        topGeneCount,
+        commitTopGeneCount,
+        { delay: 350 },
+    );
+    const targetTraitCountDraftValue = Math.min(
+        relatedTraitSliderMax,
+        Math.max(MIN_TARGET_LIMIT, Number(targetTraitCountDraft) || MIN_TARGET_LIMIT),
+    );
+    const topGeneCountDraftValue = Math.min(
+        MAX_TOP_GENES,
+        Math.max(MIN_TOP_GENES, Number(topGeneCountDraft) || MIN_TOP_GENES),
+    );
+    const controlsPending = targetTraitCountDraftValue !== targetTraitCount || topGeneCountDraftValue !== topGeneCount;
+
     useEffect(() => {
-        if (!status?.available) return;
+        if (!status?.available || !targetsData || !selectedTargets.length) return;
         const nextTargets = prependPinnedTrait(selectedTargets, currentTrait).slice(0, MAX_TARGET_LIMIT);
         if (!nextTargets.length) return;
         const nextTargetKey = traitListKey(nextTargets);
@@ -226,6 +258,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         renderVersion,
         selectedTargets,
         status?.available,
+        targetsData,
         topGeneCount,
     ]);
 
@@ -236,21 +269,32 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             Math.abs(Number(matrixPayload?.summary?.valueRange?.max) || 0),
             0.0001,
         );
+        const cellCount = (matrixPayload.targets.length || 0) * (matrixPayload.genes.length || 0);
+        const compactHover = cellCount > 2500;
         return [{
             type: 'heatmap',
             z: matrixPayload.matrix,
             x: matrixPayload.targets.map((target) => truncateLabel(target.trait_name, 24)),
             y: matrixPayload.genes.map((_, index) => index),
-            text: matrixPayload.matrix.map((row, rowIndex) => row.map((value, colIndex) => {
+            customdata: compactHover
+                ? matrixPayload.matrix.map((row, rowIndex) => row.map((_, colIndex) => [
+                    matrixPayload.genes[rowIndex]?.gene || matrixPayload.genes[rowIndex]?.ensg || `Gene ${rowIndex + 1}`,
+                    matrixPayload.targets[colIndex]?.trait_name || matrixPayload.targets[colIndex]?.file_id || `Trait ${colIndex + 1}`,
+                ]))
+                : undefined,
+            text: compactHover ? undefined : matrixPayload.matrix.map((row, rowIndex) => row.map((value, colIndex) => {
                 const gene = matrixPayload.genes[rowIndex];
                 const target = matrixPayload.targets[colIndex];
                 return [
                     `<b>${gene.gene || gene.ensg}</b>`,
                     `Source: ${matrixPayload.sourceTrait?.trait_name || traitLabel || fileId}`,
                     `Target: ${target.trait_name}`,
-                    `post_mean: ${value == null ? 'NA' : Number(value).toFixed(4)}`,
+                    `LoF effect (post_mean): ${value == null ? 'NA' : Number(value).toFixed(4)}`,
                 ].join('<br>');
             })),
+            hovertemplate: compactHover
+                ? '<b>%{customdata[0]}</b><br>Target: %{customdata[1]}<br>LoF effect (post_mean): %{z:.4f}<extra></extra>'
+                : undefined,
             colorscale: [
                 [0, '#527ea8'],
                 [0.5, '#eef2f6'],
@@ -259,14 +303,14 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             zmin: -maxAbs,
             zmax: maxAbs,
             zmid: 0,
-            hoverinfo: 'text',
+            hoverinfo: compactHover ? undefined : 'text',
             hoverlabel: buildPlotHoverTone(theme, '#64748b', {
                 bgAlpha: 0.18,
                 borderAlpha: 0.32,
             }),
             showscale: true,
             colorbar: {
-                title: { text: 'Gene effect (post_mean)', side: 'top', font: { size: 11 } },
+                title: { text: 'Gene LoF effect (post_mean)', side: 'top', font: { size: 11 } },
                 orientation: 'h',
                 x: 0.99,
                 xanchor: 'right',
@@ -334,6 +378,44 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         displaylogo: false,
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     }), []);
+    const matrixCellCount = (matrixPayload?.genes?.length || 0) * (matrixPayload?.targets?.length || 0);
+    const plotRenderKey = useMemo(() => (
+        matrixKey && matrixPayload
+            ? [
+                'cross-trait-heatmap',
+                fileId,
+                matrixTargetKey,
+                appliedTopGeneCount,
+                matrixPayload?.summary?.topGenes || 0,
+                matrixPayload?.summary?.targetCount || 0,
+                matrixCellCount,
+            ].join(':')
+            : 'cross-trait-heatmap-empty'
+    ), [
+        appliedTopGeneCount,
+        fileId,
+        matrixCellCount,
+        matrixKey,
+        matrixPayload,
+        matrixTargetKey,
+    ]);
+    const [readyPlotKey, setReadyPlotKey] = useState(null);
+    const plotReady = plotData.length > 0 && readyPlotKey === plotRenderKey;
+    const matrixBusy = matrixLoading || controlsPending;
+
+    useEffect(() => {
+        setReadyPlotKey(null);
+    }, [plotRenderKey]);
+
+    const markPlotReady = useCallback(() => {
+        setReadyPlotKey(plotRenderKey);
+    }, [plotRenderKey]);
+
+    const shouldRenderTable = useIdleRenderGate(
+        !matrixBusy && afterFirstPaint && plotReady && Boolean(matrixPayload?.targets?.length && matrixPayload?.genes?.length),
+        `${matrixKey || 'cross-trait-empty'}:${matrixCellCount}`,
+        { delay: matrixCellCount > 2500 ? 650 : 180, timeout: 1800 },
+    );
 
     if (statusLoading) {
         return (
@@ -355,30 +437,30 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={toolbarSx(theme, { alignItems: 'stretch' })}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            <Box sx={toolbarSx(theme, { alignItems: 'stretch', px: 1.25, py: 0.85, gap: 0.75 })}>
                 <Box
                     sx={{
                         display: 'grid',
                         gridTemplateColumns: {
                             xs: '1fr',
-                            lg: 'minmax(260px, 1.1fr) minmax(240px, 280px) minmax(220px, 260px) auto',
+                            lg: 'minmax(260px, 1.1fr) minmax(240px, 280px) minmax(260px, 320px)',
                         },
-                        gap: 1.15,
+                        gap: 0.75,
                         alignItems: 'stretch',
                         width: '100%',
                     }}
                 >
-                    <Box sx={{ ...toolbarPanelSx, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 1 }}>
+                    <Box sx={{ ...toolbarPanelSx, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 0.55 }}>
                         <Box>
-                            <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
+                            <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.15 }}>
                                 Cross-trait Heatmap
                             </Typography>
-                            <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
+                            <Typography sx={sectionTitleSx(theme, { fontSize: '0.96rem', lineHeight: 1.2 })}>
                                 Shared gene effects across selected traits
                             </Typography>
                         </Box>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.45 }}>
                             <Chip icon={<Timeline />} label={`${matrixPayload?.summary?.topGenes || topGeneCount} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
                             <Chip icon={<Hub />} label={`${selectedTargets.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
                             <Chip icon={<Search />} label={`${matrixPayload?.summary?.missingCells?.toLocaleString?.() || 0} missing`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
@@ -387,24 +469,25 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     </Box>
 
                     <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.4 }}>
                             Top related traits
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                             <Slider
                                 size="small"
-                                value={Math.min(targetTraitCount, relatedTraitSliderMax)}
+                                value={targetTraitCountDraftValue}
                                 min={MIN_TARGET_LIMIT}
                                 max={relatedTraitSliderMax}
                                 step={1}
                                 marks={relatedTraitCountMarks}
-                                onChange={(_, value) => applyTopRelatedTraitCount(Array.isArray(value) ? value[0] : value)}
-                                sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                                onChange={(_, value) => setTargetTraitCountDraft(Array.isArray(value) ? value[0] : value)}
+                                onChangeCommitted={(_, value) => commitTargetTraitCount(Array.isArray(value) ? value[0] : value)}
+                                sx={{ flex: 1, mt: 0.35, mb: 0 }}
                             />
                             <TextField
                                 size="small"
-                                value={Math.min(targetTraitCount, relatedTraitSliderMax)}
-                                onChange={(event) => applyTopRelatedTraitCount(event.target.value)}
+                                value={targetTraitCountDraftValue}
+                                onChange={(event) => setTargetTraitCountDraft(event.target.value)}
                                 slotProps={{
                                     htmlInput: {
                                         min: MIN_TARGET_LIMIT,
@@ -425,13 +508,31 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     </Box>
 
                     <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
-                            Gene rows
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.75, mb: 0.4 }}>
+                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary }}>
+                                Gene rows
+                            </Typography>
+                            <Button
+                                variant="text"
+                                size="small"
+                                startIcon={<RestartAlt />}
+                                onClick={() => {
+                                    setTargetTraitCount(DEFAULT_TARGET_LIMIT);
+                                    setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT));
+                                    setTopGeneCount(DEFAULT_TOP_GENES);
+                                    setAppliedTargets([]);
+                                    setAppliedTopGeneCount(DEFAULT_TOP_GENES);
+                                    setRenderVersion(0);
+                                }}
+                                sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 28, py: 0, px: 0.5 }}
+                            >
+                                Reset
+                            </Button>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                             <Slider
                                 size="small"
-                                value={topGeneCount}
+                                value={topGeneCountDraftValue}
                                 min={MIN_TOP_GENES}
                                 max={MAX_TOP_GENES}
                                 step={5}
@@ -440,19 +541,20 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                                     { value: 50, label: '50' },
                                     { value: MAX_TOP_GENES, label: String(MAX_TOP_GENES) },
                                 ]}
-                                onChange={(_, value) => setTopGeneCount(Array.isArray(value) ? value[0] : value)}
-                                sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                                onChange={(_, value) => setTopGeneCountDraft(Array.isArray(value) ? value[0] : value)}
+                                onChangeCommitted={(_, value) => commitTopGeneCountDraft(Array.isArray(value) ? value[0] : value)}
+                                sx={{ flex: 1, mt: 0.35, mb: 0 }}
                             />
                             <TextField
                                 size="small"
-                                value={topGeneCount}
+                                value={topGeneCountDraftValue}
                                 onChange={(event) => {
                                     const raw = Number.parseInt(event.target.value, 10);
                                     if (Number.isNaN(raw)) {
-                                        setTopGeneCount(MIN_TOP_GENES);
+                                        setTopGeneCountDraft(MIN_TOP_GENES);
                                         return;
                                     }
-                                    setTopGeneCount(Math.min(MAX_TOP_GENES, Math.max(MIN_TOP_GENES, raw)));
+                                    setTopGeneCountDraft(Math.min(MAX_TOP_GENES, Math.max(MIN_TOP_GENES, raw)));
                                 }}
                                 slotProps={{
                                     htmlInput: {
@@ -472,24 +574,6 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                             />
                         </Box>
                     </Box>
-
-                    <Box sx={{ ...toolbarPanelSx, display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'center' } }}>
-                        <Button
-                            variant="text"
-                            startIcon={<RestartAlt />}
-                            onClick={() => {
-                                setTargetTraitCount(DEFAULT_TARGET_LIMIT);
-                                setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT));
-                                setTopGeneCount(DEFAULT_TOP_GENES);
-                                setAppliedTargets([]);
-                                setAppliedTopGeneCount(DEFAULT_TOP_GENES);
-                                setRenderVersion(0);
-                            }}
-                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38, justifyContent: { xs: 'center', lg: 'flex-start' } }}
-                        >
-                            Reset
-                        </Button>
-                    </Box>
                 </Box>
             </Box>
 
@@ -507,18 +591,18 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
 
             <Card elevation={0} sx={plotFrameSx(theme)}>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
-                    {matrixLoading && (
+                    {matrixBusy && (
                         <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                                 <CircularProgress size={52} />
                                 <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    Loading cross-trait heatmap...
+                                    {matrixLoading ? 'Loading cross-trait heatmap...' : 'Updating cross-trait heatmap...'}
                                 </Typography>
                             </Box>
                         </Box>
                     )}
 
-                    {!matrixLoading && hasRenderedMatrix && plotData.length === 0 && (
+                    {!matrixBusy && hasRenderedMatrix && plotData.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No heatmap values are available for the current target trait selection.</Typography>
@@ -526,7 +610,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                         </Box>
                     )}
 
-                    {!matrixLoading && !hasRenderedMatrix && plotData.length === 0 && (
+                    {!matrixBusy && !hasRenderedMatrix && plotData.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">Select target traits above to view the heatmap.</Typography>
@@ -534,24 +618,52 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                         </Box>
                     )}
 
-                    {!matrixLoading && plotData.length > 0 && !afterFirstPaint && (
-                        <Box sx={{ minHeight: plotHeight }} />
+                    {!matrixBusy && plotData.length > 0 && !afterFirstPaint && (
+                        <Box sx={{ minHeight: plotHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Box sx={{ textAlign: 'center' }}>
+                                <CircularProgress size={52} />
+                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
+                                    Rendering cross-trait heatmap...
+                                </Typography>
+                            </Box>
+                        </Box>
                     )}
 
-                    {!matrixLoading && plotData.length > 0 && afterFirstPaint && (
+                    {!matrixBusy && plotData.length > 0 && afterFirstPaint && !plotReady && (
+                        <Box sx={{ minHeight: plotHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Box sx={{ textAlign: 'center' }}>
+                                <CircularProgress size={52} />
+                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
+                                    Rendering cross-trait heatmap...
+                                </Typography>
+                            </Box>
+                        </Box>
+                    )}
+
+                    {!matrixBusy && plotData.length > 0 && afterFirstPaint && (
                         <Box sx={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' }}>
                             <Box sx={{ minWidth: { xs: `${plotMinWidth}px`, xl: '100%' } }}>
                                 <Plot
+                                    key={plotRenderKey}
                                     data={plotData}
                                     layout={layout}
                                     config={plotConfig}
+                                    onInitialized={markPlotReady}
+                                    onUpdate={markPlotReady}
                                     onClick={(event) => {
                                         const point = event?.points?.[0];
                                         const target = matrixPayload?.targets?.[point?.pointNumber?.[1] ?? point?.pointIndex];
                                         if (target?.file_id) navigate(`/trait/${encodeURIComponent(target.file_id)}`);
                                     }}
                                     useResizeHandler
-                                    style={{ width: '100%', height: `${plotHeight}px` }}
+                                    style={{
+                                        width: '100%',
+                                        height: `${plotHeight}px`,
+                                        opacity: plotReady ? 1 : 0,
+                                        position: plotReady ? 'static' : 'absolute',
+                                        inset: plotReady ? undefined : 0,
+                                        pointerEvents: plotReady ? 'auto' : 'none',
+                                    }}
                                 />
                             </Box>
                         </Box>
@@ -559,7 +671,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                 </CardContent>
             </Card>
 
-            {!matrixLoading && afterFirstPaint && <CrossTraitHeatmapTable payload={matrixPayload} fileId={fileId} />}
+            {shouldRenderTable && <CrossTraitHeatmapTable payload={matrixPayload} fileId={fileId} />}
         </Box>
     );
 }

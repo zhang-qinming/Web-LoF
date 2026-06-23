@@ -50,13 +50,14 @@ import homeFigureTraitProgramNetwork from '../assets/home/home-figure-trait-prog
 import traitsIcon from '../assets/home/traits.svg';
 import variantsIcon from '../assets/home/variants.svg';
 import programsIcon from '../assets/home/programs.svg';
+import associationsIcon from '../assets/home/associations.svg';
 import homeFigureDataBrowser from '../assets/home/home-figure-data-browser.svg';
 import homeFigureProgramVolcano from '../assets/home/home-figure-program-volcano.svg';
 import homeFigureTraitCorrelation from '../assets/home/home-figure-trait-correlation.svg';
 import homeFigureVariantDetail from '../assets/home/home-figure-variant-detail.svg';
 
 const accent = '#ff6b4a';
-const siteName = 'Gene-Program-Trait Atlas';
+const siteName = 'TraitCircuit';
 const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const EMPTY_ENTITY_RESULTS = { traits: [], genes: [], programs: [] };
 const EMPTY_ENTITY_META = { traits: 0, genes: 0, programs: 0 };
@@ -155,7 +156,7 @@ const traitFigureCards = [
     },
     {
         title: 'Posterior Volcano',
-        description: 'Explore GeneBayes posterior effects and gene-level association strength.',
+        description: 'Explore GeneBayes LoF effects and gene-level association strength.',
         image: homeFigurePosteriorVolcano,
         to: traitTabPath('posterior-volcano'),
         color: '#a21caf',
@@ -182,18 +183,18 @@ const traitFigureCards = [
         color: '#c2410c',
     },
     {
-        title: 'Program Volcano',
-        description: 'Review program-trait effects and highlighted cellular program signals.',
-        image: homeFigureProgramVolcano,
-        to: traitTabPath('program-scatter'),
-        color: '#7c3aed',
-    },
-    {
         title: 'Trait Correlation',
         description: 'Compare GeneBayes effect profiles across shared genes with Spearman or Pearson correlation.',
         image: homeFigureTraitCorrelation,
         to: traitTabPath('trait-correlation'),
         color: '#2563eb',
+    },
+    {
+        title: 'Program Volcano',
+        description: 'Review program-trait effects and highlighted cellular program signals.',
+        image: homeFigureProgramVolcano,
+        to: traitTabPath('program-scatter'),
+        color: '#7c3aed',
     },
     {
         title: 'Trait Detail',
@@ -206,8 +207,32 @@ const traitFigureCards = [
         title: 'Data Browser',
         description: 'Search indexed project outputs and download the underlying result files.',
         image: homeFigureDataBrowser,
-        to: '/data',
+        to: '/data?view=browser',
         color: '#b45309',
+    },
+];
+
+const programCentricHighlights = [
+    {
+        title: 'Connect genes to cellular programs',
+        body: 'Trace how distinct genes converge on shared perturbation-informed programs rather than stopping at isolated gene-trait hits.',
+        icon: <Hub sx={{ fontSize: 22 }} />,
+        to: '/genes',
+        color: '#0f766e',
+    },
+    {
+        title: 'Prioritize trait-relevant programs',
+        body: 'Move from thousands of GWAS datasets into program-trait evidence, burden signals, posteriors, and regulatory context.',
+        icon: <Biotech sx={{ fontSize: 22 }} />,
+        to: '/programs',
+        color: '#7c3aed',
+    },
+    {
+        title: 'Explore, search, and download',
+        body: 'Use interactive modules and indexed result files to inspect candidate mechanisms and export resources for downstream studies.',
+        icon: <FileDownload sx={{ fontSize: 22 }} />,
+        to: '/data',
+        color: '#2563eb',
     },
 ];
 
@@ -299,7 +324,7 @@ function getCachedSearchResult(query) {
 }
 
 function buildDataBrowserHref({ path = '', search = '' } = {}) {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ view: 'browser' });
     if (path) params.set('dir', path);
     else if (search) params.set('q', search);
     const queryString = params.toString();
@@ -1347,6 +1372,149 @@ function FigureGateway({ items }) {
 }
 
 /* ─── Animated SVG background for the hero ─── */
+function ProgramCentricIntro() {
+    return (
+        <Box
+            component="section"
+            sx={{
+                position: 'relative',
+                zIndex: 1,
+                maxWidth: APP_SHELL_MAX_WIDTH,
+                mx: 'auto',
+                px: { xs: 2, sm: 3, lg: 4, xl: 5 },
+                pt: { xs: 1, md: 2 },
+                pb: { xs: 5, md: 7 },
+            }}
+        >
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.12fr) minmax(360px, 0.88fr)' },
+                    gap: { xs: 2.5, lg: 3 },
+                    alignItems: 'stretch',
+                }}
+            >
+                <Box
+                    sx={{
+                        p: { xs: 2.4, md: 3.4 },
+                        borderRadius: 2,
+                        border: '1px solid rgba(15,23,42,0.08)',
+                        bgcolor: 'rgba(255,255,255,0.92)',
+                        boxShadow: '0 18px 50px rgba(15,23,42,0.075)',
+                    }}
+                >
+                    <Chip
+                        label="Program-centric human genetics"
+                        size="small"
+                        sx={{
+                            mb: 1.6,
+                            color: '#0f766e',
+                            bgcolor: alpha('#0f766e', 0.09),
+                            border: `1px solid ${alpha('#0f766e', 0.16)}`,
+                            fontWeight: 720,
+                        }}
+                    />
+                    <Typography
+                        component="h2"
+                        sx={{
+                            maxWidth: 920,
+                            color: '#0f172a',
+                            fontSize: { xs: '1.75rem', md: '2.55rem' },
+                            fontWeight: 800,
+                            lineHeight: 1.08,
+                            letterSpacing: '-0.025em',
+                            textWrap: 'balance',
+                        }}
+                    >
+                        TraitCircuit links genes, cellular programs, and human traits.
+                    </Typography>
+                    <Typography
+                        sx={{
+                            mt: 1.8,
+                            maxWidth: 960,
+                            color: '#475569',
+                            fontSize: { xs: '0.98rem', md: '1.05rem' },
+                            lineHeight: 1.78,
+                        }}
+                    >
+                        TraitCircuit systematically connects genes, cellular programs, and complex traits by integrating thousands of GWAS datasets with large-scale genetic perturbation analyses. The resource helps researchers move beyond gene-trait associations and identify the cellular programs that may mediate genetic effects on human diseases and traits.
+                    </Typography>
+                    <Typography
+                        sx={{
+                            mt: 1.4,
+                            maxWidth: 960,
+                            color: '#475569',
+                            fontSize: { xs: '0.98rem', md: '1.05rem' },
+                            lineHeight: 1.78,
+                        }}
+                    >
+                        Explore gene-trait, gene-program, and program-trait relationships; compare programs shared across traits; and inspect regulatory networks, trait-specific programs, and cross-trait program sharing through interactive visual modules.
+                    </Typography>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1} sx={{ mt: 2.4 }}>
+                        <Button component={RouterLink} to="/trait" variant="contained" endIcon={<ArrowForward />} sx={{ borderRadius: 999 }}>
+                            Start with traits
+                        </Button>
+                        <Button component={RouterLink} to="/data?view=browser" variant="outlined" startIcon={<Search />} sx={{ borderRadius: 999 }}>
+                            Search resources
+                        </Button>
+                    </Stack>
+                </Box>
+
+                <Box sx={{ display: 'grid', gap: 1.5 }}>
+                    {programCentricHighlights.map((item) => (
+                        <Box
+                            key={item.title}
+                            component={RouterLink}
+                            to={item.to}
+                            sx={{
+                                display: 'grid',
+                                gridTemplateColumns: 'auto 1fr',
+                                gap: 1.5,
+                                alignItems: 'start',
+                                p: { xs: 2, md: 2.3 },
+                                borderRadius: 2,
+                                border: `1px solid ${alpha(item.color, 0.14)}`,
+                                bgcolor: '#fff',
+                                color: 'inherit',
+                                textDecoration: 'none',
+                                boxShadow: '0 12px 34px rgba(15,23,42,0.055)',
+                                transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
+                                '&:hover': {
+                                    transform: 'translateY(-3px)',
+                                    borderColor: alpha(item.color, 0.32),
+                                    boxShadow: `0 18px 42px ${alpha(item.color, 0.13)}`,
+                                },
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: 1.5,
+                                    display: 'grid',
+                                    placeItems: 'center',
+                                    color: item.color,
+                                    bgcolor: alpha(item.color, 0.09),
+                                }}
+                            >
+                                {item.icon}
+                            </Box>
+                            <Box>
+                                <Typography component="h3" sx={{ color: '#111827', fontWeight: 780, fontSize: '1.02rem', lineHeight: 1.25 }}>
+                                    {item.title}
+                                </Typography>
+                                <Typography sx={{ mt: 0.6, color: '#64748b', fontSize: '0.9rem', lineHeight: 1.62 }}>
+                                    {item.body}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    ))}
+                </Box>
+            </Box>
+        </Box>
+    );
+}
+
 function HeroBackground() {
     return (
         <Box
@@ -1533,13 +1701,10 @@ function HeroSection({ stats, statsLoading, theme }) {
                             animation: 'heroFadeIn 700ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both',
                         }}
                     >
-                        <Box component="span" sx={{ display: { xs: 'block', sm: 'inline' }, whiteSpace: 'nowrap' }}>
-                            Gene-Program-Trait{' '}
-                        </Box>
                         <Box
                             component="span"
                             sx={{
-                                display: { xs: 'block', sm: 'inline' },
+                                display: 'inline-block',
                                 background: 'linear-gradient(135deg, #2563eb 0%, #0d9488 50%, #7c3aed 100%)',
                                 backgroundClip: 'text',
                                 WebkitBackgroundClip: 'text',
@@ -1547,7 +1712,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                                 WebkitTextFillColor: 'transparent',
                             }}
                         >
-                            Atlas
+                            TraitCircuit
                         </Box>
                     </Typography>
 
@@ -1564,7 +1729,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                             animation: 'heroFadeIn 700ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both',
                         }}
                     >
-                        Follow genetic associations from traits to candidate genes and cellular programs. Integrating GWAS summary statistics, LoF burden tests, GeneBayes posteriors, perturb-seq annotations, and cross-trait comparisons.
+                        A program-centric atlas linking genes, cellular programs, and human traits through GWAS datasets, genetic perturbation analyses, and interactive mechanistic exploration.
                     </Typography>
 
                     {/* Stats row — glassmorphism */}
@@ -1574,7 +1739,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                             mx: 'auto',
                             maxWidth: 860,
                             display: 'grid',
-                            gridTemplateColumns: { xs: 'repeat(1, 1fr)', sm: 'repeat(3, 1fr)' },
+                            gridTemplateColumns: { xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
                             gap: { xs: 2, md: 3 },
                             animation: 'heroFadeIn 700ms 240ms cubic-bezier(0.22, 1, 0.36, 1) both',
                         }}
@@ -1588,6 +1753,9 @@ function HeroSection({ stats, statsLoading, theme }) {
                             )},
                             { label: 'Traits', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.traits ? stats.traits.toLocaleString() : '...'), color: '#2563eb', href: '/trait', icon: (
                                 <Box component="img" src={traitsIcon} alt="Traits" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
+                            )},
+                            { label: 'Associations', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.associations ? stats.associations.toLocaleString() : '...'), color: '#ea580c', href: '/programs', icon: (
+                                <Box component="img" src={associationsIcon} alt="Associations" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
                             )},
                         ].map((metric) => (
                             <Box
@@ -1664,7 +1832,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                                 transition: 'transform 220ms ease, background-color 180ms ease, box-shadow 220ms ease',
                             }}
                         >
-                            Browse Traits
+                            Browse traits
                         </Button>
 
                     </Stack>
@@ -1705,6 +1873,8 @@ function Home() {
     return (
         <Box sx={{ width: '100%', minHeight: '100%', color: '#1f2933', bgcolor: '#f5f7fb', mx: 'auto' }}>
             <HeroSection stats={homeStats} statsLoading={homeStatsLoading} theme={theme} />
+
+            <ProgramCentricIntro />
 
             <FigureGateway items={traitFigureCards} />
 

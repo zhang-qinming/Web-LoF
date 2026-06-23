@@ -29,7 +29,7 @@ import Refresh from '@mui/icons-material/Refresh';
 import RestartAlt from '@mui/icons-material/RestartAlt';
 import ScatterPlot from '@mui/icons-material/ScatterPlot';
 import Timeline from '@mui/icons-material/Timeline';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import { getTraitManhattanHits } from '../api/gwas';
 import { UpdatingStatus } from './PageScaffold';
 import TraitHitManhattanLegend from './TraitHitManhattanLegend';
@@ -39,6 +39,7 @@ import { scrollElementNearViewportCenter } from '../utils/scroll';
 import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useIdleRenderGate } from '../utils/renderScheduling';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneArray,
@@ -68,17 +69,6 @@ const PROGRAM_COLORS = [
     '#7F73CE', '#CE9273', '#73CE99', '#CE73CE', '#73CEC8', '#CEC273', '#738CCE', '#CE7382',
     '#73CE7F', '#B973CE', '#73B3CE', '#A7CE73',
 ];
-const HOVER_TEMPLATE = [
-    '<b>%{customdata[1]}</b>',
-    'CHR %{customdata[2]}:%{customdata[3]}',
-    'P %{customdata[4]} | -log10(P) %{y:.2f}',
-    'Nearest gene: %{customdata[5]}',
-    'distance_to_gene: %{customdata[6]}',
-    'Program: %{customdata[7]}',
-    'Geneset: %{customdata[8]}',
-    '<extra></extra>',
-].join('<br>');
-
 const CHROM_ORDER = [
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
     '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y',
@@ -113,7 +103,8 @@ const CHROM_LENGTHS = {
 
 const CHROM_GAP = 3000000;
 const GWAS_HIT_LOGP = -Math.log10(5e-8);
-const AUTO_FULL_MIN_POINTS = 20;
+const AUTO_FULL_MIN_POINTS = 30;
+const EMPTY_MANHATTAN_ROWS = [];
 
 function sanitizeFileNamePart(value) {
     return String(value || 'plot').replace(/[\\/:*?"<>|]+/g, '_');
@@ -166,18 +157,17 @@ function buildCategoryColorMap(rows, field) {
     return colorMap;
 }
 
-function buildPointCustomdata(row) {
-    return [
-        row.rowKey,
-        row.snp || 'NA',
-        row.normalizedChr,
-        Number.isFinite(row.bp) ? row.bp.toLocaleString() : 'NA',
-        formatP(row.p),
-        row.nearestGene || 'NA',
-        formatDistance(row.distanceToGene),
-        row.primaryProgram || 'None',
-        row.primaryGeneset || 'None',
+function buildPointHoverText(row) {
+    const lines = [
+        `<b>${row.snp || 'Variant'}</b>`,
+        `CHR ${row.normalizedChr}:${Number.isFinite(row.bp) ? row.bp.toLocaleString() : 'NA'}`,
+        `P ${formatP(row.p)} | -log10(P) ${row.logp.toFixed(2)}`,
     ];
+    if (row.nearestGene) lines.push(`Nearest gene: ${row.nearestGene}`);
+    if (row.distanceToGene != null) lines.push(`distance_to_gene: ${formatDistance(row.distanceToGene)}`);
+    if (row.primaryProgram) lines.push(`Program: ${row.primaryProgram}`);
+    if (row.primaryGeneset) lines.push(`Geneset: ${row.primaryGeneset}`);
+    return lines.join('<br>');
 }
 
 function getProgramRoute(program) {
@@ -185,8 +175,22 @@ function getProgramRoute(program) {
     return match ? `/programs/${match[0]}` : null;
 }
 
+function buildManhattanCacheKey(fileId, gwasId, variant, retryKey) {
+    return fileId ? ['trait-manhattan', fileId, gwasId || '', variant, retryKey] : null;
+}
+
+function serializeCacheKey(key) {
+    if (!key) return '';
+    try {
+        return JSON.stringify(key);
+    } catch {
+        return String(key);
+    }
+}
+
 export default function TraitHitManhattan({ fileId, gwasId }) {
     const theme = useTheme();
+    const { mutate } = useSWRConfig();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
     const toolbarStyles = useMemo(() => toolbarSx(theme), [theme]);
     const compactToggleStyles = useMemo(() => compactToggleGroupSx(theme), [theme]);
@@ -201,7 +205,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const tableRowRefs = useRef({});
     const plotRef = useRef(null);
     const tableSectionRef = useRef(null);
-    const autoVariantHandledRef = useRef(false);
+    const prefetchedFullKeysRef = useRef(new Set());
     const exportBaseName = useMemo(() => sanitizeFileNamePart(fileId || gwasId || 'trait'), [fileId, gwasId]);
 
     const [variant, setVariant] = useState('hits');
@@ -225,20 +229,34 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const [tableRowsPerPage, setTableRowsPerPage] = useState(25);
     const [retryKey, setRetryKey] = useState(0);
     const deferredGeneQuery = useDeferredValue(geneQuery);
-    const manhattanKey = fileId ? ['trait-manhattan', fileId, gwasId || '', variant, retryKey] : null;
+    const manhattanKey = useMemo(
+        () => buildManhattanCacheKey(fileId, gwasId, variant, retryKey),
+        [fileId, gwasId, retryKey, variant],
+    );
     const manhattanResource = useCachedResourceState(
         useSWR(
             manhattanKey,
             ([, traitName, aliasId, requestedVariant]) => getTraitManhattanHits(traitName, {
                 variant: requestedVariant,
                 aliasId: aliasId || undefined,
+                autoFullMinPoints: requestedVariant === 'hits' ? AUTO_FULL_MIN_POINTS : undefined,
             }),
             figureResourceSWRConfig,
         ),
-        { cacheKey: manhattanKey, retainData: false },
+        { cacheKey: manhattanKey, retainPreviousData: false },
     );
     const { displayData: payload, error, isInitialLoading: loading, isRefreshing } = manhattanResource;
     const afterFirstPaint = useAfterFirstPaint(manhattanKey || 'trait-manhattan-empty');
+    const rawRows = payload?.data || EMPTY_MANHATTAN_ROWS;
+    const dataReady = useIdleRenderGate(
+        Boolean(payload && !loading && !error && afterFirstPaint),
+        `${serializeCacheKey(manhattanKey)}:${rawRows.length}`,
+        {
+            delay: rawRows.length > 2000 ? 90 : 20,
+            timeout: rawRows.length > 2000 ? 700 : 300,
+        },
+    );
+    const isPreparingData = rawRows.length > 0 && !dataReady;
 
     const onInitialized = useCallback((_figure, graphDiv) => {
         plotRef.current = graphDiv;
@@ -248,14 +266,15 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         plotRef.current = graphDiv;
     }, []);
 
-    useEffect(() => {
-        autoVariantHandledRef.current = false;
-    }, [fileId, gwasId, retryKey]);
-
-    const rows = useMemo(() => payload?.data || [], [payload]);
+    const rows = dataReady ? rawRows : EMPTY_MANHATTAN_ROWS;
     const resolvedVariant = payload?.resolvedVariant || variant;
     const variantLabel = resolvedVariant === 'full' ? 'full' : 'hits';
+    const variantControlValue = variantLabel === 'full' ? 'full' : variant;
     const isTruncated = Boolean(payload?.truncated);
+
+    useEffect(() => {
+        setTableOpen(!(resolvedVariant === 'full' && rawRows.length > 1000));
+    }, [fileId, rawRows.length, resolvedVariant]);
 
     const summary = payload?.summary || {
         totalRows: 0,
@@ -265,44 +284,68 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     };
 
     useEffect(() => {
-        if (autoVariantHandledRef.current) return;
+        if (!fileId || !payload || error) return;
         if (variant !== 'hits') return;
-        if (loading || !payload || error) return;
+        if (resolvedVariant !== 'full') return;
 
-        const rawPointCount = payload?.returnedRowCount ?? rows.length;
-        if (resolvedVariant === 'full' || rawPointCount >= AUTO_FULL_MIN_POINTS || !payload?.availableVariants?.full) {
-            autoVariantHandledRef.current = true;
-            return;
-        }
-
-        autoVariantHandledRef.current = true;
+        const fullKey = buildManhattanCacheKey(fileId, gwasId, 'full', retryKey);
+        void mutate(fullKey, payload, { populateCache: true, revalidate: false });
         setVariant('full');
-    }, [error, loading, payload, resolvedVariant, rows.length, variant]);
+    }, [error, fileId, gwasId, mutate, payload, resolvedVariant, retryKey, variant]);
 
-    const genesetOptions = useMemo(() => {
+    useEffect(() => {
+        if (!fileId || !payload || error || loading) return;
+        if (variant !== 'hits' || resolvedVariant !== 'hits') return;
+        if (!payload?.availableVariants?.full) return;
+
+        const rawPointCount = payload?.autoFullPointCount ?? payload?.returnedRowCount ?? rawRows.length;
+        if (rawPointCount < AUTO_FULL_MIN_POINTS) return;
+
+        const fullKey = buildManhattanCacheKey(fileId, gwasId, 'full', retryKey);
+        const serializedKey = serializeCacheKey(fullKey);
+        if (prefetchedFullKeysRef.current.has(serializedKey)) return;
+
+        prefetchedFullKeysRef.current.add(serializedKey);
+        void mutate(
+            fullKey,
+            getTraitManhattanHits(fileId, {
+                variant: 'full',
+                aliasId: gwasId || undefined,
+            }),
+            {
+                populateCache: true,
+                revalidate: false,
+                rollbackOnError: false,
+                throwOnError: false,
+            },
+        ).catch(() => {});
+    }, [error, fileId, gwasId, loading, mutate, payload, rawRows.length, resolvedVariant, retryKey, variant]);
+
+    const filterOptions = useMemo(() => {
         const genesetSet = new Set();
+        const programSet = new Set();
+        const chromosomeSet = new Set();
+
         rows.forEach((item) => {
             item.genesets.forEach((geneset) => {
                 if (geneset) genesetSet.add(geneset);
             });
-        });
-        return [...genesetSet].sort((a, b) => a.localeCompare(b));
-    }, [rows]);
-
-    const chromosomeOptions = useMemo(() => {
-        const present = new Set(rows.map((item) => normalizeChromosome(item.chr)).filter(Boolean));
-        return CHROM_ORDER.filter((chrom) => present.has(chrom));
-    }, [rows]);
-
-    const programOptions = useMemo(() => {
-        const programSet = new Set();
-        rows.forEach((item) => {
             item.programs.forEach((program) => {
                 if (program) programSet.add(program);
             });
+            const chromosome = normalizeChromosome(item.chr);
+            if (chromosome) chromosomeSet.add(chromosome);
         });
-        return [...programSet].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+        return {
+            genesets: [...genesetSet].sort((a, b) => a.localeCompare(b)),
+            programs: [...programSet].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })),
+            chromosomes: CHROM_ORDER.filter((chromosome) => chromosomeSet.has(chromosome)),
+        };
     }, [rows]);
+    const genesetOptions = filterOptions.genesets;
+    const chromosomeOptions = filterOptions.chromosomes;
+    const programOptions = filterOptions.programs;
 
     const selectedChromosomeSet = useMemo(() => new Set(selectedChromosomes), [selectedChromosomes]);
     const selectedProgramSet = useMemo(() => new Set(selectedPrograms), [selectedPrograms]);
@@ -344,18 +387,18 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }, [distanceMode, normalizedGeneQuery, programOnly, rows, selectedChromosomeSet, selectedGenesetSet, selectedProgramSet]);
 
     const chromosomeRanges = useMemo(() => {
-        const present = new Set(filteredRows.map((item) => normalizeChromosome(item.chr)).filter(Boolean));
-        const ordered = CHROM_ORDER.filter((chrom) => present.has(chrom));
-        let offset = 0;
-
-        // Pre-compute max BP per chromosome using reduce (avoids stack overflow with spread)
+        const present = new Set();
         const maxBpPerChr = {};
         for (const item of filteredRows) {
             const chr = normalizeChromosome(item.chr);
+            if (!chr) continue;
+            present.add(chr);
             const bp = Number(item.bp) || 0;
             if (!maxBpPerChr[chr] || bp > maxBpPerChr[chr]) maxBpPerChr[chr] = bp;
         }
 
+        const ordered = CHROM_ORDER.filter((chrom) => present.has(chrom));
+        let offset = 0;
         return ordered.map((chrom) => {
             const dynamicLength = Math.max(maxBpPerChr[chrom] || 0, 1);
             const length = Math.max(CHROM_LENGTHS[chrom] || 0, dynamicLength);
@@ -430,28 +473,31 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         const fullBackground = {
             x: [],
             y: [],
+            text: [],
             customdata: [],
             colors: [],
         };
         const unassigned = {
             x: [],
             y: [],
+            text: [],
             customdata: [],
         };
         const assigned = {
             x: [],
             y: [],
+            text: [],
             customdata: [],
             colors: [],
         };
-
         processedRows.forEach((row) => {
-            const pointData = buildPointCustomdata(row);
+            const hoverText = buildPointHoverText(row);
             if (variantLabel === 'full' && row.logp < GWAS_HIT_LOGP) {
                 const chromIndex = chromosomeIndexMap[row.normalizedChr] ?? 0;
                 fullBackground.x.push(row.genomePos);
                 fullBackground.y.push(row.logp);
-                fullBackground.customdata.push(pointData);
+                fullBackground.text.push(hoverText);
+                fullBackground.customdata.push([row.rowKey]);
                 fullBackground.colors.push(FULL_BACKGROUND_CHROM_COLORS[chromIndex % FULL_BACKGROUND_CHROM_COLORS.length]);
                 return;
             }
@@ -459,14 +505,16 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             if (row[colorField]) {
                 assigned.x.push(row.genomePos);
                 assigned.y.push(row.logp);
-                assigned.customdata.push(pointData);
+                assigned.text.push(hoverText);
+                assigned.customdata.push([row.rowKey]);
                 assigned.colors.push(colorMap.get(row[colorField]) || UNASSIGNED_COLOR);
                 return;
             }
 
             unassigned.x.push(row.genomePos);
             unassigned.y.push(row.logp);
-            unassigned.customdata.push(pointData);
+            unassigned.text.push(hoverText);
+            unassigned.customdata.push([row.rowKey]);
         });
 
         const traces = [];
@@ -474,13 +522,14 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             traces.push({
                 x: fullBackground.x,
                 y: fullBackground.y,
+                text: fullBackground.text,
                 customdata: fullBackground.customdata,
                 mode: 'markers',
                 type: 'scattergl',
                 name: 'Below hit threshold',
                 showlegend: false,
-                hovertemplate: HOVER_TEMPLATE,
-                hoverlabel: buildPlotHoverToneArray(theme, fullBackground.colors, {
+                hovertemplate: '%{text}<extra></extra>',
+                hoverlabel: buildPlotHoverTone(theme, FULL_BACKGROUND_CHROM_COLORS[0], {
                     bgAlpha: 0.16,
                     borderAlpha: 0.36,
                 }),
@@ -497,12 +546,13 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             traces.push({
                 x: unassigned.x,
                 y: unassigned.y,
+                text: unassigned.text,
                 customdata: unassigned.customdata,
                 mode: 'markers',
                 type: 'scattergl',
                 name: 'No program',
                 showlegend: false,
-                hovertemplate: HOVER_TEMPLATE,
+                hovertemplate: '%{text}<extra></extra>',
                 hoverlabel: buildPlotHoverTone(theme, UNASSIGNED_COLOR, {
                     bgAlpha: 0.14,
                     borderAlpha: 0.28,
@@ -520,12 +570,13 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             traces.push({
                 x: assigned.x,
                 y: assigned.y,
+                text: assigned.text,
                 customdata: assigned.customdata,
                 mode: 'markers',
                 type: 'scattergl',
                 name: 'Program annotated',
                 showlegend: false,
-                hovertemplate: HOVER_TEMPLATE,
+                hovertemplate: '%{text}<extra></extra>',
                 hoverlabel: buildPlotHoverToneArray(theme, assigned.colors, {
                     bgAlpha: 0.18,
                     borderAlpha: 0.42,
@@ -541,7 +592,6 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
 
         return traces;
     }, [chromosomeIndexMap, colorField, colorMap, processedRows, theme, variantLabel]);
-
     const legendItems = useMemo(() => {
         const counts = new Map();
         const backgroundCounts = [0, 0];
@@ -698,8 +748,8 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const plotRevision = useMemo(() => JSON.stringify({
         highlightKey: highlight.key,
         rowCount: processedRows.length,
-        variant,
-    }), [highlight.key, processedRows.length, variant]);
+        variant: variantLabel,
+    }), [highlight.key, processedRows.length, variantLabel]);
 
     const handleResetFilters = () => {
         setProgramOnly(false);
@@ -712,8 +762,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     };
 
     const handleVariantChange = (_, value) => {
-        if (!value || value === variant) return;
-        autoVariantHandledRef.current = true;
+        if (!value || value === variantControlValue) return;
         setVariant(value);
         setProgramOnly(false);
         setSelectedGenesets([]);
@@ -735,8 +784,17 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     };
 
     const collator = useMemo(() => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), []);
+    const tableDataReady = useIdleRenderGate(
+        dataReady && processedRows.length > 0 && tableOpen,
+        `${serializeCacheKey(manhattanKey)}:${processedRows.length}:${sortBy}:${sortDir}`,
+        {
+            delay: processedRows.length > 1000 ? 520 : 180,
+            timeout: 1800,
+        },
+    );
 
     const sortedRows = useMemo(() => {
+        if (!tableDataReady) return EMPTY_MANHATTAN_ROWS;
         const dir = sortDir === 'asc' ? 1 : -1;
         return [...processedRows].sort((a, b) => {
             if (['snp', 'nearestGene', 'normalizedChr', 'primaryProgram', 'primaryGeneset'].includes(sortBy)) {
@@ -747,12 +805,17 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             if (av === bv) return 0;
             return av > bv ? dir : -dir;
         });
-    }, [collator, processedRows, sortBy, sortDir]);
+    }, [collator, processedRows, sortBy, sortDir, tableDataReady]);
 
     const pagedRows = useMemo(() => {
         const start = tablePage * tableRowsPerPage;
         return sortedRows.slice(start, start + tableRowsPerPage);
     }, [sortedRows, tablePage, tableRowsPerPage]);
+    const shouldRenderTable = useIdleRenderGate(
+        !loading && !error && dataReady && processedRows.length > 0,
+        `${manhattanKey || 'trait-manhattan-empty'}:${processedRows.length}:${sortedRows.length}`,
+        { delay: 220, timeout: 900 },
+    );
 
     useEffect(() => {
         const maxPage = Math.max(0, Math.ceil(sortedRows.length / tableRowsPerPage) - 1);
@@ -787,9 +850,9 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         const width = normalizeExportSize(exportWidth, DEFAULT_EXPORT_WIDTH);
         const height = normalizeExportSize(exportHeight, DEFAULT_EXPORT_HEIGHT);
         Plotly.toImage(gd, { format: exportFmt, width, height }).then((dataUrl) => {
-            downloadDataUrl(dataUrl, `${exportBaseName}-${variant}-manhattan.${exportFmt}`);
+            downloadDataUrl(dataUrl, `${exportBaseName}-${variantLabel}-manhattan.${exportFmt}`);
         });
-    }, [exportBaseName, exportFmt, exportHeight, exportWidth, variant]);
+    }, [exportBaseName, exportFmt, exportHeight, exportWidth, variantLabel]);
 
     const downloadCSV = useCallback(() => {
         const cols = ['SNP', 'CHR', 'BP', 'P', '-log10(P)', 'Gene', 'distance_to_gene', 'Program', 'Geneset', 'Primary Program', 'Primary Geneset'];
@@ -832,7 +895,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 <ToggleButtonGroup
                     exclusive
                     size="small"
-                    value={variant}
+                    value={variantControlValue}
                     onChange={handleVariantChange}
                     sx={compactToggleStyles}
                 >
@@ -1004,6 +1067,10 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
+                    {!loading && !error && isPreparingData && (
+                        <Box aria-hidden="true" sx={{ minHeight: MANHATTAN_PLOT_HEIGHT }} />
+                    )}
+
                     {!loading && error && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert
@@ -1027,7 +1094,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !error && rows.length === 0 && (
+                    {!loading && !error && !isPreparingData && rawRows.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="warning" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No Manhattan rows are currently available for this trait.</Typography>
@@ -1035,7 +1102,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                         </Box>
                     )}
 
-                    {!loading && !error && rows.length > 0 && processedRows.length === 0 && (
+                    {!loading && !error && dataReady && rawRows.length > 0 && processedRows.length === 0 && (
                         <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                             <Alert severity="info" sx={{ maxWidth: 760 }}>
                                 <Typography variant="body2">No loci match the current filters.</Typography>
@@ -1081,7 +1148,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     )}
                 </Box>
             </Box>
-            {!loading && !error && afterFirstPaint && (
+            {shouldRenderTable && (
                 <TraitHitManhattanTable
                     tableSectionRef={tableSectionRef}
                     processedRows={processedRows}

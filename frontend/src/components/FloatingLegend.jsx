@@ -1,8 +1,11 @@
 import { alpha, useTheme } from '@mui/material/styles';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ChevronLeft from '@mui/icons-material/ChevronLeft';
+import ChevronRight from '@mui/icons-material/ChevronRight';
 
 const DEFAULT_OFFSET = 12;
 const SAFE_MARGIN = 8;
@@ -117,7 +120,7 @@ function buildPointRects(parentRect, gd) {
                 existing.top = Math.min(existing.top, y - 10);
                 existing.right = Math.max(existing.right, x + 10);
                 existing.bottom = Math.max(existing.bottom, y + 10);
-                return;
+                continue;
             }
             clusters.set(clusterKey, {
                 key: clusterKey,
@@ -141,10 +144,8 @@ function buildPointRects(parentRect, gd) {
         }));
 }
 
-function getLegendRect(candidate, width, height, placement) {
-    const left = placement === 'right'
-        ? candidate.side
-        : candidate.side;
+function getLegendRect(candidate, width, height) {
+    const left = candidate.side;
     const right = left + width;
     return {
         left,
@@ -163,7 +164,7 @@ function buildDefaultPosition(placement, top, sideOffset) {
 }
 
 export default function FloatingLegend({
-    items,
+    items = [],
     collapsed = false,
     onToggleCollapsed,
     title = 'Legend',
@@ -190,7 +191,6 @@ export default function FloatingLegend({
     const [position, setPosition] = useState(() => buildDefaultPosition(defaultPlacement, defaultTop, defaultSideOffset));
     const [dragging, setDragging] = useState(false);
     const [manualPosition, setManualPosition] = useState(false);
-    const [showTitle, setShowTitle] = useState(!collapsed);
     const [showContent, setShowContent] = useState(!collapsed);
 
     useEffect(() => {
@@ -198,18 +198,6 @@ export default function FloatingLegend({
         setPosition(buildDefaultPosition(defaultPlacement, defaultTop, defaultSideOffset));
     }, [defaultPlacement, defaultSideOffset, defaultTop, items.length, manualPosition, title]);
 
-    useEffect(() => {
-        if (!collapsed) {
-            setShowTitle(true);
-            return undefined;
-        }
-
-        const timeoutId = window.setTimeout(() => {
-            setShowTitle(false);
-        }, 180);
-
-        return () => window.clearTimeout(timeoutId);
-    }, [collapsed]);
 
     useEffect(() => {
         if (!collapsed) {
@@ -370,7 +358,7 @@ export default function FloatingLegend({
             ];
 
             const scored = allCandidates.map((candidate, index) => {
-                const rect = getLegendRect(candidate, widthPx, heightPx, candidate.placement);
+                const rect = getLegendRect(candidate, widthPx, heightPx);
                 let score = candidate.placement === preferredPlacement ? 0 : 90;
                 score += Math.abs(candidate.top - defaultTop) * 1.2;
                 if (index > 1) score += 20;
@@ -407,11 +395,21 @@ export default function FloatingLegend({
             });
         };
 
-        const rafId = window.requestAnimationFrame(placeLegend);
-        window.addEventListener('resize', placeLegend);
+        let rafId = window.requestAnimationFrame(placeLegend);
+        const schedulePlacement = () => {
+            window.cancelAnimationFrame(rafId);
+            rafId = window.requestAnimationFrame(placeLegend);
+        };
+        const resizeObserver = typeof ResizeObserver === 'function'
+            ? new ResizeObserver(schedulePlacement)
+            : null;
+        resizeObserver?.observe(parent);
+        resizeObserver?.observe(node);
+        window.addEventListener('resize', schedulePlacement);
         return () => {
             window.cancelAnimationFrame(rafId);
-            window.removeEventListener('resize', placeLegend);
+            resizeObserver?.disconnect();
+            window.removeEventListener('resize', schedulePlacement);
         };
     }, [anchorPlotRef, collapsed, defaultPlacement, defaultSideOffset, defaultTop, dragging, items, manualPosition, title]);
 
@@ -422,11 +420,23 @@ export default function FloatingLegend({
             setPosition((prev) => clampPosition(prev.top, prev.side, prev.placement));
         };
 
-        const rafId = window.requestAnimationFrame(keepInBounds);
-        window.addEventListener('resize', keepInBounds);
+        const node = rootRef.current;
+        const parent = node?.parentElement;
+        let rafId = window.requestAnimationFrame(keepInBounds);
+        const scheduleClamp = () => {
+            window.cancelAnimationFrame(rafId);
+            rafId = window.requestAnimationFrame(keepInBounds);
+        };
+        const resizeObserver = typeof ResizeObserver === 'function'
+            ? new ResizeObserver(scheduleClamp)
+            : null;
+        if (node) resizeObserver?.observe(node);
+        if (parent) resizeObserver?.observe(parent);
+        window.addEventListener('resize', scheduleClamp);
         return () => {
             window.cancelAnimationFrame(rafId);
-            window.removeEventListener('resize', keepInBounds);
+            resizeObserver?.disconnect();
+            window.removeEventListener('resize', scheduleClamp);
         };
     }, [clampPosition, collapsed, manualPosition, maxHeight]);
 
@@ -434,13 +444,26 @@ export default function FloatingLegend({
 
     const itemCount = items.length;
     const headerCountText = itemCount.toLocaleString();
-    const maxItemCount = Math.max(...items.map((item) => item.count), 1);
-    const maxCountTextLength = Math.max(...items.map((item) => item.count.toLocaleString().length), 1);
-    const countColumnWidth = Math.max(34, Math.min(86, 12 + maxCountTextLength * 7.2));
+    const numericCounts = items
+        .map((item) => item.count)
+        .filter(Number.isFinite);
+    const hasItemCounts = numericCounts.length > 0;
+    const maxItemCount = hasItemCounts ? Math.max(...numericCounts, 1) : 1;
+    const maxCountTextLength = hasItemCounts
+        ? Math.max(...numericCounts.map((count) => count.toLocaleString().length), 1)
+        : 0;
+    const countColumnWidth = hasItemCounts
+        ? Math.max(34, Math.min(86, 12 + maxCountTextLength * 7.2))
+        : 0;
     const badgeMinWidth = Math.max(18, 8 + headerCountText.length * 6.4);
-    const expandedWidth = width.expanded + Math.max(0, countColumnWidth - 44);
-    const collapsedWidth = Math.min(expandedWidth, Math.max(62, badgeMinWidth + 34));
+    const requestedExpandedWidth = Number.isFinite(width?.expanded) ? width.expanded : 196;
+    const requestedCollapsedWidth = Number.isFinite(width?.collapsed) ? width.collapsed : 118;
+    const expandedWidth = requestedExpandedWidth + Math.max(0, countColumnWidth - 44);
+    const collapsedWidth = Math.min(expandedWidth, Math.max(104, requestedCollapsedWidth));
     const activeWidth = collapsed ? collapsedWidth : expandedWidth;
+    const collapseTowardRight = position.placement === 'right';
+    const togglePointsRight = collapsed ? !collapseTowardRight : collapseTowardRight;
+    const toggleLabel = `${collapsed ? 'Expand' : 'Collapse'} ${title}`;
     const surfaceTransition = theme.custom.motion.swift;
     const legendBorder = alpha(theme.palette.common.white, 0.76);
     const shellBorder = alpha(theme.palette.primary.main, 0.08);
@@ -456,8 +479,8 @@ export default function FloatingLegend({
                 position: 'absolute',
                 top: position.top,
                 ...(position.placement === 'left' ? { left: position.side } : { right: position.side }),
-                width: 'fit-content',
-                minWidth: 0,
+                width: activeWidth,
+                minWidth: activeWidth,
                 maxWidth: activeWidth,
                 maxHeight,
                 display: 'flex',
@@ -471,7 +494,7 @@ export default function FloatingLegend({
                 backdropFilter: 'blur(12px) saturate(1.05)',
                 WebkitBackdropFilter: 'blur(12px) saturate(1.05)',
                 zIndex: 3,
-                transition: dragging ? 'none' : `max-width ${surfaceTransition}, box-shadow ${surfaceTransition}, transform ${surfaceTransition}`,
+                transition: dragging ? 'none' : `width ${surfaceTransition}, min-width ${surfaceTransition}, max-width ${surfaceTransition}, box-shadow ${surfaceTransition}, transform ${surfaceTransition}`,
                 userSelect: 'none',
                 '&::before': {
                     content: '""',
@@ -499,12 +522,13 @@ export default function FloatingLegend({
                 sx={{
                     position: 'relative',
                     display: 'grid',
-                    gridTemplateColumns: collapsed ? 'minmax(18px, auto) 0px 24px' : 'minmax(18px, auto) minmax(0, 1fr) 24px',
-                    columnGap: collapsed ? 0.32 : 0.45,
+                    gridTemplateColumns: 'minmax(18px, auto) minmax(0, 1fr) 26px',
+                    columnGap: 0.55,
                     alignItems: 'center',
                     px: 0.75,
-                    py: 0.64,
-                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.75)}`,
+                    py: 0.62,
+                    minHeight: 38,
+                    borderBottom: `1px solid ${collapsed ? 'transparent' : alpha(theme.palette.divider, 0.75)}`,
                     bgcolor: alpha(theme.custom.surface.raised, 0.9),
                     cursor: dragging ? 'grabbing' : 'grab',
                     touchAction: 'none',
@@ -534,69 +558,64 @@ export default function FloatingLegend({
                 >
                     {headerCountText}
                 </Box>
-                {showTitle && (
-                    <Box
+                <Box
+                    sx={{
+                        gridColumn: '2',
+                        gridRow: '1',
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        justifySelf: 'stretch',
+                    }}
+                >
+                    <Typography
+                        data-floating-legend-title="true"
                         sx={{
-                            gridColumn: '2',
-                            gridRow: '1',
-                            minWidth: 0,
-                            maxWidth: collapsed ? 0 : '100%',
-                            pr: collapsed ? 0 : 0.15,
+                            fontSize: '0.7rem',
+                            fontWeight: 750,
+                            color: theme.palette.text.primary,
+                            lineHeight: 1.2,
+                            whiteSpace: 'nowrap',
                             overflow: 'hidden',
-                            opacity: collapsed ? 0 : 1,
-                            transform: collapsed ? 'translateX(-8px)' : 'translateX(0)',
-                            transition: `max-width ${surfaceTransition}, padding ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}`,
-                            pointerEvents: 'none',
-                            justifySelf: 'start',
+                            textOverflow: 'ellipsis',
                         }}
                     >
-                        <Typography
-                            data-floating-legend-title="true"
+                        {title}
+                    </Typography>
+                </Box>
+                {onToggleCollapsed && (
+                    <Tooltip title={toggleLabel} arrow>
+                        <IconButton
+                            data-floating-legend-toggle="true"
+                            size="small"
+                            onClick={onToggleCollapsed}
+                            aria-label={toggleLabel}
+                            aria-expanded={!collapsed}
                             sx={{
-                                minWidth: 0,
-                                fontSize: collapsed ? '0.62rem' : '0.64rem',
-                                fontWeight: 700,
-                                color: theme.palette.text.primary,
-                                lineHeight: 1.2,
-                                pl: 0,
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
+                                gridColumn: '3',
+                                gridRow: '1',
+                                width: 26,
+                                height: 26,
+                                p: 0,
+                                borderRadius: 1.25,
+                                color: theme.palette.text.secondary,
+                                bgcolor: alpha(theme.palette.background.paper, 0.72),
+                                boxShadow: `inset 0 0 0 1px ${alpha(theme.palette.divider, 0.7)}`,
+                                transition: `background-color ${surfaceTransition}, color ${surfaceTransition}, transform ${surfaceTransition}`,
+                                '&:hover': {
+                                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                    color: theme.palette.primary.main,
+                                },
+                                '&:focus-visible': {
+                                    outline: `2px solid ${alpha(theme.palette.primary.main, 0.45)}`,
+                                    outlineOffset: 1,
+                                },
                             }}
                         >
-                            {title}
-                        </Typography>
-                    </Box>
-                )}
-                {onToggleCollapsed && (
-                    <Button
-                        data-floating-legend-toggle="true"
-                        size="small"
-                        onClick={onToggleCollapsed}
-                        sx={{
-                            gridColumn: '3',
-                            gridRow: '1',
-                            minWidth: 24,
-                            width: 24,
-                            height: 24,
-                            flexShrink: 0,
-                            p: 0,
-                            borderRadius: 999,
-                            color: theme.palette.text.secondary,
-                            fontSize: '0.76rem',
-                            lineHeight: 1,
-                            textTransform: 'none',
-                            bgcolor: alpha(theme.palette.common.white, 0.55),
-                            boxShadow: `inset 0 0 0 1px ${alpha(theme.palette.divider, 0.7)}`,
-                            transition: `background-color ${surfaceTransition}, color ${surfaceTransition}, transform ${surfaceTransition}`,
-                            '&:hover': {
-                                bgcolor: alpha(theme.palette.common.white, 0.88),
-                                color: theme.palette.text.primary,
-                            },
-                        }}
-                    >
-                        {collapsed ? '<' : '>'}
-                    </Button>
+                            {togglePointsRight
+                                ? <ChevronRight sx={{ fontSize: 18 }} />
+                                : <ChevronLeft sx={{ fontSize: 18 }} />}
+                        </IconButton>
+                    </Tooltip>
                 )}
             </Box>
 
@@ -629,10 +648,11 @@ export default function FloatingLegend({
                             <Box
                                 key={item.key}
                                 sx={{
-                                position: 'relative',
-                                display: 'flex',
-                                alignItems: 'stretch',
-                                gap: 0.62,
+                                    position: 'relative',
+                                    display: 'grid',
+                                gridTemplateColumns: '14px minmax(0, 1fr)',
+                                alignItems: 'start',
+                                columnGap: 0.62,
                                 px: 0.68,
                                 py: 0.58,
                                 borderRadius: 1.4,
@@ -644,8 +664,8 @@ export default function FloatingLegend({
                             >
                                 <Box
                                     sx={{
-                                        alignSelf: 'flex-start',
-                                        mt: 0.24,
+                                        justifySelf: 'center',
+                                        mt: 0.2,
                                         width: item.symbol === 'diamond' ? 12 : (swatchColors ? 14 : 10),
                                         height: 10,
                                         borderRadius: item.symbol === 'diamond' ? 2 : (swatchColors ? 999 : '50%'),
@@ -653,7 +673,7 @@ export default function FloatingLegend({
                                         background: swatchBg,
                                         boxShadow: `0 0 0 2px ${alpha(item.color, 0.18)}`,
                                         flexShrink: 0,
-                                        transform: item.symbol === 'diamond' ? 'rotate(45deg) translateY(1px)' : 'none',
+                                        transform: item.symbol === 'diamond' ? 'rotate(45deg)' : 'none',
                                         transition: `transform ${surfaceTransition}, box-shadow ${surfaceTransition}`,
                                     }}
                                 />
@@ -684,31 +704,33 @@ export default function FloatingLegend({
                                         >
                                             {item.label}
                                         </Typography>
-                                        <Box
-                                            sx={{
-                                                flexShrink: 0,
-                                                mt: 0.02,
-                                                width: countColumnWidth,
-                                                minWidth: countColumnWidth,
-                                                textAlign: 'right',
-                                                transition: `max-width ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}`,
-                                            }}
-                                        >
-                                            <Typography
+                                        {Number.isFinite(item.count) && (
+                                            <Box
                                                 sx={{
-                                                    display: 'block',
-                                                    fontSize: '0.68rem',
-                                                    color: theme.palette.text.secondary,
-                                                    fontWeight: 700,
-                                                    fontVariantNumeric: 'tabular-nums',
-                                                    lineHeight: 1.2,
-                                                    whiteSpace: 'nowrap',
+                                                    flexShrink: 0,
+                                                    mt: 0.02,
+                                                    width: countColumnWidth,
+                                                    minWidth: countColumnWidth,
                                                     textAlign: 'right',
+                                                    transition: `max-width ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}`,
                                                 }}
                                             >
-                                                {item.count.toLocaleString()}
-                                            </Typography>
-                                        </Box>
+                                                <Typography
+                                                    sx={{
+                                                        display: 'block',
+                                                        fontSize: '0.68rem',
+                                                        color: theme.palette.text.secondary,
+                                                        fontWeight: 700,
+                                                        fontVariantNumeric: 'tabular-nums',
+                                                        lineHeight: 1.2,
+                                                        whiteSpace: 'nowrap',
+                                                        textAlign: 'right',
+                                                    }}
+                                                >
+                                                    {item.count.toLocaleString()}
+                                                </Typography>
+                                            </Box>
+                                        )}
                                     </Box>
                                     {item.note && (
                                         <Typography
@@ -724,7 +746,7 @@ export default function FloatingLegend({
                                             {item.note}
                                         </Typography>
                                     )}
-                                    {showScale && (
+                                    {showScale && Number.isFinite(item.count) && (
                                         <Box
                                             sx={{
                                                 mt: item.note ? 0.38 : 0.45,

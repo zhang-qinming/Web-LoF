@@ -1,10 +1,10 @@
 const { throwIfAborted } = require('./http');
+const { parseNullableNumber } = require('./numbers');
 
 const DEFAULT_MIN_SHARED_GENES = 100;
 
 function toFiniteNumber(value) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
+    return parseNullableNumber(value);
 }
 
 function effectGeneKey(row) {

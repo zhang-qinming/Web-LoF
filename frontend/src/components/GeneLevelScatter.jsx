@@ -22,16 +22,19 @@ import Biotech from '@mui/icons-material/Biotech';
 import Download from '@mui/icons-material/Download';
 import FilterAlt from '@mui/icons-material/FilterAlt';
 import Insights from '@mui/icons-material/Insights';
+import Refresh from '@mui/icons-material/Refresh';
 import RestartAlt from '@mui/icons-material/RestartAlt';
 import Science from '@mui/icons-material/Science';
 import useSWR from 'swr';
 import { getDataFileText } from '../api/gwas';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
+import { parseNullableNumber } from '../utils/numbers';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useDebouncedControlValue, useIdleRenderGate } from '../utils/renderScheduling';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -58,25 +61,25 @@ const GENE_EVIDENCE_PLOT_HEIGHT = RESPONSIVE_TALL_PLOT_HEIGHT;
 const EVIDENCE_CLASSES = {
     background: {
         label: 'Neutral / low support',
-        color: '#b8c2d0',
+        color: '#b0b9c4',
         symbol: 'circle',
         rank: 0,
     },
     posterior_high: {
         label: 'Posterior-high signal',
-        color: '#b45a78',
+        color: '#9b6fb0',
         symbol: 'circle',
         rank: 1,
     },
     regulation_supported: {
         label: 'Concordant signal',
-        color: '#c45a32',
+        color: '#d4523e',
         symbol: 'circle',
         rank: 3,
     },
     direction_discordant: {
         label: 'Discordant signal',
-        color: '#3f78a8',
+        color: '#3b7fc4',
         symbol: 'diamond',
         rank: 2,
     },
@@ -86,7 +89,7 @@ const EVIDENCE_ORDER = ['background', 'posterior_high', 'regulation_supported', 
 
 const MARKER_STYLE_BY_CLASS = {
     background: {
-        opacity: 0.34,
+        opacity: 0.2,
         sizeBoost: 0,
         lineColor: 'rgba(255,255,255,0)',
         lineWidth: 0,
@@ -94,28 +97,21 @@ const MARKER_STYLE_BY_CLASS = {
     posterior_high: {
         opacity: 0.88,
         sizeBoost: 1.25,
-        lineColor: 'rgba(112, 36, 68, 0.3)',
+        lineColor: 'rgba(100, 55, 120, 0.3)',
         lineWidth: 0.4,
     },
     regulation_supported: {
         opacity: 0.94,
         sizeBoost: 2.2,
-        lineColor: 'rgba(127, 29, 29, 0.34)',
+        lineColor: 'rgba(170, 48, 28, 0.34)',
         lineWidth: 0.55,
     },
     direction_discordant: {
         opacity: 0.94,
         sizeBoost: 2.1,
-        lineColor: 'rgba(30, 64, 175, 0.32)',
+        lineColor: 'rgba(32, 82, 140, 0.32)',
         lineWidth: 0.55,
     },
-};
-
-const VIEW_MODES = {
-    ALL: 'all',
-    SUPPORTED: 'supported',
-    DISCORDANT: 'discordant',
-    LABELED: 'labeled',
 };
 
 const DIRECTION_MODES = {
@@ -125,8 +121,7 @@ const DIRECTION_MODES = {
 };
 
 function toFiniteNumber(value) {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
+    return parseNullableNumber(value);
 }
 
 function clamp(value, min, max) {
@@ -248,22 +243,23 @@ function formatPValue(value) {
 }
 
 function buildHoverText(row) {
-    return [
+    const lines = [
         `<b>${row.gene || row.ensg}</b>`,
         row.ensg ? `<span style="color:#64748b">${row.ensg}</span>` : '',
         `<span style="color:${EVIDENCE_CLASSES[row.evidenceClass].color};font-weight:600">${row.evidenceClassLabel}</span>`,
-        '',
-        '<b>GeneBayes</b>',
-        `post_mean: ${formatNumber(row.postMean, 4)} (${row.postMeanSign || 'unknown'})`,
-        '',
-        '<b>Perturb-seq regulation</b>',
-        `signed -log10(P): ${formatNumber(row.signedLogP, 2)}`,
-        `beta_withShet: ${formatNumber(row.beta, 4)} (${row.regulationSign || 'unknown'})`,
-        `P_withShet: ${formatPValue(row.p)}`,
-        `FDR: ${formatPValue(row.fdr)}`,
-        '',
-        `Combined score: ${formatNumber(row.combinedScore, 2)}`,
-    ].filter(Boolean).join('<br>');
+    ];
+    if (Number.isFinite(row.postMean)) {
+        lines.push('', '<b>GeneBayes</b>', `LoF effect (post_mean): ${formatNumber(row.postMean, 4)}${row.postMeanSign ? ` (${row.postMeanSign})` : ''}`);
+    }
+    if ([row.signedLogP, row.beta, row.p, row.fdr].some(Number.isFinite)) {
+        lines.push('', '<b>Perturb-seq regulation</b>');
+        if (Number.isFinite(row.signedLogP)) lines.push(`signed -log10(P): ${formatNumber(row.signedLogP, 2)}`);
+        if (Number.isFinite(row.beta)) lines.push(`beta_withShet: ${formatNumber(row.beta, 4)}${row.regulationSign ? ` (${row.regulationSign})` : ''}`);
+        if (Number.isFinite(row.p)) lines.push(`P_withShet: ${formatPValue(row.p)}`);
+        if (Number.isFinite(row.fdr)) lines.push(`FDR: ${formatPValue(row.fdr)}`);
+    }
+    if (Number.isFinite(row.combinedScore)) lines.push('', `Combined score: ${formatNumber(row.combinedScore, 2)}`);
+    return lines.filter(Boolean).join('<br>');
 }
 
 function getBackgroundPointColor(row) {
@@ -272,10 +268,10 @@ function getBackgroundPointColor(row) {
     const sameDirection = (x >= 0 && y >= 0) || (x <= 0 && y <= 0);
 
     if (sameDirection) {
-        return x >= 0 ? 'rgba(196, 90, 50, 0.42)' : 'rgba(63, 120, 168, 0.42)';
+        return x >= 0 ? 'rgba(212, 82, 62, 0.24)' : 'rgba(59, 127, 196, 0.24)';
     }
 
-    return x >= 0 ? 'rgba(196, 90, 50, 0.26)' : 'rgba(63, 120, 168, 0.26)';
+    return x >= 0 ? 'rgba(212, 82, 62, 0.12)' : 'rgba(59, 127, 196, 0.12)';
 }
 
 function getBackgroundGroupKey(row) {
@@ -307,18 +303,30 @@ function getDataPath(fileId) {
     return `${DATA_DIR}/${encodeURIComponent(fileId)}.tsv`;
 }
 
+function isMissingDataError(error) {
+    return Number(error?.response?.status) === 404;
+}
+
+function getRequestErrorMessage(error, fallback) {
+    return error?.response?.data?.error || error?.message || fallback;
+}
+
 async function loadGeneLevelScatterPayload(candidateIds) {
-    let lastError = null;
+    let missingError = null;
+    let requestError = null;
+
     for (const candidate of candidateIds) {
         const path = getDataPath(candidate);
         try {
             const text = await getDataFileText(path);
             return { rows: parseTsv(text), fileId: candidate, path };
         } catch (err) {
-            lastError = err;
+            if (isMissingDataError(err)) missingError = err;
+            else if (!requestError) requestError = err;
         }
     }
-    throw lastError || new Error('Gene-level scatter TSV not found');
+
+    throw requestError || missingError || new Error('Gene-level scatter TSV not found');
 }
 
 export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds = [] }) {
@@ -329,7 +337,6 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     const tableRowRefs = useRef({});
     const tableSectionRef = useRef(null);
 
-    const [viewMode, setViewMode] = useState(VIEW_MODES.ALL);
     const [directionMode, setDirectionMode] = useState(DIRECTION_MODES.ALL);
     const [geneQuery, setGeneQuery] = useState('');
     const [pointSize, setPointSize] = useState(DEFAULT_POINT_SIZE);
@@ -353,16 +360,27 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     const scatterKey = candidateIds.length ? ['gene-level-scatter', ...candidateIds] : null;
     const scatterResource = useCachedResourceState(
         useSWR(scatterKey, ([, ...ids]) => loadGeneLevelScatterPayload(ids), figureResourceSWRConfig),
-        { cacheKey: scatterKey, retainData: false },
+        { cacheKey: scatterKey, retainPreviousData: false },
     );
     const {
         displayData: cachedPayload,
         error,
         isInitialLoading: isLoading,
         isRefreshing,
+        mutate: retryScatter,
     } = scatterResource;
     const payload = cachedPayload || { rows: [], fileId: candidateIds[0] || '', path: candidateIds[0] ? getDataPath(candidateIds[0]) : '' };
     const afterFirstPaint = useAfterFirstPaint(scatterKey || 'gene-level-scatter-empty');
+    const [pointSizeDraft, setPointSizeDraft, commitPointSize] = useDebouncedControlValue(
+        pointSize,
+        (value) => setPointSize(clamp(Number(value) || DEFAULT_POINT_SIZE, 3, 14)),
+        { delay: 250 },
+    );
+    const [labelLimitDraft, setLabelLimitDraft, commitLabelLimit] = useDebouncedControlValue(
+        labelLimit,
+        (value) => setLabelLimit(clamp(Number(value) || 0, 0, 30)),
+        { delay: 250 },
+    );
 
     useEffect(() => {
         setHighlight({ rowKey: '', key: 0 });
@@ -374,15 +392,12 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     const filteredRows = useMemo(() => {
         const query = geneQuery.trim().toLowerCase();
         return rows.filter((row) => {
-            if (viewMode === VIEW_MODES.SUPPORTED && row.evidenceClass !== 'regulation_supported') return false;
-            if (viewMode === VIEW_MODES.DISCORDANT && row.evidenceClass !== 'direction_discordant') return false;
-            if (viewMode === VIEW_MODES.LABELED && !row.label) return false;
             if (directionMode === DIRECTION_MODES.CONCORDANT && !row.isConcordant) return false;
             if (directionMode === DIRECTION_MODES.DISCORDANT && !row.isDiscordant) return false;
             if (query && !`${row.gene} ${row.ensg}`.toLowerCase().includes(query)) return false;
             return true;
         });
-    }, [directionMode, geneQuery, rows, viewMode]);
+    }, [directionMode, geneQuery, rows]);
 
     const counts = useMemo(() => {
         const base = {
@@ -414,7 +429,6 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
 
     const labelRows = useMemo(() => {
         const explicit = filteredRows.filter((row) => row.label);
-        if (viewMode === VIEW_MODES.LABELED) return explicit.slice(0, labelLimit);
         if (explicit.length >= labelLimit) return explicit.slice(0, labelLimit);
         const used = new Set(explicit.map((row) => row.rowKey));
         const top = [...filteredRows]
@@ -422,7 +436,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             .sort((a, b) => (b.combinedScore || -Infinity) - (a.combinedScore || -Infinity))
             .slice(0, Math.max(0, labelLimit - explicit.length));
         return [...explicit, ...top];
-    }, [filteredRows, labelLimit, viewMode]);
+    }, [filteredRows, labelLimit]);
 
     const axisStyle = useMemo(() => ({
         zeroline: false,
@@ -570,12 +584,12 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     key,
                     label: EVIDENCE_CLASSES[key].label,
                     color: EVIDENCE_CLASSES[key].color,
-                    colors: key === 'background' ? ['rgba(196, 90, 50, 0.34)', 'rgba(63, 120, 168, 0.34)'] : undefined,
+                    colors: key === 'background' ? ['rgba(212, 82, 62, 0.24)', 'rgba(59, 127, 196, 0.24)'] : undefined,
                     symbol: EVIDENCE_CLASSES[key].symbol,
                     note: key === 'background'
                         ? 'Muted background genes; tint follows quadrant direction.'
                         : key === 'posterior_high'
-                            ? 'High GeneBayes posterior effect without matched regulation support.'
+                            ? 'High GeneBayes LoF effect without matched regulation support.'
                             : key === 'regulation_supported'
                                 ? 'Posterior and perturb-seq regulation agree.'
                                 : 'Posterior and perturb-seq regulation disagree.',
@@ -656,7 +670,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             showlegend: false,
             xaxis: {
                 ...axisStyle,
-                title: { text: 'GeneBayes posterior effect (post_mean)', font: { size: 14, color: theme.palette.text.primary } },
+                title: { text: 'GeneBayes LoF effect (post_mean)', font: { size: 14, color: theme.palette.text.primary } },
                 range: xRange,
                 fixedrange: false,
             },
@@ -702,6 +716,11 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
         const start = tablePage * tableRowsPerPage;
         return sortedRows.slice(start, start + tableRowsPerPage);
     }, [sortedRows, tablePage, tableRowsPerPage]);
+    const shouldRenderTable = useIdleRenderGate(
+        !isLoading && afterFirstPaint,
+        `${scatterKey || 'gene-level-scatter-empty'}:${rows.length}:${sortedRows.length}`,
+        { delay: sortedRows.length > 1000 ? 450 : 180, timeout: 1600 },
+    );
 
     useEffect(() => {
         const maxPage = Math.max(0, Math.ceil(sortedRows.length / tableRowsPerPage) - 1);
@@ -735,7 +754,6 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     }, [sortBy]);
 
     const resetControls = useCallback(() => {
-        setViewMode(VIEW_MODES.ALL);
         setDirectionMode(DIRECTION_MODES.ALL);
         setGeneQuery('');
         setPointSize(DEFAULT_POINT_SIZE);
@@ -776,20 +794,35 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
 
     const plotRevision = useMemo(() => JSON.stringify({
         rows: filteredRows.length,
-        viewMode,
         directionMode,
         query: geneQuery,
         pointSize,
         labelLimit,
         highlight: highlight.key,
-    }), [directionMode, filteredRows.length, geneQuery, highlight.key, labelLimit, pointSize, viewMode]);
+    }), [directionMode, filteredRows.length, geneQuery, highlight.key, labelLimit, pointSize]);
 
     const hasVisiblePoints = plotData.some((trace) => Array.isArray(trace.x) && trace.x.length > 0);
 
     if (error && !isLoading && rows.length === 0) {
+        const missing = isMissingDataError(error);
         return (
-            <Alert severity="info" sx={{ m: 2 }}>
-                Gene-level scatter TSV is not available for this trait yet.
+            <Alert
+                severity={missing ? 'info' : 'error'}
+                sx={{ m: 2 }}
+                action={(
+                    <Button
+                        color="inherit"
+                        size="small"
+                        startIcon={<Refresh />}
+                        onClick={() => { void retryScatter(); }}
+                    >
+                        Retry
+                    </Button>
+                )}
+            >
+                {missing
+                    ? 'Gene-level scatter TSV is not available for this trait yet.'
+                    : getRequestErrorMessage(error, 'Failed to load gene-level scatter data.')}
             </Alert>
         );
     }
@@ -805,19 +838,6 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                         Posterior effect vs regulation evidence
                     </Typography>
                 </Box>
-
-                <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    value={viewMode}
-                    onChange={(_, value) => { if (value) setViewMode(value); }}
-                    sx={statusToggleSx(theme)}
-                >
-                    <ToggleButton value={VIEW_MODES.ALL}>All</ToggleButton>
-                    <ToggleButton value={VIEW_MODES.SUPPORTED}>Supported</ToggleButton>
-                    <ToggleButton value={VIEW_MODES.DISCORDANT}>Discordant</ToggleButton>
-                    <ToggleButton value={VIEW_MODES.LABELED}>Labeled</ToggleButton>
-                </ToggleButtonGroup>
 
                 <ToggleButtonGroup
                     exclusive
@@ -855,28 +875,30 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                         Point
                     </Typography>
                     <Slider
-                        value={pointSize}
+                        value={Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
                         min={3}
                         max={14}
                         step={1}
-                        onChange={(_, value) => setPointSize(Number(value))}
+                        onChange={(_, value) => setPointSizeDraft(Number(value))}
+                        onChangeCommitted={(_, value) => commitPointSize(Number(value))}
                         sx={{ width: 120, color: theme.palette.primary.main, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
                     />
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20 }}>{pointSize}</Typography>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20 }}>{Number(pointSizeDraft) || DEFAULT_POINT_SIZE}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 250 }}>
                     <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
                         Labels
                     </Typography>
                     <Slider
-                        value={labelLimit}
+                        value={Number(labelLimitDraft) || 0}
                         min={0}
                         max={30}
                         step={1}
-                        onChange={(_, value) => setLabelLimit(Number(value))}
+                        onChange={(_, value) => setLabelLimitDraft(Number(value))}
+                        onChangeCommitted={(_, value) => commitLabelLimit(Number(value))}
                         sx={{ width: 120, color: theme.palette.text.secondary, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
                     />
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 24 }}>{labelLimit}</Typography>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 24 }}>{Number(labelLimitDraft) || 0}</Typography>
                 </Stack>
                 <Button variant="text" startIcon={<RestartAlt />} onClick={resetControls} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}>
                     Reset
@@ -959,7 +981,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                 </CardContent>
             </Card>
 
-            {!isLoading && afterFirstPaint && (
+            {shouldRenderTable && (
                 <GeneLevelScatterTable
                     tableSectionRef={tableSectionRef}
                     rows={rows}

@@ -315,11 +315,13 @@ async function getHomeSummary() {
     );
 
     const [[geneRow]] = await pool.query(`SELECT COUNT(*) AS genes FROM gene_info_hg37_matched`);
+    const [[associationRow]] = await pool.query(`SELECT COUNT(*) AS associations FROM gene_program_trait_edge`);
 
     return {
         traits: Number(row && row.traits) || 0,
         variants: Number(row && row.variants) || 0,
         genes: Number(geneRow && geneRow.genes) || 0,
+        associations: Number(associationRow && associationRow.associations) || 0,
         significantLoci: Number(row && row.significantLoci) || 0,
         minYear: row && row.minYear ? Number(row.minYear) : null,
         maxYear: row && row.maxYear ? Number(row.maxYear) : null,

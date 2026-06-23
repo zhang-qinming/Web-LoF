@@ -175,12 +175,12 @@ pre, code {
 .route-transition {
     min-width: 0;
     width: 100%;
-    animation: routeFadeIn 120ms ease-out both;
+    animation: routeFadeIn 90ms ease-out both;
 }
 
 @keyframes routeFadeIn {
     from {
-        opacity: 0;
+        opacity: 0.96;
     }
     to {
         opacity: 1;

@@ -21,6 +21,7 @@ import {
     exportSvg,
     sanitizeFileNamePart,
 } from './shared';
+import { useDebouncedControlValue } from '../../utils/renderScheduling';
 
 function ControlBlock({ title, children }) {
     return (
@@ -56,6 +57,17 @@ export default function TraitProgramGraphControls({
     sideFilter,
     svgRef,
 }) {
+    const [gammaThresholdDraft, setGammaThresholdDraft, commitGammaThreshold] = useDebouncedControlValue(
+        gammaThreshold,
+        (value) => onGammaThresholdChange(Number(value)),
+        { delay: 250 },
+    );
+    const [maxGenesDraft, setMaxGenesDraft, commitMaxGenes] = useDebouncedControlValue(
+        maxGenesPerProgram,
+        (value) => onMaxGenesPerProgramChange(Number(value)),
+        { delay: 250 },
+    );
+
     return (
         <Card variant="outlined" sx={{ borderRadius: 3, borderColor: 'rgba(15,23,42,0.10)' }}>
             <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
@@ -72,8 +84,9 @@ export default function TraitProgramGraphControls({
                                 min={0}
                                 max={2}
                                 step={0.05}
-                                value={gammaThreshold}
-                                onChange={(_event, value) => onGammaThresholdChange(value)}
+                                value={Number(gammaThresholdDraft) || 0}
+                                onChange={(_event, value) => setGammaThresholdDraft(value)}
+                                onChangeCommitted={(_event, value) => commitGammaThreshold(value)}
                                 valueLabelDisplay="auto"
                                 size="small"
                             />
@@ -84,8 +97,9 @@ export default function TraitProgramGraphControls({
                                 min={1}
                                 max={24}
                                 step={1}
-                                value={maxGenesPerProgram}
-                                onChange={(_event, value) => onMaxGenesPerProgramChange(value)}
+                                value={Number(maxGenesDraft) || 1}
+                                onChange={(_event, value) => setMaxGenesDraft(value)}
+                                onChangeCommitted={(_event, value) => commitMaxGenes(value)}
                                 valueLabelDisplay="auto"
                                 size="small"
                             />

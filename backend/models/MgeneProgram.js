@@ -1,4 +1,5 @@
 const pool = require('./db');
+const { parseNullableNumber } = require('../lib/numbers');
 
 const TABLE_MISSING_CODES = new Set(['ER_NO_SUCH_TABLE', 'ER_BAD_TABLE_ERROR']);
 const GENE_INFO_TABLE = 'gene_info_hg37_matched';
@@ -83,7 +84,7 @@ function boolValue(value) {
 }
 
 function toNullableNumber(value) {
-    return value == null ? null : Number(value);
+    return parseNullableNumber(value);
 }
 
 function normalizeChromosomeLabel(value) {

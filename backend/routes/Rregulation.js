@@ -3,6 +3,7 @@ const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute } = require('../lib/http');
 const { parseTsvStream } = require('../lib/tsv');
+const { trySendPrecomputedJson } = require('../lib/precomputedJson');
 
 const router = express.Router();
 const regulationStore = createFileStore(config.paths.regulationDataDir);
@@ -83,6 +84,12 @@ router.get('/api/regulation/:programId', asyncRoute(async (req, res) => {
     if (!match) return res.status(404).json({ error: 'Program not found' });
 
     const fileName = match.file;
+    const sent = await trySendPrecomputedJson(req, res, {
+        store: regulationStore,
+        sourceFileName: fileName,
+    });
+    if (sent) return;
+
     const data = await parseTsvFromStore(fileName);
     if (!data) return res.status(404).json({ error: 'Failed to parse' });
 

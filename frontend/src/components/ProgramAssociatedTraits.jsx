@@ -25,7 +25,7 @@ import useSWR from 'swr';
 import { getProgramTraits } from '../api/gwas';
 import { StatePanel, UpdatingStatus } from './PageScaffold';
 import { downloadBlob } from '../utils/download';
-import { stableListSWRConfig } from '../utils/swrOptions';
+import { detailSummarySWRConfig } from '../utils/swrOptions';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
     compactToggleGroupSx,
@@ -54,9 +54,9 @@ function colorTone(theme, color) {
 
 const PROGRAM_TRAIT_COLUMNS = [
     { key: 'traitName', label: 'Trait', align: 'left', tone: 'trait', width: 310 },
-    { key: 'selection', label: 'Selection', align: 'center', tone: 'selection', width: 185 },
-    { key: 'programScore', label: 'Program Score', align: 'center', tone: 'score', width: 132 },
-    { key: 'regulatorScore', label: 'Regulator Score', align: 'center', tone: 'score', width: 142 },
+    { key: 'selection', label: 'Relationship', align: 'center', tone: 'selection', width: 185 },
+    { key: 'programScore', label: 'Program Burden Score', align: 'center', tone: 'score', width: 168 },
+    { key: 'regulatorScore', label: 'Regulator-Burden Score', align: 'center', tone: 'score', width: 182 },
     { key: 'totalGenes', label: 'Trait Evidence Genes', align: 'right', tone: 'genes', width: 170 },
     { key: 'topGenes', label: 'Top Evidence Genes', align: 'left', tone: 'genes', width: 370 },
 ];
@@ -64,6 +64,12 @@ const PROGRAM_TRAIT_COLUMNS = [
 const PROGRAM_TRAIT_TITLE_HEADER_HEIGHT = 56;
 const TABLE_PAGINATION_THRESHOLD = 50;
 const DEFAULT_ROWS_PER_PAGE = 25;
+
+function justifyForAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
+}
 
 const programTraitSortLabelSx = {
     fontSize: '0.68rem',
@@ -122,10 +128,10 @@ function buildProgramTraitCsv(rows) {
     const header = [
         'Trait',
         'Trait ID',
-        'Selection',
-        'Class',
-        'Program Score',
-        'Regulator Score',
+        'Relationship',
+        'Relationship Class',
+        'Program Burden Score',
+        'Regulator-Burden Score',
         'Trait Evidence Genes',
         'Program Evidence Gene Count',
         'Regulator Evidence Gene Count',
@@ -213,9 +219,9 @@ export default function ProgramAssociatedTraits({
         useSWR(
             traitKey,
             ([, id]) => getProgramTraits(id),
-            stableListSWRConfig,
+            detailSummarySWRConfig,
         ),
-        { cacheKey: traitKey },
+        { cacheKey: traitKey, retainPreviousData: false },
     );
     const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = traitResource;
 
@@ -237,7 +243,7 @@ export default function ProgramAssociatedTraits({
     }, [sortBy, sortDir]);
 
     if (isLoading) {
-        return <StatePanel loading title="Loading associated traits" message="Querying the SQL trait-program index." minHeight={240} />;
+        return <Paper elevation={0} aria-hidden="true" sx={panelSx(theme, { minHeight: 240, boxShadow: 'none' })} />;
     }
 
     if (error) {
@@ -339,7 +345,7 @@ export default function ProgramAssociatedTraits({
                                         direction={sortBy === column.key ? sortDir : 'asc'}
                                         hideSortIcon
                                         onClick={() => handleSort(column.key)}
-                                        sx={programTraitSortLabelSx}
+                                        sx={{ ...programTraitSortLabelSx, justifyContent: justifyForAlign(column.align), width: '100%' }}
                                     >
                                         {column.label}
                                     </TableSortLabel>

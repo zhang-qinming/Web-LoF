@@ -4,6 +4,18 @@ const path = require('path');
 const crypto = require('crypto');
 const { createFileStore, buildHttpError } = require('../lib/fileStore');
 const { config } = require('../lib/config');
+const {
+    dataArchiveRoot,
+    getArchiveFileName,
+    statArchive,
+    statPackageArchive,
+    toArchiveResponse,
+} = require('../lib/dataArchives');
+const {
+    getDataPackageDefinition,
+    getDataPackageDefinitions,
+    getDataPackageStatus,
+} = require('../lib/dataPackages');
 const { asyncRoute, throwIfAborted } = require('../lib/http');
 const { parsePositiveInt } = require('../lib/request');
 
@@ -207,6 +219,49 @@ async function createZipArchive(options) {
     throw new Error('Unsupported archiver module shape');
 }
 
+function getZipArchiveOptions() {
+    return {
+        forceZip64: true,
+        // Folder-level data downloads use the highest zlib compression by default.
+        zlib: { level: config.data.archiveCompressionLevel },
+    };
+}
+
+async function summarizeFolder(fullPath, relPath = '') {
+    const stat = await dataStore.stat(fullPath);
+    if (!stat || !stat.isDirectory) return null;
+
+    let fileCount = 0;
+    let folderCount = 0;
+    let directFileBytes = 0;
+    try {
+        const entries = await dataStore.list(fullPath);
+        for (const entry of entries) {
+            if (entry.type === 'dir') folderCount += 1;
+            else if (entry.type === 'file') {
+                fileCount += 1;
+                directFileBytes += entry.size || 0;
+            }
+        }
+    } catch (err) {
+        fileCount = 0;
+        folderCount = 0;
+        directFileBytes = 0;
+    }
+
+    return {
+        name: relPath ? dataStore.basename(fullPath) : dataStore.basename(dataStore.rootPath) || 'data',
+        path: relPath,
+        type: 'dir',
+        fileCount,
+        folderCount,
+        totalCount: fileCount + folderCount,
+        directFileBytes,
+        mtime: isoFromMtime(stat.mtimeMs),
+        archive: toArchiveResponse(relPath, await statArchive(relPath)),
+    };
+}
+
 async function estimateArchive(store, fullPath, counters = { entries: 0, bytes: 0 }) {
     const stat = await store.stat(fullPath);
     if (!stat) return counters;
@@ -281,7 +336,7 @@ async function streamBatchDownload(res, zipBaseName, resolvedItems) {
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', encodeDownloadFilename(`${zipBaseName}.zip`));
 
-    const archive = await createZipArchive({ zlib: { level: 6 } });
+    const archive = await createZipArchive(getZipArchiveOptions());
     archive.on('error', () => {
         if (!res.headersSent) res.status(500).end();
         else res.end();
@@ -432,6 +487,7 @@ router.get('/api/data/status', asyncRoute(async (req, res) => {
     const rootStat = await getDataRootStat();
     res.json({
         root: dataStore.rootPath,
+        archiveRoot: dataArchiveRoot,
         exists: Boolean(rootStat),
         isDirectory: Boolean(rootStat?.isDirectory),
         searchIndex: {
@@ -440,6 +496,105 @@ router.get('/api/data/status', asyncRoute(async (req, res) => {
             cacheAgeMs: searchIndexBuiltAt ? Date.now() - searchIndexBuiltAt : null,
         },
     });
+}));
+
+router.get('/api/data/folders', asyncRoute(async (req, res) => {
+    const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
+    const limit = parsePositiveInt(req.query.limit, 50, 200);
+    const parentRel = normalizeRequestedPath(req.query.dir || '') || '';
+    const dirInfo = await getDirectoryStatOrEmpty(parentRel);
+
+    if (dirInfo.empty) {
+        return res.json({
+            current: null,
+            data: [],
+            totalCount: 0,
+            page,
+            totalPages: 1,
+        });
+    }
+
+    const { fullPath, stat } = dirInfo;
+    if (!stat) return res.status(404).json({ error: 'Not found' });
+    if (!stat.isDirectory) return res.status(400).json({ error: 'Not a directory' });
+
+    const searchQ = String(req.query.search || '').trim().toLowerCase().slice(0, config.data.maxSearchQueryLength);
+    const entries = (await dataStore.list(fullPath))
+        .filter((entry) => entry.type === 'dir' && (!searchQ || entry.name.toLowerCase().includes(searchQ)))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+    const total = entries.length;
+    const pageEntries = entries.slice((page - 1) * limit, page * limit);
+    const data = (await Promise.all(pageEntries.map((entry) => {
+        const childFullPath = dataStore.pathImpl.join(fullPath, entry.name);
+        const childRelPath = parentRel ? `${parentRel}/${entry.name}` : entry.name;
+        return summarizeFolder(childFullPath, childRelPath);
+    }))).filter(Boolean);
+
+    res.json({
+        current: await summarizeFolder(fullPath, parentRel),
+        data,
+        totalCount: total,
+        page,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+}));
+
+router.get('/api/data/packages', asyncRoute(async (req, res) => {
+    const packages = await Promise.all(
+        getDataPackageDefinitions().map((definition) => getDataPackageStatus(definition)),
+    );
+
+    res.json({
+        archiveRoot: dataArchiveRoot,
+        data: packages,
+    });
+}));
+
+router.get('/api/data/packages/:packageId/download-info', asyncRoute(async (req, res) => {
+    const packageId = String(req.params.packageId || '');
+    const definition = getDataPackageDefinition(packageId);
+    if (!definition) return res.status(404).json({ error: 'Package not found' });
+
+    const archiveStat = await statPackageArchive(definition.id);
+    if (!archiveStat.exists) {
+        return res.status(404).json({
+            error: 'Prepared package is missing. Run npm run prepare:data-archives in backend first.',
+        });
+    }
+
+    res.json({
+        id: definition.id,
+        title: definition.title,
+        type: definition.type,
+        size: archiveStat.size || 0,
+    });
+}));
+
+router.get('/api/data/packages/:packageId/download', asyncRoute(async (req, res) => {
+    const { abortSignal: signal } = req;
+    const packageId = String(req.params.packageId || '');
+    const definition = getDataPackageDefinition(packageId);
+    if (!definition) throw buildHttpError(404, 'Package not found');
+
+    const archiveStat = await statPackageArchive(definition.id);
+    if (!archiveStat.exists) {
+        throw buildHttpError(404, 'Prepared package is missing. Run npm run prepare:data-archives in backend first.');
+    }
+
+    throwIfAborted(signal);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', encodeDownloadFilename(`${definition.id}.zip`));
+    res.setHeader('Content-Length', archiveStat.size || 0);
+    if (archiveStat.mtimeMs) res.setHeader('Last-Modified', new Date(archiveStat.mtimeMs).toUTCString());
+
+    const stream = fs.createReadStream(archiveStat.path);
+    stream.on('error', () => {
+        if (!res.headersSent) res.status(500).end();
+        else res.end();
+    });
+    signal?.addEventListener('abort', () => stream.destroy(), { once: true });
+    stream.pipe(res);
 }));
 
 router.get('/api/data/file-paths', asyncRoute(async (req, res) => {
@@ -474,7 +629,8 @@ router.get('/api/data/breadcrumb', asyncRoute(async (req, res) => {
 }));
 
 router.get('/api/data/download-info', asyncRoute(async (req, res) => {
-    const fullPath = resolveRelativePath(req.query.path || '');
+    const requestedRelPath = normalizeRequestedPath(req.query.path || '') || '';
+    const fullPath = resolveRelativePath(requestedRelPath);
     const stat = await dataStore.stat(fullPath);
     if (!stat) return res.status(404).json({ error: 'Not found' });
     if (stat.isFile && stat.size > config.data.maxDownloadFileBytes) {
@@ -483,7 +639,19 @@ router.get('/api/data/download-info', asyncRoute(async (req, res) => {
 
     const baseName = dataStore.basename(fullPath);
     if (stat.isDirectory) {
-        await estimateArchive(dataStore, fullPath);
+        const archiveStat = await statArchive(requestedRelPath);
+        if (!archiveStat.exists) {
+            return res.status(404).json({
+                error: 'Prepared archive is missing. Run npm run prepare:data-archives in backend first.',
+            });
+        }
+
+        return res.json({
+            name: getArchiveFileName(requestedRelPath),
+            type: 'dir',
+            size: archiveStat.size || 0,
+            archive: toArchiveResponse(requestedRelPath, archiveStat),
+        });
     }
 
     return res.json({
@@ -495,7 +663,8 @@ router.get('/api/data/download-info', asyncRoute(async (req, res) => {
 
 router.get('/api/data/download', asyncRoute(async (req, res) => {
     const { abortSignal: signal } = req;
-    const fullPath = resolveRelativePath(req.query.path || '');
+    const requestedRelPath = normalizeRequestedPath(req.query.path || '') || '';
+    const fullPath = resolveRelativePath(requestedRelPath);
     const stat = await dataStore.stat(fullPath);
     if (!stat) return res.status(404).send('Not found');
     if (stat.isFile && stat.size > config.data.maxDownloadFileBytes) {
@@ -505,24 +674,23 @@ router.get('/api/data/download', asyncRoute(async (req, res) => {
     const baseName = dataStore.basename(fullPath);
     if (stat.isDirectory) {
         throwIfAborted(signal);
-        await estimateArchive(dataStore, fullPath);
-        res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', encodeDownloadFilename(`${baseName}.zip`));
+        const archiveStat = await statArchive(requestedRelPath);
+        if (!archiveStat.exists) {
+            throw buildHttpError(404, 'Prepared archive is missing. Run npm run prepare:data-archives in backend first.');
+        }
 
-        const archive = await createZipArchive({ zlib: { level: 6 } });
-        archive.on('error', () => {
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', encodeDownloadFilename(getArchiveFileName(requestedRelPath)));
+        res.setHeader('Content-Length', archiveStat.size || 0);
+        if (archiveStat.mtimeMs) res.setHeader('Last-Modified', new Date(archiveStat.mtimeMs).toUTCString());
+
+        const stream = fs.createReadStream(archiveStat.path);
+        stream.on('error', () => {
             if (!res.headersSent) res.status(500).end();
             else res.end();
         });
-        signal?.addEventListener('abort', () => {
-            if (typeof archive.abort === 'function') archive.abort();
-            else if (typeof archive.destroy === 'function') archive.destroy();
-        }, { once: true });
-        archive.pipe(res);
-        throwIfAborted(signal);
-        await dataStore.appendToArchive(archive, fullPath, baseName);
-        throwIfAborted(signal);
-        await archive.finalize();
+        signal?.addEventListener('abort', () => stream.destroy(), { once: true });
+        stream.pipe(res);
         return;
     }
 

@@ -42,7 +42,7 @@ const COLUMN_SPECS = [
     { key: 'nearestGene', label: 'Gene', align: 'left', width: 112, tone: 'annotation' },
     { key: 'distanceToGene', label: 'distance_to_gene', align: 'right', width: 104, tone: 'annotation' },
     { key: 'primaryProgram', label: 'Program', align: 'left', width: 126, tone: 'program' },
-    { key: 'primaryGeneset', label: 'Regulator', align: 'left', width: 144, tone: 'program' },
+    { key: 'primaryGeneset', label: 'Geneset', align: 'left', width: 144, tone: 'program' },
 ];
 
 const GROUPS = [
@@ -76,6 +76,12 @@ function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'n
     };
 }
 
+function justifyForAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
+}
+
 const sortLabelSx = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -105,14 +111,14 @@ function buildSearchIndex(row) {
 }
 
 function renderCellContent({ column, row, programColorMap, formatDistance, formatP, getProgramRoute, navigate }) {
-    if (column.key === 'snp') return row.snp || '—';
+    if (column.key === 'snp') return row.snp || '\u2014';
     if (column.key === 'normalizedChr') return row.normalizedChr;
-    if (column.key === 'bp') return row.bp?.toLocaleString() || '—';
+    if (column.key === 'bp') return row.bp?.toLocaleString() || '\u2014';
     if (column.key === 'p') return formatP(row.p);
     if (column.key === 'logp') return row.logp.toFixed(2);
-    if (column.key === 'nearestGene') return row.nearestGene || '—';
+    if (column.key === 'nearestGene') return row.nearestGene || '\u2014';
     if (column.key === 'distanceToGene') return formatDistance(row.distanceToGene);
-    if (column.key === 'primaryGeneset') return row.primaryGeneset || '—';
+    if (column.key === 'primaryGeneset') return row.primaryGeneset || '\u2014';
 
     if (column.key === 'primaryProgram') {
         const route = getProgramRoute(row.primaryProgram);
@@ -153,7 +159,7 @@ function renderCellContent({ column, row, programColorMap, formatDistance, forma
                         '&:hover': route ? { textDecoration: 'underline' } : undefined,
                     }}
                 >
-                    {row.primaryProgram || '—'}
+                    {row.primaryProgram || '\u2014'}
                 </Box>
             </Box>
         );
@@ -345,7 +351,7 @@ export default function TraitHitManhattanTable({
                                             direction={sortBy === column.key ? sortDir : 'asc'}
                                             hideSortIcon
                                             onClick={() => handleSort(column.key)}
-                                            sx={sortLabelSx}
+                                            sx={{ ...sortLabelSx, justifyContent: justifyForAlign(column.align), width: '100%' }}
                                         >
                                             {column.label}
                                         </TableSortLabel>

@@ -26,6 +26,7 @@ export default function TraitProgramGraphSummary({
     selectedGeneKey,
     onSelectProgram,
     onSelectGene,
+    onClearSelection,
     onToggleExpanded,
     sideMeta,
     sideMetaMap,
@@ -42,7 +43,6 @@ export default function TraitProgramGraphSummary({
     const [filter, setFilter] = React.useState('all');
     const [tablePage, setTablePage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(25);
-    const rowRefs = React.useRef(new Map());
     const headerTone = tableTone(theme, 'neutral');
     const programCount = modules.filter((module) => (module.side || side) === 'program').length;
     const regulatorCount = modules.filter((module) => (module.side || side) === 'regulator').length;
@@ -60,50 +60,9 @@ export default function TraitProgramGraphSummary({
         : filteredModules;
 
     React.useEffect(() => {
-        if (selectedGeneKey) {
-            setFilter('gene');
-            return;
-        }
-        if (selectedProgram) {
-            setFilter('selected');
-            return;
-        }
-        if (filter === 'gene' || filter === 'selected') {
-            setFilter('all');
-        }
+        if (filter === 'gene' && !selectedGeneKey) setFilter('all');
+        if (filter === 'selected' && !selectedProgram) setFilter('all');
     }, [filter, selectedGeneKey, selectedProgram]);
-
-    React.useEffect(() => {
-        if (!selectedProgram) return;
-        const rowIndex = filteredModules.findIndex((item) => item.program === selectedProgram);
-        if (rowIndex < 0) return;
-        if (shouldPaginate) {
-            const nextPage = Math.floor(rowIndex / rowsPerPage);
-            if (nextPage !== tablePage) {
-                setTablePage(nextPage);
-                return;
-            }
-        }
-        const row = rowRefs.current.get(`${selectedProgram}:program`) || rowRefs.current.get(`${selectedProgram}:regulator`);
-        row?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-    }, [filteredModules, rowsPerPage, selectedProgram, shouldPaginate, tablePage]);
-
-    React.useEffect(() => {
-        if (!selectedGeneKey) return;
-        const rowIndex = filteredModules.findIndex((item) => item.filteredGeneKeys?.includes(selectedGeneKey));
-        if (rowIndex < 0) return;
-        if (shouldPaginate) {
-            const nextPage = Math.floor(rowIndex / rowsPerPage);
-            if (nextPage !== tablePage) {
-                setTablePage(nextPage);
-                return;
-            }
-        }
-        const module = filteredModules[rowIndex];
-        if (!module) return;
-        const row = rowRefs.current.get(`${module.program}:${module.side || side}`);
-        row?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-    }, [filteredModules, rowsPerPage, selectedGeneKey, shouldPaginate, side, tablePage]);
 
     React.useEffect(() => {
         const maxPage = shouldPaginate ? Math.max(0, Math.ceil(filteredModules.length / rowsPerPage) - 1) : 0;
@@ -180,6 +139,16 @@ export default function TraitProgramGraphSummary({
                             {option.label}
                         </Button>
                     ))}
+                    {(selectedProgram || selectedGeneKey) && (
+                        <Button
+                            size="small"
+                            variant="text"
+                            onClick={onClearSelection}
+                            sx={{ minHeight: 26, py: 0.15, px: 1, fontSize: 11.5, textTransform: 'none' }}
+                        >
+                            Clear focus
+                        </Button>
+                    )}
                 </Stack>
             </Box>
 
@@ -190,11 +159,11 @@ export default function TraitProgramGraphSummary({
                             <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 112 })}>Side</TableCell>
                             <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 132 })}>Program</TableCell>
                             <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 132 })}>Selected by</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Score</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Evidence score</TableCell>
                             <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Genes</TableCell>
                             <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>+ / -</TableCell>
                             <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, minWidth: 260 })}>Visible genes</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Shown</TableCell>
+                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Gene display</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -221,9 +190,6 @@ export default function TraitProgramGraphSummary({
                             return (
                                 <TableRow
                                     key={`${module.program}:${rowSide}`}
-                                    ref={(el) => {
-                                        if (el) rowRefs.current.set(`${module.program}:${rowSide}`, el);
-                                    }}
                                     hover
                                     selected={selected}
                                     onClick={() => onSelectProgram(module.program, rowSide)}
@@ -295,7 +261,7 @@ export default function TraitProgramGraphSummary({
                                                 </Tooltip>
                                             </Stack>
                                             <Typography sx={{ fontSize: 11.5, color: '#667085', lineHeight: 1.2 }}>
-                                                {rowSide === 'program' ? 'program burden' : 'regulator-program'}
+                                                {rowSide === 'program' ? 'program burden' : 'regulator-burden'}
                                             </Typography>
                                         </Stack>
                                     </TableCell>
@@ -428,7 +394,7 @@ export default function TraitProgramGraphSummary({
                                                 }}
                                                 sx={{ minWidth: 0, px: 0.5, textTransform: 'none', fontSize: 12 }}
                                             >
-                                                {module.expanded ? 'all' : module.visibleGenes.length}
+                                                {module.expanded ? 'Collapse' : 'Show all'}
                                             </Button>
                                         )}
                                     </TableCell>

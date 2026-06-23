@@ -36,18 +36,24 @@ const COLUMN_SPECS = [
     { key: 'progScore', label: 'Score', align: 'right', tone: 'program', width: 92 },
     { key: 'rankProg', label: 'Rank', align: 'center', tone: 'program', width: 70 },
     { key: 'progP', label: 'P-value', align: 'right', tone: 'program', width: 92 },
-    { key: 'progGamma', label: 'Gamma', align: 'right', tone: 'program', width: 84 },
+    { key: 'progGamma', label: 'Mean gamma', align: 'right', tone: 'program', width: 104 },
     { key: 'regScore', label: 'Score', align: 'right', tone: 'regulator', width: 92 },
     { key: 'rankReg', label: 'Rank', align: 'center', tone: 'regulator', width: 70 },
     { key: 'regP', label: 'P-value', align: 'right', tone: 'regulator', width: 92 },
-    { key: 'regBeta', label: 'Beta', align: 'right', tone: 'regulator', width: 84 },
+    { key: 'regBeta', label: 'Reg beta', align: 'right', tone: 'regulator', width: 92 },
 ];
 
 const GROUPS = [
     { label: 'Info', span: 2, tone: 'info' },
     { label: 'Program Burden', span: 4, tone: 'program' },
-    { label: 'Regulator Burden', span: 4, tone: 'regulator' },
+    { label: 'Regulator-Burden', span: 4, tone: 'regulator' },
 ];
+
+function justifyForAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
+}
 
 const sortLabelSx = {
     fontSize: '0.69rem',
@@ -231,7 +237,7 @@ export default function ProgramScatterTable({
                                                 direction={sortBy === column.key ? sortDir : 'asc'}
                                                 hideSortIcon
                                                 onClick={() => handleSort(column.key)}
-                                                sx={sortLabelSx}
+                                                sx={{ ...sortLabelSx, justifyContent: justifyForAlign(column.align), width: '100%' }}
                                             >
                                                 {column.label}
                                             </TableSortLabel>

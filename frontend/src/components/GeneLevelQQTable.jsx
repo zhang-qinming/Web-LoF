@@ -52,6 +52,12 @@ const COLUMN_GROUPS = [
     { label: 'Regulation statistic', span: 4, tone: 'stat' },
 ];
 
+function justifyForAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
+}
+
 function sortLabelSx() {
     return {
         display: 'inline-flex',
@@ -214,7 +220,7 @@ export default function GeneLevelQQTable({
                                             direction={sortBy === column.key ? sortDir : 'asc'}
                                             hideSortIcon
                                             onClick={() => handleSort(column.key)}
-                                            sx={sortLabelSx()}
+                                            sx={{ ...sortLabelSx(), justifyContent: justifyForAlign(column.align), width: '100%' }}
                                         >
                                             {column.label}
                                         </TableSortLabel>

@@ -26,6 +26,7 @@ import { scrollElementNearViewportCenter } from '../utils/scroll';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useIdleRenderGate } from '../utils/renderScheduling';
 import GeneRegulationTable from './GeneRegulationTable';
 import {
     buildPlotHoverTone,
@@ -90,7 +91,7 @@ export default function GeneRegulation({ programId }) {
     const regulationKey = programId ? `/api/regulation/${programId}` : null;
     const regulationResource = useCachedResourceState(
         useSWR(regulationKey, fetcher, figureResourceSWRConfig),
-        { cacheKey: regulationKey, retainData: false },
+        { cacheKey: regulationKey, retainPreviousData: false },
     );
     const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = regulationResource;
     const infoResource = useCachedResourceState(
@@ -102,9 +103,13 @@ export default function GeneRegulation({ programId }) {
     const afterFirstPaint = useAfterFirstPaint(regulationKey || 'gene-regulation-empty');
 
     const plotElRef = useRef(null);
+    const fullscreenPlotElRef = useRef(null);
 
     const onInitialized = useCallback((_figure, graphDiv) => {
         plotElRef.current = graphDiv;
+    }, []);
+    const onFullscreenInitialized = useCallback((_figure, graphDiv) => {
+        fullscreenPlotElRef.current = graphDiv;
     }, []);
 
     useEffect(() => { setPage(1); }, [programId]);
@@ -263,6 +268,7 @@ export default function GeneRegulation({ programId }) {
         };
 
         const legendShown = new Set();
+        const traceType = rows.length > 1500 ? 'scattergl' : 'scatter';
         function buildTraces(dataRows, yaxisKey, isPrimary) {
             const grouped = {};
             dataRows.forEach((row) => {
@@ -276,7 +282,7 @@ export default function GeneRegulation({ programId }) {
 
             return ['ns', 'sig_down', 'sig_up', 'top100_down', 'top100_up', 'nodata'].map((category) => {
                 const group = grouped[category];
-                if (!group || group.x.length === 0) return { type: 'scatter', x: [], y: [], visible: false, yaxis: yaxisKey };
+                if (!group || group.x.length === 0) return { type: traceType, x: [], y: [], visible: false, yaxis: yaxisKey };
 
                 const style = CLASS_STYLE[category];
                 const show = isPrimary && !legendShown.has(category);
@@ -286,7 +292,7 @@ export default function GeneRegulation({ programId }) {
                     x: group.x,
                     y: group.y,
                     mode: 'markers',
-                    type: 'scatter',
+                    type: traceType,
                     marker: {
                         size: style.size,
                         color: style.color,
@@ -422,6 +428,11 @@ export default function GeneRegulation({ programId }) {
         const start = (page - 1) * rowsPerPage;
         return sortedRows.slice(start, start + rowsPerPage);
     }, [page, rowsPerPage, shouldPaginateTable, sortedRows]);
+    const shouldRenderTable = useIdleRenderGate(
+        plotData.length > 0 && afterFirstPaint,
+        `${regulationKey || 'gene-regulation-empty'}:${rows.length}:${sortedRows.length}`,
+        { delay: sortedRows.length > 1000 ? 450 : 180, timeout: 1600 },
+    );
 
     useEffect(() => {
         if (!highlightGene.gene || !tableOpen) return undefined;
@@ -541,32 +552,34 @@ export default function GeneRegulation({ programId }) {
                                         defaultSideOffset={10}
                                         anchorPlotRef={plotElRef}
                                     />
-                                    <GeneRegulationTable
-                                        rows={rows}
-                                        pagedRows={pagedRows}
-                                        tableOpen={tableOpen}
-                                        setTableOpen={setTableOpen}
-                                        sortBy={sortBy}
-                                        sortDir={sortDir}
-                                        handleSort={handleSort}
-                                        highlightGene={highlightGene}
-                                        setHighlightGene={setHighlightGene}
-                                        page={page}
-                                        setPage={setPage}
-                                        rowsPerPage={rowsPerPage}
-                                        setRowsPerPage={setRowsPerPage}
-                                        totalPages={totalPages}
-                                        shouldPaginate={shouldPaginateTable}
-                                        jumpInput={jumpInput}
-                                        setJumpInput={setJumpInput}
-                                        handleJumpToPage={handleJumpToPage}
-                                        tablePaperRef={tablePaperRef}
-                                        tableRowRefs={tableRowRefs}
-                                        downloadCSV={downloadCSV}
-                                        stats={stats}
-                                        annotation={pinfo?.curated_annotation}
-                                        embedded
-                                    />
+                                    {shouldRenderTable && (
+                                        <GeneRegulationTable
+                                            rows={rows}
+                                            pagedRows={pagedRows}
+                                            tableOpen={tableOpen}
+                                            setTableOpen={setTableOpen}
+                                            sortBy={sortBy}
+                                            sortDir={sortDir}
+                                            handleSort={handleSort}
+                                            highlightGene={highlightGene}
+                                            setHighlightGene={setHighlightGene}
+                                            page={page}
+                                            setPage={setPage}
+                                            rowsPerPage={rowsPerPage}
+                                            setRowsPerPage={setRowsPerPage}
+                                            totalPages={totalPages}
+                                            shouldPaginate={shouldPaginateTable}
+                                            jumpInput={jumpInput}
+                                            setJumpInput={setJumpInput}
+                                            handleJumpToPage={handleJumpToPage}
+                                            tablePaperRef={tablePaperRef}
+                                            tableRowRefs={tableRowRefs}
+                                            downloadCSV={downloadCSV}
+                                            stats={stats}
+                                            annotation={pinfo?.curated_annotation}
+                                            embedded
+                                        />
+                                    )}
                                 </>
                             ) : (
                                 <Box sx={{ height: PLOT_HEIGHT }} />
@@ -607,8 +620,8 @@ export default function GeneRegulation({ programId }) {
                         data={plotData}
                         layout={{ ...layout, title: titleText, margin: { l: 80, r: 30, t: 50, b: 50 } }}
                         config={plotConfig}
-                        onInitialized={onInitialized}
-                        onUpdate={onInitialized}
+                        onInitialized={onFullscreenInitialized}
+                        onUpdate={onFullscreenInitialized}
                         onClick={(evt) => {
                             if (!evt?.points?.length) return;
                             const gene = evt.points[0].customdata?.[0];
@@ -629,7 +642,7 @@ export default function GeneRegulation({ programId }) {
                         defaultPlacement="right"
                         defaultTop={58}
                         defaultSideOffset={18}
-                        anchorPlotRef={plotElRef}
+                        anchorPlotRef={fullscreenPlotElRef}
                     />
                 </Box>
             )}

@@ -146,7 +146,7 @@ function ZoomToolbar({ scale, zoomIn, zoomOut, resetView }) {
 
     return (
         <Box
-            data-graph-clickable="true"
+            data-graph-control="true"
             onPointerDown={(event) => event.stopPropagation()}
             sx={{
                 position: 'absolute',
@@ -211,7 +211,7 @@ function SelectionActions({
 
     return (
         <Box
-            data-graph-clickable="true"
+            data-graph-control="true"
             onPointerDown={(event) => event.stopPropagation()}
             sx={{
                 position: 'absolute',
@@ -311,6 +311,7 @@ export default function TraitProgramGraphCanvas({
     selectedGeneKey,
     selectedGeneOccurrences,
     selectedProgram,
+    shouldSuppressClick,
     svgHeight,
     svgRef,
     traitCenterY,
@@ -1064,30 +1065,32 @@ export default function TraitProgramGraphCanvas({
                     <g className="trait-program-template" transform={`translate(${transform.x} ${transform.y}) scale(${transform.scale})`}>
                         <rect x="0" y="0" width={SVG_WIDTH} height={svgHeight} fill="#fff" />
 
-                        <text x="8" y="36" className="section-title">
+                        <text x="8" y="28" className="section-title">
                             Programs selected by
                         </text>
-                        <text x="8" y="62" className="section-title">
+                        <text x="8" y="54" className="section-title">
                             program burden effects
                         </text>
                         <text
                             x={layout.rightProgramX}
-                            y="36"
+                            y="28"
                             className="section-title"
                         >
                             Programs selected by
                         </text>
                         <text
                             x={layout.rightProgramX}
-                            y="62"
+                            y="54"
                             className="section-title"
                         >
-                            regulator-program effects
+                            regulator-burden correlations
                         </text>
 
                         <g
                             data-graph-clickable="true"
-                            onClick={clearSelection}
+                            onClick={() => {
+                                if (!shouldSuppressClick()) clearSelection();
+                            }}
                             style={{ cursor: 'pointer' }}
                         >
                             <rect

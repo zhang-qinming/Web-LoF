@@ -4,9 +4,11 @@ const geneProgramModel = require('../models/MgeneProgram');
 const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute, throwIfAborted } = require('../lib/http');
+const { parseNullableNumber } = require('../lib/numbers');
 const { normalizeSafeBaseName, normalizeSafeBaseNameList } = require('../lib/request');
 const { parseTsvStream } = require('../lib/tsv');
 const { findVariantFile } = require('../lib/variantFiles');
+const { trySendPrecomputedJson } = require('../lib/precomputedJson');
 
 const router = express.Router();
 
@@ -146,6 +148,8 @@ async function getTsvVariant(store, fileIds, variant, suffix, { readRows = true,
         if (!readRows) return { exists: true, data: [], fileName };
 
         const data = await parseTsvFromStore(store, fileName, {
+            // Full mode intentionally returns every row. parseTsvFromStore still
+            // enforces the configured TSV file-size limit before reading.
             maxRows: variant === 'full' ? null : config.data.maxTsvRows,
             signal,
         });
@@ -162,8 +166,8 @@ function summarizeVolcanoRows(rows, effectField) {
     let annotatedGeneset = 0;
 
     for (const row of rows) {
-        const effect = Number(row[effectField]);
-        if (Number.isFinite(effect)) {
+        const effect = parseNullableNumber(row[effectField]);
+        if (effect != null) {
             if (effect >= 0) positive += 1;
             else negative += 1;
         }
@@ -187,6 +191,15 @@ function createVolcanoRoute({ store, volcanoType, effectField }) {
         if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
 
         const variant = req.query.variant === 'full' ? 'full' : 'hits';
+        if (variant === 'full') {
+            const sent = await trySendPrecomputedJson(req, res, {
+                store,
+                sourceFileName: `${safeFileId}_genes.tsv`,
+                freshnessFileNames: [`${safeFileId}_hits.tsv`],
+            });
+            if (sent) return;
+        }
+
         const lookupIds = [safeFileId, ...normalizeSafeBaseNameList(req.query.aliasId)];
         const current = await getTsvVariant(store, lookupIds, variant, '.tsv', { signal });
         const fallbackVariant = variant === 'full' ? 'hits' : 'full';
@@ -225,8 +238,7 @@ function createVolcanoRoute({ store, volcanoType, effectField }) {
 }
 
 function toNullableNumber(value) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
+    return parseNullableNumber(value);
 }
 
 function toBoolean(value) {

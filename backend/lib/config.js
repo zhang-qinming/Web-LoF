@@ -35,11 +35,23 @@ function parseBytes(value, fallback) {
     return Math.floor(amount * multiplier);
 }
 
+function parseStringList(value, fallback = []) {
+    if (value == null || value === '') return fallback;
+    const items = String(value)
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    return items.length ? [...new Set(items)] : fallback;
+}
+
 const dataDir = process.env.DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs';
+const dataArchiveDir = process.env.DATA_ARCHIVE_DIR || path.join(path.dirname(dataDir), `${path.basename(dataDir)}_archives`);
 const crossTraitHeatmapDir = process.env.CROSS_TRAIT_HEATMAP_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/cross_trait_heatmap';
+const crossTraitPrecomputedDir = process.env.CROSS_TRAIT_PRECOMPUTED_DIR || path.join(crossTraitHeatmapDir, 'precomputed', 'current');
 
 const paths = {
     dataDir,
+    dataArchiveDir,
     programDataDir: process.env.PROGRAM_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/run_all/outputs/figures/cnmf/tables/program_regulator',
     traitProgramGenePanelDir: process.env.TRAIT_PROGRAM_GENE_PANEL_DIR || path.join(dataDir, 'trait_program_gene_panel', 'tables'),
     regulationDataDir: process.env.REGULATION_DATA_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/run_all/outputs/perturbseq/cnmf_genomewide/cNMF_regulation/K562GW',
@@ -49,6 +61,7 @@ const paths = {
     posteriorVolcanoDir: process.env.POSTERIOR_VOLCANO_DIR || '/gpfs/chencao/qinminzhang/workflow/catalog_lof/figure_all/outputs/posterior_volcano/tables',
     crossTraitHeatmapDir,
     traitEffectNeighborsFile: process.env.TRAIT_EFFECT_NEIGHBORS_FILE || path.join(crossTraitHeatmapDir, 'trait_effect_neighbors.json'),
+    crossTraitPrecomputedDir,
 };
 
 const config = {
@@ -88,6 +101,19 @@ const config = {
         maxDownloadFileBytes: parseBytes(process.env.DATA_MAX_DOWNLOAD_FILE_BYTES, 1024 ** 3),
         maxArchiveEntries: parseInteger(process.env.DATA_MAX_ARCHIVE_ENTRIES, 5000, { min: 1 }),
         maxArchiveBytes: parseBytes(process.env.DATA_MAX_ARCHIVE_BYTES, 2 * 1024 ** 3),
+        archiveCompressionLevel: parseInteger(process.env.DATA_ARCHIVE_COMPRESSION_LEVEL, 9, { min: 0, max: 9 }),
+        dbExportTables: parseStringList(process.env.DATA_EXPORT_DB_TABLES, [
+            'file_id_mapping',
+            'file_metadata',
+            'gwas_meta',
+            'lof_meta',
+            'trait_ldsc',
+            'program_info',
+            'trait_program_edge',
+            'gene_program_trait_edge',
+            'gene_info_hg37_matched',
+            'gene_summary',
+        ]),
         maxTsvFileBytes: parseBytes(process.env.DATA_MAX_TSV_FILE_BYTES, 100 * 1024 ** 2),
         maxTsvRows: parseInteger(process.env.DATA_MAX_TSV_ROWS, 200000, { min: 1000 }),
         maxManhattanFileBytes: parseBytes(process.env.MANHATTAN_MAX_FILE_BYTES, 200 * 1024 ** 2),
@@ -95,6 +121,11 @@ const config = {
         maxManhattanMaxPoints: parseInteger(process.env.MANHATTAN_MAX_POINTS, 100000, { min: 1000, max: 250000 }),
         manhattanCacheMaxBytes: parseBytes(process.env.MANHATTAN_CACHE_MAX_BYTES, 64 * 1024 ** 2),
         manhattanCacheMaxEntries: parseInteger(process.env.MANHATTAN_CACHE_MAX_ENTRIES, 16, { min: 1, max: 100 }),
+        precomputedChartJsonEnabled: parseBoolean(process.env.PRECOMPUTED_CHART_JSON_ENABLED, true),
+        precomputedChartJsonSubdir: process.env.PRECOMPUTED_CHART_JSON_SUBDIR || 'json_precomputed',
+        precomputedChartJsonStatTtlMs: parseInteger(process.env.PRECOMPUTED_CHART_JSON_STAT_TTL_MS, 60000, { min: 1000 }),
+        maxCrossTraitPrecomputedFileBytes: parseBytes(process.env.CROSS_TRAIT_PRECOMPUTED_MAX_FILE_BYTES, 16 * 1024 ** 2),
+        crossTraitPrecomputedCacheMaxEntries: parseInteger(process.env.CROSS_TRAIT_PRECOMPUTED_CACHE_MAX_ENTRIES, 128, { min: 1, max: 1000 }),
     },
 };
 
@@ -103,4 +134,5 @@ module.exports = {
     parseBoolean,
     parseBytes,
     parseInteger,
+    parseStringList,
 };

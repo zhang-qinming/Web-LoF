@@ -24,12 +24,13 @@ import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import OpenInNew from '@mui/icons-material/OpenInNew';
 import Search from '@mui/icons-material/Search';
-import useSWR from 'swr';
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr';
 import { fetcher, getProgramGenes, getProgramTraits } from '../api/gwas';
 import { PageFrame, StatePanel, UpdatingStatus } from '../components/PageScaffold';
 import { downloadBlob } from '../utils/download';
-import { detailSummarySWRConfig, stableListSWRConfig } from '../utils/swrOptions';
+import { detailSummarySWRConfig } from '../utils/swrOptions';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useProgressiveCount, useStagedMount } from '../utils/useProgressiveRender';
 import {
     DATA_PAGE_MAX_WIDTH,
     groupedTableColumnHeaderCellSx,
@@ -53,6 +54,7 @@ const GeneRegulation = React.lazy(loadGeneRegulation);
 const ProgramAssociatedTraits = React.lazy(loadProgramAssociatedTraits);
 const PROGRAM_DETAIL_PRELOADERS = [loadGeneRegulation, loadProgramAssociatedTraits];
 const preloadedProgramDetailLoaders = new Set();
+const prefetchedProgramData = new Set();
 
 function scheduleIdleTask(callback, timeout = 1200) {
     if (typeof window === 'undefined') return () => {};
@@ -77,14 +79,23 @@ function preloadProgramDetail(index) {
     });
 }
 
-function ProgramDetailFallback() {
+function ProgramDetailFallback({ minHeight = 320 }) {
+    return <Box aria-hidden="true" sx={{ minHeight, width: '100%' }} />;
+}
+
+function DeferredProgramPanel({ ready, minHeight = 320, children }) {
+    if (!ready) return <ProgramDetailFallback minHeight={minHeight} />;
+
     return (
-        <StatePanel
-            loading
-            title="Loading panel"
-            message="Preparing this program detail panel."
-            minHeight={320}
-        />
+        <Box
+            sx={{
+                minWidth: 0,
+                contentVisibility: 'auto',
+                containIntrinsicSize: `auto ${minHeight}px`,
+            }}
+        >
+            {children}
+        </Box>
     );
 }
 
@@ -127,7 +138,7 @@ const PROGRAM_INFO_FIELDS = [
 
 const PROGRAM_GENE_COLUMNS = [
     { key: 'geneSymbol', label: 'Symbol', align: 'center', tone: 'genes', width: 150 },
-    { key: 'ensgId', label: 'ENSEMBL id', align: 'center', tone: 'identity', width: 180 },
+    { key: 'ensgId', label: 'Ensembl ID', align: 'center', tone: 'identity', width: 180 },
     { key: 'location', label: 'Location', align: 'center', tone: 'annotation', width: 220 },
     { key: 'geneType', label: 'Gene Type', align: 'center', tone: 'annotation', width: 180 },
     { key: 'direction', label: 'Direction in Program', align: 'center', tone: 'metric', width: 210 },
@@ -137,6 +148,10 @@ const PROGRAM_GENE_COLUMNS = [
 const DETAIL_TABLE_TITLE_HEADER_HEIGHT = 56;
 const TABLE_PAGINATION_THRESHOLD = 50;
 const DEFAULT_ROWS_PER_PAGE = 25;
+const PROGRAM_INITIAL_RENDER_ROWS = 10;
+const PROGRAM_RENDER_STEP = 10;
+const PROGRAM_DETAIL_STAGE_COUNT = 4;
+const EMPTY_PROGRAM_LIST = [];
 
 const programSortLabelSx = {
     display: 'inline-flex',
@@ -402,7 +417,7 @@ const PROGRAM_PLACEHOLDERS = [
     'e.g. P150'
 ];
 
-function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
+function ProgramSwitcher({ programOptions, selectedProgram, onSelect, onPreload }) {
     const theme = useTheme();
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
     const searchPlaceholder = PROGRAM_PLACEHOLDERS[placeholderIndex % PROGRAM_PLACEHOLDERS.length];
@@ -525,6 +540,8 @@ function ProgramSwitcher({ programOptions, selectedProgram, onSelect }) {
                             <ButtonBase
                                 key={option.id}
                                 onClick={() => handleSelect(option.id)}
+                                onMouseEnter={() => onPreload?.(option.id)}
+                                onFocus={() => onPreload?.(option.id)}
                                 sx={{
                                     width: '100%',
                                     display: 'flex',
@@ -751,8 +768,8 @@ function ProgramGenesTable({ programId }) {
     const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
     const geneKey = programId ? ['program-genes', programId] : null;
     const geneResource = useCachedResourceState(
-        useSWR(geneKey, ([, id]) => getProgramGenes(id), stableListSWRConfig),
-        { cacheKey: geneKey },
+        useSWR(geneKey, ([, id]) => getProgramGenes(id), detailSummarySWRConfig),
+        { cacheKey: geneKey, retainPreviousData: false },
     );
     const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = geneResource;
 
@@ -986,6 +1003,7 @@ const PROGRAM_GENE_PLACEHOLDERS = [
 
 export default function Programs() {
     const theme = useTheme();
+    const { cache, mutate } = useSWRConfig();
     const [genePlaceholderIndex, setGenePlaceholderIndex] = useState(0);
     const geneSearchPlaceholder = PROGRAM_GENE_PLACEHOLDERS[genePlaceholderIndex % PROGRAM_GENE_PLACEHOLDERS.length];
 
@@ -1008,7 +1026,11 @@ export default function Programs() {
         { cacheKey: '/api/programs/info' },
     );
     const { displayData: info, isInitialLoading: loading } = infoResource;
-    const [programs, setPrograms] = useState([]);
+    const regulationListResource = useCachedResourceState(
+        useSWR('/api/regulation/list', fetcher, detailSummarySWRConfig),
+        { cacheKey: '/api/regulation/list' },
+    );
+    const programs = regulationListResource.displayData?.programs || EMPTY_PROGRAM_LIST;
     const [programGeneInput, setProgramGeneInput] = useState('');
     const [sortBy, setSortBy] = useState('program');
     const [sortDir, setSortDir] = useState('asc');
@@ -1019,24 +1041,22 @@ export default function Programs() {
     const programNumber = normalizedProgramId ? normalizedProgramId.replace(/^P/i, '') : '';
     const traitKey = normalizedProgramId ? ['program-traits', normalizedProgramId] : null;
     const traitResource = useCachedResourceState(
-        useSWR(traitKey, ([, id]) => getProgramTraits(id), stableListSWRConfig),
-        { cacheKey: traitKey },
+        useSWR(traitKey, ([, id]) => getProgramTraits(id), detailSummarySWRConfig),
+        { cacheKey: traitKey, retainPreviousData: false },
     );
     const { displayData: traitData, error: traitError, isInitialLoading: traitLoading, isRefreshing: traitRefreshing } = traitResource;
     const detailGeneKey = normalizedProgramId ? ['program-genes', normalizedProgramId] : null;
     const detailGeneResource = useCachedResourceState(
-        useSWR(detailGeneKey, ([, id]) => getProgramGenes(id), stableListSWRConfig),
-        { cacheKey: detailGeneKey },
+        useSWR(detailGeneKey, ([, id]) => getProgramGenes(id), detailSummarySWRConfig),
+        { cacheKey: detailGeneKey, retainPreviousData: false },
     );
     const { displayData: geneData, isInitialLoading: geneLoading, isRefreshing: geneRefreshing } = detailGeneResource;
+    const detailStage = useStagedMount(
+        normalizedProgramId ? `program-detail-${normalizedProgramId}` : 'program-index',
+        normalizedProgramId ? PROGRAM_DETAIL_STAGE_COUNT : 0,
+    );
 
     useEffect(() => {
-        fetch('/api/regulation/list').then(r => r.json()).then(res => setPrograms(res.programs || [])).catch(() => {});
-    }, []);
-
-    useEffect(() => {
-        if (!programId) return undefined;
-
         const preloadQueue = PROGRAM_DETAIL_PRELOADERS.map((_, index) => index);
         let cancelled = false;
         let cancelIdleTask = () => {};
@@ -1057,7 +1077,7 @@ export default function Programs() {
             cancelled = true;
             cancelIdleTask();
         };
-    }, [programId]);
+    }, []);
 
     const rows = useMemo(() => {
         const query = programGeneSearch.trim().toLowerCase();
@@ -1067,9 +1087,10 @@ export default function Programs() {
             go_term: v?.go_term || v?.representative_go || '',
             go_accession: v?.go_accession || extractGoAccession(v?.representative_go),
             go_ontology: v?.go_ontology || '',
+            representativeGenes: splitTopGenes(v?.top10_genes).slice(0, 10),
         }));
         const filteredItems = query
-            ? items.filter((item) => splitTopGenes(item.top10_genes).some((gene) => gene.toLowerCase().includes(query)))
+            ? items.filter((item) => item.representativeGenes.some((gene) => gene.toLowerCase().includes(query)))
             : items;
         const dir = sortDir === 'asc' ? 1 : -1;
         filteredItems.sort((a, b) => {
@@ -1079,7 +1100,13 @@ export default function Programs() {
         });
         return filteredItems;
     }, [info, programGeneSearch, sortBy, sortDir]);
-    const visibleProgramRows = rows;
+    const programRenderKey = `${programGeneSearch}|${sortBy}|${sortDir}|${rows.map((row) => row.program).join(',')}`;
+    const renderedProgramRowCount = useProgressiveCount(loading ? 0 : rows.length, {
+        resetKey: programRenderKey,
+        initialCount: PROGRAM_INITIAL_RENDER_ROWS,
+        step: PROGRAM_RENDER_STEP,
+    });
+    const visibleProgramRows = rows.slice(0, renderedProgramRowCount);
 
     const selectedProgramInfo = info?.[normalizedProgramId] || info?.[programNumber] || {};
     const annotation = traitData?.program?.annotation || selectedProgramInfo?.curated_annotation || '';
@@ -1145,6 +1172,42 @@ export default function Programs() {
         navigate(`/programs/P${id}`);
     }, [navigate]);
 
+    const preloadProgram = useCallback((rawId) => {
+        const id = String(rawId || '').replace(/^P/i, '').trim();
+        if (!id) return;
+
+        PROGRAM_DETAIL_PRELOADERS.forEach((_, index) => {
+            preloadProgramDetail(index)?.catch(() => {});
+        });
+
+        const normalizedId = `P${id}`;
+        const traitPrefetchKey = ['program-traits', normalizedId];
+        const genePrefetchKey = ['program-genes', normalizedId];
+        const hasTraitData = cache.get(unstable_serialize(traitPrefetchKey)) !== undefined;
+        const hasGeneData = cache.get(unstable_serialize(genePrefetchKey)) !== undefined;
+        if (hasTraitData && hasGeneData) return;
+        if (prefetchedProgramData.has(normalizedId)) return;
+        prefetchedProgramData.add(normalizedId);
+
+        const tasks = [];
+        if (!hasTraitData) {
+            tasks.push(mutate(traitPrefetchKey, getProgramTraits(normalizedId), {
+                populateCache: true,
+                revalidate: false,
+            }));
+        }
+        if (!hasGeneData) {
+            tasks.push(mutate(genePrefetchKey, getProgramGenes(normalizedId), {
+                populateCache: true,
+                revalidate: false,
+            }));
+        }
+
+        Promise.allSettled(tasks).finally(() => {
+            prefetchedProgramData.delete(normalizedId);
+        });
+    }, [cache, mutate]);
+
     if (programId) {
         return (
             <Box sx={{
@@ -1184,6 +1247,7 @@ export default function Programs() {
                                 programOptions={programOptions}
                                 selectedProgram={selectedProgramOption}
                                 onSelect={handleProgramSelect}
+                                onPreload={preloadProgram}
                             />
                         </Box>
                         <Stack direction="row" spacing={0.8} alignItems="center" sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
@@ -1217,14 +1281,18 @@ export default function Programs() {
                             },
                         }}
                     >
-                        <ProgramInfoTable
-                            row={detailInfoRow}
-                            loading={loading}
-                            loadingCounts={traitLoading || geneLoading}
-                        />
-                        <React.Suspense fallback={<ProgramDetailFallback />}>
-                            <GeneRegulation programId={programNumber} />
-                        </React.Suspense>
+                        <DeferredProgramPanel ready={detailStage >= 1} minHeight={260}>
+                            <ProgramInfoTable
+                                row={detailInfoRow}
+                                loading={loading}
+                                loadingCounts={traitLoading || geneLoading}
+                            />
+                        </DeferredProgramPanel>
+                        <DeferredProgramPanel ready={detailStage >= 3} minHeight={420}>
+                            <React.Suspense fallback={<ProgramDetailFallback minHeight={420} />}>
+                                <GeneRegulation programId={programNumber} />
+                            </React.Suspense>
+                        </DeferredProgramPanel>
                     </Box>
                     <Box
                         sx={{
@@ -1243,12 +1311,16 @@ export default function Programs() {
                             },
                         }}
                     >
-                        <ProgramGenesTable programId={normalizedProgramId} />
-                        <React.Suspense fallback={<ProgramDetailFallback />}>
-                            <ProgramAssociatedTraits
-                                programId={normalizedProgramId}
-                            />
-                        </React.Suspense>
+                        <DeferredProgramPanel ready={detailStage >= 2} minHeight={520}>
+                            <ProgramGenesTable programId={normalizedProgramId} />
+                        </DeferredProgramPanel>
+                        <DeferredProgramPanel ready={detailStage >= 4} minHeight={520}>
+                            <React.Suspense fallback={<ProgramDetailFallback minHeight={520} />}>
+                                <ProgramAssociatedTraits
+                                    programId={normalizedProgramId}
+                                />
+                            </React.Suspense>
+                        </DeferredProgramPanel>
                     </Box>
                 </Stack>
             </Box>
@@ -1450,10 +1522,21 @@ export default function Programs() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {loading ? skeleton : visibleProgramRows.map((r, i) => (
-                                <TableRow key={r.program} hover
+                            {loading ? skeleton : visibleProgramRows.length === 0 && rows.length > 0 ? (
+                                <TableRow aria-hidden="true">
+                                    <TableCell
+                                        colSpan={PROGRAM_TABLE_COLUMNS.length}
+                                        sx={{ height: 420, p: 0, borderBottom: 0 }}
+                                    />
+                                </TableRow>
+                            ) : visibleProgramRows.map((r, i) => (
+                                <TableRow
+                                    key={r.program}
+                                    hover
                                     sx={{
-                                        ...tableRowRevealSx(theme, i),
+                                        ...tableRowRevealSx(theme, i, {
+                                            disableReveal: i >= PROGRAM_INITIAL_RENDER_ROWS,
+                                        }),
                                         '&:hover td': {
                                             backgroundColor: alpha(theme.palette.primary.main, 0.035),
                                         },
@@ -1462,6 +1545,8 @@ export default function Programs() {
                                         <Button
                                             component={RouterLink}
                                             to={`/programs/${r.program}`}
+                                            onMouseEnter={() => preloadProgram(r.program)}
+                                            onFocus={() => preloadProgram(r.program)}
                                             sx={{
                                                 textTransform: 'none',
                                                 px: 0,
@@ -1518,7 +1603,7 @@ export default function Programs() {
                                     </TableCell>
                                     <TableCell sx={programTableCellSx(theme, programTableTones.genes, 'left', { whiteSpace: 'normal' })}>
                                         <Stack direction="row" spacing={0.45} sx={{ flexWrap: 'wrap' }}>
-                                            {splitTopGenes(r.top10_genes).slice(0, 10).map((gene) => (
+                                            {r.representativeGenes.map((gene) => (
                                                 <Chip
                                                     key={`${r.program}-${gene}`}
                                                     label={gene}

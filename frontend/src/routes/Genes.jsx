@@ -37,10 +37,10 @@ import ScienceOutlined from '@mui/icons-material/ScienceOutlined';
 import SearchOutlined from '@mui/icons-material/SearchOutlined';
 import TableChartOutlined from '@mui/icons-material/TableChartOutlined';
 import useSWR from 'swr';
-import { getGeneOverview, getGeneProgramRecords, getGenes, getRecommendedGenes, searchGenes } from '../api/gwas';
+import { getGeneOverview, getGeneProgramRecords, getGenes, searchGenes } from '../api/gwas';
 import { PageFrame, StatePanel, UpdatingStatus } from '../components/PageScaffold';
 import { downloadBlob } from '../utils/download';
-import { detailSummarySWRConfig, interactiveSearchSWRConfig, stableKeepPreviousSWRConfig, stableListSWRConfig } from '../utils/swrOptions';
+import { detailSummarySWRConfig, interactiveSearchSWRConfig, stableListSWRConfig } from '../utils/swrOptions';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import {
@@ -398,6 +398,7 @@ function QuietDeferredPanel({ minHeight = 260 }) {
 
 const GENE_TABLE_COLUMNS = [
     { key: 'geneSymbol', label: 'Gene Symbol', align: 'center', width: 138 },
+    { key: 'geneDescription', label: 'Gene Description', align: 'left', width: 320 },
     { key: 'ensgId', label: 'Ensembl ID', align: 'center', width: 170 },
     { key: 'location', label: 'Location', align: 'center', width: 190 },
     { key: 'geneType', label: 'Gene Type', align: 'center', width: 150 },
@@ -410,7 +411,7 @@ const GENE_PROGRAM_COLUMNS = [
     { key: 'programGoLabel', label: 'GO Term', align: 'left', width: 244, tone: 'annotation' },
     { key: 'geneDirection', label: 'Gene Role / Direction', align: 'center', width: 170, tone: 'evidence' },
     { key: 'totalTraits', label: 'Linked Traits', align: 'center', width: 112, tone: 'evidence' },
-    { key: 'programGeneCountSort', label: 'Program Gene Count', align: 'center', width: 154, tone: 'evidence' },
+    { key: 'programGeneCountSort', label: 'Evidence Gene Count', align: 'center', width: 158, tone: 'evidence' },
 ];
 const GENE_PROGRAM_GROUPS = [
     { label: 'Identity', span: 1, tone: 'identity' },
@@ -423,9 +424,9 @@ const GENE_TRAIT_COLUMNS = [
     { key: 'programAnnotation', label: 'Function', align: 'left', width: 228, tone: 'trait' },
     { key: 'role', label: 'Role', align: 'center', width: 92, tone: 'mapping' },
     { key: 'direction', label: 'Direction', align: 'center', width: 112, tone: 'mapping' },
-    { key: 'postMean', label: 'Post Mean', align: 'center', width: 94, tone: 'metric' },
-    { key: 'absGamma', label: 'Abs Gamma', align: 'center', width: 96, tone: 'metric' },
-    { key: 'membershipScore', label: 'Membership', align: 'center', width: 104, tone: 'metric' },
+    { key: 'postMean', label: 'LoF Effect', align: 'center', width: 98, tone: 'metric' },
+    { key: 'absGamma', label: 'Abs LoF Effect', align: 'center', width: 122, tone: 'metric' },
+    { key: 'membershipScore', label: 'Membership / Beta', align: 'center', width: 130, tone: 'metric' },
     { key: 'concordance', label: 'Concordance', align: 'center', width: 132, tone: 'metric' },
 ];
 const GENE_TRAIT_GROUPS = [
@@ -453,6 +454,7 @@ function matchesGeneIndexRow(gene, query) {
         gene?.geneSymbol,
         gene?.geneLabel,
         gene?.geneName,
+        gene?.description,
         gene?.ensgId,
         getGeneLocation(gene),
         gene?.geneType,
@@ -601,6 +603,10 @@ function getGeneLocation(gene) {
     return `${normalizeChromosomeLabel(chromosome)}:${begin}-${end}`;
 }
 
+function getGeneDescription(gene) {
+    return gene?.geneName || gene?.description || '';
+}
+
 function normalizeChromosomeLabel(value) {
     const text = String(value ?? '').trim();
     if (!text) return '';
@@ -624,37 +630,6 @@ function normalizeLocationText(value) {
 
     const chromosome = normalizeChromosomeLabel(match[1]);
     return `${chromosome}:${normalizeCoordinate(match[2])}-${normalizeCoordinate(match[3])}`;
-}
-
-function evidenceWidth(value, maxValue) {
-    const count = Number(value) || 0;
-    const max = Number(maxValue) || 0;
-    if (!count || !max) return 0;
-    return Math.max(12, Math.min(100, (count / max) * 100));
-}
-
-function geneTypeTone(theme, geneType) {
-    const type = String(geneType || '').toLowerCase();
-    if (type.includes('protein')) return {
-        color: theme.palette.primary.dark,
-        backgroundColor: alpha(theme.palette.primary.main, 0.08),
-        borderColor: alpha(theme.palette.primary.main, 0.2),
-    };
-    if (type.includes('rna') || type.includes('transcript')) return {
-        color: '#2f6a49',
-        backgroundColor: alpha('#2f6a49', 0.08),
-        borderColor: alpha('#2f6a49', 0.2),
-    };
-    if (type.includes('pseudo')) return {
-        color: '#8a5b12',
-        backgroundColor: alpha(theme.palette.warning.main, 0.1),
-        borderColor: alpha(theme.palette.warning.main, 0.22),
-    };
-    return {
-        color: theme.palette.text.secondary,
-        backgroundColor: alpha(theme.palette.text.primary, 0.05),
-        borderColor: theme.custom.border.soft,
-    };
 }
 
 function chromosomeSortRank(value) {
@@ -698,6 +673,7 @@ function compareGenes(a, b, sortBy, sortDir) {
     let result = 0;
 
     if (sortBy === 'geneSymbol') result = compareText(a?.geneSymbol || a?.geneLabel, b?.geneSymbol || b?.geneLabel);
+    if (sortBy === 'geneDescription') result = compareText(getGeneDescription(a), getGeneDescription(b));
     if (sortBy === 'ensgId') result = compareText(a?.ensgId, b?.ensgId);
     if (sortBy === 'location') result = compareLocation(a, b);
     if (sortBy === 'geneType') result = compareText(a?.geneType, b?.geneType);
@@ -723,6 +699,7 @@ function buildGeneTableCsv(rows) {
         GENE_TABLE_COLUMNS.map((column) => escapeCsvValue(column.label)).join(','),
         ...rows.map((row) => ([
             row.geneSymbol || '',
+            getGeneDescription(row),
             row.ensgId || '',
             getGeneLocation(row),
             row.geneType || '',
@@ -845,7 +822,7 @@ function buildGeneProgramRows(gene, records) {
         if (signValues.length === 1) signLabel = signValues[0];
         if (signValues.length > 1) signLabel = 'mixed';
         const geneDirection = roleLabel === '-' ? signLabel : (signLabel === '-' ? roleLabel : `${roleLabel} / ${signLabel}`);
-        const programGeneCountSort = Number(item.programGeneCount) || 0;
+        const programGeneCountSort = (Number(item.loadingGeneCount) || 0) + (Number(item.regulatorGeneCount) || 0);
 
         return {
             geneLabel: item.geneLabel || item.geneSymbol || item.ensgId || '-',
@@ -1263,7 +1240,7 @@ function GeneHomeTable({
             order: direction,
             search,
         }), stableListSWRConfig),
-        { cacheKey: geneIndexKey },
+        { cacheKey: geneIndexKey, retainPreviousData: true },
     );
     const { displayData: data, isInitialLoading: isLoading, isRefreshing, error } = geneIndexResource;
 
@@ -1280,8 +1257,6 @@ function GeneHomeTable({
     const responsePage = Number(data?.page) || currentPage + 1;
     const start = totalCount ? ((responsePage - 1) * rowsPerPage) : 0;
     const end = totalCount ? Math.min(start + rows.length, totalCount) : 0;
-    const maxPrograms = Math.max(1, Number(data?.maxTotals?.totalPrograms) || 0);
-    const maxTraits = Math.max(1, Number(data?.maxTotals?.totalTraits) || 0);
     const handleSort = React.useCallback((key) => {
         setPage(0);
         if (sortBy === key) {
@@ -1378,17 +1353,9 @@ function GeneHomeTable({
                         Gene
                     </Typography>
                     <Stack direction="row" spacing={0.55} alignItems="center" sx={{ flexWrap: 'wrap', minWidth: 0 }}>
-                        <Chip
-                            label={resultChipLabel}
-                            size="small"
-                            sx={summaryChipSx(theme, {
-                                height: 22,
-                                color: '#2f6a49',
-                                bgcolor: alpha('#2f6a49', 0.08),
-                                border: `1px solid ${alpha('#2f6a49', 0.18)}`,
-                                flexShrink: 0,
-                            })}
-                        />
+                        <Typography sx={{ fontSize: '0.76rem', fontWeight: 680, color: '#2f6a49', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
+                            {resultChipLabel}
+                        </Typography>
                         {filterChipLabel && (
                             <Chip
                                 label={`Filter: ${filterChipLabel}`}
@@ -1634,12 +1601,14 @@ function GeneHomeTable({
                                                     <Typography sx={{ fontSize: '0.87rem', fontWeight: 740, lineHeight: 1.08, color: '#173b35', textAlign: 'center' }} noWrap>
                                                         {gene.geneSymbol || gene.geneLabel || '-'}
                                                     </Typography>
-                                                    {gene.geneName && (
-                                                        <Typography sx={{ mt: 0.18, fontSize: '0.63rem', color: theme.palette.text.secondary, textAlign: 'center' }} noWrap>
-                                                            {gene.geneName}
-                                                        </Typography>
-                                                    )}
                                                 </Box>
+                                            );
+                                        }
+                                        if (column.key === 'geneDescription') {
+                                            content = (
+                                                <Typography sx={{ fontSize: '0.76rem', lineHeight: 1.35, color: theme.palette.text.primary, overflowWrap: 'anywhere' }}>
+                                                    {getGeneDescription(gene) || '-'}
+                                                </Typography>
                                             );
                                         }
                                         if (column.key === 'ensgId') {
@@ -1649,13 +1618,13 @@ function GeneHomeTable({
                                                 </Typography>
                                             );
                                         }
-                                        if (column.key === 'location') content = <GeneLocationCell gene={gene} />;
-                                        if (column.key === 'geneType') content = <GeneTypeBadge value={gene.geneType} />;
+                                        if (column.key === 'location') content = getGeneLocation(gene) || '-';
+                                        if (column.key === 'geneType') content = gene.geneType || '-';
                                         if (column.key === 'totalPrograms') {
-                                            content = <GeneAssociationMeter value={gene.totalPrograms} maxValue={maxPrograms} tone="primary" />;
+                                            content = (Number(gene.totalPrograms) || 0).toLocaleString();
                                         }
                                         if (column.key === 'totalTraits') {
-                                            content = <GeneAssociationMeter value={gene.totalTraits} maxValue={maxTraits} tone="accent" />;
+                                            content = (Number(gene.totalTraits) || 0).toLocaleString();
                                         }
 
                                         return (
@@ -1666,7 +1635,7 @@ function GeneHomeTable({
                                                         align: column.align,
                                                         fontFamily: isMono ? 'monospace' : undefined,
                                                         fontWeight: column.key === 'geneSymbol' || isNumeric ? 700 : 500,
-                                                        whiteSpace: column.key === 'geneType' ? 'normal' : 'nowrap',
+                                                        whiteSpace: ['geneDescription', 'geneType'].includes(column.key) ? 'normal' : 'nowrap',
                                                     }),
                                                     ...(isNumeric ? { overflow: 'visible' } : {}),
                                                 }}
@@ -2359,7 +2328,7 @@ function GeneProgramTable({ gene, records, programRows }) {
                                             direction={sortBy === column.key ? sortDir : 'asc'}
                                             hideSortIcon
                                             onClick={() => handleSort(column.key)}
-                                            sx={geneSortLabelSx}
+                                            sx={{ ...geneSortLabelSx, justifyContent: justifyForAlign(column.align) }}
                                         >
                                             {column.label}
                                         </TableSortLabel>
@@ -2675,7 +2644,7 @@ function GeneProgramTraitTable({
                                             direction={sortBy === column.key ? sortDir : 'asc'}
                                             hideSortIcon
                                             onClick={() => handleSort(column.key)}
-                                            sx={geneSortLabelSx}
+                                            sx={{ ...geneSortLabelSx, justifyContent: justifyForAlign(column.align) }}
                                         >
                                             {column.label}
                                         </TableSortLabel>
@@ -2867,7 +2836,7 @@ export default function Genes() {
     const overviewKey = query ? ['gene-overview', query] : null;
     const overviewResource = useCachedResourceState(
         useSWR(overviewKey, ([, q]) => getGeneOverview(q), detailSummarySWRConfig),
-        { cacheKey: overviewKey, retainData: false },
+        { cacheKey: overviewKey, retainPreviousData: true },
     );
     const { displayData: overview, isInitialLoading: overviewLoading, error: overviewError } = overviewResource;
 
@@ -2904,9 +2873,9 @@ export default function Genes() {
             sortBy: sortKey,
             order: direction,
         }), stableListSWRConfig),
-        { cacheKey: recordKey },
+        { cacheKey: recordKey, retainPreviousData: true },
     );
-    const { displayData: recordData, isInitialLoading: recordsLoading, isRefreshing: recordsRefreshing, error: recordsError } = recordResource;
+    const { displayData: recordData, isInitialLoading: recordsLoading, isRefreshing: recordsRefreshing, isStale: recordsStale, error: recordsError } = recordResource;
 
     const recordPage = recordData?.recordPage || {};
     const hasFreshRecordPage = Boolean(
@@ -2916,7 +2885,7 @@ export default function Genes() {
         && String(recordPage.sortBy || '') === traitSortBy
         && String(recordPage.order || '').toLowerCase() === String(traitSortDir || '').toLowerCase(),
     );
-    const records = hasFreshRecordPage ? (recordData?.records || []) : [];
+    const records = hasFreshRecordPage || recordsStale ? (recordData?.records || []) : [];
     const totalRecordCount = Number(recordPage.totalCount ?? summary.totalRows) || totalOverviewCount;
 
     const handleTraitSort = React.useCallback((key, direction) => {
@@ -2949,8 +2918,8 @@ export default function Genes() {
                     <>
                         <GeneDetailHeaderSkeleton />
                         <GeneInfoTableSkeleton />
-                        <StatePanel loading title="Loading gene-program summary" message={`Preparing ${query} overview`} minHeight={220} />
-                        <StatePanel loading title="Loading linked traits" message={`Searching ${query} evidence rows`} minHeight={300} />
+                        <QuietDeferredPanel minHeight={220} />
+                        <QuietDeferredPanel minHeight={300} />
                     </>
                 )}
 
@@ -3014,13 +2983,8 @@ export default function Genes() {
                                 title="Failed to load linked traits"
                                 message={recordsError.message || 'The trait evidence request failed.'}
                             />
-                        ) : (recordsLoading || !hasFreshRecordPage) ? (
-                            <StatePanel
-                                loading
-                                title="Loading linked traits"
-                                message={`Querying ${query} trait evidence`}
-                                minHeight={300}
-                            />
+                        ) : (recordsLoading || (!hasFreshRecordPage && !records.length)) ? (
+                            <QuietDeferredPanel minHeight={300} />
                         ) : !detailTablesReady ? (
                             <QuietDeferredPanel minHeight={300} />
                         ) : (
@@ -3035,7 +2999,7 @@ export default function Genes() {
                                 onPageChange={setTraitPage}
                                 onRowsPerPageChange={handleTraitRowsPerPageChange}
                                 onSort={handleTraitSort}
-                                isRefreshing={recordsRefreshing}
+                                isRefreshing={recordsRefreshing || !hasFreshRecordPage}
                             />
                         )}
                     </>
@@ -3051,7 +3015,6 @@ export default function Genes() {
                             onClear={clearSearch}
                             onSelect={(gene) => runSearch(gene)}
                         />
-                        <GeneDiscoveryPanel recommended={recommended} onSelect={(gene) => runSearch(gene)} />
                     </>
                 )}
             </Stack>

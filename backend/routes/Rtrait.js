@@ -6,6 +6,7 @@ const { asyncRoute, throwIfAborted } = require('../lib/http');
 const { normalizeSafeBaseNameList, parsePositiveInt } = require('../lib/request');
 const { forEachTsvRow } = require('../lib/tsv');
 const { findVariantFile } = require('../lib/variantFiles');
+const { trySendPrecomputedJson } = require('../lib/precomputedJson');
 
 const router = express.Router();
 
@@ -57,6 +58,8 @@ function normalizeChromosome(value) {
 
 function parseManhattanReadOptions(query, variant) {
     return {
+        // Full mode intentionally has no row-count limit. The file-size guard in
+        // readDelimitedTsv remains the safety boundary for full TSV responses.
         rowLimit: variant === 'full'
             ? null
             : parsePositiveInt(query.maxPoints, config.data.maxTsvRows, config.data.maxTsvRows),
@@ -68,6 +71,22 @@ function parseManhattanReadOptions(query, variant) {
         programs: normalizeFilterList(query.program),
         genesets: normalizeFilterList(query.geneset),
     };
+}
+
+function hasManhattanServerFilters(query) {
+    return ['chr', 'minLogP', 'program', 'geneset'].some((key) => {
+        const value = query[key];
+        return Array.isArray(value)
+            ? value.some((item) => String(item || '').trim())
+            : Boolean(String(value || '').trim());
+    });
+}
+
+function getAutoFullPointCount(result) {
+    if (!result?.exists) return 0;
+    if (Number.isFinite(result.filteredRowCount)) return result.filteredRowCount;
+    if (Number.isFinite(result.sourceRowCount)) return result.sourceRowCount;
+    return result.rows.length;
 }
 
 function createSeededRandom(seedValue) {
@@ -321,11 +340,21 @@ router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
     const fileId = normalizeTraitFileId(req.params.traitName);
     if (!fileId) return res.status(400).json({ error: 'Invalid traitName' });
 
-    const variant = req.query.variant === 'full' ? 'full' : 'hits';
+    const requestedVariant = req.query.variant === 'full' ? 'full' : 'hits';
+    if (requestedVariant === 'full' && !hasManhattanServerFilters(req.query)) {
+        const sent = await trySendPrecomputedJson(req, res, {
+            store: manhattanStore,
+            sourceFileName: `${fileId}_gwas_variants.tsv`,
+            freshnessFileNames: [`${fileId}_gwas_hits.tsv`],
+        });
+        if (sent) return;
+    }
+
+    let variant = requestedVariant;
     const lookupIds = [fileId, ...normalizeSafeBaseNameList(req.query.aliasId)];
     const readOptions = parseManhattanReadOptions(req.query, variant);
-    const current = await getManhattanRows(lookupIds, variant, { readOptions, signal });
-    const fallback = variant === 'full'
+    let current = await getManhattanRows(lookupIds, variant, { readOptions, signal });
+    let fallback = variant === 'full'
         ? await getManhattanRows(lookupIds, 'hits', {
             signal,
             readOptions: {
@@ -335,20 +364,41 @@ router.get('/api/trait/manhattan/:traitName', asyncRoute(async (req, res) => {
             },
         })
         : null;
-    const hitsResult = variant === 'hits' ? current : fallback || await getManhattanRows(lookupIds, 'hits', { signal });
-    const fullResult = variant === 'full' ? current : await getManhattanRows(lookupIds, 'full', { readRows: false, signal });
+    let hitsResult = variant === 'hits' ? current : fallback || await getManhattanRows(lookupIds, 'hits', { signal });
+    let fullResult = variant === 'full' ? current : await getManhattanRows(lookupIds, 'full', { readRows: false, signal });
+    const autoFullThreshold = requestedVariant === 'hits'
+        ? parsePositiveInt(req.query.autoFullMinPoints, 0, config.data.maxTsvRows)
+        : 0;
+    const autoFullPointCount = requestedVariant === 'hits' ? getAutoFullPointCount(hitsResult) : null;
+    let autoFullApplied = false;
+
+    if (autoFullThreshold > 0 && fullResult.exists && autoFullPointCount < autoFullThreshold) {
+        fallback = hitsResult;
+        variant = 'full';
+        current = await getManhattanRows(lookupIds, 'full', {
+            readOptions: parseManhattanReadOptions(req.query, 'full'),
+            signal,
+        });
+        fullResult = current;
+        hitsResult = fallback;
+        autoFullApplied = current.exists;
+    }
+
     const effectiveRows = current.exists
         ? mergeManhattanRows(current.rows, variant === 'full' ? (fallback?.rows || []) : [])
         : (fallback?.rows || []);
-    const usingFallback = !current.exists && variant === 'full' && Boolean(fallback?.exists);
+    const usingFallback = requestedVariant === 'full' && !current.exists && variant === 'full' && Boolean(fallback?.exists);
 
     throwIfAborted(signal);
     res.json({
         fileId,
         variant,
-        requestedVariant: variant,
+        requestedVariant,
         resolvedVariant: current.exists ? variant : (usingFallback ? 'hits' : variant),
         fallbackUsed: usingFallback,
+        autoFullApplied,
+        autoFullThreshold,
+        autoFullPointCount,
         fileName: current.exists ? current.fileName : (fallback?.fileName || null),
         availableVariants: {
             hits: hitsResult.exists,

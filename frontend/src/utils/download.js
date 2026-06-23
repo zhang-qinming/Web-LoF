@@ -79,12 +79,24 @@ export async function triggerDataDownload(path) {
         throw new Error(message);
     }
 
-    const info = await response.json();
-    if (info?.type === 'dir') {
-        triggerBatchDataDownload([path], getZipName(path));
-        return;
-    }
     triggerNativeDownload(buildApiUrl('/data/download', { path }));
+}
+
+export async function triggerDataPackageDownload(packageId) {
+    const encodedPackageId = encodeURIComponent(packageId);
+    const response = await fetch(buildApiUrl(`/data/packages/${encodedPackageId}/download-info`));
+    if (!response.ok) {
+        let message = 'Download failed';
+        try {
+            const payload = await response.json();
+            if (payload?.error) message = payload.error;
+        } catch {
+            message = response.statusText || message;
+        }
+        throw new Error(message);
+    }
+
+    triggerNativeDownload(buildApiUrl(`/data/packages/${encodedPackageId}/download`));
 }
 
 export function triggerBatchDataDownload(paths, filename = 'data-selection.zip') {

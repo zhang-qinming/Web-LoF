@@ -12,9 +12,9 @@ export async function fetcher(url, params) {
     return res.data;
 }
 
-export async function getTraitManhattanHits(traitName, { variant = 'hits', aliasId, signal } = {}) {
+export async function getTraitManhattanHits(traitName, { variant = 'hits', aliasId, autoFullMinPoints, signal } = {}) {
     const res = await axios.get(`${API_BASE}/trait/manhattan/${encodeURIComponent(traitName)}`, {
-        params: { variant, aliasId },
+        params: { variant, aliasId, autoFullMinPoints },
         signal,
     });
     return res.data;

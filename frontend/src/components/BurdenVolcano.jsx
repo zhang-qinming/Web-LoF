@@ -30,10 +30,12 @@ import BurdenVolcanoTable from './BurdenVolcanoTable';
 import FloatingLegend from './FloatingLegend';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
+import { parseNullableNumber } from '../utils/numbers';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useDebouncedControlValue, useIdleRenderGate } from '../utils/renderScheduling';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneNeutral,
@@ -50,9 +52,9 @@ import {
 } from '../themeUtils';
 
 const VOLCANO_STYLE = {
-    background: { color: '#94a3b8', opacity: 0.24, label: 'Background genes', lineColor: 'rgba(255,255,255,0.22)' },
-    positive: { color: '#f3a17a', strong: '#c95b3e', opacity: 0.64, strongOpacity: 0.95, label: 'Positive effect', lineColor: 'rgba(106,43,24,0.2)' },
-    negative: { color: '#79c4cb', strong: '#2e7e8f', opacity: 0.64, strongOpacity: 0.95, label: 'Negative effect', lineColor: 'rgba(20,68,79,0.2)' },
+    background: { color: '#9aa4ae', opacity: 0.2, label: 'Non-significant', lineColor: 'rgba(255,255,255,0.16)' },
+    positive: { color: '#ee9b7a', strong: '#d4523e', opacity: 0.58, strongOpacity: 0.94, label: 'Positive effect', lineColor: 'rgba(180,55,30,0.22)' },
+    negative: { color: '#6eb8d4', strong: '#2878a0', opacity: 0.58, strongOpacity: 0.94, label: 'Negative effect', lineColor: 'rgba(20,78,105,0.22)' },
 };
 
 const EFFECT_MODES = {
@@ -88,15 +90,15 @@ const VOLCANO_CONFIGS = {
     posterior: {
         api: getPosteriorVolcano,
         effectField: 'post_mean',
-        effectLabel: 'Post mean',
-        effectAxisLabel: 'Posterior mean',
+        effectLabel: 'LoF effect',
+        effectAxisLabel: 'GeneBayes LoF effect (post_mean)',
         title: 'Posterior Volcano',
-        fullTitle: 'All Gene Posterior Effects',
-        hitsTitle: 'Gene Posterior Hit Overview',
-        fullDescription: 'Full gene-level posterior effects for this trait. Click a point to focus its table row.',
-        hitsDescription: 'Significant posterior hits for this trait. Switch to Full TSV for all genes when available.',
+        fullTitle: 'All GeneBayes LoF Effects',
+        hitsTitle: 'GeneBayes LoF Hit Overview',
+        fullDescription: 'Full gene-level GeneBayes LoF effects for this trait. Click a point to focus its table row.',
+        hitsDescription: 'Significant GeneBayes LoF hits for this trait. Switch to Full TSV for all genes when available.',
         emptyMessage: 'No posterior volcano rows are currently available for this trait.',
-        guideText: 'Y-axis uses -log10(P). Horizontal guide marks nominal significance. Positive posterior mean shifts right; negative posterior mean shifts left.',
+        guideText: 'Y-axis uses -log10(P). Horizontal guide marks nominal significance. Positive LoF effect shifts right; negative LoF effect shifts left.',
         exportPrefix: 'posterior_volcano',
         plotSuffix: 'posterior-volcano',
         includePosteriorColumns: true,
@@ -135,12 +137,29 @@ function computeVolcanoXAxisRange(values, paddingRatio = 0.1) {
 }
 
 function toFiniteNumber(value) {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
+    return parseNullableNumber(value);
+}
+
+const PLACEHOLDER_ANNOTATION_TOKENS = new Set(['other', 'others', 'na', 'n/a', 'none', 'null', '-', '--', '.']);
+
+function splitAnnotationTokens(value) {
+    return String(value || '')
+        .split(';')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function isMeaningfulAnnotationToken(value) {
+    return !PLACEHOLDER_ANNOTATION_TOKENS.has(String(value || '').trim().toLowerCase());
+}
+
+function normalizeAnnotationValue(value) {
+    const tokens = splitAnnotationTokens(value).filter(isMeaningfulAnnotationToken);
+    return tokens.join('; ');
 }
 
 function getProgramRoute(program) {
-    const firstProgram = String(program || '').split(';').map((item) => item.trim()).find(Boolean);
+    const firstProgram = splitAnnotationTokens(program).find(isMeaningfulAnnotationToken);
     const match = firstProgram?.match(/\d+/);
     return match ? `/programs/${match[0]}` : null;
 }
@@ -196,10 +215,15 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             }),
             figureResourceSWRConfig,
         ),
-        { cacheKey: volcanoKey, retainData: false },
+        { cacheKey: volcanoKey, retainPreviousData: false },
     );
     const { displayData: payload, error, isInitialLoading: isLoading, isRefreshing } = volcanoResource;
     const afterFirstPaint = useAfterFirstPaint(volcanoKey || 'volcano-empty');
+    const [pointSizeDraft, setPointSizeDraft, commitPointSize] = useDebouncedControlValue(
+        pointSize,
+        (value) => setPointSize(clamp(Number(value) || DEFAULT_POINT_SIZE, 4, 18)),
+        { delay: 250 },
+    );
 
     const onInitialized = useCallback((_figure, graphDiv) => {
         plotRef.current = graphDiv;
@@ -225,8 +249,8 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             const upper95 = toFiniteNumber(item.upper_95);
             const gene = String(item.gene || '').trim();
             const ensg = String(item.ensg || '').trim();
-            const primaryProgram = String(item.program || '').trim();
-            const primaryGeneset = String(item.geneset || '').trim();
+            const primaryProgram = normalizeAnnotationValue(item.program);
+            const primaryGeneset = normalizeAnnotationValue(item.geneset);
             const rowKey = `${ensg || gene || 'gene'}-${index}`;
             return {
                 rowKey,
@@ -280,31 +304,50 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             negative: 0,
             neutral: 0,
             significant: 0,
+            significantPositive: 0,
+            significantNegative: 0,
+            nonSignificant: 0,
         };
         filteredRows.forEach((row) => {
             stats[row.effectClass] += 1;
-            if (row.isSignificant) stats.significant += 1;
+            if (!row.isSignificant) {
+                stats.nonSignificant += 1;
+                return;
+            }
+
+            stats.significant += 1;
+            if (row.effectClass === 'positive') stats.significantPositive += 1;
+            if (row.effectClass === 'negative') stats.significantNegative += 1;
         });
         return stats;
     }, [filteredRows]);
     const legendItems = useMemo(() => {
         const items = [];
-        if (counts.positive > 0) {
+        if (counts.nonSignificant > 0) {
             items.push({
-                key: 'positive',
-                label: VOLCANO_STYLE.positive.label,
-                note: 'Right of zero; darker ember marks stronger signal.',
-                color: VOLCANO_STYLE.positive.strong,
-                count: counts.positive,
+                key: 'background',
+                label: VOLCANO_STYLE.background.label,
+                note: 'Below significance threshold (P ≥ 0.05).',
+                color: VOLCANO_STYLE.background.color,
+                count: counts.nonSignificant,
             });
         }
-        if (counts.negative > 0) {
+        if (counts.significantPositive > 0) {
+            items.push({
+                key: 'positive',
+                label: `Significant ${VOLCANO_STYLE.positive.label.toLowerCase()}`,
+                note: 'Right of zero; deeper coral marks stronger signal.',
+                color: VOLCANO_STYLE.positive.strong,
+                count: counts.significantPositive,
+            });
+        }
+        if (counts.significantNegative > 0) {
             items.push({
                 key: 'negative',
-                label: VOLCANO_STYLE.negative.label,
-                note: 'Left of zero; deeper teal marks stronger signal.',
+                label: `Significant ${VOLCANO_STYLE.negative.label.toLowerCase()}`,
+                note: 'Left of zero; deeper blue marks stronger signal.',
                 color: VOLCANO_STYLE.negative.strong,
-                count: counts.negative,
+                count: counts.significantNegative,
             });
         }
         return items;
@@ -327,6 +370,24 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         });
 
         const logpSpan = Math.max(maxLogp - SIGNIFICANCE_LOGP, 0.75);
+        const buildHoverText = (row) => {
+            const lines = [
+                `<b>${row.gene || row.ensg || 'Gene'}</b>`,
+            ];
+            if (row.gene && row.ensg) lines.push(row.ensg);
+            lines.push(`${effectLabel} ${Number.isFinite(row.effect) ? row.effect.toFixed(4) : 'NA'}`);
+            if (includePosteriorColumns && Number.isFinite(row.posteriorSd)) {
+                lines.push(`Posterior SD ${row.posteriorSd.toFixed(4)}`);
+            }
+            if (includePosteriorColumns && Number.isFinite(row.lower95) && Number.isFinite(row.upper95)) {
+                lines.push(`95% CI [${row.lower95.toFixed(4)}, ${row.upper95.toFixed(4)}]`);
+            }
+            if (Number.isFinite(row.p)) lines.push(`P ${row.p.toExponential(2)}`);
+            if (Number.isFinite(row.fdr)) lines.push(`FDR ${row.fdr.toExponential(2)}`);
+            if (row.primaryProgram) lines.push(`Program: ${row.primaryProgram}`);
+            if (row.primaryGeneset) lines.push(`Geneset: ${row.primaryGeneset}`);
+            return lines.join('<br>');
+        };
 
         filteredRows.forEach((row) => {
             const directionKey = row.effectClass === 'negative' ? 'negative' : 'positive';
@@ -339,20 +400,8 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 const bucket = grouped[bucketKey];
                 bucket.x.push(row.effect);
                 bucket.y.push(row.logp);
-                bucket.text.push(row.gene || row.ensg || row.rowKey);
-                bucket.customdata.push([
-                    row.rowKey,
-                    row.gene || 'NA',
-                    row.ensg || 'NA',
-                    row.effect,
-                    row.p,
-                    row.fdr,
-                    row.primaryProgram || 'others',
-                    row.primaryGeneset || 'others',
-                    row.posteriorSd,
-                    row.lower95,
-                    row.upper95,
-                ]);
+                bucket.text.push(buildHoverText(row));
+                bucket.customdata.push([row.rowKey]);
                 bucket.colors.push(emphasis > 0.55 ? VOLCANO_STYLE[directionKey].strong : VOLCANO_STYLE[directionKey].color);
                 bucket.opacities.push(emphasis > 0.55 ? VOLCANO_STYLE[directionKey].strongOpacity : VOLCANO_STYLE[directionKey].opacity);
                 bucket.sizes.push((pointSize * 0.84) + (emphasis * 1.8));
@@ -362,29 +411,12 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             const bucket = grouped.background;
             bucket.x.push(row.effect);
             bucket.y.push(row.logp);
-            bucket.text.push(row.gene || row.ensg || row.rowKey);
-            bucket.customdata.push([
-                row.rowKey,
-                row.gene || 'NA',
-                row.ensg || 'NA',
-                row.effect,
-                row.p,
-                row.fdr,
-                row.primaryProgram || 'others',
-                row.primaryGeneset || 'others',
-                row.posteriorSd,
-                row.lower95,
-                row.upper95,
-            ]);
+            bucket.text.push(buildHoverText(row));
+            bucket.customdata.push([row.rowKey]);
             bucket.colors.push(VOLCANO_STYLE.background.color);
             bucket.opacities.push(VOLCANO_STYLE.background.opacity + (significanceIntensity * 0.08));
             bucket.sizes.push(Math.max(4.6, (pointSize * 0.62) + (effectIntensity * 0.9)));
         });
-
-        const posteriorHover = includePosteriorColumns ? [
-            'Posterior SD %{customdata[8]:.4f}',
-            '95% CI [%{customdata[9]:.4f}, %{customdata[10]:.4f}]',
-        ] : [];
 
         const makeTrace = (key, bucket, showLegend) => ({
             x: bucket.x,
@@ -411,17 +443,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                             : VOLCANO_STYLE.negative.lineColor,
                 },
             },
-            hovertemplate: [
-                '<b>%{customdata[1]}</b>',
-                '%{customdata[2]}',
-                `${effectLabel} %{customdata[3]:.4f}`,
-                ...posteriorHover,
-                'P %{customdata[4]:.2e}',
-                'FDR %{customdata[5]:.2e}',
-                'Program: %{customdata[6]}',
-                'Geneset: %{customdata[7]}',
-                '<extra></extra>',
-            ].join('<br>'),
+            hovertemplate: '%{text}<extra></extra>',
             hoverlabel: key === 'background'
                 ? buildPlotHoverToneNeutral(theme, '#7a8798', {
                     fontSize: 12,
@@ -591,6 +613,11 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         const start = tablePage * tableRowsPerPage;
         return sortedRows.slice(start, start + tableRowsPerPage);
     }, [sortedRows, tablePage, tableRowsPerPage]);
+    const shouldRenderTable = useIdleRenderGate(
+        !isLoading && afterFirstPaint,
+        `${volcanoKey || 'volcano-empty'}:${rows.length}:${sortedRows.length}`,
+        { delay: sortedRows.length > 1000 ? 450 : 180, timeout: 1600 },
+    );
 
     useEffect(() => {
         const maxPage = Math.max(0, Math.ceil(sortedRows.length / tableRowsPerPage) - 1);
@@ -789,11 +816,12 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                         Size
                     </Typography>
                     <Slider
-                        value={pointSize}
+                        value={Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
                         min={4}
                         max={18}
                         step={1}
-                        onChange={(_, value) => setPointSize(Number(value))}
+                        onChange={(_, value) => setPointSizeDraft(Number(value))}
+                        onChangeCommitted={(_, value) => commitPointSize(Number(value))}
                         sx={{
                             width: 120,
                             color: theme.palette.text.secondary,
@@ -802,7 +830,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                         }}
                     />
                     <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.72rem', minWidth: 26 }}>
-                        {pointSize}
+                        {Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
                     </Typography>
                 </Box>
 
@@ -883,7 +911,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 </CardContent>
             </Card>
 
-            {!isLoading && afterFirstPaint && (
+            {shouldRenderTable && (
                 <BurdenVolcanoTable
                     tableSectionRef={tableSectionRef}
                     rows={rows}

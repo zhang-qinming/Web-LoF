@@ -586,7 +586,7 @@ export default function GwasDataList({
 
     const traitResource = useCachedResourceState(
         useSWR(apiUrl, fetcher, stableListSWRConfig),
-        { cacheKey: apiUrl },
+        { cacheKey: apiUrl, retainPreviousData: true },
     );
     const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = traitResource;
 

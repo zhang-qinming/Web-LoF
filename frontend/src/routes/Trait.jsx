@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
@@ -30,6 +31,7 @@ const GwasDataList = React.lazy(loadGwasDataList);
 const ProgramScatter = React.lazy(loadProgramScatter);
 const TraitProgramGraph = React.lazy(loadTraitProgramGraph);
 const TraitHitManhattan = React.lazy(loadTraitHitManhattan);
+const MemoizedTraitHitManhattan = React.memo(TraitHitManhattan);
 const BurdenVolcano = React.lazy(loadBurdenVolcano);
 const GeneLevelScatter = React.lazy(loadGeneLevelScatter);
 const GeneLevelQQ = React.lazy(loadGeneLevelQQ);
@@ -119,14 +121,7 @@ function preloadTraitTab(tabIndex) {
 }
 
 function TraitFigureFallback() {
-    return (
-        <StatePanel
-            loading
-            title="Loading figure"
-            message="Preparing this visualization panel."
-            minHeight={360}
-        />
-    );
+    return <TraitFigureDeferredPlaceholder />;
 }
 
 function TraitFigureDeferredPlaceholder() {
@@ -151,6 +146,7 @@ export default function Trait() {
     const hasExplicitTab = Object.prototype.hasOwnProperty.call(TAB_KEY_TO_INDEX, requestedTabKey);
     const requestedTab = hasExplicitTab ? TAB_KEY_TO_INDEX[requestedTabKey] : 2;
     const [tab, setTab] = React.useState(requestedTab);
+    const [mountedManhattanFileId, setMountedManhattanFileId] = React.useState('');
     const userSelectedTabRef = React.useRef(false);
     const figurePanelRef = React.useRef(null);
     const {
@@ -188,8 +184,9 @@ export default function Trait() {
         else if (tab === 1 && !hasProgramGraph) displayedTab = preferredTab;
         else if (tab === 2 && !userSelectedTabRef.current && !hasExplicitTab) displayedTab = preferredTab;
     }
-    const shouldDeferFigureTab = Boolean(fileId && !hasExplicitTab && !availabilityReady);
+    const shouldDeferFigureTab = false;
     const figureReady = useAfterFirstPaint(fileId ? `trait-figure-${fileId}-${displayedTab}-${resolvedFileId}-${gwasId}` : 'trait-browser');
+    const hasMountedManhattan = mountedManhattanFileId === fileId;
 
     const syncTabParam = React.useCallback((nextTab, options = {}) => {
         const tabKey = TAB_INDEX_TO_KEY[nextTab] || TAB_INDEX_TO_KEY[2];
@@ -206,6 +203,11 @@ export default function Trait() {
         userSelectedTabRef.current = false;
         setTab(requestedTab);
     }, [fileId, requestedTab]);
+
+    React.useEffect(() => {
+        if (displayedTab !== 2 || !figureReady || !fileId) return;
+        setMountedManhattanFileId(fileId);
+    }, [displayedTab, figureReady, fileId]);
 
     React.useEffect(() => {
         if (!availabilityReady) return;
@@ -289,7 +291,7 @@ export default function Trait() {
                     <GwasDataList
                         title="Browse Traits"
                         columns={[
-                            { id: 'file_id', label: 'File ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
+                            { id: 'file_id', label: 'Trait ID', width: 132, minWidth: 132, whiteSpace: 'nowrap' },
                             { id: 'trait_name', label: 'Trait', width: '34%', minWidth: 360 },
                             { id: 'sample_size', label: 'Sample Size', numeric: true, width: 132, minWidth: 132, whiteSpace: 'nowrap', headerWrap: true },
                             { id: 'mesh_term', label: 'MeSH term', width: 170, minWidth: 170, headerWrap: true },
@@ -322,7 +324,7 @@ export default function Trait() {
                 Figures
             </Typography>
             <Tabs
-                value={shouldDeferFigureTab ? false : displayedTab}
+                value={displayedTab}
                 onChange={(e, v) => {
                     userSelectedTabRef.current = true;
                     setTab(v);
@@ -356,22 +358,14 @@ export default function Trait() {
                 <Tab label="Cross-trait Heatmap" onMouseEnter={() => warmTraitTab(7)} onFocus={() => warmTraitTab(7)} />
                 <Tab label="Trait Correlation" onMouseEnter={() => warmTraitTab(8)} onFocus={() => warmTraitTab(8)} />
             </Tabs>
-
-            <Box
-                id="trait-figure-panel"
-                ref={figurePanelRef}
-                sx={{ minHeight: 400, scrollMarginTop: { xs: 7, md: 8 } }}
-            >
-                {availabilityError ? (
-                    <StatePanel
-                        severity="error"
-                        icon={Timeline}
-                        title="Failed to load trait figure availability"
-                        message={availabilityError?.response?.data?.error || availabilityError?.message || 'Program figure lists could not be loaded.'}
-                        minHeight={360}
-                    >
+            {availabilityError && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 1.5, borderRadius: 1 }}
+                    action={(
                         <Button
-                            variant="outlined"
+                            color="inherit"
+                            size="small"
                             startIcon={<Refresh />}
                             onClick={() => {
                                 void retryScatterList();
@@ -380,15 +374,46 @@ export default function Trait() {
                         >
                             Retry
                         </Button>
-                    </StatePanel>
-                ) : shouldDeferFigureTab ? (
+                    )}
+                >
+                    Program figure availability is still loading or failed. Independent trait figures remain available.
+                </Alert>
+            )}
+
+            <Box
+                id="trait-figure-panel"
+                ref={figurePanelRef}
+                sx={{ minHeight: 400, scrollMarginTop: { xs: 7, md: 8 }, position: 'relative' }}
+            >
+                {hasMountedManhattan && (
+                    <Box
+                        aria-hidden={displayedTab !== 2}
+                        sx={{ display: displayedTab === 2 ? 'block' : 'none', minWidth: 0 }}
+                    >
+                        <React.Suspense fallback={<TraitFigureFallback />}>
+                            <MemoizedTraitHitManhattan
+                                key={`manhattan-${fileId}-${gwasId}`}
+                                fileId={resolvedFileId}
+                                gwasId={gwasId}
+                                traitLabel={traitLabel}
+                            />
+                        </React.Suspense>
+                    </Box>
+                )}
+
+                {displayedTab === 2 && !hasMountedManhattan && (
+                    <TraitFigureDeferredPlaceholder />
+                )}
+
+                {displayedTab !== 2 && (shouldDeferFigureTab ? (
                     <TraitFigureFallback />
                 ) : !figureReady ? (
                     <TraitFigureDeferredPlaceholder />
                 ) : (
                     <React.Suspense fallback={<TraitFigureFallback />}>
                         {displayedTab === 0 && hasProgramScatter && <ProgramScatter key={scatterFileId} fileId={scatterFileId} />}
-                        {displayedTab === 0 && !hasProgramScatter && (
+                        {displayedTab === 0 && !hasProgramScatter && !availabilityReady && <TraitFigureDeferredPlaceholder />}
+                        {displayedTab === 0 && !hasProgramScatter && availabilityReady && (
                             <StatePanel
                                 icon={Timeline}
                                 title="No Program enrichment data"
@@ -403,20 +428,13 @@ export default function Trait() {
                                 traitLabel={traitLabel}
                             />
                         )}
-                        {displayedTab === 1 && !hasProgramGraph && (
+                        {displayedTab === 1 && !hasProgramGraph && !availabilityReady && <TraitFigureDeferredPlaceholder />}
+                        {displayedTab === 1 && !hasProgramGraph && availabilityReady && (
                             <StatePanel
                                 icon={Timeline}
                                 title="No Trait Program Graph data"
                                 message="This trait does not have graph-linked program and regulator data available."
                                 minHeight={360}
-                            />
-                        )}
-                        {displayedTab === 2 && (
-                            <TraitHitManhattan
-                                key={`manhattan-${fileId}-${gwasId}`}
-                                fileId={resolvedFileId}
-                                gwasId={gwasId}
-                                traitLabel={traitLabel}
                             />
                         )}
                         {displayedTab === 3 && (
@@ -472,7 +490,7 @@ export default function Trait() {
                             />
                         )}
                     </React.Suspense>
-                )}
+                ))}
             </Box>
         </Box>
     );

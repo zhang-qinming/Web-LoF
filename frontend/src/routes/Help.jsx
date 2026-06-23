@@ -205,7 +205,7 @@ const TEXT = {
                         route: '/trait',
                         role: 'Trait-level scatter plot comparing program burden with regulator burden.',
                         usage: [
-                            'Each point is one program. In Scatter mode, x is Program burden and y is Regulator burden, so the four quadrants separate programs that are strong on one side, both sides, or neither side.',
+                            'Each point is one program. In Scatter mode, x is Program burden and y is Regulator-burden correlation, so the four quadrants separate programs that are strong on one side, both sides, or neither side.',
                             'Rank mode keeps the same programs but switches the axes to relative ranking, which is useful when absolute scores vary a lot across traits.',
                             'Colors encode enrichment class, while marker size or bubble scaling helps you see which programs carry stronger signed signal.',
                             'Use this plot to find programs that are jointly trait- and regulator-supported, then click a point to focus the matching row in the table below.',
@@ -296,7 +296,7 @@ const TEXT = {
                         route: '/trait',
                         role: 'Gene Evidence plot comparing GeneBayes posterior signal with perturbation support.',
                         usage: [
-                            'Each point is a gene. The x axis is GeneBayes post_mean and the y axis is signed -log10(P) from perturbation evidence, so the sign of both axes matters, not only the magnitude.',
+                            'Each point is a gene. The x axis is GeneBayes LoF effect (post_mean) and the y axis is signed -log10(P) from perturbation evidence, so the sign of both axes matters, not only the magnitude.',
                             'Genes far from zero on both axes have stronger combined support. Concordant genes stay in the upper-right or lower-left logic implied by sign, while discordant genes separate toward opposite directions.',
                             'Color encodes evidence class, so you can distinguish broad background genes from posterior-high, regulation-supported, and direction-discordant genes without opening the table first.',
                             'Use this figure when you want to compare statistical gene prioritization against perturbation directionality, then click a point to inspect the matched row and labels below.',
@@ -336,8 +336,8 @@ const TEXT = {
                         route: '/trait',
                         role: 'Cross-trait heatmap of top source-trait genes across selected target traits.',
                         usage: [
-                            'Rows are the current trait\'s top genes and columns are selected target traits. Each cell shows the target trait\'s post_mean for the same gene after gene-level alignment.',
-                            'The color scale is centered at zero: warm cells mean positive post_mean, cool cells mean negative post_mean, and near-neutral cells indicate weak or missing directional effect.',
+                            'Rows are the current trait\'s top genes and columns are selected target traits. Each cell shows the target trait\'s LoF effect (post_mean) for the same gene after gene-level alignment.',
+                            'The color scale is centered at zero: warm cells mean positive LoF effect, cool cells mean negative LoF effect, and near-neutral cells indicate weak or missing directional effect.',
                             'Recommended, Recent, and Search are three different ways to build the target trait panel. Reset returns to the recommended starting set instead of the full universe.',
                             'Use this view to ask whether the same prioritized genes repeat across related traits and whether their effect directions stay consistent. Click a cell or target label to jump into that trait.',
                         ],
@@ -453,8 +453,8 @@ const TEXT = {
                         route: '/programs/P1',
                         role: 'Trait-level table linking the current program back to enriched traits.',
                         usage: [
-                            'Review trait name, selection class, program score, regulator score, visible gene counts, and top genes together.',
-                            'Use the selection filter and CSV export to separate program-selected, regulator-selected, and jointly selected traits.',
+                            'Review trait name, relationship class, program score, regulator score, visible gene counts, and top genes together.',
+                            'Use the relationship filter and CSV export to separate program-selected, regulator-selected, and jointly selected traits.',
                         ],
                     },
                 ],
@@ -811,7 +811,7 @@ const TEXT = {
                         route: '/trait',
                         role: '比较 program burden 与 regulator burden 的 trait 级散点图。',
                         usage: [
-                            '每个点代表一个 program。Scatter 模式下，x 轴是 Program burden，y 轴是 Regulator burden，因此四个象限天然对应偏 program、偏 regulator、两者都强或两者都弱的 program。',
+                            '每个点代表一个 program。Scatter 模式下，x 轴是 Program burden，y 轴是 Regulator-burden correlation，因此四个象限天然对应偏 program、偏 regulator、两者都强或两者都弱的 program。',
                             'Rank 模式保留同一批 program，但把坐标改成相对排名，适合在不同 trait 间绝对分值差异较大时看相对位置。',
                             '颜色表示 enrichment class，点大小或 bubble scale 用来补充显示信号强弱，而不只是类别。',
                             '这个图适合先找同时得到 trait 与 regulator 支持的 program，再点击点位到下方表格查看具体数值。',
@@ -902,7 +902,7 @@ const TEXT = {
                         route: '/trait',
                         role: '比较 GeneBayes posterior signal 与 perturbation 支持证据的 Gene Evidence 图。',
                         usage: [
-                            '每个点都是一个 gene。x 轴是 GeneBayes post_mean，y 轴是扰动证据的 signed -log10(P)，所以这里不仅看绝对值大小，也要看两个轴的正负方向是否一致。',
+                            '每个点都是一个 gene。x 轴是 GeneBayes LoF effect (post_mean)，y 轴是扰动证据的 signed -log10(P)，所以这里不仅看绝对值大小，也要看两个轴的正负方向是否一致。',
                             '同时远离两个轴原点的 gene 往往有更强的联合支持；方向一致的 gene 会落在逻辑上相符的区域，方向冲突的 gene 会分离到相反方向。',
                             '颜色表示 evidence class，因此不用先展开表格，也能区分背景基因、posterior-high、regulation-supported 和 direction-discordant。',
                             '这个图适合对比统计优先级和扰动方向是否一致，再点击点位到下方表格查看对应 gene 的详细证据。',
@@ -940,10 +940,10 @@ const TEXT = {
                     {
                         name: 'CrossTraitHeatmap',
                         route: '/trait',
-                        role: '展示当前 trait 顶部 genes 在多个 target traits 中 post_mean 的跨 trait 热图。',
+                        role: '展示当前 trait 顶部 genes 在多个 target traits 中 LoF effect (post_mean) 的跨 trait 热图。',
                         usage: [
-                            '行是当前 trait 的 top genes，列是选中的 target traits。每个单元格表示同一个 gene 在目标 trait 中对齐后的 post_mean。',
-                            '配色以 0 为中心：暖色表示正 post_mean，冷色表示负 post_mean，接近中性的颜色表示方向弱或接近缺失。',
+                            '行是当前 trait 的 top genes，列是选中的 target traits。每个单元格表示同一个 gene 在目标 trait 中对齐后的 LoF effect (post_mean)。',
+                            '配色以 0 为中心：暖色表示正 LoF effect，冷色表示负 LoF effect，接近中性的颜色表示方向弱或接近缺失。',
                             'Recommended、Recent 和 Search 是三种构建目标 trait 面板的方式；Reset 不是恢复全量，而是恢复推荐的起始集合。',
                             '这个图适合回答：当前 trait 优先出来的 gene 是否也在其他 trait 中重复出现，以及方向是否保持一致。点击单元格或目标 trait 标签可继续跳转查看。',
                         ],
@@ -1059,8 +1059,8 @@ const TEXT = {
                         route: '/programs/P1',
                         role: '把当前 program 反向连接到 traits 的 trait-level 表。',
                         usage: [
-                            '联合查看 trait name、selection class、program score、regulator score、visible gene counts 和 top genes。',
-                            '配合 selection filter 和 CSV 导出，可以拆开看 program-selected、regulator-selected 和 jointly selected 的 traits。',
+                            '联合查看 trait name、relationship class、program score、regulator score、visible gene counts 和 top genes。',
+                            '配合 relationship filter 和 CSV 导出，可以拆开看 program-selected、regulator-selected 和 jointly selected 的 traits。',
                         ],
                     },
                 ],

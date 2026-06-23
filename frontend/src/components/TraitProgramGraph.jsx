@@ -54,7 +54,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
     const graphKey = fileId ? ['trait-program-graph', fileId] : null;
     const graphResource = useCachedResourceState(
         useSWR(graphKey, ([, id]) => getTraitProgramGraph(id), figureResourceSWRConfig),
-        { cacheKey: graphKey, retainData: false },
+        { cacheKey: graphKey, retainPreviousData: false },
     );
     const { displayData: data, error, isInitialLoading: isLoading, isRefreshing } = graphResource;
     const afterFirstPaint = useAfterFirstPaint(graphKey || 'trait-program-graph-empty');
@@ -180,16 +180,10 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         });
     }, []);
 
-    const handleSelectProgram = useCallback((program, side = null) => {
+    const handleSelectProgram = useCallback((program) => {
         if (shouldSuppressClick()) return;
-        setSelectedProgram(program);
+        setSelectedProgram((current) => (current === program ? null : program));
         setSelectedGene(null);
-        setExpandedPrograms((current) => {
-            const next = new Set(current);
-            const sides = side ? [side] : ['program', 'regulator'];
-            sides.forEach((item) => next.add(`${program}:${item}`));
-            return next;
-        });
     }, [shouldSuppressClick]);
 
     const handleSelectGene = useCallback((gene) => {
@@ -197,20 +191,8 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
 
         const nextKey = gene.highlightKey;
         setSelectedProgram(null);
-        setSelectedGene(gene);
-
-        setExpandedPrograms((current) => {
-            const next = new Set(current);
-            (graph?.programs || []).forEach((program) => {
-                ['program', 'regulator'].forEach((side) => {
-                    if ((program.genes[side] || []).some((entry) => entry.highlightKey === nextKey)) {
-                        next.add(`${program.program}:${side}`);
-                    }
-                });
-            });
-            return next;
-        });
-    }, [graph, shouldSuppressClick]);
+        setSelectedGene((current) => (current?.highlightKey === nextKey ? null : gene));
+    }, [shouldSuppressClick]);
 
     const clearSelection = useCallback(() => {
         setSelectedProgram(null);
@@ -292,6 +274,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 selectedGeneKey={selectedGeneKey}
                 selectedGeneOccurrences={selectedGeneOccurrences}
                 selectedProgram={selectedProgram}
+                shouldSuppressClick={shouldSuppressClick}
                 svgHeight={svgHeight}
                 svgRef={svgRef}
                 traitCenterY={traitCenterY}
@@ -317,6 +300,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                         selectedGeneKey={selectedGeneKey}
                         onSelectProgram={handleSelectProgram}
                         onSelectGene={handleSelectGene}
+                        onClearSelection={clearSelection}
                         onToggleExpanded={toggleExpanded}
                         onOpenProgram={openProgram}
                         onOpenGene={openGene}

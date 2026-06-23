@@ -43,6 +43,12 @@ const COLUMNS = [
     { key: 'negLogP', label: '-log10(P)', align: 'right', width: 132 },
 ];
 
+function justifyForAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
+}
+
 const sortLabelSx = {
     fontSize: '0.72rem',
     '& .MuiTableSortLabel-icon': {
@@ -198,7 +204,7 @@ export default function GeneRegulationTable({
                                             active={sortBy === column.key}
                                             direction={sortBy === column.key ? sortDir : 'asc'}
                                             onClick={() => handleSort(column.key)}
-                                            sx={sortLabelSx}
+                                            sx={{ ...sortLabelSx, justifyContent: justifyForAlign(column.align), width: '100%' }}
                                         >
                                             {column.label}
                                         </TableSortLabel>

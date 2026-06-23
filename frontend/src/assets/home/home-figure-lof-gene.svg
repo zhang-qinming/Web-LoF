@@ -2,7 +2,7 @@
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
   <text x="62" y="82" fill="#7A4B35" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Posterior vs regulation</text>
-  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">GeneBayes posterior effect against perturb-seq support</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">GeneBayes LoF effect against perturb-seq support</text>
 
   <rect x="96" y="118" width="528" height="214" rx="6" fill="#FBFEFF" stroke="#E5E7EB"/>
   <g stroke="#E2E8F0" stroke-width="1">
@@ -20,7 +20,7 @@
   <line x1="96" y1="332" x2="624" y2="332" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="96" y1="332" x2="96" y2="118" stroke="#CBD5E1" stroke-width="2"/>
 
-  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">GeneBayes posterior effect</text>
+  <text x="360" y="350" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">GeneBayes LoF effect</text>
   <text transform="rotate(-90 73 236)" x="73" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">Perturb-seq signed signal</text>
   <text x="550" y="158" fill="#92400E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">FDR 0.05</text>
   <text x="544" y="291" fill="#92400E" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">-FDR 0.05</text>

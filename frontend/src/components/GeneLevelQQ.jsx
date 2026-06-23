@@ -23,16 +23,19 @@ import { alpha, useTheme } from '@mui/material/styles';
 import Download from '@mui/icons-material/Download';
 import FilterAlt from '@mui/icons-material/FilterAlt';
 import Insights from '@mui/icons-material/Insights';
+import Refresh from '@mui/icons-material/Refresh';
 import RestartAlt from '@mui/icons-material/RestartAlt';
 import Timeline from '@mui/icons-material/Timeline';
 import useSWR from 'swr';
 import { getCrossTraitTargets, getDataFileText } from '../api/gwas';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
+import { parseNullableNumber } from '../utils/numbers';
 import { scrollElementNearViewportCenter } from '../utils/scroll';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
+import { useIdleRenderGate } from '../utils/renderScheduling';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -48,6 +51,7 @@ import {
 } from '../themeUtils';
 import FloatingLegend from './FloatingLegend';
 import GeneLevelQQTable from './GeneLevelQQTable';
+import { computeGeneLevelQQAxisRange } from './geneLevelQQData';
 
 const DATA_DIR = 'gene_level_qq/tables';
 const DEFAULT_EXPORT_WIDTH = 1280;
@@ -115,8 +119,7 @@ function traitListKey(items = []) {
 }
 
 function toFiniteNumber(value) {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
+    return parseNullableNumber(value);
 }
 
 function clamp(value, min, max) {
@@ -137,6 +140,14 @@ function getDataPath(fileId) {
     return `${DATA_DIR}/${encodeURIComponent(fileId)}.tsv`;
 }
 
+function isMissingDataError(error) {
+    return Number(error?.response?.status) === 404;
+}
+
+function getRequestErrorMessage(error, fallback) {
+    return error?.response?.data?.error || error?.message || fallback;
+}
+
 function parseTsv(text) {
     const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.length > 0);
     if (lines.length < 2) return [];
@@ -149,7 +160,10 @@ function parseTsv(text) {
             raw[header] = cells[i] ?? '';
         });
 
-        const tailSide = TAIL_META[raw.tail_side] ? raw.tail_side : (Number(raw.beta_withShet) >= 0 ? 'positive' : 'negative');
+        const beta = toFiniteNumber(raw.beta_withShet);
+        const tailSide = TAIL_META[raw.tail_side]
+            ? raw.tail_side
+            : (beta == null ? '' : (beta >= 0 ? 'positive' : 'negative'));
         const ensg = String(raw.ensg || '').trim();
         const gene = String(raw.gene || raw.GENE || '').trim() || ensg;
         const expected = toFiniteNumber(raw.expected);
@@ -167,7 +181,7 @@ function parseTsv(text) {
             tailSide,
             p,
             fdr: null,
-            beta: toFiniteNumber(raw.beta_withShet),
+            beta,
             signedLogP: toFiniteNumber(raw.signed_log10_p),
             expected,
             observed,
@@ -204,10 +218,13 @@ function addFdr(rows) {
 async function loadGeneLevelQQPayload({ appliedTraits, availableTraits, candidateIds, primaryTrait }) {
     const chosenTraits = uniqueTraitOptions(appliedTraits).slice(0, MAX_COMPARE_TRAITS);
     const loadedTraits = [];
-    let lastError = null;
+    const failedTraits = [];
 
     for (let traitIndex = 0; traitIndex < chosenTraits.length; traitIndex += 1) {
         const trait = chosenTraits[traitIndex];
+        let loaded = false;
+        let missingError = null;
+        let requestError = null;
         const loadCandidates = [...new Set([
             trait.file_id,
             trait.gwas_id,
@@ -232,15 +249,30 @@ async function loadGeneLevelQQPayload({ appliedTraits, availableTraits, candidat
                     path,
                     rows: parsedRows,
                 });
+                loaded = true;
                 break;
             } catch (err) {
-                lastError = err;
+                if (isMissingDataError(err)) missingError = err;
+                else if (!requestError) requestError = err;
             }
+        }
+
+        if (!loaded) {
+            const error = requestError || missingError || new Error('Gene-level QQ TSV not found');
+            failedTraits.push({
+                file_id: trait.file_id,
+                trait_name: trait.trait_name,
+                missing: !requestError && Boolean(missingError),
+                message: getRequestErrorMessage(error, 'Failed to load gene-level QQ data.'),
+                error,
+            });
         }
     }
 
     const mergedRows = loadedTraits.flatMap((item) => item.rows);
-    if (!mergedRows.length && lastError) throw lastError;
+    if (!mergedRows.length && failedTraits.length) {
+        throw failedTraits.find((item) => !item.missing)?.error || failedTraits[0].error;
+    }
 
     return {
         rows: mergedRows,
@@ -252,20 +284,13 @@ async function loadGeneLevelQQPayload({ appliedTraits, availableTraits, candidat
             return rest;
         }),
         availableTraits,
+        failedTraits: failedTraits.map((failure) => ({
+            file_id: failure.file_id,
+            trait_name: failure.trait_name,
+            missing: failure.missing,
+            message: failure.message,
+        })),
     };
-}
-
-function computeAxisRange(rows, extraValues = []) {
-    const values = [
-        ...rows.flatMap((row) => [row.expected, row.observed]),
-        ...extraValues,
-    ].filter(Number.isFinite);
-    if (!values.length) return [-1, 1];
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const span = Math.max(max - min, 1);
-    const pad = span * 0.08;
-    return [min - pad, max + pad];
 }
 
 function formatNumber(value, digits = 3) {
@@ -277,21 +302,26 @@ function formatPValue(value) {
 }
 
 function buildHoverText(row) {
-    return [
+    const lines = [
         `<b>${row.gene || row.ensg}</b>`,
         row.ensg ? `<span style="color:#64748b">${row.ensg}</span>` : '',
         row.sourceTraitName ? `<span style="color:#475569;font-weight:600">${row.sourceTraitName}</span>` : '',
         `<span style="color:${TAIL_META[row.tailSide].color};font-weight:600">${TAIL_META[row.tailSide].label}</span>`,
-        '',
-        `Expected: ${formatNumber(row.expected, 3)}`,
-        `Observed: ${formatNumber(row.observed, 3)}`,
-        `Observed - expected: ${formatNumber(row.deviation, 3)}`,
-        `Rank: ${Number.isFinite(row.qqRank) ? row.qqRank : 'NA'}`,
-        '',
-        `P_withShet: ${formatPValue(row.p)}`,
-        `FDR: ${formatPValue(row.fdr)}`,
-        `beta_withShet: ${formatNumber(row.beta, 4)}`,
-    ].filter(Boolean).join('<br>');
+    ];
+    if ([row.expected, row.observed, row.deviation, row.qqRank].some(Number.isFinite)) {
+        lines.push('');
+        if (Number.isFinite(row.expected)) lines.push(`Expected: ${formatNumber(row.expected, 3)}`);
+        if (Number.isFinite(row.observed)) lines.push(`Observed: ${formatNumber(row.observed, 3)}`);
+        if (Number.isFinite(row.deviation)) lines.push(`Observed - expected: ${formatNumber(row.deviation, 3)}`);
+        if (Number.isFinite(row.qqRank)) lines.push(`Rank: ${row.qqRank}`);
+    }
+    if ([row.p, row.fdr, row.beta].some(Number.isFinite)) {
+        lines.push('');
+        if (Number.isFinite(row.p)) lines.push(`P_withShet: ${formatPValue(row.p)}`);
+        if (Number.isFinite(row.fdr)) lines.push(`FDR: ${formatPValue(row.fdr)}`);
+        if (Number.isFinite(row.beta)) lines.push(`beta_withShet: ${formatNumber(row.beta, 4)}`);
+    }
+    return lines.filter(Boolean).join('<br>');
 }
 
 function pickSparseLabelRows(rows, limit, axisRange) {
@@ -430,19 +460,27 @@ function buildEnvelopeRanks(n) {
     return [...ranks].sort((a, b) => a - b);
 }
 
-function buildEnvelope(rows) {
-    const byTail = new Map();
+function buildEnvelope(rows, resolveColor) {
+    const groups = new Map();
     rows.forEach((row) => {
-        if (!byTail.has(row.tailSide)) byTail.set(row.tailSide, []);
-        byTail.get(row.tailSide).push(row);
+        const key = `${row.sourceFileId || 'trait'}::${row.tailSide}`;
+        if (!groups.has(key)) {
+            groups.set(key, {
+                tailSide: row.tailSide,
+                traitName: row.sourceTraitName || row.sourceFileId || 'Trait',
+                rows: [],
+            });
+        }
+        groups.get(key).rows.push(row);
     });
 
     const traces = [];
-    for (const [tailSide, tailRows] of byTail.entries()) {
+    for (const { tailSide, traitName, rows: tailRows } of groups.values()) {
         const sorted = [...tailRows].sort((a, b) => Math.abs(b.expected) - Math.abs(a.expected));
         const n = sorted.length;
         if (n < 10) continue;
         const ranks = buildEnvelopeRanks(n);
+        const color = resolveColor?.(sorted[0]) || TAIL_META[tailSide].color;
 
         const x = [];
         const upper = [];
@@ -463,11 +501,11 @@ function buildEnvelope(rows) {
         traces.push({
             type: 'scatter',
             mode: 'lines',
-            name: `${TAIL_META[tailSide].label} envelope`,
+            name: `${traitName} ${TAIL_META[tailSide].label} envelope`,
             x,
             y: upper,
             line: {
-                color: alpha(TAIL_META[tailSide].color, 0.28),
+                color: alpha(color, 0.28),
                 width: 1,
                 dash: 'dot',
             },
@@ -477,13 +515,13 @@ function buildEnvelope(rows) {
         traces.push({
             type: 'scatter',
             mode: 'lines',
-            name: `${TAIL_META[tailSide].label} envelope`,
+            name: `${traitName} ${TAIL_META[tailSide].label} envelope`,
             x,
             y: lower,
             fill: 'tonexty',
-            fillcolor: alpha(TAIL_META[tailSide].color, 0.1),
+            fillcolor: alpha(color, 0.1),
             line: {
-                color: alpha(TAIL_META[tailSide].color, 0.28),
+                color: alpha(color, 0.28),
                 width: 1,
                 dash: 'dot',
             },
@@ -498,8 +536,8 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
     const toolbarPanelSx = useMemo(() => ({
-        px: 1.2,
-        py: 0.95,
+        px: 1,
+        py: 0.7,
         borderRadius: 2,
         border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
         backgroundColor: alpha(theme.palette.background.paper, 0.82),
@@ -529,10 +567,10 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const [exportHeight, setExportHeight] = useState(DEFAULT_EXPORT_HEIGHT);
     const [exportFmt, setExportFmt] = useState('svg');
     const [legendCollapsed, setLegendCollapsed] = useState(false);
-    const [selectedTraits, setSelectedTraits] = useState([]);
-    const [appliedTraits, setAppliedTraits] = useState([]);
-    const [renderVersion, setRenderVersion] = useState(0);
     const [comparisonTraitCount, setComparisonTraitCount] = useState(DEFAULT_COMPARE_TRAITS);
+    const [comparisonTraitCountDraft, setComparisonTraitCountDraft] = useState(String(DEFAULT_COMPARE_TRAITS));
+    const [pointSizeDraft, setPointSizeDraft] = useState(DEFAULT_POINT_SIZE);
+    const [labelLimitDraft, setLabelLimitDraft] = useState(DEFAULT_LABEL_LIMIT);
 
     const primaryTrait = useMemo(() => normalizeTraitOption({
         file_id: fileId,
@@ -541,11 +579,9 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     }), [fileId, gwasId, traitLabel]);
 
     useEffect(() => {
-        if (!primaryTrait) return;
         setComparisonTraitCount(DEFAULT_COMPARE_TRAITS);
-        setSelectedTraits([primaryTrait]);
-        setAppliedTraits([]);
-        setRenderVersion(0);
+        setHighlight({ rowKey: '', key: 0 });
+        setTablePage(0);
     }, [primaryTrait]);
 
     const candidateIds = useMemo(() => (
@@ -555,37 +591,55 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     const targetsKey = primaryTrait?.file_id ? ['gene-level-qq-targets', primaryTrait.file_id] : null;
     const targetsResource = useCachedResourceState(
         useSWR(targetsKey, ([, id]) => getCrossTraitTargets(id), detailSummarySWRConfig),
-        { cacheKey: targetsKey, retainData: false },
+        { cacheKey: targetsKey, retainPreviousData: true },
     );
-    const { displayData: targetsData, isRefreshing: targetsRefreshing } = targetsResource;
+    const {
+        displayData: targetsData,
+        error: targetsError,
+        isRefreshing: targetsRefreshing,
+        mutate: retryTargets,
+    } = targetsResource;
     const availableTraits = useMemo(
         () => uniqueTraitOptions([primaryTrait, ...(targetsData?.targets || [])]),
         [primaryTrait, targetsData],
     );
-    const hasRenderedQQ = renderVersion > 0 && appliedTraits.length > 0;
+    const selectedTraits = useMemo(
+        () => uniqueTraitOptions([primaryTrait, ...availableTraits]).slice(0, comparisonTraitCount),
+        [availableTraits, comparisonTraitCount, primaryTrait],
+    );
+    const selectedTraitKey = useMemo(() => traitListKey(selectedTraits), [selectedTraits]);
+    const hasRenderedQQ = selectedTraits.length > 0;
     const qqKey = hasRenderedQQ
-        ? ['gene-level-qq', traitListKey(appliedTraits), candidateIds.join('|'), primaryTrait?.file_id || '']
+        ? ['gene-level-qq', selectedTraitKey, candidateIds.join('|'), primaryTrait?.file_id || '']
         : null;
     const qqResource = useCachedResourceState(
         useSWR(
             qqKey,
             () => loadGeneLevelQQPayload({
-                appliedTraits,
+                appliedTraits: selectedTraits,
                 availableTraits,
                 candidateIds,
                 primaryTrait,
             }),
             figureResourceSWRConfig,
         ),
-        { cacheKey: qqKey, retainData: false },
+        { cacheKey: qqKey, retainPreviousData: false },
     );
     const {
         displayData: cachedPayload,
         error,
         isInitialLoading: isLoading,
         isRefreshing,
+        mutate: retryQq,
     } = qqResource;
-    const payload = cachedPayload || { rows: [], fileId: '', path: '', selectedTraits: [], availableTraits };
+    const payload = cachedPayload || {
+        rows: [],
+        fileId: '',
+        path: '',
+        selectedTraits: [],
+        availableTraits,
+        failedTraits: [],
+    };
     const afterFirstPaint = useAfterFirstPaint(qqKey || 'gene-level-qq-empty');
     const payloadTraitKey = useMemo(() => traitListKey(payload.selectedTraits), [payload.selectedTraits]);
 
@@ -615,12 +669,10 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             fdr: 0,
             maxDeviation: 0,
         };
-        rows.forEach((row) => {
+        filteredRows.forEach((row) => {
             if (row.tailSide === 'positive') base.positive += 1;
             if (row.tailSide === 'negative') base.negative += 1;
             if (Number.isFinite(row.absDeviation)) base.maxDeviation = Math.max(base.maxDeviation, row.absDeviation);
-        });
-        filteredRows.forEach((row) => {
             if (Number.isFinite(row.fdr) && row.fdr <= 0.05) base.fdr += 1;
         });
         return base;
@@ -651,40 +703,76 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             Math.max(DEFAULT_COMPARE_TRAITS, Number(value) || DEFAULT_COMPARE_TRAITS),
         );
         setComparisonTraitCount(nextCount);
-        setSelectedTraits(uniqueTraitOptions([primaryTrait, ...availableTraits]).slice(0, nextCount));
-    }, [availableTraits, primaryTrait, relatedTraitSliderMax]);
-
-    useEffect(() => {
-        if (!primaryTrait) return;
-        const nextTraits = uniqueTraitOptions([primaryTrait, ...selectedTraits]).slice(0, MAX_COMPARE_TRAITS);
-        if (!nextTraits.length) return;
-        const nextTraitKey = traitListKey(nextTraits);
-        if (traitListKey(selectedTraits) !== nextTraitKey) {
-            setSelectedTraits(nextTraits);
-            return;
-        }
-        if (renderVersion > 0 && traitListKey(appliedTraits) === nextTraitKey) {
-            return;
-        }
-        setAppliedTraits(nextTraits);
-        setRenderVersion((value) => value + 1);
-    }, [appliedTraits, primaryTrait, renderVersion, selectedTraits]);
+    }, [relatedTraitSliderMax]);
 
     const comparisonTraitCountMarks = useMemo(() => (
         [...new Set([DEFAULT_COMPARE_TRAITS, relatedTraitSliderMax])]
             .filter((value) => value >= DEFAULT_COMPARE_TRAITS && value <= relatedTraitSliderMax)
             .map((value) => ({ value, label: String(value) }))
     ), [relatedTraitSliderMax]);
+    const comparisonTraitCountDraftValue = clamp(
+        Number(comparisonTraitCountDraft) || DEFAULT_COMPARE_TRAITS,
+        DEFAULT_COMPARE_TRAITS,
+        relatedTraitSliderMax,
+    );
+    const commitComparisonTraitCount = useCallback((value = comparisonTraitCountDraft) => {
+        const nextValue = Math.round(clamp(
+            Number(value) || DEFAULT_COMPARE_TRAITS,
+            DEFAULT_COMPARE_TRAITS,
+            relatedTraitSliderMax,
+        ));
+        setComparisonTraitCountDraft(String(nextValue));
+        applyComparisonTraitCount(nextValue);
+    }, [applyComparisonTraitCount, comparisonTraitCountDraft, relatedTraitSliderMax]);
+    const commitPointSize = useCallback((value = pointSizeDraft) => {
+        const nextValue = Math.round(clamp(Number(value) || DEFAULT_POINT_SIZE, 3, 14));
+        setPointSizeDraft(nextValue);
+        setPointSize(nextValue);
+    }, [pointSizeDraft]);
+    const commitLabelLimit = useCallback((value = labelLimitDraft) => {
+        const nextValue = Math.round(clamp(Number(value) || 0, 0, 30));
+        setLabelLimitDraft(nextValue);
+        setLabelLimit(nextValue);
+    }, [labelLimitDraft]);
+
+    useEffect(() => {
+        setComparisonTraitCountDraft(String(Math.min(comparisonTraitCount, relatedTraitSliderMax)));
+    }, [comparisonTraitCount, relatedTraitSliderMax]);
+
+    useEffect(() => {
+        setPointSizeDraft(pointSize);
+    }, [pointSize]);
+
+    useEffect(() => {
+        setLabelLimitDraft(labelLimit);
+    }, [labelLimit]);
 
     const fdrGuide = useMemo(() => {
-        const sig = filteredRows.filter((row) => Number.isFinite(row.fdr) && row.fdr <= 0.05 && Number.isFinite(row.p) && row.p > 0);
-        if (!sig.length) return null;
-        return -Math.log10(Math.max(...sig.map((row) => row.p)));
-    }, [filteredRows]);
+        if (activeTraits.length !== 1) return null;
+        let largestSignificantP = null;
+        rows.forEach((row) => {
+            if (!Number.isFinite(row.fdr) || row.fdr > 0.05 || !Number.isFinite(row.p) || row.p <= 0) return;
+            if (largestSignificantP == null || row.p > largestSignificantP) {
+                largestSignificantP = row.p;
+            }
+        });
+        return largestSignificantP == null ? null : -Math.log10(largestSignificantP);
+    }, [activeTraits.length, rows]);
+    const fdrGuideUnavailableReason = activeTraits.length > 1
+        ? 'FDR guide (single trait only)'
+        : 'FDR guide (no hits)';
+
+    const renderedRows = filteredRows;
 
     const envelopeTraces = useMemo(() => (
-        showEnvelope ? buildEnvelope(filteredRows) : []
-    ), [filteredRows, showEnvelope]);
+        showEnvelope
+            ? buildEnvelope(filteredRows, (row) => (
+                useTailColors
+                    ? TAIL_META[row.tailSide].color
+                    : traitColorMap.get(row.sourceFileId) || TAIL_META[row.tailSide].color
+            ))
+            : []
+    ), [filteredRows, showEnvelope, traitColorMap, useTailColors]);
 
     const envelopeAxisValues = useMemo(() => (
         envelopeTraces.flatMap((trace) => [
@@ -694,8 +782,12 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     ), [envelopeTraces]);
 
     const axisRange = useMemo(() => (
-        computeAxisRange(filteredRows, envelopeAxisValues)
-    ), [envelopeAxisValues, filteredRows]);
+        computeGeneLevelQQAxisRange(filteredRows, [
+            ...envelopeAxisValues,
+            ...(showFdrLine && Number.isFinite(fdrGuide) ? [fdrGuide, -fdrGuide] : []),
+            ...(showNominalLine ? [NOMINAL_LOGP, -NOMINAL_LOGP] : []),
+        ])
+    ), [envelopeAxisValues, fdrGuide, filteredRows, showFdrLine, showNominalLine]);
 
     const labelRows = useMemo(() => {
         if (!showTopLabels || labelLimit <= 0) return [];
@@ -723,13 +815,13 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         const grouped = new Map();
         let deviationCap = 0.8;
 
-        filteredRows.forEach((row) => {
+        renderedRows.forEach((row) => {
             if (Number.isFinite(row.absDeviation)) {
                 deviationCap = Math.max(deviationCap, row.absDeviation);
             }
         });
 
-        filteredRows.forEach((row) => {
+        renderedRows.forEach((row) => {
             const groupKey = `${row.sourceFileId || payload.fileId || 'trait'}::${row.tailSide}`;
             if (!grouped.has(groupKey)) {
                 grouped.set(groupKey, {
@@ -768,7 +860,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             return {
                 type: 'scattergl',
                 mode: 'markers',
-                name: `${group.traitName} · ${TAIL_META[group.tailSide].label}`,
+                name: `${group.traitName} — ${TAIL_META[group.tailSide].label}`,
                 x: group.x,
                 y: group.y,
                 hovertext: group.hovertext,
@@ -790,7 +882,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 },
             };
         });
-    }, [filteredRows, payload.fileId, pointSize, theme, traitColorMap, traitLabel, useTailColors]);
+    }, [payload.fileId, pointSize, renderedRows, theme, traitColorMap, traitLabel, useTailColors]);
 
     const labelTrace = useMemo(() => {
         if (!labelRows.length) return [];
@@ -848,10 +940,9 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 label: trait.trait_name,
                 note: useTailColors
                     ? 'Blue diamond: negative; orange circle: positive.'
-                    : trait.gwas_id && trait.gwas_id !== trait.trait_name ? trait.gwas_id : '',
+                    : '',
                 color: traitColorMap.get(trait.file_id) || TRAIT_PALETTE[0],
                 colors: useTailColors ? [TAIL_META.negative.color, TAIL_META.positive.color] : undefined,
-                count: filteredRows.filter((row) => row.sourceFileId === trait.file_id).length,
             }));
 
         if (showEnvelope) {
@@ -860,7 +951,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 label: '95% envelope',
                 note: 'Tail shape uses marker symbol; envelope is computed from visible rows.',
                 color: alpha(theme.palette.text.secondary, 0.68),
-                count: filteredRows.length,
             });
         }
 
@@ -876,6 +966,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             shapes.push(
                 {
                     type: 'line',
+                    layer: 'above',
                     x0: 0,
                     y0: axisRange[0],
                     x1: 0,
@@ -884,6 +975,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 },
                 {
                     type: 'line',
+                    layer: 'above',
                     x0: axisRange[0],
                     y0: 0,
                     x1: axisRange[1],
@@ -896,6 +988,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         if (showExpectedLine) {
             shapes.push({
                 type: 'line',
+                layer: 'above',
                 x0: axisRange[0],
                 y0: axisRange[0],
                 x1: axisRange[1],
@@ -919,6 +1012,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             shapes.push(
                 {
                     type: 'line',
+                    layer: 'above',
                     x0: axisRange[0],
                     x1: axisRange[1],
                     y0: NOMINAL_LOGP,
@@ -927,6 +1021,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 },
                 {
                     type: 'line',
+                    layer: 'above',
                     x0: axisRange[0],
                     x1: axisRange[1],
                     y0: -NOMINAL_LOGP,
@@ -940,19 +1035,21 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             shapes.push(
                 {
                     type: 'line',
+                    layer: 'above',
                     x0: axisRange[0],
                     x1: axisRange[1],
                     y0: fdrGuide,
                     y1: fdrGuide,
-                    line: { color: alpha(chartTokens.threshold, 0.72), width: 1.1, dash: 'dot' },
+                    line: { color: chartTokens.threshold, width: 1.6, dash: 'dash' },
                 },
                 {
                     type: 'line',
+                    layer: 'above',
                     x0: axisRange[0],
                     x1: axisRange[1],
                     y0: -fdrGuide,
                     y1: -fdrGuide,
-                    line: { color: alpha(chartTokens.threshold, 0.72), width: 1.1, dash: 'dot' },
+                    line: { color: chartTokens.threshold, width: 1.6, dash: 'dash' },
                 },
             );
             annotations.push({
@@ -999,7 +1096,6 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             },
             shapes,
             annotations,
-            transition: { duration: 220, easing: 'cubic-in-out' },
         };
     }, [axisRange, axisStyle, chartTokens.plotBg, chartTokens.threshold, fdrGuide, fileId, payload.fileId, showExpectedLine, showFdrLine, showNominalLine, theme, traitLabel]);
 
@@ -1034,6 +1130,11 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         const start = tablePage * tableRowsPerPage;
         return sortedRows.slice(start, start + tableRowsPerPage);
     }, [sortedRows, tablePage, tableRowsPerPage]);
+    const shouldRenderTable = useIdleRenderGate(
+        !isLoading && afterFirstPaint,
+        `${qqKey || 'gene-level-qq-empty'}:${rows.length}:${sortedRows.length}`,
+        { delay: sortedRows.length > 1000 ? 450 : 180, timeout: 1600 },
+    );
 
     useEffect(() => {
         const maxPage = Math.max(0, Math.ceil(sortedRows.length / tableRowsPerPage) - 1);
@@ -1075,14 +1176,11 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         setShowEnvelope(true);
         setShowTopLabels(true);
         setComparisonTraitCount(DEFAULT_COMPARE_TRAITS);
-        setSelectedTraits(primaryTrait ? [primaryTrait] : []);
-        setAppliedTraits([]);
-        setRenderVersion(0);
         setPointSize(DEFAULT_POINT_SIZE);
         setLabelLimit(DEFAULT_LABEL_LIMIT);
         setHighlight({ rowKey: '', key: 0 });
         setTablePage(0);
-    }, [primaryTrait]);
+    }, []);
 
     const handleExport = useCallback(() => {
         const gd = plotRef.current;
@@ -1113,44 +1211,77 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         downloadBlob(blob, `${sanitizeFileNamePart(payload.fileId || fileId)}-gene-level-qq.csv`);
     }, [fileId, payload.fileId, rows]);
 
-    const plotRevision = useMemo(() => JSON.stringify({
-        rows: filteredRows.length,
-        traits: activeTraits.map((trait) => trait.file_id).join('|'),
-        tailMode,
-        query: geneQuery,
-        lines: [showExpectedLine, showNominalLine, showFdrLine, showEnvelope, showTopLabels].join('-'),
-        pointSize,
-        labelLimit,
-        highlight: highlight.key,
-    }), [activeTraits, filteredRows.length, geneQuery, highlight.key, labelLimit, pointSize, showEnvelope, showExpectedLine, showFdrLine, showNominalLine, showTopLabels, tailMode]);
-
     const plotKey = useMemo(() => [
         payload.fileId || fileId || 'qq',
         activeTraits.map((trait) => trait.file_id).join('+'),
-        tailMode,
-        geneQuery.trim().toLowerCase(),
-        showEnvelope ? 'envelope' : 'no-envelope',
-        showTopLabels ? `labels-${labelLimit}` : 'no-labels',
-    ].join('|'), [activeTraits, fileId, geneQuery, labelLimit, payload.fileId, showEnvelope, showTopLabels, tailMode]);
+    ].join('|'), [activeTraits, fileId, payload.fileId]);
+    const plotData = useMemo(
+        () => [...envelopeTraces, ...pointTraces, ...labelTrace, ...highlightedPoint],
+        [envelopeTraces, highlightedPoint, labelTrace, pointTraces],
+    );
 
     const hasVisiblePoints = pointTraces.some((trace) => Array.isArray(trace.x) && trace.x.length > 0);
 
     if (error && !isLoading && rows.length === 0) {
+        const missing = isMissingDataError(error);
         return (
-            <Alert severity="info" sx={{ m: 2 }}>
-                Gene-level QQ TSV is not available for this trait yet.
+            <Alert
+                severity={missing ? 'info' : 'error'}
+                sx={{ m: 2 }}
+                action={(
+                    <Button
+                        color="inherit"
+                        size="small"
+                        startIcon={<Refresh />}
+                        onClick={() => { void retryQq(); }}
+                    >
+                        Retry
+                    </Button>
+                )}
+            >
+                {missing
+                    ? 'Gene-level QQ TSV is not available for this trait yet.'
+                    : getRequestErrorMessage(error, 'Failed to load gene-level QQ data.')}
             </Alert>
         );
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={toolbarSx(theme)}>
-                <Box sx={{ minWidth: 270, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            {targetsError && (
+                <Alert
+                    severity="error"
+                    action={(
+                        <Button color="inherit" size="small" onClick={() => { void retryTargets(); }}>
+                            Retry
+                        </Button>
+                    )}
+                >
+                    {getRequestErrorMessage(targetsError, 'Failed to load related trait recommendations.')}
+                </Alert>
+            )}
+
+            {payload.failedTraits?.length > 0 && (
+                <Alert
+                    severity={payload.failedTraits.some((item) => !item.missing) ? 'warning' : 'info'}
+                    action={(
+                        <Button color="inherit" size="small" onClick={() => { void retryQq(); }}>
+                            Retry
+                        </Button>
+                    )}
+                >
+                    {`${payload.failedTraits.length} selected trait${payload.failedTraits.length === 1 ? '' : 's'} could not be loaded: ${payload.failedTraits
+                        .map((item) => item.trait_name || item.file_id)
+                        .join(', ')}.`}
+                </Alert>
+            )}
+
+            <Box sx={toolbarSx(theme, { px: 1.25, py: 0.85, gap: 0.75 })}>
+                <Box sx={{ minWidth: 240, mr: 0.25 }}>
+                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.15 }}>
                         Gene-level QQ
                     </Typography>
-                    <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
+                    <Typography sx={sectionTitleSx(theme, { fontSize: '0.96rem', lineHeight: 1.2 })}>
                         Signed deviation from expectation
                     </Typography>
                 </Box>
@@ -1160,7 +1291,15 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     size="small"
                     value={tailMode}
                     onChange={(_, value) => { if (value) setTailMode(value); }}
-                    sx={statusToggleSx(theme)}
+                    sx={[
+                        statusToggleSx(theme),
+                        {
+                            '& .MuiToggleButton-root': {
+                            px: 1.5,
+                            py: 0.4,
+                            },
+                        },
+                    ]}
                 >
                     <ToggleButton value={TAIL_MODES.BOTH}>Both tails</ToggleButton>
                     <ToggleButton value={TAIL_MODES.POSITIVE}>Positive</ToggleButton>
@@ -1175,10 +1314,20 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                         setGeneQuery(event.target.value);
                         setTablePage(0);
                     }}
-                    sx={controlFieldSx(theme, { width: 180 })}
+                    sx={controlFieldSx(theme, {
+                        width: 160,
+                        '& .MuiInputBase-root': { minHeight: 36 },
+                    })}
                 />
 
-                <Chip icon={<Timeline />} label={`${counts.filtered.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                <Chip
+                    icon={<Timeline />}
+                    label={renderedRows.length < counts.filtered
+                        ? `${renderedRows.length.toLocaleString()} / ${counts.filtered.toLocaleString()} plotted`
+                        : `${counts.filtered.toLocaleString()} genes`}
+                    size="small"
+                    sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
+                />
                 <Chip icon={<FilterAlt />} label={`${activeTraits.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
                 <Chip icon={<Insights />} label={`${counts.fdr.toLocaleString()} FDR hits`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(chartTokens.threshold, 0.08), color: chartTokens.threshold, border: `1px solid ${alpha(chartTokens.threshold, 0.22)}` })} />
                 <Chip icon={<FilterAlt />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.positive.color, 0.08), color: TAIL_META.positive.color, border: `1px solid ${alpha(TAIL_META.positive.color, 0.2)}` })} />
@@ -1186,39 +1335,48 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 <UpdatingStatus active={targetsRefreshing || isRefreshing} />
             </Box>
 
-            <Box sx={toolbarSx(theme, { alignItems: 'stretch' })}>
+            <Box sx={toolbarSx(theme, { alignItems: 'stretch', px: 1.25, py: 0.85, gap: 0.75 })}>
                 <Box
                     sx={{
                         display: 'grid',
                         gridTemplateColumns: {
                             xs: '1fr',
-                            lg: 'minmax(220px, 240px) minmax(320px, 1fr)',
-                            xl: 'minmax(220px, 240px) minmax(340px, 1.15fr) minmax(260px, 320px) auto',
+                            md: 'minmax(210px, 240px) minmax(320px, 1fr)',
+                            lg: 'minmax(190px, 220px) minmax(300px, 1fr) minmax(260px, 320px)',
                         },
-                        gap: 1.15,
+                        gap: 0.75,
                         alignItems: 'stretch',
                         width: '100%',
                     }}
                 >
                     <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.7 }}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.4 }}>
                             Trait overlays
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                             <Slider
+                                aria-label="Trait overlays"
                                 size="small"
-                                value={Math.min(comparisonTraitCount, relatedTraitSliderMax)}
+                                value={comparisonTraitCountDraftValue}
                                 min={DEFAULT_COMPARE_TRAITS}
                                 max={relatedTraitSliderMax}
                                 step={1}
                                 marks={comparisonTraitCountMarks}
-                                onChange={(_, value) => applyComparisonTraitCount(Array.isArray(value) ? value[0] : value)}
-                                sx={{ flex: 1, mt: 0.6, mb: 0.1 }}
+                                onChange={(_, value) => setComparisonTraitCountDraft(String(Array.isArray(value) ? value[0] : value))}
+                                onChangeCommitted={(_, value) => commitComparisonTraitCount(Array.isArray(value) ? value[0] : value)}
+                                sx={{ flex: 1, mt: 0.35, mb: 0 }}
                             />
                             <TextField
                                 size="small"
-                                value={Math.min(comparisonTraitCount, relatedTraitSliderMax)}
-                                onChange={(event) => applyComparisonTraitCount(event.target.value)}
+                                value={comparisonTraitCountDraft}
+                                onChange={(event) => setComparisonTraitCountDraft(event.target.value)}
+                                onBlur={() => commitComparisonTraitCount()}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        commitComparisonTraitCount();
+                                        event.currentTarget.blur();
+                                    }
+                                }}
                                 slotProps={{
                                     htmlInput: {
                                         min: DEFAULT_COMPARE_TRAITS,
@@ -1239,18 +1397,30 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     </Box>
 
                     <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.55 }}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.3 }}>
                             Guides
                         </Typography>
                         <Box
                             sx={{
                                 display: 'grid',
-                                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
-                                gap: 0.2,
+                                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' },
+                                columnGap: 0.35,
+                                rowGap: 0,
                             }}
                         >
                             <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showExpectedLine} onChange={(event) => setShowExpectedLine(event.target.checked)} size="small" />} label="Expected line" />
-                            <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showFdrLine} onChange={(event) => setShowFdrLine(event.target.checked)} size="small" />} label="FDR guide" />
+                            <FormControlLabel
+                                sx={{ m: 0 }}
+                                control={(
+                                    <Checkbox
+                                        checked={showFdrLine && Number.isFinite(fdrGuide)}
+                                        disabled={!Number.isFinite(fdrGuide)}
+                                        onChange={(event) => setShowFdrLine(event.target.checked)}
+                                        size="small"
+                                    />
+                                )}
+                                label={Number.isFinite(fdrGuide) ? 'FDR guide' : fdrGuideUnavailableReason}
+                            />
                             <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showNominalLine} onChange={(event) => setShowNominalLine(event.target.checked)} size="small" />} label="P=0.05" />
                             <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showEnvelope} onChange={(event) => setShowEnvelope(event.target.checked)} size="small" />} label="95% envelope" />
                             <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showTopLabels} onChange={(event) => setShowTopLabels(event.target.checked)} size="small" />} label="Top labels" />
@@ -1258,58 +1428,70 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     </Box>
 
                     <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.65 }}>
+                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
                             Density
                         </Typography>
-                        <Stack spacing={1.1}>
-                            <Stack direction="row" spacing={1.2} alignItems="center">
+                        <Stack spacing={0.55}>
+                            <Stack direction="row" spacing={0.8} alignItems="center">
                                 <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none', minWidth: 42 }}>
                                     Point
                                 </Typography>
                                 <Slider
-                                    value={pointSize}
+                                    aria-label="Point size"
+                                    value={pointSizeDraft}
                                     min={3}
                                     max={14}
                                     step={1}
-                                    onChange={(_, value) => setPointSize(Number(value))}
+                                    onChange={(_, value) => setPointSizeDraft(Number(value))}
+                                    onChangeCommitted={(_, value) => commitPointSize(Number(value))}
                                     sx={{ flex: 1, color: theme.palette.primary.main, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
                                 />
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20, textAlign: 'right' }}>{pointSize}</Typography>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20, textAlign: 'right' }}>{pointSizeDraft}</Typography>
                             </Stack>
 
-                            <Stack direction="row" spacing={1.2} alignItems="center">
+                            <Stack direction="row" spacing={0.8} alignItems="center">
                                 <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none', minWidth: 42 }}>
                                     Labels
                                 </Typography>
                                 <Slider
-                                    value={labelLimit}
+                                    aria-label="Label count"
+                                    value={labelLimitDraft}
                                     min={0}
                                     max={30}
                                     step={1}
-                                    onChange={(_, value) => setLabelLimit(Number(value))}
+                                    onChange={(_, value) => setLabelLimitDraft(Number(value))}
+                                    onChangeCommitted={(_, value) => commitLabelLimit(Number(value))}
                                     disabled={!showTopLabels}
                                     sx={{ flex: 1, color: theme.palette.text.secondary, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
                                 />
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 24, textAlign: 'right' }}>{labelLimit}</Typography>
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 24, textAlign: 'right' }}>{labelLimitDraft}</Typography>
                             </Stack>
-                        </Stack>
-                    </Box>
-
-                    <Box
-                        sx={{
-                            ...toolbarPanelSx,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: { xs: 'flex-start', xl: 'flex-end' },
-                        }}
-                    >
-                        <Stack direction={{ xs: 'row', xl: 'column' }} spacing={1} sx={{ width: { xs: '100%', xl: 'auto' } }}>
-                            <Button variant="text" startIcon={<RestartAlt />} onClick={resetControls} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38, justifyContent: { xs: 'center', xl: 'flex-start' } }}>
-                                Reset
-                            </Button>
-                            <Button variant="text" startIcon={<Download />} onClick={downloadCSV} disabled={!rows.length} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38, justifyContent: { xs: 'center', xl: 'flex-start' } }}>
-                                CSV
-                            </Button>
+                            <Stack
+                                direction="row"
+                                spacing={0.25}
+                                justifyContent="flex-end"
+                                sx={{ pt: 0.15 }}
+                            >
+                                <Button
+                                    variant="text"
+                                    size="small"
+                                    startIcon={<RestartAlt />}
+                                    onClick={resetControls}
+                                    sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 30 }}
+                                >
+                                    Reset
+                                </Button>
+                                <Button
+                                    variant="text"
+                                    size="small"
+                                    startIcon={<Download />}
+                                    onClick={downloadCSV}
+                                    disabled={!rows.length}
+                                    sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 30 }}
+                                >
+                                    CSV
+                                </Button>
+                            </Stack>
                         </Stack>
                     </Box>
                 </Box>
@@ -1360,10 +1542,9 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                         <>
                             <Plot
                                 key={plotKey}
-                                data={[...envelopeTraces, ...pointTraces, ...labelTrace, ...highlightedPoint]}
+                                data={plotData}
                                 layout={layout}
                                 config={plotConfig}
-                                revision={plotRevision}
                                 onInitialized={(_figure, graphDiv) => {
                                     plotRef.current = graphDiv;
                                     plotElRef.current = graphDiv;
@@ -1414,7 +1595,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 </CardContent>
             </Card>
 
-            {!isLoading && afterFirstPaint && (
+            {shouldRenderTable && (
                 <GeneLevelQQTable
                     tableSectionRef={tableSectionRef}
                     rows={rows}

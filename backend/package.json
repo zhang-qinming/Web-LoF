@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "refresh:gene-summary": "node scripts/refresh_gene_summary.js"
+    "refresh:gene-summary": "node scripts/refresh_gene_summary.js",
+    "prepare:data-archives": "node scripts/prepare_data_archives.js",
+    "prepare:data-archives:hpc": "bash scripts/prepare_data_archives_hpc.sh",
+    "precompute:chart-json": "python3 scripts/precompute_chart_json.py"
   },
   "keywords": [],
   "author": "",

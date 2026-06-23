@@ -63,6 +63,16 @@ function NotFound() {
     );
 }
 
+function RouteModuleFallback() {
+    return (
+        <div
+            aria-busy="true"
+            aria-label="Loading route module"
+            style={{ minHeight: 160 }}
+        />
+    );
+}
+
 function ScrollToTopOnPathChange() {
     const { pathname } = useLocation();
 
@@ -79,19 +89,14 @@ function ScrollToTopOnPathChange() {
 
 function AnimatedRoutes() {
     const location = useLocation();
+    const routeGroup = React.useMemo(() => {
+        const [section] = location.pathname.split('/').filter(Boolean);
+        return section || 'home';
+    }, [location.pathname]);
 
     return (
-        <div key={location.pathname} className="route-transition">
-            <Suspense
-                fallback={(
-                    <StatePanel
-                        loading
-                        title="Loading view"
-                        message="Preparing the requested browser panel."
-                        minHeight={320}
-                    />
-                )}
-            >
+        <div key={routeGroup} className="route-transition">
+            <Suspense fallback={<RouteModuleFallback />}>
                 <Routes location={location}>
                     <Route path="/" element={<Home />} />
                     <Route path="/about" element={<About />} />

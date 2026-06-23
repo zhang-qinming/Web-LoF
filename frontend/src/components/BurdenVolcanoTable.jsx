@@ -37,7 +37,7 @@ function getColumnSpecs({ effectLabel = 'Beta', includePosteriorColumns = false 
 
     if (includePosteriorColumns) {
         effectColumns.push(
-            { key: 'posteriorSd', label: 'Post SD', align: 'right', tone: 'effect', width: 92 },
+            { key: 'posteriorSd', label: 'Posterior SD', align: 'right', tone: 'effect', width: 92 },
             { key: 'lower95', label: 'Lower 95', align: 'right', tone: 'effect', width: 92 },
             { key: 'upper95', label: 'Upper 95', align: 'right', tone: 'effect', width: 92 },
         );
@@ -64,6 +64,12 @@ function getColumnGroups(includePosteriorColumns = false) {
         { label: 'Effect', span: includePosteriorColumns ? 7 : 4, tone: 'effect' },
         { label: 'Annotation', span: 2, tone: 'annotation' },
     ];
+}
+
+function justifyForAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
 }
 
 const sortLabelSx = {
@@ -104,25 +110,28 @@ function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'n
 }
 
 function renderCellContent({ column, row, getProgramRoute, navigate }) {
-    if (column.key === 'gene') return row.gene || '—';
-    if (column.key === 'ensg') return row.ensg || '—';
-    if (column.key === 'effect') return Number.isFinite(row.effect) ? row.effect.toFixed(4) : '—';
-    if (column.key === 'posteriorSd') return Number.isFinite(row.posteriorSd) ? row.posteriorSd.toFixed(4) : '—';
-    if (column.key === 'lower95') return Number.isFinite(row.lower95) ? row.lower95.toFixed(4) : '—';
-    if (column.key === 'upper95') return Number.isFinite(row.upper95) ? row.upper95.toFixed(4) : '—';
-    if (column.key === 'logp') return Number.isFinite(row.logp) ? row.logp.toFixed(2) : '—';
-    if (column.key === 'p') return Number.isFinite(row.p) ? row.p.toExponential(2) : '—';
-    if (column.key === 'fdr') return Number.isFinite(row.fdr) ? row.fdr.toExponential(2) : '—';
-    if (column.key === 'primaryGeneset') return row.primaryGeneset || 'others';
+    if (column.key === 'gene') return row.gene || '\u2014';
+    if (column.key === 'ensg') return row.ensg || '\u2014';
+    if (column.key === 'effect') return Number.isFinite(row.effect) ? row.effect.toFixed(4) : '\u2014';
+    if (column.key === 'posteriorSd') return Number.isFinite(row.posteriorSd) ? row.posteriorSd.toFixed(4) : '\u2014';
+    if (column.key === 'lower95') return Number.isFinite(row.lower95) ? row.lower95.toFixed(4) : '\u2014';
+    if (column.key === 'upper95') return Number.isFinite(row.upper95) ? row.upper95.toFixed(4) : '\u2014';
+    if (column.key === 'logp') return Number.isFinite(row.logp) ? row.logp.toFixed(2) : '\u2014';
+    if (column.key === 'p') return Number.isFinite(row.p) ? row.p.toExponential(2) : '\u2014';
+    if (column.key === 'fdr') return Number.isFinite(row.fdr) ? row.fdr.toExponential(2) : '\u2014';
+    if (column.key === 'primaryGeneset') return row.primaryGeneset || '\u2014';
 
     if (column.key === 'primaryProgram') {
         const route = getProgramRoute(row.primaryProgram);
+        if (!row.primaryProgram) return '\u2014';
+        if (!route) return row.primaryProgram;
+
         return (
             <Box
                 component="button"
                 type="button"
                 onClick={() => {
-                    if (route) navigate(route);
+                    navigate(route);
                 }}
                 sx={{
                     appearance: 'none',
@@ -139,10 +148,10 @@ function renderCellContent({ column, row, getProgramRoute, navigate }) {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    '&:hover': route ? { textDecoration: 'underline' } : undefined,
+                    '&:hover': { textDecoration: 'underline' },
                 }}
             >
-                {row.primaryProgram || 'others'}
+                {row.primaryProgram}
             </Box>
         );
     }
@@ -266,7 +275,7 @@ export default function BurdenVolcanoTable({
                                             direction={sortBy === column.key ? sortDir : 'asc'}
                                             hideSortIcon
                                             onClick={() => handleSort(column.key)}
-                                            sx={sortLabelSx}
+                                            sx={{ ...sortLabelSx, justifyContent: justifyForAlign(column.align), width: '100%' }}
                                         >
                                             {column.label}
                                         </TableSortLabel>

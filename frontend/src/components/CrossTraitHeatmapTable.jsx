@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
@@ -61,6 +61,9 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
     const navigate = useNavigate();
     const targets = payload?.targets || [];
     const genes = payload?.genes || [];
+    const cellCount = targets.length * genes.length;
+    const largeMatrix = cellCount > 2500;
+    const [forceRenderTable, setForceRenderTable] = useState(false);
     const maxAbs = useMemo(() => Math.max(
         Math.abs(Number(payload?.summary?.valueRange?.min) || 0),
         Math.abs(Number(payload?.summary?.valueRange?.max) || 0),
@@ -69,7 +72,61 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
     const neutralTone = tableTone(theme, 'neutral');
     const effectTone = tableTone(theme, 'primary');
 
+    useEffect(() => {
+        setForceRenderTable(false);
+    }, [payload]);
+
     if (!targets.length || !genes.length) return null;
+
+    if (largeMatrix && !forceRenderTable) {
+        return (
+            <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
+                <Box sx={{
+                    px: 1.75,
+                    py: 1.15,
+                    display: 'flex',
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    justifyContent: 'space-between',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: 1,
+                    backgroundColor: theme.custom.surface.raised,
+                    borderBottom: `1px solid ${theme.custom.border.soft}`,
+                }}>
+                    <Box>
+                        <Typography sx={sectionTitleSx(theme, { fontSize: '0.9rem' })}>
+                            Cross-trait gene effect matrix
+                        </Typography>
+                        <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', mt: 0.2 }}>
+                            {genes.length.toLocaleString()} genes × {targets.length.toLocaleString()} traits ({cellCount.toLocaleString()} cells). The table is deferred so the plot stays responsive.
+                        </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Tooltip title="Download the displayed matrix as CSV">
+                            <Button
+                                size="small"
+                                startIcon={<DownloadOutlined />}
+                                onClick={() => downloadBlob(
+                                    new Blob([buildMatrixCsv(payload)], { type: 'text/csv;charset=utf-8;' }),
+                                    `${fileId || 'trait'}-cross-trait-gene-effects.csv`,
+                                )}
+                                sx={{ textTransform: 'none', color: theme.palette.text.secondary }}
+                            >
+                                CSV
+                            </Button>
+                        </Tooltip>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setForceRenderTable(true)}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            Render table
+                        </Button>
+                    </Box>
+                </Box>
+            </Paper>
+        );
+    }
 
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
@@ -141,32 +198,32 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                             >
                                 ENSG
                             </TableCell>
-                            {targets.map((target) => (
-                                <TableCell
-                                    key={target.file_id}
-                                    align="left"
-                                    onClick={() => navigate(`/trait/${encodeURIComponent(target.file_id)}`)}
-                                    sx={stickyTableHeaderCellSx(theme, effectTone, 'left', {
-                                        cursor: 'pointer',
-                                        whiteSpace: 'normal',
-                                        wordBreak: 'break-word',
-                                        overflowWrap: 'anywhere',
-                                        overflow: 'visible',
-                                        textOverflow: 'clip',
-                                        lineHeight: 1.18,
-                                        py: 0.9,
-                                        px: 1,
-                                        verticalAlign: 'top',
-                                    })}
-                                >
-                                    <Typography sx={{ fontSize: '0.68rem', fontWeight: 720, lineHeight: 1.18 }}>
-                                        {target.trait_name || target.file_id}
-                                    </Typography>
-                                    <Typography sx={{ mt: 0.25, fontSize: '0.6rem', color: theme.palette.text.secondary }}>
-                                        {target.n_sig == null ? target.file_id : `${Number(target.n_sig).toLocaleString()} loci`}
-                                    </Typography>
-                                </TableCell>
-                            ))}
+                             {targets.map((target) => (
+                                 <TableCell
+                                     key={target.file_id}
+                                     align="right"
+                                     onClick={() => navigate(`/trait/${encodeURIComponent(target.file_id)}`)}
+                                     sx={stickyTableHeaderCellSx(theme, effectTone, 'right', {
+                                         cursor: 'pointer',
+                                         whiteSpace: 'normal',
+                                         wordBreak: 'break-word',
+                                         overflowWrap: 'anywhere',
+                                         overflow: 'visible',
+                                         textOverflow: 'clip',
+                                         lineHeight: 1.18,
+                                         py: 0.9,
+                                         px: 1,
+                                         verticalAlign: 'top',
+                                     })}
+                                 >
+                                     <Typography sx={{ fontSize: '0.68rem', fontWeight: 720, lineHeight: 1.18 }}>
+                                         {target.trait_name || target.file_id}
+                                     </Typography>
+                                     <Typography sx={{ mt: 0.25, fontSize: '0.6rem', color: theme.palette.text.secondary }}>
+                                         {target.n_sig == null ? target.file_id : `${Number(target.n_sig).toLocaleString()} loci`}
+                                     </Typography>
+                                 </TableCell>
+                             ))}
                         </TableRow>
                     </TableHead>
                     <TableBody>

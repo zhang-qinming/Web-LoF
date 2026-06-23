@@ -28,11 +28,12 @@ import FolderOpen from '@mui/icons-material/FolderOpen';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import Close from '@mui/icons-material/Close';
 import FileDownload from '@mui/icons-material/FileDownload';
+import Refresh from '@mui/icons-material/Refresh';
 import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBox from '@mui/icons-material/CheckBox';
 import axios from 'axios';
 import DataBrowseSummary from '../components/DataBrowseSummary';
-import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload } from '../utils/download';
+import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload, triggerDataPackageDownload } from '../utils/download';
 import { createTtlCache } from '../utils/cache';
 import {
     controlFieldSx,
@@ -59,9 +60,17 @@ function fmtSize(b) {
     if (b == null) return '';
     const bytes = Number(b);
     if (!Number.isFinite(bytes)) return '';
-    if (bytes < 1024) return `${Math.max(0, bytes)} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value = Math.max(0, bytes);
+    let unitIndex = 0;
+
+    while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024;
+        unitIndex += 1;
+    }
+
+    if (unitIndex === 0) return `${Math.round(value)} B`;
+    return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
 }
 
 const SelectionCtx = createContext({
@@ -1154,7 +1163,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
     );
 }
 
-export default function DataBrowser() {
+function FullDataBrowser() {
     const theme = useTheme();
     const loadingBarSx = {
         height: 3,
@@ -1486,5 +1495,268 @@ export default function DataBrowser() {
                 )}
             </Box>
         </SelectionCtx.Provider>
+    );
+}
+const FOLDER_DOWNLOAD_PAGE_SIZE = 50;
+const DOWNLOAD_START_FEEDBACK_MS = 900;
+
+function formatArchiveUpdated(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return `Updated ${date.toLocaleDateString('en-US')} ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function getArchiveTooltip(archive) {
+    return formatArchiveUpdated(archive?.mtime) || 'Prepared archive';
+}
+
+function formatArchiveDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+}
+
+export default function DataBrowser() {
+    const theme = useTheme();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialBrowserView = searchParams.get('view') === 'browser'
+        || searchParams.get('mode') === 'global'
+        || Boolean(searchParams.get('dir'))
+        || Boolean(searchParams.get('q'));
+    const [showFullBrowser, setShowFullBrowser] = useState(() => initialBrowserView);
+    const [page, setPage] = useState(1);
+    const [payload, setPayload] = useState({ data: [], totalPages: 1 });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [downloadState, setDownloadState] = useState({ path: null, error: '' });
+    const [packagePayload, setPackagePayload] = useState({ data: [] });
+    const [packageLoading, setPackageLoading] = useState(true);
+    const [packageError, setPackageError] = useState('');
+    const [packageDownloadId, setPackageDownloadId] = useState(null);
+    const [folderRefreshKey, setFolderRefreshKey] = useState(0);
+    const [packageRefreshKey, setPackageRefreshKey] = useState(0);
+    const folderDownloadResetTimerRef = useRef(null);
+    const packageDownloadResetTimerRef = useRef(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        setError('');
+        API.get('/folders', { params: { dir: '', page, limit: FOLDER_DOWNLOAD_PAGE_SIZE } })
+            .then((response) => {
+                if (cancelled) return;
+                setPayload({
+                    data: response.data?.data || [],
+                    totalPages: response.data?.totalPages || 1,
+                });
+            })
+            .catch((err) => {
+                if (!cancelled) setError(getRequestErrorMessage(err, 'Failed to load folders'));
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [page, folderRefreshKey]);
+
+    useEffect(() => {
+        let cancelled = false;
+        setPackageLoading(true);
+        setPackageError('');
+        API.get('/packages')
+            .then((response) => {
+                if (!cancelled) setPackagePayload({ data: response.data?.data || [] });
+            })
+            .catch((err) => {
+                if (!cancelled) setPackageError(getRequestErrorMessage(err, 'Failed to load database export'));
+            })
+            .finally(() => {
+                if (!cancelled) setPackageLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [packageRefreshKey]);
+
+    useEffect(() => () => {
+        clearTimeout(folderDownloadResetTimerRef.current);
+        clearTimeout(packageDownloadResetTimerRef.current);
+    }, []);
+
+    const showDataBrowser = useCallback(() => {
+        setSearchParams({ view: 'browser' }, { replace: true });
+        setShowFullBrowser(true);
+    }, [setSearchParams]);
+
+    const returnFromDataBrowser = useCallback(() => {
+        setSearchParams({}, { replace: true });
+        setPage(1);
+        setShowFullBrowser(false);
+        setFolderRefreshKey((value) => value + 1);
+        setPackageRefreshKey((value) => value + 1);
+    }, [setSearchParams]);
+
+    const downloadFolder = useCallback(async (folderPath) => {
+        clearTimeout(folderDownloadResetTimerRef.current);
+        setDownloadState({ path: folderPath, error: '' });
+        try {
+            await triggerDataDownload(folderPath);
+            folderDownloadResetTimerRef.current = setTimeout(() => {
+                setDownloadState((current) => current.path === folderPath ? { path: null, error: '' } : current);
+            }, DOWNLOAD_START_FEEDBACK_MS);
+        } catch (err) {
+            setDownloadState({ path: null, error: getRequestErrorMessage(err, 'Download failed') });
+        }
+    }, []);
+
+    const downloadPackage = useCallback(async (packageId) => {
+        clearTimeout(packageDownloadResetTimerRef.current);
+        setPackageDownloadId(packageId);
+        setPackageError('');
+        try {
+            await triggerDataPackageDownload(packageId);
+            packageDownloadResetTimerRef.current = setTimeout(() => {
+                setPackageDownloadId((current) => current === packageId ? null : current);
+            }, DOWNLOAD_START_FEEDBACK_MS);
+        } catch (err) {
+            setPackageError(getRequestErrorMessage(err, 'Download failed'));
+            setPackageDownloadId(null);
+        }
+    }, []);
+
+    if (showFullBrowser) {
+        return (
+            <>
+                <Box sx={{ width: '100%', maxWidth: DATA_PAGE_MAX_WIDTH, mx: 'auto', px: { xs: 1.5, sm: 2, md: 3, xl: 4 }, pt: { xs: 1.5, md: 2 } }}>
+                    <Paper elevation={0} sx={plotFrameSx(theme, {
+                        mb: 1.5,
+                        borderRadius: 3,
+                        px: { xs: 1.5, md: 2 },
+                        py: 1.25,
+                        display: 'flex',
+                        alignItems: { xs: 'stretch', sm: 'center' },
+                        justifyContent: 'space-between',
+                        gap: 1,
+                        flexDirection: { xs: 'column', sm: 'row' },
+                    })}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>Data Browser</Typography>
+                        <Button variant="outlined" size="small" onClick={returnFromDataBrowser} sx={{ textTransform: 'none' }}>
+                            Back to downloads
+                        </Button>
+                    </Paper>
+                </Box>
+                <FullDataBrowser />
+            </>
+        );
+    }
+
+    const packageHeaderTone = tableTone(theme, 'primary');
+    const folderHeaderTone = tableTone(theme, 'neutral');
+    const hasFolders = payload.data.length > 0;
+
+    return (
+        <Box sx={{
+            width: '100%',
+            maxWidth: DATA_PAGE_MAX_WIDTH,
+            mx: 'auto',
+            px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
+            py: { xs: 1.5, md: 2.5 },
+        }}>
+            <Paper elevation={0} sx={plotFrameSx(theme, {
+                mb: 2,
+                borderRadius: 4,
+                p: { xs: 2, md: 2.5 },
+                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.11)}, ${alpha(theme.palette.secondary.main, 0.055)} 48%, ${theme.palette.background.paper})`,
+            })}>
+                <Box sx={{ display: 'flex', alignItems: { xs: 'stretch', md: 'center' }, justifyContent: 'space-between', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                    <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0 })}>Data Downloads</Typography>
+                    <Button variant="outlined" onClick={showDataBrowser} sx={{ textTransform: 'none', bgcolor: alpha(theme.palette.background.paper, 0.72) }}>
+                        <FolderOpen sx={{ fontSize: 18, mr: 0.7 }} />
+                        Data browser
+                    </Button>
+                </Box>
+            </Paper>
+
+            {loading && <LinearProgress sx={{ mb: 1.5, borderRadius: 999 }} />}
+            {error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setError('')}>{error}</Alert>}
+            {downloadState.error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setDownloadState({ path: null, error: '' })}>{downloadState.error}</Alert>}
+            {packageError && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setPackageError('')}>{packageError}</Alert>}
+
+            <Paper elevation={0} sx={plotFrameSx(theme, { mb: 2, borderRadius: 3, overflow: 'hidden' })}>
+                <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.25 })}>
+                    <FileDownload sx={{ fontSize: 18, color: theme.palette.primary.main }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Database tables</Typography>
+                    <Box sx={{ flex: 1 }} />
+                    <Button size="small" variant="outlined" disabled={packageLoading} onClick={() => setPackageRefreshKey((value) => value + 1)} sx={{ textTransform: 'none' }}>
+                        <Refresh sx={{ fontSize: 15, mr: 0.4 }} />Refresh
+                    </Button>
+                </Box>
+                {packageLoading && <LinearProgress sx={{ height: 3 }} />}
+                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
+                    <Table size="small" sx={stickyTableSx(theme)}>
+                        <TableHead><TableRow>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone)}>Export</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Tables</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Archive</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Date</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'center')} align="center">Action</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {!packageLoading && packagePayload.data.length === 0 && <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}>Database export not prepared.</TableCell></TableRow>}
+                            {packagePayload.data.map((item, index) => {
+                                const archiveReady = Boolean(item.archive?.exists);
+                                const isDownloading = packageDownloadId === item.id;
+                                return <TableRow key={item.id} hover sx={tableRowRevealSx(theme, index)}>
+                                    <TableCell><Typography variant="body2" sx={{ fontWeight: 700 }}>{item.title}</Typography></TableCell>
+                                    <TableCell align="right"><Typography variant="body2" color="text.secondary">{item.tableCount || 0}</Typography></TableCell>
+                                    <TableCell align="right">
+                                        {archiveReady ? <Tooltip title={getArchiveTooltip(item.archive)} arrow><Typography variant="body2" sx={{ fontWeight: 760 }}>{fmtSize(item.archive.size)}</Typography></Tooltip> : <Typography variant="body2" color="text.secondary">Not prepared</Typography>}
+                                    </TableCell>
+                                    <TableCell align="right"><Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{formatArchiveDate(item.archive?.mtime)}</Typography></TableCell>
+                                    <TableCell align="center"><Button size="small" variant="contained" disabled={isDownloading || !archiveReady} onClick={() => { void downloadPackage(item.id); }} sx={{ textTransform: 'none', boxShadow: 'none' }}><Download sx={{ fontSize: 16, mr: 0.45 }} />{isDownloading ? 'Starting...' : 'Download'}</Button></TableCell>
+                                </TableRow>;
+                            })}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
+
+            <Paper elevation={0} sx={plotFrameSx(theme, { borderRadius: 3, overflow: 'hidden' })}>
+                <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.25 })}>
+                    <Folder sx={{ fontSize: 18, color: theme.palette.primary.main }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Folder archives</Typography>
+                    <Box sx={{ flex: 1 }} />
+                    <Button size="small" variant="outlined" disabled={loading} onClick={() => setFolderRefreshKey((value) => value + 1)} sx={{ textTransform: 'none' }}>
+                        <Refresh sx={{ fontSize: 15, mr: 0.4 }} />Refresh
+                    </Button>
+                </Box>
+                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
+                    <Table size="small" sx={stickyTableSx(theme)}>
+                        <TableHead><TableRow>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone)}>Folder</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone, 'right')} align="right">Contents</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone, 'right')} align="right">Archive</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone, 'right')} align="right">Date</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone, 'center')} align="center">Action</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {!loading && !hasFolders && <TableRow><TableCell colSpan={5} align="center" sx={{ py: 5 }}>No folders available.</TableCell></TableRow>}
+                            {payload.data.map((folder, index) => {
+                                const archiveReady = Boolean(folder.archive?.exists);
+                                const isDownloading = downloadState.path === folder.path;
+                                return <TableRow key={folder.path} hover sx={tableRowRevealSx(theme, index)}>
+                                    <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Folder sx={{ fontSize: 18, color: theme.palette.primary.main }} /><Typography variant="body2" sx={{ fontWeight: 700 }}>{folder.name}</Typography></Box></TableCell>
+                                    <TableCell align="right" sx={{ color: 'text.secondary' }}>{folder.folderCount || 0} folders · {folder.fileCount || 0} files</TableCell>
+                                    <TableCell align="right">{archiveReady ? <Tooltip title={getArchiveTooltip(folder.archive)} arrow><Typography variant="body2" sx={{ fontWeight: 760 }}>{fmtSize(folder.archive.size)}</Typography></Tooltip> : <Typography variant="body2" color="text.secondary">Not prepared</Typography>}</TableCell>
+                                    <TableCell align="right"><Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{formatArchiveDate(folder.archive?.mtime)}</Typography></TableCell>
+                                    <TableCell align="center"><Button size="small" variant="contained" disabled={isDownloading || !archiveReady} onClick={() => { void downloadFolder(folder.path); }} sx={{ textTransform: 'none', boxShadow: 'none' }}><Download sx={{ fontSize: 16, mr: 0.45 }} />{isDownloading ? 'Starting...' : 'Download'}</Button></TableCell>
+                                </TableRow>;
+                            })}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+                {payload.totalPages > 1 && <Box sx={{ py: 1.2, display: 'flex', justifyContent: 'center', borderTop: `1px solid ${theme.custom.border.soft}` }}><Pagination count={payload.totalPages} page={page} onChange={(_, value) => setPage(value)} size="small" /></Box>}
+            </Paper>
+        </Box>
     );
 }

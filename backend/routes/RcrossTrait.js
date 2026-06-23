@@ -3,6 +3,7 @@ const pool = require('../models/db');
 const { createFileStore, buildHttpError } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute, throwIfAborted } = require('../lib/http');
+const { parseNullableNumber } = require('../lib/numbers');
 const { normalizeIdentifier, normalizeSafeBaseNameList, parsePositiveInt } = require('../lib/request');
 const { parseTsvStream } = require('../lib/tsv');
 const {
@@ -11,6 +12,11 @@ const {
     buildEffectProfile,
 } = require('../lib/correlation');
 const { getTraitEffectNeighbors } = require('../lib/traitEffectNeighbors');
+const {
+    getPrecomputedCrossTraitMatrix,
+    getPrecomputedTraitCorrelation,
+    recordTraitId,
+} = require('../lib/crossTraitPrecomputed');
 
 const router = express.Router();
 
@@ -101,6 +107,17 @@ function buildTraitOption(meta, fallbackId) {
         correlation: toFiniteNumber(meta?.correlation),
         shared_genes: toFiniteNumber(meta?.shared_genes),
     };
+}
+
+function buildTraitOptionFromPrecomputed(record, metaMap) {
+    const traitId = recordTraitId(record);
+    return buildTraitOption({
+        ...(metaMap.get(traitId) || {}),
+        selection_rank: record?.selection_rank,
+        selection_basis: record?.selection_basis,
+        correlation: record?.correlation,
+        shared_genes: record?.shared_genes,
+    }, traitId);
 }
 
 function getFreshCache(cache, key, ttlMs) {
@@ -264,8 +281,7 @@ async function getCachedEffectProfile(traitId, { signal = null } = {}) {
 }
 
 function toFiniteNumber(value) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
+    return parseNullableNumber(value);
 }
 
 function toGeneKey(row) {
@@ -545,6 +561,26 @@ router.get('/api/cross-trait/:fileId/matrix', asyncRoute(async (req, res) => {
 
     const sourceMeta = await getTraitMetaById(fileId);
     const sourceCandidates = pickTraitIdCandidates(fileId, sourceMeta);
+    const precomputedMatrix = await getPrecomputedCrossTraitMatrix(sourceCandidates, {
+        targetIds,
+        topGenes,
+        signal,
+    });
+    if (precomputedMatrix) {
+        const precomputedTargetIds = precomputedMatrix.targets.map(recordTraitId).filter(Boolean);
+        const precomputedMetaMap = await getTraitMetaMapByIds([...targetIds, ...precomputedTargetIds]);
+        throwIfAborted(signal);
+        return res.json({
+            sourceTrait: buildTraitOption(sourceMeta, precomputedMatrix.sourceId || sourceCandidates[0] || fileId),
+            targets: precomputedMatrix.targets.map((record) => (
+                buildTraitOptionFromPrecomputed(record, precomputedMetaMap)
+            )),
+            genes: precomputedMatrix.genes,
+            matrix: precomputedMatrix.matrix,
+            summary: precomputedMatrix.summary,
+        });
+    }
+
     let sourceTraitId = sourceCandidates[0] || fileId;
     let sourceRows = null;
     for (const candidate of sourceCandidates) {
@@ -625,6 +661,35 @@ router.get('/api/cross-trait/:fileId/correlation', asyncRoute(async (req, res) =
     const targetIds = normalizeSafeBaseNameList(req.query.targetIds).slice(0, MAX_TARGET_IDS);
     const sourceMeta = await getTraitMetaById(fileId);
     const sourceCandidates = pickTraitIdCandidates(fileId, sourceMeta);
+    const sourceIdentityForPrecomputed = new Set(sourceCandidates);
+    const precomputedTargetIds = targetIds.filter((targetId) => !sourceIdentityForPrecomputed.has(targetId));
+    const precomputedCorrelation = await getPrecomputedTraitCorrelation(sourceCandidates, {
+        targetIds: precomputedTargetIds,
+        method,
+        signal,
+    });
+    if (precomputedCorrelation) {
+        const precomputedTraitIds = precomputedCorrelation.traits.map(recordTraitId).filter(Boolean);
+        const precomputedMetaMap = await getTraitMetaMapByIds([...targetIds, ...precomputedTraitIds]);
+        const traits = precomputedCorrelation.traits.map((record) => (
+            buildTraitOptionFromPrecomputed(record, precomputedMetaMap)
+        ));
+        throwIfAborted(signal);
+        return res.json({
+            sourceTrait: traits[0],
+            traits,
+            matrix: precomputedCorrelation.matrix,
+            sharedGeneCounts: precomputedCorrelation.sharedGeneCounts,
+            summary: {
+                ...precomputedCorrelation.summary,
+                method,
+                minSharedGenes: precomputedCorrelation.summary.minSharedGenes ?? DEFAULT_MIN_SHARED_GENES,
+                requestedTraitCount: precomputedTargetIds.length + 1,
+                skippedTraits: Math.max(0, precomputedTargetIds.length - (traits.length - 1)),
+            },
+        });
+    }
+
     let sourceTraitId = sourceCandidates[0] || fileId;
     let sourceRows = null;
     let sourceProfile = null;

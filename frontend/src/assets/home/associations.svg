@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#FFF7ED" />
+  <g transform="translate(14, 14) scale(1.5) rotate(-45 12 12)">
+    <!-- Left loop (Gene side) -->
+    <path d="M9 17H7A5 5 0 0 1 7 7h2" stroke="#F97316" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <circle cx="7" cy="12" r="2" fill="#F97316" />
+    
+    <!-- Middle connection line -->
+    <line x1="8" y1="12" x2="16" y2="12" stroke="#EA580C" stroke-width="2.2" stroke-linecap="round" opacity="0.85" />
+    
+    <!-- Right loop (Trait side) -->
+    <path d="M15 7h2a5 5 0 0 1 0 10h-2" stroke="#EA580C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <circle cx="17" cy="12" r="2" fill="#EA580C" />
+  </g>
+</svg>

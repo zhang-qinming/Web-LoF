@@ -33,22 +33,28 @@ import {
 const COLUMN_SPECS = [
     { key: 'gene', label: 'Gene', align: 'left', tone: 'gene', width: 118 },
     { key: 'ensg', label: 'ENSG', align: 'left', tone: 'gene', width: 148 },
-    { key: 'postMean', label: 'Post mean', align: 'right', tone: 'posterior', width: 104 },
+    { key: 'postMean', label: 'LoF effect', align: 'right', tone: 'posterior', width: 108 },
     { key: 'signedLogP', label: 'signed -log10(P)', align: 'right', tone: 'regulation', width: 128 },
-    { key: 'beta', label: 'Beta', align: 'right', tone: 'regulation', width: 92 },
+    { key: 'beta', label: 'Reg beta', align: 'right', tone: 'regulation', width: 92 },
     { key: 'p', label: 'P', align: 'right', tone: 'regulation', width: 104 },
     { key: 'fdr', label: 'FDR', align: 'right', tone: 'regulation', width: 104 },
     { key: 'evidenceClassLabel', label: 'Evidence', align: 'left', tone: 'evidence', width: 180 },
     { key: 'combinedScore', label: 'Score', align: 'right', tone: 'evidence', width: 94 },
-    { key: 'labelReason', label: 'Label', align: 'left', tone: 'evidence', width: 130 },
+    { key: 'labelReason', label: 'Label reason', align: 'left', tone: 'evidence', width: 130 },
 ];
 
 const COLUMN_GROUPS = [
     { label: 'Gene', span: 2, tone: 'gene' },
     { label: 'Posterior', span: 1, tone: 'posterior' },
     { label: 'Perturb-seq regulation', span: 4, tone: 'regulation' },
-    { label: 'Selection', span: 3, tone: 'evidence' },
+    { label: 'Evidence', span: 3, tone: 'evidence' },
 ];
+
+function justifyForAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
+}
 
 function sortLabelSx() {
     return {
@@ -216,7 +222,7 @@ export default function GeneLevelScatterTable({
                                             direction={sortBy === column.key ? sortDir : 'asc'}
                                             hideSortIcon
                                             onClick={() => handleSort(column.key)}
-                                            sx={sortLabelSx()}
+                                            sx={{ ...sortLabelSx(), justifyContent: justifyForAlign(column.align), width: '100%' }}
                                         >
                                             {column.label}
                                         </TableSortLabel>

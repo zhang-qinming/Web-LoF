@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { downloadBlob } from '../../utils/download';
+import { parseNullableNumber } from '../../utils/numbers';
 
 const PROGRAM_SELECTION_LABELS = {
     other: 'Other',
@@ -179,8 +180,8 @@ export const INLINE_LEGEND_GROUPS = [
     {
         label: 'Gene',
         items: [
-            { label: 'post_mean +', color: EFFECT_COLORS.positive },
-            { label: 'post_mean -', color: EFFECT_COLORS.negative },
+            { label: 'LoF effect +', color: EFFECT_COLORS.positive },
+            { label: 'LoF effect -', color: EFFECT_COLORS.negative },
         ],
     },
     {
@@ -192,7 +193,7 @@ export const INLINE_LEGEND_GROUPS = [
         ],
     },
     {
-        label: 'Regulator group',
+        label: 'Regulator-program sign',
         items: [
             { label: 'positive', color: EFFECT_COLORS.positive },
             { label: 'negative', color: EFFECT_COLORS.negative },
@@ -205,8 +206,7 @@ export function clamp(value, min, max) {
 }
 
 export function toFiniteNumber(value, fallback = null) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
+    return parseNullableNumber(value, fallback);
 }
 
 export function sanitizeFileNamePart(value) {
@@ -222,9 +222,9 @@ export function formatProgramTooltip(program) {
         `Program: ${program.program}`,
         `Selected by: ${programSelectionLabel(program)}`,
         `Selected side: ${program.selectedSide}`,
-        `Program score: ${formatNumber(program.programScore)}`,
-        `Regulator score: ${formatNumber(program.regulatorScore)}`,
-        `Loading genes: ${program.loadingGeneCount}`,
+        `Program burden score: ${formatNumber(program.programScore)}`,
+        `Regulator-burden score: ${formatNumber(program.regulatorScore)}`,
+        `Program genes: ${program.loadingGeneCount}`,
         `Regulator genes: ${program.regulatorGeneCount}`,
         program.annotation ? `Annotation: ${program.annotation}` : null,
         program.emptyReason ? `Note: ${program.emptyReason}` : null,
@@ -235,16 +235,16 @@ export function formatGeneTooltip(gene) {
     return [
         `Gene: ${gene.gene}`,
         `ENSG: ${gene.ensg || 'NA'}`,
-        `post_mean: ${formatNumber(gene.postMean, 4)}`,
-        `abs_gamma: ${formatNumber(gene.absGamma, 4)}`,
-        `membership_score: ${formatNumber(gene.membershipScore, 4)}`,
-        `program_trait_sign: ${gene.programTraitSign || 'NA'}`,
-        `regulator_program_sign: ${gene.regulatorProgramSign || 'NA'}`,
-        `predicted_sign: ${gene.predictedSign || 'NA'}`,
-        `display_bucket: ${gene.displayBucket || 'NA'}`,
-        `display_column: ${gene.displayColumn || 'NA'}`,
-        `is_concordant: ${gene.isConcordant ? 'true' : 'false'}`,
-        `is_discordant: ${gene.isDiscordant ? 'true' : 'false'}`,
+        `LoF effect (post_mean): ${formatNumber(gene.postMean, 4)}`,
+        `Abs LoF effect (abs_gamma): ${formatNumber(gene.absGamma, 4)}`,
+        `Membership / regulator beta score: ${formatNumber(gene.membershipScore, 4)}`,
+        `Program-trait sign: ${gene.programTraitSign || 'NA'}`,
+        `Regulator-program sign: ${gene.regulatorProgramSign || 'NA'}`,
+        `Predicted sign: ${gene.predictedSign || 'NA'}`,
+        `Display bucket: ${gene.displayBucket || 'NA'}`,
+        `Display column: ${gene.displayColumn || 'NA'}`,
+        `Concordant direction: ${gene.isConcordant ? 'yes' : 'no'}`,
+        `Discordant direction: ${gene.isDiscordant ? 'yes' : 'no'}`,
     ].join('\n');
 }
 
@@ -623,7 +623,30 @@ export function useGraphTransform() {
     const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
     const [isDragging, setIsDragging] = useState(false);
     const dragRef = useRef(null);
+    const frameRef = useRef(null);
+    const pendingTransformRef = useRef(null);
     const suppressClickUntilRef = useRef(0);
+
+    const commitPendingTransform = useCallback(() => {
+        frameRef.current = null;
+        const pendingTransform = pendingTransformRef.current;
+        if (!pendingTransform) return;
+        pendingTransformRef.current = null;
+        setTransform((current) => ({
+            ...current,
+            ...pendingTransform,
+        }));
+    }, []);
+
+    const scheduleTransform = useCallback((nextTransform) => {
+        pendingTransformRef.current = nextTransform;
+        if (frameRef.current !== null) return;
+        frameRef.current = requestAnimationFrame(commitPendingTransform);
+    }, [commitPendingTransform]);
+
+    useEffect(() => () => {
+        if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    }, []);
 
     const trySetPointerCapture = useCallback((target, pointerId) => {
         try {
@@ -642,7 +665,11 @@ export function useGraphTransform() {
     }, []);
 
     const onPointerDown = useCallback((event) => {
-        if (event.target.closest?.('[data-graph-clickable="true"]')) return;
+        if (
+            event.button !== 0
+            || event.target.closest?.('[data-graph-control="true"]')
+            || event.target.closest?.('[data-graph-clickable="true"]')
+        ) return;
 
         dragRef.current = {
             id: event.pointerId,
@@ -666,23 +693,26 @@ export function useGraphTransform() {
             dragState.moved = true;
         }
 
-        setTransform((current) => ({
-            ...current,
+        scheduleTransform({
             x: dragState.startX + dx,
             y: dragState.startY + dy,
-        }));
-    }, []);
+        });
+    }, [scheduleTransform]);
 
     const onPointerUp = useCallback((event) => {
         if (dragRef.current?.id === event.pointerId) {
             if (dragRef.current.moved) {
                 suppressClickUntilRef.current = Date.now() + 180;
             }
+            if (frameRef.current !== null) {
+                cancelAnimationFrame(frameRef.current);
+                commitPendingTransform();
+            }
             dragRef.current = null;
             setIsDragging(false);
             tryReleasePointerCapture(event.currentTarget, event.pointerId);
         }
-    }, [tryReleasePointerCapture]);
+    }, [commitPendingTransform, tryReleasePointerCapture]);
 
     const onWheel = useCallback((event) => {
         if (!event.ctrlKey && !event.metaKey) return;
@@ -702,6 +732,9 @@ export function useGraphTransform() {
     }, []);
 
     const reset = useCallback(() => {
+        if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+        pendingTransformRef.current = null;
         setTransform({ x: 0, y: 0, scale: 1 });
         suppressClickUntilRef.current = 0;
     }, []);
