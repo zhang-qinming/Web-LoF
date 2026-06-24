@@ -46,19 +46,45 @@ function formatScore(value) {
 }
 
 function colorTone(theme, color) {
-    if (color === 'program_enriched') return metricChipTone(theme, 'primary');
-    if (color === 'regulator_enriched') return metricChipTone(theme, 'accent');
-    if (color === 'both_enriched') return metricChipTone(theme, 'success');
-    return metricChipTone(theme, 'neutral');
+    void color;
+    const tones = {
+        other: {
+            backgroundColor: alpha('#E69F00', 0.14),
+            color: '#8a5b12',
+            border: `1px solid ${alpha('#E69F00', 0.32)}`,
+        },
+        program_enriched: {
+            backgroundColor: alpha('#E69F00', 0.14),
+            color: '#8a5b12',
+            border: `1px solid ${alpha('#E69F00', 0.32)}`,
+        },
+        regulator_enriched: {
+            backgroundColor: alpha('#0072B2', 0.12),
+            color: '#245089',
+            border: `1px solid ${alpha('#0072B2', 0.28)}`,
+        },
+        both_enriched: {
+            backgroundColor: alpha('#009E73', 0.12),
+            color: '#2f6a49',
+            border: `1px solid ${alpha('#009E73', 0.3)}`,
+        },
+    };
+    return tones.other;
 }
+
+const ENRICHMENT_LABELS = {
+    other: 'Other',
+    program_enriched: 'Program enriched',
+    regulator_enriched: 'Regulator enriched',
+    both_enriched: 'Both enriched',
+};
 
 const PROGRAM_TRAIT_COLUMNS = [
     { key: 'traitName', label: 'Trait', align: 'left', tone: 'trait', width: 310 },
-    { key: 'selection', label: 'Relationship', align: 'center', tone: 'selection', width: 185 },
-    { key: 'programScore', label: 'Program Burden Score', align: 'center', tone: 'score', width: 168 },
-    { key: 'regulatorScore', label: 'Regulator-Burden Score', align: 'center', tone: 'score', width: 182 },
-    { key: 'totalGenes', label: 'Trait Evidence Genes', align: 'right', tone: 'genes', width: 170 },
-    { key: 'topGenes', label: 'Top Evidence Genes', align: 'left', tone: 'genes', width: 370 },
+    { key: 'selection', label: 'Relationship', align: 'center', tone: 'other', width: 185 },
+    { key: 'programScore', label: 'Program Burden Score', align: 'center', tone: 'program', width: 168 },
+    { key: 'regulatorScore', label: 'Regulator-Burden Score', align: 'center', tone: 'other', width: 182 },
+    { key: 'topGenes', label: 'Top Evidence Genes', align: 'left', tone: 'gene', width: 370 },
 ];
 
 const PROGRAM_TRAIT_TITLE_HEADER_HEIGHT = 56;
@@ -90,16 +116,9 @@ function escapeCsvValue(value) {
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function selectionTags(row) {
-    const tags = [];
-    if (row?.selectedByProgram) tags.push('program');
-    if (row?.selectedByRegulator) tags.push('regulator');
-    if (!tags.length) tags.push(row?.color || 'other');
-    return tags;
-}
-
 function selectionLabel(row) {
-    return selectionTags(row).join(' / ');
+    const color = row?.color || 'other';
+    return ENRICHMENT_LABELS[color] || ENRICHMENT_LABELS.other;
 }
 
 function compareProgramTraits(a, b, sortBy, sortDir) {
@@ -112,8 +131,6 @@ function compareProgramTraits(a, b, sortBy, sortDir) {
         result = (Number(a?.programScore) || 0) - (Number(b?.programScore) || 0);
     } else if (sortBy === 'regulatorScore') {
         result = (Number(a?.regulatorScore) || 0) - (Number(b?.regulatorScore) || 0);
-    } else if (sortBy === 'totalGenes') {
-        result = (Number(a?.totalGenes) || 0) - (Number(b?.totalGenes) || 0);
     } else if (sortBy === 'topGenes') {
         result = (a?.topGenes?.length || 0) - (b?.topGenes?.length || 0);
     }
@@ -129,10 +146,8 @@ function buildProgramTraitCsv(rows) {
         'Trait',
         'Trait ID',
         'Relationship',
-        'Relationship Class',
         'Program Burden Score',
         'Regulator-Burden Score',
-        'Trait Evidence Genes',
         'Program Evidence Gene Count',
         'Regulator Evidence Gene Count',
         'Top Evidence Genes',
@@ -143,10 +158,8 @@ function buildProgramTraitCsv(rows) {
             row.traitName || '',
             row.traitId || '',
             selectionLabel(row),
-            row.color || '',
             row.programScore ?? '',
             row.regulatorScore ?? '',
-            Number(row.totalGenes) || 0,
             Number(row.loadingGeneCount) || 0,
             Number(row.regulatorGeneCount) || 0,
             (row.topGenes || []).join('; '),
@@ -204,10 +217,10 @@ export default function ProgramAssociatedTraits({
 }) {
     const theme = useTheme();
     const tones = {
-        trait: tableTone(theme, 'neutral'),
-        selection: tableTone(theme, 'accent'),
-        score: tableTone(theme, 'primary'),
-        genes: tableTone(theme, 'success'),
+        trait: tableTone(theme, 'warning'),
+        program: tableTone(theme, 'warning'),
+        gene: tableTone(theme, 'warning'),
+        other: tableTone(theme, 'warning'),
     };
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(DEFAULT_ROWS_PER_PAGE);
@@ -239,7 +252,7 @@ export default function ProgramAssociatedTraits({
             return;
         }
         setSortBy(key);
-        setSortDir(['programScore', 'regulatorScore', 'totalGenes', 'topGenes'].includes(key) ? 'desc' : 'asc');
+        setSortDir(['programScore', 'regulatorScore', 'topGenes'].includes(key) ? 'desc' : 'asc');
     }, [sortBy, sortDir]);
 
     if (isLoading) {
@@ -292,7 +305,7 @@ export default function ProgramAssociatedTraits({
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1309 })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1139 })}>
                     <colgroup>
                         {PROGRAM_TRAIT_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -388,39 +401,30 @@ export default function ProgramAssociatedTraits({
                                         {row.traitId}
                                     </Typography>
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.selection, 'center')}>
-                                    <Stack spacing={0.35} alignItems="center">
-                                        <Stack direction="row" spacing={0.45} justifyContent="center" sx={{ flexWrap: 'wrap' }}>
-                                            {row.selectedByProgram && <Chip label="program" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'primary')), height: 20, fontSize: '0.62rem' }} />}
-                                            {row.selectedByRegulator && <Chip label="regulator" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'accent')), height: 20, fontSize: '0.62rem' }} />}
-                                            {!row.selectedByProgram && !row.selectedByRegulator && <Chip label="other" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'subtle')), height: 20, fontSize: '0.62rem' }} />}
-                                        </Stack>
-                                        <Chip
-                                            label={String(row.color || 'other').replace(/_/g, ' ')}
-                                            size="small"
-                                            sx={{
-                                                ...summaryChipSx(theme, colorTone(theme, row.color)),
-                                                height: 20,
-                                                fontSize: '0.6rem',
-                                            }}
-                                        />
-                                    </Stack>
+                                <TableCell sx={programTraitCellSx(theme, tones.other, 'center')}>
+                                    <Chip
+                                        label={selectionLabel(row)}
+                                        size="small"
+                                        sx={{
+                                            ...summaryChipSx(theme, colorTone(theme, row.color)),
+                                            height: 'auto',
+                                            minHeight: 22,
+                                            fontSize: '0.64rem',
+                                            '& .MuiChip-label': {
+                                                display: 'block',
+                                                whiteSpace: 'normal',
+                                                py: 0.25,
+                                            },
+                                        }}
+                                    />
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.score, 'center', { fontFamily: 'monospace', fontWeight: 680, bgcolor: tones.score.cellStrong })}>
+                                <TableCell sx={programTraitCellSx(theme, tones.program, 'center', { fontFamily: 'monospace', fontWeight: 680, bgcolor: tones.program.cellStrong })}>
                                     {formatScore(row.programScore)}
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.score, 'center', { fontFamily: 'monospace', fontWeight: 680 })}>
+                                <TableCell sx={programTraitCellSx(theme, tones.other, 'center', { fontFamily: 'monospace', fontWeight: 680, bgcolor: tones.other.cellStrong })}>
                                     {formatScore(row.regulatorScore)}
                                 </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.genes, 'right', { bgcolor: tones.genes.cellStrong })}>
-                                    <Typography sx={{ fontSize: '0.74rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
-                                        {Number(row.totalGenes || 0).toLocaleString()} evidence
-                                    </Typography>
-                                    <Typography sx={{ fontSize: '0.62rem', color: theme.palette.text.secondary }}>
-                                        {row.loadingGeneCount || 0} program / {row.regulatorGeneCount || 0} regulator
-                                    </Typography>
-                                </TableCell>
-                                <TableCell sx={programTraitCellSx(theme, tones.genes, 'left', { whiteSpace: 'normal' })}>
+                                <TableCell sx={programTraitCellSx(theme, tones.gene, 'left', { whiteSpace: 'normal' })}>
                                     <Stack direction="row" spacing={0.45} sx={{ flexWrap: 'wrap' }}>
                                         {(row.topGenes || []).slice(0, 8).map((gene) => (
                                             <Chip

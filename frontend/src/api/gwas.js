@@ -80,7 +80,7 @@ export async function getGeneOverview(geneId) {
 export async function getGeneProgramRecords(geneId, {
     page = 1,
     limit = 50,
-    sortBy = 'absGamma',
+    sortBy = 'membershipScore',
     order = 'desc',
 } = {}) {
     const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/records`, {

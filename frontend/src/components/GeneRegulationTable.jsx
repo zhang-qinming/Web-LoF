@@ -37,10 +37,10 @@ import {
 } from '../themeUtils';
 
 const COLUMNS = [
-    { key: 'gene', label: 'Gene', align: 'center', width: 150 },
-    { key: 'es', label: 'Effect Size (lm_es)', align: 'right', width: 160 },
-    { key: 'p', label: 'P-value (lm_p)', align: 'right', width: 150 },
-    { key: 'negLogP', label: '-log10(P)', align: 'right', width: 132 },
+    { key: 'gene', label: 'Gene', align: 'center', width: 150, tone: 'gene' },
+    { key: 'es', label: 'Effect Size (lm_es)', align: 'right', width: 160, tone: 'other' },
+    { key: 'p', label: 'P-value (lm_p)', align: 'right', width: 150, tone: 'other' },
+    { key: 'negLogP', label: '-log10(P)', align: 'right', width: 132, tone: 'other' },
 ];
 
 function justifyForAlign(align = 'left') {
@@ -120,7 +120,10 @@ export default function GeneRegulationTable({
     embedded = false,
 }) {
     const theme = useTheme();
-    const tone = tableTone(theme, 'primary');
+    const tones = {
+        gene: tableTone(theme, 'primary'),
+        other: tableTone(theme, 'primary'),
+    };
 
     if (!rows.length) return null;
 
@@ -193,7 +196,7 @@ export default function GeneRegulationTable({
                                 {COLUMNS.map((column) => (
                                     <TableCell
                                         key={column.key}
-                                        sx={stickyTableHeaderCellSx(theme, tone, column.align, {
+                                        sx={stickyTableHeaderCellSx(theme, tones[column.tone], column.align, {
                                             fontWeight: 700,
                                             fontSize: '0.72rem',
                                             py: 0.78,
@@ -237,7 +240,7 @@ export default function GeneRegulationTable({
                                                     px: 1.5,
                                                     textAlign: column.align,
                                                     color: column.key === 'gene' ? theme.palette.primary.dark : theme.palette.text.primary,
-                                                    bgcolor: column.key === 'gene' ? tone.cellStrong : tone.cellSoft,
+                                                    bgcolor: column.key === 'gene' ? tones.gene.cellStrong : tones.other.cellSoft,
                                                     borderBottom: `1px solid ${theme.custom.border.soft}`,
                                                 }}
                                             >

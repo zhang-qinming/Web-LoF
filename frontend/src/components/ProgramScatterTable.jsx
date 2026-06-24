@@ -18,7 +18,6 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import {
     groupedTableColumnHeaderCellSx,
-    groupedTableHeaderCellSx,
     highlightedRowSx,
     metricChipTone,
     plotFrameSx,
@@ -31,7 +30,7 @@ import {
 } from '../themeUtils';
 
 const COLUMN_SPECS = [
-    { key: 'program', label: 'Program', align: 'left', tone: 'info', width: 118 },
+    { key: 'program', label: 'Program', align: 'left', tone: 'program', width: 118 },
     { key: 'color', label: 'Class', align: 'left', tone: 'info', width: 126 },
     { key: 'progScore', label: 'Score', align: 'right', tone: 'program', width: 92 },
     { key: 'rankProg', label: 'Rank', align: 'center', tone: 'program', width: 70 },
@@ -41,12 +40,6 @@ const COLUMN_SPECS = [
     { key: 'rankReg', label: 'Rank', align: 'center', tone: 'regulator', width: 70 },
     { key: 'regP', label: 'P-value', align: 'right', tone: 'regulator', width: 92 },
     { key: 'regBeta', label: 'Reg beta', align: 'right', tone: 'regulator', width: 92 },
-];
-
-const GROUPS = [
-    { label: 'Info', span: 2, tone: 'info' },
-    { label: 'Program Burden', span: 4, tone: 'program' },
-    { label: 'Regulator-Burden', span: 4, tone: 'regulator' },
 ];
 
 function justifyForAlign(align = 'left') {
@@ -149,7 +142,7 @@ export default function ProgramScatterTable({
     navigate,
 }) {
     const theme = useTheme();
-    const infoTone = tableTone(theme, 'neutral');
+    const infoTone = tableTone(theme, 'primary');
     const [tablePage, setTablePage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(25);
     const shouldPaginate = sortedRows.length > 50;
@@ -206,22 +199,6 @@ export default function ProgramScatterTable({
                         </colgroup>
                         <TableHead>
                             <TableRow>
-                                {GROUPS.map((group) => {
-                                    const tone = group.tone === 'info' ? infoTone : TABLE_TONES[group.tone];
-                                    return (
-                                        <TableCell
-                                            key={group.label}
-                                            colSpan={group.span}
-                                            sx={{
-                                                ...groupedTableHeaderCellSx(theme, tone),
-                                            }}
-                                        >
-                                            {group.label}
-                                        </TableCell>
-                                    );
-                                })}
-                            </TableRow>
-                            <TableRow>
                                 {COLUMN_SPECS.map((column) => {
                                     const tone = column.tone === 'info' ? infoTone : TABLE_TONES[column.tone];
                                     return (
@@ -229,7 +206,7 @@ export default function ProgramScatterTable({
                                             key={column.key}
                                             sx={{
                                                 ...thSx(column.align),
-                                                ...groupedTableColumnHeaderCellSx(theme, tone, column.align),
+                                                ...groupedTableColumnHeaderCellSx(theme, tone, column.align, { top: 0 }),
                                             }}
                                         >
                                             <TableSortLabel

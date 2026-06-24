@@ -47,8 +47,6 @@ import {
     captionSx,
     DATA_PAGE_MAX_WIDTH,
     groupedTableColumnHeaderCellSx,
-    groupedTableHeaderMetrics,
-    groupedTableHeaderCellSx,
     metricChipTone,
     panelSx,
     sectionPanelHeaderSx,
@@ -71,7 +69,7 @@ function formatSigned(value, digits = 3) {
 }
 
 function roleTone(theme, role) {
-    if (role === 'program') return metricChipTone(theme, 'primary');
+    if (role === 'program') return metricChipTone(theme, 'warning');
     if (role === 'regulator') return metricChipTone(theme, 'accent');
     return metricChipTone(theme, 'neutral');
 }
@@ -406,33 +404,22 @@ const GENE_TABLE_COLUMNS = [
     { key: 'totalTraits', label: 'Associated Traits', align: 'center', width: 156, headerWrap: true },
 ];
 const GENE_PROGRAM_COLUMNS = [
-    { key: 'program', label: 'Program', align: 'center', width: 84, tone: 'identity' },
-    { key: 'programAnnotation', label: 'Function', align: 'left', width: 292, tone: 'annotation' },
-    { key: 'programGoLabel', label: 'GO Term', align: 'left', width: 244, tone: 'annotation' },
-    { key: 'geneDirection', label: 'Gene Role / Direction', align: 'center', width: 170, tone: 'evidence' },
-    { key: 'totalTraits', label: 'Linked Traits', align: 'center', width: 112, tone: 'evidence' },
-    { key: 'programGeneCountSort', label: 'Evidence Gene Count', align: 'center', width: 158, tone: 'evidence' },
-];
-const GENE_PROGRAM_GROUPS = [
-    { label: 'Identity', span: 1, tone: 'identity' },
-    { label: 'Annotation', span: 2, tone: 'annotation' },
-    { label: 'Gene Evidence / Program Size', span: 3, tone: 'evidence' },
+    { key: 'program', label: 'Program', align: 'center', width: 84, tone: 'program' },
+    { key: 'programAnnotation', label: 'Function Annotation', align: 'left', width: 292, tone: 'neutral' },
+    { key: 'programGoLabel', label: 'GO Term', align: 'left', width: 244, tone: 'neutral' },
+    { key: 'geneDirection', label: 'Gene Role / Direction', align: 'center', width: 170, tone: 'gene' },
+    { key: 'totalTraits', label: 'Associated Traits', align: 'center', width: 122, tone: 'trait' },
+    { key: 'programGeneCountSort', label: 'Gene Count', align: 'center', width: 128, tone: 'gene' },
 ];
 const GENE_TRAIT_COLUMNS = [
     { key: 'traitName', label: 'Trait', align: 'left', width: 272, tone: 'trait' },
-    { key: 'program', label: 'Program', align: 'center', width: 82, tone: 'trait' },
-    { key: 'programAnnotation', label: 'Function', align: 'left', width: 228, tone: 'trait' },
-    { key: 'role', label: 'Role', align: 'center', width: 92, tone: 'mapping' },
-    { key: 'direction', label: 'Direction', align: 'center', width: 112, tone: 'mapping' },
-    { key: 'postMean', label: 'LoF Effect', align: 'center', width: 98, tone: 'metric' },
-    { key: 'absGamma', label: 'Abs LoF Effect', align: 'center', width: 122, tone: 'metric' },
-    { key: 'membershipScore', label: 'Membership / Beta', align: 'center', width: 130, tone: 'metric' },
-    { key: 'concordance', label: 'Concordance', align: 'center', width: 132, tone: 'metric' },
-];
-const GENE_TRAIT_GROUPS = [
-    { label: 'Trait / Program', span: 3, tone: 'trait' },
-    { label: 'Mapping', span: 2, tone: 'mapping' },
-    { label: 'Metrics', span: 4, tone: 'metric' },
+    { key: 'program', label: 'Program', align: 'center', width: 82, tone: 'program' },
+    { key: 'programAnnotation', label: 'Function Annotation', align: 'left', width: 228, tone: 'neutral' },
+    { key: 'role', label: 'Role', align: 'center', width: 92, tone: 'gene' },
+    { key: 'direction', label: 'Direction', align: 'center', width: 112, tone: 'gene' },
+    { key: 'postMean', label: 'LoF Effect', align: 'center', width: 98, tone: 'neutral' },
+    { key: 'membershipScore', label: 'Beta', align: 'center', width: 100, tone: 'neutral' },
+    { key: 'concordance', label: 'Concordance', align: 'center', width: 132, tone: 'neutral' },
 ];
 const EMPTY_GENE_ROWS = [];
 const EMPTY_RECORDS = [];
@@ -488,7 +475,7 @@ function geneTableCellSx(theme, {
     align = 'left',
     fontFamily,
     fontWeight = 500,
-    whiteSpace = 'nowrap',
+    whiteSpace = 'normal',
 } = {}) {
     const useDataFont = fontFamily === 'monospace';
     return {
@@ -504,8 +491,10 @@ function geneTableCellSx(theme, {
         fontWeight,
         color: '#334155',
         borderBottom: `1px solid ${theme.custom.border.soft}`,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
+        overflow: 'visible',
+        textOverflow: 'clip',
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
         verticalAlign: 'middle',
     };
 }
@@ -545,16 +534,9 @@ function embeddedTableTitleCellSx(theme) {
     };
 }
 
-function embeddedGroupHeaderSx(theme, tone) {
-    return groupedTableHeaderCellSx(theme, tone, {
-        top: GENE_TABLE_TITLE_HEADER_HEIGHT,
-        fontSize: '0.72rem',
-    });
-}
-
 function embeddedColumnHeaderSx(theme, tone, align) {
     return groupedTableColumnHeaderCellSx(theme, tone, align, {
-        top: GENE_TABLE_TITLE_HEADER_HEIGHT + groupedTableHeaderMetrics.groupHeight,
+        top: GENE_TABLE_TITLE_HEADER_HEIGHT,
         fontSize: '0.75rem',
         fontWeight: 680,
     });
@@ -863,12 +845,11 @@ function buildGeneTraitCsv(rows) {
             'Trait',
             'Trait ID',
             'Program',
-            'Program Function',
+            'Function Annotation',
             'Role',
             'Direction',
-            'post_mean',
-            'abs_gamma',
-            'membership',
+            'LoF Effect',
+            'Beta',
             'Concordance',
         ].map((value) => escapeCsvValue(value)).join(','),
         ...rows.map((row) => ([
@@ -879,7 +860,6 @@ function buildGeneTraitCsv(rows) {
             row.role || '',
             getRecordDirection(row),
             Number.isFinite(row.postMean) ? row.postMean : '',
-            Number.isFinite(row.absGamma) ? row.absGamma : '',
             Number.isFinite(row.membershipScore) ? row.membershipScore : '',
             getConcordanceLabel(row),
         ].map((value) => escapeCsvValue(value)).join(','))),
@@ -1059,124 +1039,12 @@ function GeneSuggestionList({ suggestions, isLoading, onSelect }) {
                                 )}
                             </Box>
                             <Stack direction="row" spacing={0.45} sx={{ width: '100%', flexWrap: 'wrap' }}>
-                                <Chip label={`${Number(gene.totalTraits) || 0} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))} />
-                                <Chip label={`${Number(gene.totalPrograms) || 0} programs`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                                <Chip label={`${Number(gene.totalTraits) || 0} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                                <Chip label={`${Number(gene.totalPrograms) || 0} programs`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
                             </Stack>
                         </Button>
                     );
                 })}
-            </Box>
-        </Box>
-    );
-}
-
-function GeneLocationCell({ gene }) {
-    const location = getGeneLocation(gene) || '-';
-
-    return (
-        <Box
-            title={location}
-            sx={{
-                width: '100%',
-                minWidth: 0,
-                px: 0.65,
-                py: 0.28,
-                borderRadius: 0.75,
-                fontVariantNumeric: 'tabular-nums',
-                fontFeatureSettings: '"tnum" 1',
-                fontSize: '0.72rem',
-                fontWeight: 680,
-                color: '#315d57',
-                bgcolor: alpha('#2f6a49', 0.06),
-                border: `1px solid ${alpha('#2f6a49', 0.14)}`,
-                textAlign: 'center',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-            }}
-        >
-            {location}
-        </Box>
-    );
-}
-
-function GeneTypeBadge({ value }) {
-    const theme = useTheme();
-    const tone = geneTypeTone(theme, value);
-
-    return (
-        <Box
-            sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                maxWidth: '100%',
-                px: 0.72,
-                py: 0.24,
-                borderRadius: 1,
-                color: tone.color,
-                bgcolor: tone.backgroundColor,
-                border: `1px solid ${tone.borderColor}`,
-                fontSize: '0.68rem',
-                fontWeight: 680,
-                lineHeight: 1.12,
-                whiteSpace: 'normal',
-                wordBreak: 'break-word',
-            }}
-        >
-            {value || '-'}
-        </Box>
-    );
-}
-
-function GeneAssociationMeter({ value, maxValue, tone = 'primary', compact = true }) {
-    const count = Number(value) || 0;
-    const width = evidenceWidth(count, maxValue);
-    const color = tone === 'accent' ? '#5d3f8c' : '#245089';
-    const softColor = tone === 'accent' ? alpha('#5d3f8c', 0.13) : alpha('#245089', 0.13);
-
-    return (
-        <Box sx={{
-            width: '100%',
-            maxWidth: compact ? 126 : 152,
-            minWidth: 0,
-            mx: 'auto',
-            display: 'grid',
-            gridTemplateColumns: compact ? '44px minmax(64px, 1fr)' : '52px minmax(76px, 1fr)',
-            alignItems: 'center',
-            gap: 0.65,
-        }}>
-            <Typography
-                sx={{
-                    fontVariantNumeric: 'tabular-nums',
-                    fontFeatureSettings: '"tnum" 1',
-                    fontSize: compact ? '0.76rem' : '0.86rem',
-                    fontWeight: 720,
-                    lineHeight: 1,
-                    color,
-                    textAlign: 'right',
-                }}
-            >
-                {count.toLocaleString()}
-            </Typography>
-            <Box
-                sx={{
-                    width: '100%',
-                    height: compact ? 4 : 5,
-                    borderRadius: 999,
-                    bgcolor: softColor,
-                    overflow: 'hidden',
-                }}
-            >
-                <Box
-                    sx={{
-                        width: `${width}%`,
-                        height: '100%',
-                        borderRadius: 999,
-                        bgcolor: color,
-                    }}
-                />
             </Box>
         </Box>
     );
@@ -1215,7 +1083,7 @@ function GeneHomeTable({
         return () => clearInterval(timer);
     }, []);
     const geneTone = {
-        ...tableTone(theme, 'neutral'),
+        ...tableTone(theme, 'success'),
         headerBg: '#f5faf8',
         headerBorder: alpha('#2f6a49', 0.24),
         headerColor: '#315d57',
@@ -1307,11 +1175,6 @@ function GeneHomeTable({
         }
     }, [activeSearch, sortBy, sortDir]);
 
-    const resultChipLabel = previewingSearch
-        ? `${visibleRows.length.toLocaleString()} visible; updating`
-        : activeSearch
-            ? `${totalCount.toLocaleString()} matching genes`
-            : `${totalCount.toLocaleString()} genes`;
     const filterChipLabel = searchInput || activeSearch;
 
     return (
@@ -1347,15 +1210,15 @@ function GeneHomeTable({
                         gap: 0.65,
                         flexWrap: 'wrap',
                         maxWidth: { lg: 280 },
+                        '@media (min-width: 2200px)': {
+                            maxWidth: 420,
+                        },
                     }}
                 >
                     <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b35', lineHeight: 1.15 })}>
                         Gene
                     </Typography>
                     <Stack direction="row" spacing={0.55} alignItems="center" sx={{ flexWrap: 'wrap', minWidth: 0 }}>
-                        <Typography sx={{ fontSize: '0.76rem', fontWeight: 680, color: '#2f6a49', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
-                            {resultChipLabel}
-                        </Typography>
                         {filterChipLabel && (
                             <Chip
                                 label={`Filter: ${filterChipLabel}`}
@@ -1396,6 +1259,9 @@ function GeneHomeTable({
                         sx={{
                             width: '100%',
                             maxWidth: { lg: 260 },
+                            '@media (min-width: 2200px)': {
+                                maxWidth: 360,
+                            },
                             '& .MuiOutlinedInput-root': {
                                 height: 32,
                                 bgcolor: theme.palette.background.paper,
@@ -1491,7 +1357,7 @@ function GeneHomeTable({
             )}
 
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'hidden' })}>
-                <Table size="small" stickyHeader sx={stickyTableSx(theme, { minWidth: 960, tableLayout: 'fixed' })}>
+                <Table size="small" stickyHeader sx={stickyTableSx(theme, { minWidth: 1280, tableLayout: 'auto' })}>
                     <colgroup>
                         {GENE_TABLE_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -1598,7 +1464,7 @@ function GeneHomeTable({
                                         if (column.key === 'geneSymbol') {
                                             content = (
                                                 <Box sx={{ minWidth: 0, textAlign: 'center' }}>
-                                                    <Typography sx={{ fontSize: '0.87rem', fontWeight: 740, lineHeight: 1.08, color: '#173b35', textAlign: 'center' }} noWrap>
+                                                    <Typography sx={{ fontSize: '0.87rem', fontWeight: 740, lineHeight: 1.18, color: '#173b35', textAlign: 'center', overflowWrap: 'anywhere' }}>
                                                         {gene.geneSymbol || gene.geneLabel || '-'}
                                                     </Typography>
                                                 </Box>
@@ -1613,7 +1479,7 @@ function GeneHomeTable({
                                         }
                                         if (column.key === 'ensgId') {
                                             content = (
-                                                <Typography sx={{ fontSize: '0.73rem', fontWeight: 650, color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', textAlign: 'center' }} noWrap>
+                                                <Typography sx={{ fontSize: '0.73rem', fontWeight: 650, color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', textAlign: 'center', overflowWrap: 'anywhere' }}>
                                                     {gene.ensgId || '-'}
                                                 </Typography>
                                             );
@@ -1635,9 +1501,8 @@ function GeneHomeTable({
                                                         align: column.align,
                                                         fontFamily: isMono ? 'monospace' : undefined,
                                                         fontWeight: column.key === 'geneSymbol' || isNumeric ? 700 : 500,
-                                                        whiteSpace: ['geneDescription', 'geneType'].includes(column.key) ? 'normal' : 'nowrap',
+                                                        whiteSpace: 'normal',
                                                     }),
-                                                    ...(isNumeric ? { overflow: 'visible' } : {}),
                                                 }}
                                             >
                                                 {content}
@@ -1675,139 +1540,6 @@ function GeneHomeTable({
                     showRange
                 />
             </Box>
-        </Paper>
-    );
-}
-
-function GeneDiscoveryPanel({ recommended, onSelect }) {
-    const theme = useTheme();
-    const fallbackGenes = ['RPL37', 'RPL36', 'PTMA', 'RPL23', 'RPL24', 'TP53'];
-    const genes = recommended?.genes || [];
-    const spotlightGenes = (genes.length ? genes : fallbackGenes.map((gene) => ({ geneSymbol: gene }))).slice(0, 8);
-    const maxTraits = Math.max(1, ...spotlightGenes.map((gene) => Number(gene.totalTraits) || 0));
-    const maxPrograms = Math.max(1, ...spotlightGenes.map((gene) => Number(gene.totalPrograms) || 0));
-
-    return (
-        <Paper
-            elevation={0}
-            sx={panelSx(theme, {
-                overflow: 'hidden',
-                bgcolor: alpha('#2f6a49', 0.025),
-                borderColor: alpha('#2f6a49', 0.14),
-            })}
-        >
-            {recommended?.unavailable ? (
-                <Alert severity="warning" sx={{ m: 1.5, borderRadius: 1 }}>
-                    Gene SQL index is not available yet.
-                </Alert>
-            ) : (
-                <Box
-                    sx={{
-                        p: { xs: 1.5, md: 1.75 },
-                        display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', xl: '240px minmax(0, 1fr)' },
-                        gap: 1.35,
-                        alignItems: 'stretch',
-                    }}
-                >
-                    <Box
-                        sx={{
-                            p: 1.25,
-                            borderRadius: 1.25,
-                            bgcolor: theme.palette.background.paper,
-                            border: `1px solid ${theme.custom.border.soft}`,
-                        }}
-                    >
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'none', color: '#2f6a49' }}>
-                            Gene spotlight
-                        </Typography>
-                        <Typography sx={sectionTitleSx(theme, { mt: 0.35, fontSize: '0.96rem', color: '#173b35' })}>
-                            High-connectivity entries
-                        </Typography>
-                        <Typography sx={captionSx(theme, { mt: 0.45, fontSize: '0.72rem', lineHeight: 1.45 })}>
-                            Quick jumps into genes with broad trait and program evidence, kept below the atlas so the table stays primary.
-                        </Typography>
-                    </Box>
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
-                            gap: 0.85,
-                        }}
-                    >
-                        {spotlightGenes.map((gene, index) => {
-                            const label = gene.geneSymbol || gene.ensgId || gene.geneLabel;
-                            const traitCount = Number(gene.totalTraits) || 0;
-                            const programCount = Number(gene.totalPrograms) || 0;
-                            return (
-                                <Button
-                                    key={`${label}-${index}`}
-                                    onClick={() => onSelect(label)}
-                                    sx={{
-                                        display: 'block',
-                                        textAlign: 'left',
-                                        textTransform: 'none',
-                                        px: 1.1,
-                                        py: 1,
-                                        borderRadius: 1.25,
-                                        border: `1px solid ${theme.custom.border.soft}`,
-                                        color: theme.palette.text.primary,
-                                        bgcolor: theme.palette.background.paper,
-                                        minWidth: 0,
-                                        transition: `background-color ${theme.custom.motion.swift}, border-color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
-                                        ...tableRowRevealSx(theme, index),
-                                        '&:hover': {
-                                            bgcolor: alpha('#2f6a49', 0.045),
-                                            borderColor: alpha('#2f6a49', 0.24),
-                                            transform: 'translateY(-1px)',
-                                        },
-                                    }}
-                                >
-                                    <Stack direction="row" spacing={0.75} alignItems="flex-start" justifyContent="space-between">
-                                        <Box sx={{ minWidth: 0 }}>
-                                            <Typography sx={{ fontSize: '0.88rem', fontWeight: 740, color: '#173b35', lineHeight: 1.12 }} noWrap>
-                                                {label}
-                                            </Typography>
-                                            {gene.ensgId && (
-                                                <Typography sx={{ mt: 0.25, fontSize: '0.65rem', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }} noWrap>
-                                                    {gene.ensgId}
-                                                </Typography>
-                                            )}
-                                        </Box>
-                                        <Box sx={{ width: 28, height: 28, borderRadius: 1, bgcolor: alpha('#2f6a49', 0.08), border: `1px solid ${alpha('#2f6a49', 0.16)}` }} />
-                                    </Stack>
-                                    {(traitCount || programCount) ? (
-                                        <Stack spacing={0.55} sx={{ mt: 0.9 }}>
-                                            <Box>
-                                                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary, fontWeight: 650 }}>Traits</Typography>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: '#5d3f8c', fontWeight: 720, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>{traitCount.toLocaleString()}</Typography>
-                                                </Stack>
-                                                <Box sx={{ height: 4, borderRadius: 999, bgcolor: alpha('#5d3f8c', 0.12), overflow: 'hidden' }}>
-                                                    <Box sx={{ height: '100%', width: `${evidenceWidth(traitCount, maxTraits)}%`, bgcolor: '#5d3f8c' }} />
-                                                </Box>
-                                            </Box>
-                                            <Box>
-                                                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary, fontWeight: 650 }}>Programs</Typography>
-                                                    <Typography sx={{ fontSize: '0.66rem', color: '#245089', fontWeight: 720, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>{programCount.toLocaleString()}</Typography>
-                                                </Stack>
-                                                <Box sx={{ height: 4, borderRadius: 999, bgcolor: alpha('#245089', 0.12), overflow: 'hidden' }}>
-                                                    <Box sx={{ height: '100%', width: `${evidenceWidth(programCount, maxPrograms)}%`, bgcolor: '#245089' }} />
-                                                </Box>
-                                            </Box>
-                                        </Stack>
-                                    ) : (
-                                        <Typography sx={{ mt: 0.9, fontSize: '0.68rem', color: theme.palette.text.secondary }}>
-                                            Open gene evidence
-                                        </Typography>
-                                    )}
-                                </Button>
-                            );
-                        })}
-                    </Box>
-                </Box>
-            )}
         </Paper>
     );
 }
@@ -1982,8 +1714,8 @@ function GeneSwitcher({ gene, query, onSelect }) {
                                     </Typography>
                                 </Box>
                                 <Stack direction="row" spacing={0.45} sx={{ width: '100%', flexWrap: 'wrap' }}>
-                                    <Chip label={`${Number(item.totalTraits) || 0} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'accent'))} />
-                                    <Chip label={`${Number(item.totalPrograms) || 0} programs`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                                    <Chip label={`${Number(item.totalTraits) || 0} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                                    <Chip label={`${Number(item.totalPrograms) || 0} programs`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
                                 </Stack>
                             </ButtonBase>
                         );
@@ -1998,10 +1730,8 @@ function GeneDetailHeader({ gene, query, summary, onSelect }) {
     const theme = useTheme();
     const metrics = [
         { label: 'Associations', value: summary?.totalRows, tone: 'neutral' },
-        { label: 'Programs', value: summary?.totalPrograms, tone: 'primary' },
-        { label: 'Traits', value: summary?.totalTraits, tone: 'accent' },
-        { label: 'Concordant', value: summary?.concordantRows, tone: 'success' },
-        { label: 'Discordant', value: summary?.discordantRows, tone: 'warning' },
+        { label: 'Programs', value: summary?.totalPrograms, tone: 'warning' },
+        { label: 'Traits', value: summary?.totalTraits, tone: 'primary' },
     ];
 
     return (
@@ -2034,14 +1764,14 @@ function GeneDetailHeader({ gene, query, summary, onSelect }) {
                         gridTemplateColumns: {
                             xs: 'repeat(2, minmax(0, 1fr))',
                             sm: 'repeat(3, minmax(104px, 1fr))',
-                            md: 'repeat(5, minmax(104px, 1fr))',
-                            lg: 'repeat(5, minmax(116px, 1fr))',
+                            md: 'repeat(3, minmax(104px, 1fr))',
+                            lg: 'repeat(3, minmax(116px, 1fr))',
                         },
                         gap: { xs: 0.75, md: 0.9 },
                         width: '100%',
                         minWidth: 0,
                         flex: { xs: '1 1 auto', md: '1 1 0%' },
-                        maxWidth: { md: 660 },
+                        maxWidth: { md: 420 },
                     }}
                 >
                     {metrics.map((metric) => {
@@ -2186,7 +1916,7 @@ function GeneInfoTable({ gene, summary }) {
                                     {row.label}
                                 </TableCell>
                                 <TableCell
-                                    align="left"
+                                    align="center"
                                     sx={{
                                         py: 1.05,
                                         px: 1.35,
@@ -2198,14 +1928,14 @@ function GeneInfoTable({ gene, summary }) {
                                         color: row.tone === 'link' ? '#245089' : theme.palette.text.primary,
                                         bgcolor: theme.palette.background.paper,
                                         borderBottom: `1px solid ${theme.custom.border.soft}`,
-                                        textAlign: 'left',
+                                        textAlign: 'center',
                                         whiteSpace: row.wrap ? 'normal' : 'nowrap',
                                         wordBreak: row.wrap ? 'break-word' : 'normal',
                                         verticalAlign: 'middle',
                                     }}
                                 >
                                     {row.links ? (
-                                        <Stack direction="row" spacing={0.75} justifyContent="flex-start" sx={{ flexWrap: 'wrap' }}>
+                                        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ flexWrap: 'wrap' }}>
                                             {row.links.length ? row.links.map((link) => (
                                                 <Button
                                                     key={link.label}
@@ -2259,9 +1989,10 @@ function GeneProgramTable({ gene, records, programRows }) {
     const [sortDir, setSortDir] = React.useState('desc');
 
     const TONES = {
-        identity: tableTone(theme, 'neutral'),
-        annotation: tableTone(theme, 'success'),
-        evidence: tableTone(theme, 'primary'),
+        gene: tableTone(theme, 'success'),
+        program: tableTone(theme, 'success'),
+        trait: tableTone(theme, 'success'),
+        neutral: tableTone(theme, 'success'),
     };
 
     const sortedRows = React.useMemo(
@@ -2297,24 +2028,10 @@ function GeneProgramTable({ gene, records, programRows }) {
                     </colgroup>
                     <TableHead>
                         <EmbeddedTableTitleRow
-                            title="Gene - Program relationships"
+                            title="Associated Programs"
                             colSpan={GENE_PROGRAM_COLUMNS.length}
                             onDownload={handleDownload}
                         />
-                        <TableRow>
-                            {GENE_PROGRAM_GROUPS.map((group) => {
-                                const palette = TONES[group.tone];
-                                return (
-                                    <TableCell
-                                        key={group.label}
-                                        colSpan={group.span}
-                                        sx={embeddedGroupHeaderSx(theme, palette)}
-                                    >
-                                        {group.label}
-                                    </TableCell>
-                                );
-                            })}
-                        </TableRow>
                         <TableRow>
                             {GENE_PROGRAM_COLUMNS.map((column) => {
                                 const palette = TONES[column.tone];
@@ -2346,7 +2063,7 @@ function GeneProgramTable({ gene, records, programRows }) {
                                     '&:hover td': { bgcolor: alpha(theme.palette.primary.main, 0.035) },
                                 }}
                             >
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.identity, fontFamily: 'monospace', fontWeight: 500 })}>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.program, fontFamily: 'monospace', fontWeight: 500 })}>
                                     <Button
                                         component={RouterLink}
                                         to={`/programs/${encodeURIComponent(row.program)}`}
@@ -2356,10 +2073,10 @@ function GeneProgramTable({ gene, records, programRows }) {
                                             fontSize: '0.72rem',
                                             px: 0,
                                             py: 0,
-                                            color: '#1976D2',
+                                            color: '#7c4d12',
                                             justifyContent: 'center',
                                             minHeight: 0,
-                                            '&:hover': { color: '#0D47A1', textDecoration: 'underline' },
+                                            '&:hover': { color: '#5f3a0b', textDecoration: 'underline' },
                                         }}
                                     >
                                         {row.program}
@@ -2367,7 +2084,7 @@ function GeneProgramTable({ gene, records, programRows }) {
                                 </TableCell>
                                 <TableCell
                                     sx={{
-                                        ...geneBodyCellSx({ align: 'left', tone: TONES.annotation, whiteSpace: 'normal' }),
+                                        ...geneBodyCellSx({ align: 'left', tone: TONES.neutral, whiteSpace: 'normal' }),
                                         overflow: 'visible',
                                         textOverflow: 'clip',
                                         verticalAlign: 'top',
@@ -2412,8 +2129,8 @@ function GeneProgramTable({ gene, records, programRows }) {
                                 </TableCell>
                                 <TableCell
                                     sx={{
-                                        ...geneBodyCellSx({ align: 'left', tone: TONES.annotation, whiteSpace: 'normal' }),
-                                        bgcolor: TONES.annotation.cellStrong,
+                                        ...geneBodyCellSx({ align: 'left', tone: TONES.neutral, whiteSpace: 'normal' }),
+                                        bgcolor: TONES.neutral.cellStrong,
                                         overflow: 'visible',
                                         textOverflow: 'clip',
                                         verticalAlign: 'top',
@@ -2435,7 +2152,7 @@ function GeneProgramTable({ gene, records, programRows }) {
                                                     py: 0,
                                                     justifyContent: 'flex-start',
                                                     minHeight: 0,
-                                                    color: TONES.annotation.headerColor,
+                                                    color: TONES.neutral.headerColor,
                                                     width: '100%',
                                                     textAlign: 'left',
                                                     whiteSpace: 'normal',
@@ -2450,15 +2167,15 @@ function GeneProgramTable({ gene, records, programRows }) {
                                         </Typography>
                                     )}
                                 </TableCell>
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.evidence, fontWeight: 600 })}>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.gene, fontWeight: 600 })}>
                                     <Typography sx={{ fontSize: '0.69rem', fontWeight: 700 }}>
                                         {row.geneDirection}
                                     </Typography>
                                 </TableCell>
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.evidence, fontFamily: 'monospace', fontWeight: 600 })}>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.trait, fontFamily: 'monospace', fontWeight: 600 })}>
                                     {Number(row.totalTraits || 0).toLocaleString()}
                                 </TableCell>
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.evidence, fontFamily: 'monospace', fontWeight: 600 })}>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.gene, fontFamily: 'monospace', fontWeight: 600 })}>
                                     {row.programGeneCountLabel}
                                 </TableCell>
                             </TableRow>
@@ -2497,17 +2214,17 @@ function GeneDetailHeaderSkeleton() {
                         gridTemplateColumns: {
                             xs: 'repeat(2, minmax(0, 1fr))',
                             sm: 'repeat(3, minmax(104px, 1fr))',
-                            md: 'repeat(5, minmax(104px, 1fr))',
-                            lg: 'repeat(5, minmax(116px, 1fr))',
+                            md: 'repeat(3, minmax(104px, 1fr))',
+                            lg: 'repeat(3, minmax(116px, 1fr))',
                         },
                         gap: { xs: 0.75, md: 0.9 },
                         width: '100%',
                         minWidth: 0,
                         flex: { xs: '1 1 auto', md: '1 1 0%' },
-                        maxWidth: { md: 660 },
+                        maxWidth: { md: 420 },
                     }}
                 >
-                    {Array.from({ length: 5 }).map((_, index) => (
+                    {Array.from({ length: 3 }).map((_, index) => (
                         <Box
                             key={index}
                             sx={{
@@ -2572,15 +2289,16 @@ function GeneProgramTraitTable({
     const rows = records || EMPTY_RECORDS;
 
     const TONES = {
-        trait: tableTone(theme, 'neutral'),
-        mapping: tableTone(theme, 'accent'),
-        metric: tableTone(theme, 'primary'),
+        gene: tableTone(theme, 'success'),
+        program: tableTone(theme, 'success'),
+        trait: tableTone(theme, 'success'),
+        neutral: tableTone(theme, 'success'),
     };
 
     const handleSort = React.useCallback((key) => {
         const nextDir = sortBy === key
             ? (sortDir === 'asc' ? 'desc' : 'asc')
-            : (['postMean', 'absGamma', 'membershipScore', 'concordance'].includes(key) ? 'desc' : 'asc');
+            : (['postMean', 'membershipScore', 'concordance'].includes(key) ? 'desc' : 'asc');
         onSort?.(key, nextDir);
     }, [onSort, sortBy, sortDir]);
 
@@ -2604,7 +2322,7 @@ function GeneProgramTraitTable({
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1212 })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1090 })}>
                     <colgroup>
                         {GENE_TRAIT_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -2612,25 +2330,11 @@ function GeneProgramTraitTable({
                     </colgroup>
                     <TableHead>
                         <EmbeddedTableTitleRow
-                            title="Gene - Program - Trait evidence"
+                            title="Associated Traits"
                             colSpan={GENE_TRAIT_COLUMNS.length}
                             onDownload={handleDownload}
                             action={<UpdatingStatus active={isRefreshing} />}
                         />
-                        <TableRow>
-                            {GENE_TRAIT_GROUPS.map((group) => {
-                                const palette = TONES[group.tone];
-                                return (
-                                    <TableCell
-                                        key={group.label}
-                                        colSpan={group.span}
-                                        sx={embeddedGroupHeaderSx(theme, palette)}
-                                    >
-                                        {group.label}
-                                    </TableCell>
-                                );
-                            })}
-                        </TableRow>
                         <TableRow>
                             {GENE_TRAIT_COLUMNS.map((column) => {
                                 const palette = TONES[column.tone];
@@ -2682,7 +2386,7 @@ function GeneProgramTraitTable({
                                             alignItems: 'flex-start',
                                             px: 0,
                                             py: 0,
-                                            color: theme.palette.text.primary,
+                                            color: '#245089',
                                             width: '100%',
                                             minHeight: 0,
                                         }}
@@ -2702,7 +2406,7 @@ function GeneProgramTraitTable({
                                         </Box>
                                     </Button>
                                 </TableCell>
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.trait, fontFamily: 'monospace', fontWeight: 500 })}>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.program, fontFamily: 'monospace', fontWeight: 500 })}>
                                     <Button
                                         component={RouterLink}
                                         to={`/programs/${encodeURIComponent(row.program)}`}
@@ -2712,10 +2416,10 @@ function GeneProgramTraitTable({
                                             fontSize: '0.72rem',
                                             px: 0,
                                             py: 0,
-                                            color: '#1976D2',
+                                            color: '#7c4d12',
                                             justifyContent: 'center',
                                             minHeight: 0,
-                                            '&:hover': { color: '#0D47A1', textDecoration: 'underline' },
+                                            '&:hover': { color: '#5f3a0b', textDecoration: 'underline' },
                                         }}
                                     >
                                         {row.program}
@@ -2723,7 +2427,7 @@ function GeneProgramTraitTable({
                                 </TableCell>
                                 <TableCell
                                     sx={{
-                                        ...geneBodyCellSx({ align: 'left', tone: TONES.trait, whiteSpace: 'normal' }),
+                                        ...geneBodyCellSx({ align: 'left', tone: TONES.neutral, whiteSpace: 'normal' }),
                                         overflow: 'visible',
                                         textOverflow: 'clip',
                                         verticalAlign: 'top',
@@ -2742,7 +2446,7 @@ function GeneProgramTraitTable({
                                         {row.programAnnotation || '—'}
                                     </Typography>
                                 </TableCell>
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.mapping })}>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.gene })}>
                                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                                         <Chip label={row.role} size="small" sx={{
                                             ...summaryChipSx(theme, roleTone(theme, row.role)),
@@ -2751,20 +2455,15 @@ function GeneProgramTraitTable({
                                         }} />
                                     </Box>
                                 </TableCell>
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.mapping, whiteSpace: 'normal' })}>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.gene, whiteSpace: 'normal' })}>
                                     <Typography sx={{ fontSize: '0.69rem', fontWeight: 700, textAlign: 'center' }}>
                                         {getRecordDirection(row)}
                                     </Typography>
                                 </TableCell>
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.metric, fontFamily: 'monospace' })}>{formatSigned(row.postMean, 4)}</TableCell>
-                                <TableCell sx={{ ...geneBodyCellSx({ align: 'center', tone: TONES.metric, fontFamily: 'monospace', fontWeight: 600 }), bgcolor: TONES.metric.cellStrong }}>{formatNumber(row.absGamma, 4)}</TableCell>
-                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.metric, fontFamily: 'monospace' })}>{formatNumber(row.membershipScore, 4)}</TableCell>
-                                <TableCell sx={{ ...geneBodyCellSx({ align: 'center', tone: TONES.metric }), bgcolor: TONES.metric.cellStrong }}>
-                                    <Stack direction="row" spacing={0.4} justifyContent="center" sx={{ flexWrap: 'wrap' }}>
-                                        {row.isConcordant && <Chip label="concordant" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'success')), height: 20, fontSize: '0.6rem' }} />}
-                                        {row.isDiscordant && <Chip label="discordant" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'warning')), height: 20, fontSize: '0.6rem' }} />}
-                                        {!row.isConcordant && !row.isDiscordant && <Chip label="—" size="small" sx={{ ...summaryChipSx(theme, metricChipTone(theme, 'subtle')), height: 20, fontSize: '0.6rem' }} />}
-                                    </Stack>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace' })}>{formatSigned(row.postMean, 4)}</TableCell>
+                                <TableCell sx={geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace' })}>{formatNumber(row.membershipScore, 4)}</TableCell>
+                                <TableCell sx={{ ...geneBodyCellSx({ align: 'center', tone: TONES.neutral }), bgcolor: TONES.neutral.cellStrong }}>
+                                    {getConcordanceLabel(row)}
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -2803,7 +2502,7 @@ export default function Genes() {
     const [input, setInput] = React.useState(queryParam);
     const [traitPage, setTraitPage] = React.useState(0);
     const [traitRowsPerPage, setTraitRowsPerPage] = React.useState(DEFAULT_ROWS_PER_PAGE);
-    const [traitSortBy, setTraitSortBy] = React.useState('absGamma');
+    const [traitSortBy, setTraitSortBy] = React.useState('membershipScore');
     const [traitSortDir, setTraitSortDir] = React.useState('desc');
     const query = queryParam.trim();
     const debouncedInput = useDebouncedValue(input.trim());
@@ -2817,7 +2516,7 @@ export default function Genes() {
 
     React.useEffect(() => {
         setTraitPage(0);
-        setTraitSortBy('absGamma');
+        setTraitSortBy('membershipScore');
         setTraitSortDir('desc');
     }, [query]);
 
@@ -2825,12 +2524,6 @@ export default function Genes() {
         suggestionQuery.length >= 2 ? ['gene-search', suggestionQuery] : null,
         ([, q]) => searchGenes(q, { limit: 12 }),
         interactiveSearchSWRConfig,
-    );
-
-    const { data: recommended } = useSWR(
-        !query ? ['recommended-genes'] : null,
-        () => getRecommendedGenes({ limit: 12 }),
-        stableKeepPreviousSWRConfig,
     );
 
     const overviewKey = query ? ['gene-overview', query] : null;
@@ -2843,7 +2536,7 @@ export default function Genes() {
     const runSearch = React.useCallback((value = input) => {
         const next = value.trim();
         setTraitPage(0);
-        setTraitSortBy('absGamma');
+        setTraitSortBy('membershipScore');
         setTraitSortDir('desc');
         if (!next) {
             setParams({});
@@ -2864,8 +2557,8 @@ export default function Genes() {
     const totalOverviewCount = Number(summary.totalRows) || 0;
 
     const recordKey = query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount > 0
-            ? ['gene-records', query, traitPage, traitRowsPerPage, traitSortBy, traitSortDir]
-            : null;
+        ? ['gene-records', query, traitPage, traitRowsPerPage, traitSortBy, traitSortDir]
+        : null;
     const recordResource = useCachedResourceState(
         useSWR(recordKey, ([, q, pageIndex, limit, sortKey, direction]) => getGeneProgramRecords(q, {
             page: pageIndex + 1,
@@ -2905,7 +2598,6 @@ export default function Genes() {
             subtitle={null}
             maxWidth={DATA_PAGE_MAX_WIDTH}
             compact
-            sx={{ py: { xs: 1.5, md: 2 } }}
         >
             <Stack spacing={query ? 1.5 : 2}>
                 {(overviewUnavailable || recordData?.unavailable) && (
@@ -2964,9 +2656,6 @@ export default function Genes() {
                                 minWidth: 0,
                                 '& > *': {
                                     minWidth: 0,
-                                },
-                                '@media (min-width: 2200px)': {
-                                    gridTemplateColumns: 'minmax(760px, 0.9fr) minmax(1056px, 1.1fr)',
                                 },
                             }}
                         >

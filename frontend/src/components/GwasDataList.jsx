@@ -24,13 +24,10 @@ import Pagination from '@mui/material/Pagination';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import Link from '@mui/material/Link';
 import TextField from '@mui/material/TextField';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
-import Chip from '@mui/material/Chip';
 import Clear from '@mui/icons-material/Clear';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
@@ -303,7 +300,6 @@ function columnLayoutSx(column = {}) {
     if (column.width !== undefined) sx.width = column.width;
     if (column.minWidth !== undefined) sx.minWidth = column.minWidth;
     if (column.maxWidth !== undefined) sx.maxWidth = column.maxWidth;
-    if (column.whiteSpace !== undefined) sx.whiteSpace = column.whiteSpace;
     return sx;
 }
 
@@ -319,7 +315,6 @@ function headerLayoutSx(column = {}) {
     };
 }
 
-const GWAS_TABLE_TITLE_HEADER_HEIGHT = 52;
 const GWAS_TABLE_COLUMN_HEADER_HEIGHT = 46;
 const TABLE_PAGINATION_THRESHOLD = 50;
 const DEFAULT_ROWS_PER_PAGE = 25;
@@ -461,6 +456,11 @@ function TraitRow({ row, index, columns, theme }) {
                     sx={{
                         ...columnLayoutSx(col),
                         textAlign: columnAlign,
+                        whiteSpace: 'normal',
+                        overflow: 'visible',
+                        textOverflow: 'clip',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
                     }}
                 >
                     {col.id === 'trait_name' ? (
@@ -702,34 +702,164 @@ export default function GwasDataList({
         );
     }
 
-    const resultLabel = previewingSearch
-        ? `${visibleRows.length.toLocaleString()} visible; updating`
-        : normalizedSearch
-            ? `${totalCount.toLocaleString()} matches`
-            : `${totalCount.toLocaleString()} records`;
-
     return (
         <Box ref={rootRef} sx={{ position: 'relative', width: '100%', minWidth: 0 }}>
-            <Card elevation={0} sx={{
-                ...panelSx(theme, {
-                    borderRadius: 3,
+            <Paper
+                elevation={0}
+                sx={panelSx(theme, {
+                    overflow: 'hidden',
                     borderColor: alpha('#245089', 0.18),
                     background: `linear-gradient(180deg, ${alpha('#245089', 0.035)} 0%, ${theme.palette.background.paper} 150px)`,
-                }),
-                overflow: 'hidden',
-                width: '100%',
-                minWidth: 0,
-            }}>
-                <CardContent sx={{ p: 0 }}>
-                    {downloadError && (
-                        <Alert severity="error" sx={{ m: 1.5, borderRadius: 1 }}>
-                            {downloadError}
-                        </Alert>
-                    )}
+                })}
+            >
+                {title && (
+                    <Box
+                        sx={{
+                            px: { xs: 1.5, md: 2 },
+                            py: { xs: 1.1, md: 1.15 },
+                            borderBottom: `1px solid ${theme.custom.border.soft}`,
+                            display: 'grid',
+                            gridTemplateColumns: {
+                                xs: '1fr',
+                                lg: 'max-content minmax(180px, 1fr) max-content',
+                            },
+                            alignItems: 'center',
+                            gap: { xs: 0.7, lg: 1.1 },
+                            minWidth: 0,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                minWidth: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'flex-start',
+                                gap: 0.65,
+                                flexWrap: 'wrap',
+                                maxWidth: { lg: 280 },
+                                '@media (min-width: 2200px)': {
+                                    maxWidth: 420,
+                                },
+                            }}
+                        >
+                            <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b5f', lineHeight: 1.15 })}>
+                                {title}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.76rem', fontWeight: 680, color: '#245089', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
+                                {previewingSearch
+                                    ? `${visibleRows.length.toLocaleString()} visible; updating`
+                                    : normalizedSearch
+                                        ? `${totalCount.toLocaleString()} matches`
+                                        : `${totalCount.toLocaleString()} records`}
+                            </Typography>
+                        </Box>
+                        <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'center' }, gap: 0.55, flexWrap: 'wrap', minWidth: 0 }}>
+                            <TextField
+                                size="small"
+                                value={search}
+                                onChange={(event) => {
+                                    setSearch(event.target.value);
+                                    setPage(1);
+                                }}
+                                placeholder={searchPlaceholder}
+                                sx={{
+                                    width: '100%',
+                                    maxWidth: { lg: 260 },
+                                    '@media (min-width: 2200px)': {
+                                        maxWidth: 360,
+                                    },
+                                    '& .MuiOutlinedInput-root': {
+                                        height: 32,
+                                        bgcolor: theme.palette.background.paper,
+                                        borderRadius: 1,
+                                        borderColor: alpha('#245089', 0.16),
+                                    },
+                                    '& .MuiInputBase-input': {
+                                        py: 0.55,
+                                        fontSize: '0.8rem',
+                                    },
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: search ? (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                size="small"
+                                                aria-label="Clear trait search"
+                                                onClick={() => {
+                                                    setSearch('');
+                                                    setPage(1);
+                                                }}
+                                                edge="end"
+                                            >
+                                                <Clear fontSize="small" />
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ) : null,
+                                }}
+                            />
+                        </Box>
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'flex-end' }, justifySelf: { xs: 'start', lg: 'end' }, gap: 0.85, minWidth: 0, flexWrap: { xs: 'wrap', lg: 'nowrap' }, whiteSpace: { lg: 'nowrap' } }}>
+                            {shouldPaginate && <HeaderPageControl totalPages={totalPages} page={page} onChange={setPage} />}
+                            {shouldPaginate && (
+                                <FormControl size="small" sx={{ minWidth: 94 }}>
+                                    <Select
+                                        value={limit}
+                                        onChange={handleChangeLimit}
+                                        inputProps={{ 'aria-label': 'Rows per page' }}
+                                        renderValue={(value) => `${value} / page`}
+                                        sx={{
+                                            height: 32,
+                                            bgcolor: theme.palette.background.paper,
+                                            fontSize: '0.78rem',
+                                            fontWeight: 650,
+                                            '& .MuiSelect-select': { py: 0.45, display: 'flex', alignItems: 'center' },
+                                        }}
+                                    >
+                                        {[25, 50, 100, 200].map((v) => (
+                                            <MenuItem key={v} value={v} dense>{v}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            )}
+                            <UpdatingStatus active={isRefreshing} />
+                            <Button
+                                size="small"
+                                startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
+                                onClick={handleDownloadTsv}
+                                disabled={!totalCount || downloading}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.74rem',
+                                    color: '#245089',
+                                    border: `1px solid ${alpha('#245089', 0.18)}`,
+                                    bgcolor: alpha('#245089', 0.045),
+                                    minWidth: 116,
+                                    height: 32,
+                                    py: 0.38,
+                                    flexShrink: 0,
+                                    '&:hover': {
+                                        bgcolor: alpha('#245089', 0.08),
+                                        borderColor: alpha('#245089', 0.28),
+                                    },
+                                }}
+                            >
+                                {downloading ? 'Preparing' : 'Download TSV'}
+                            </Button>
+                        </Box>
+                    </Box>
+                )}
+                {downloadError && (
+                    <Alert severity="error" sx={{ m: 1.5, borderRadius: 1 }}>
+                        {downloadError}
+                    </Alert>
+                )}
                     <Box sx={{ position: 'relative' }}>
                         <TableContainer
-                            component={Paper}
-                            elevation={0}
                             sx={stickyTableContainerSx(theme, {
                                 border: 0,
                                 borderRadius: 0,
@@ -742,7 +872,7 @@ export default function GwasDataList({
                                 stickyHeader
                                 sx={stickyTableSx(theme, {
                                     width: '100%',
-                                    tableLayout: columns.some((column) => column.width || column.minWidth || column.maxWidth) ? 'fixed' : 'auto',
+                                    tableLayout: 'auto',
                                 })}
                             >
                                 <colgroup>
@@ -758,168 +888,6 @@ export default function GwasDataList({
                                     ))}
                                 </colgroup>
                                 <TableHead>
-                                    {title && (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={Math.max(columns.length, 1)}
-                                                sx={stickyTableHeaderCellSx(theme, {
-                                                    headerBg: '#f7fbff',
-                                                    headerBorder: alpha('#245089', 0.16),
-                                                    headerColor: '#173b5f',
-                                                }, 'left', {
-                                                    top: 0,
-                                                    zIndex: '45 !important',
-                                                    height: GWAS_TABLE_TITLE_HEADER_HEIGHT,
-                                                    py: 1,
-                                                    px: 1.5,
-                                                    whiteSpace: 'normal',
-                                                    overflow: 'visible',
-                                                    textOverflow: 'clip',
-                                                })}
-                                            >
-                                                <Box
-                                                    sx={{
-                                                        display: 'grid',
-                                                        gridTemplateColumns: {
-                                                            xs: '1fr',
-                                                            lg: 'max-content minmax(180px, 1fr) max-content',
-                                                        },
-                                                        alignItems: 'center',
-                                                        gap: { xs: 0.7, lg: 1.1 },
-                                                        minWidth: 0,
-                                                    }}
-                                                >
-                                                    <Box
-                                                        sx={{
-                                                            minWidth: 0,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'flex-start',
-                                                            gap: 0.65,
-                                                            flexWrap: 'wrap',
-                                                            maxWidth: { lg: 280 },
-                                                            '@media (min-width: 2200px)': {
-                                                                maxWidth: 420,
-                                                            },
-                                                        }}
-                                                    >
-                                                        <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b5f', lineHeight: 1.15 })}>
-                                                            {title}
-                                                        </Typography>
-                                                        <Chip
-                                                            label={resultLabel}
-                                                            size="small"
-                                                            sx={{
-                                                                height: 22,
-                                                                color: '#245089',
-                                                                bgcolor: alpha('#245089', 0.08),
-                                                                border: `1px solid ${alpha('#245089', 0.18)}`,
-                                                                fontSize: '0.72rem',
-                                                                fontWeight: 680,
-                                                                flexShrink: 0,
-                                                            }}
-                                                        />
-                                                    </Box>
-                                                    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'center' }, gap: 0.55, flexWrap: 'wrap', minWidth: 0 }}>
-                                                        <TextField
-                                                            size="small"
-                                                            value={search}
-                                                            onChange={(event) => {
-                                                                setSearch(event.target.value);
-                                                                setPage(1);
-                                                            }}
-                                                            placeholder={searchPlaceholder}
-                                                            sx={{
-                                                                width: '100%',
-                                                                maxWidth: { lg: 260 },
-                                                                '@media (min-width: 2200px)': {
-                                                                    maxWidth: 360,
-                                                                },
-                                                                '& .MuiOutlinedInput-root': {
-                                                                    height: 32,
-                                                                    bgcolor: theme.palette.background.paper,
-                                                                },
-                                                                '& .MuiInputBase-input': {
-                                                                    py: 0.55,
-                                                                    fontSize: '0.8rem',
-                                                                },
-                                                            }}
-                                                            InputProps={{
-                                                                startAdornment: (
-                                                                    <InputAdornment position="start">
-                                                                        <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
-                                                                    </InputAdornment>
-                                                                ),
-                                                                endAdornment: search ? (
-                                                                    <InputAdornment position="end">
-                                                                        <IconButton
-                                                                            size="small"
-                                                                            aria-label="Clear trait search"
-                                                                            onClick={() => {
-                                                                                setSearch('');
-                                                                                setPage(1);
-                                                                            }}
-                                                                            edge="end"
-                                                                        >
-                                                                            <Clear fontSize="small" />
-                                                                        </IconButton>
-                                                                    </InputAdornment>
-                                                                ) : null,
-                                                            }}
-                                                        />
-                                                    </Box>
-                                                    <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'flex-end' }, justifySelf: { xs: 'start', lg: 'end' }, gap: 0.85, minWidth: 0, flexWrap: { xs: 'wrap', lg: 'nowrap' }, whiteSpace: { lg: 'nowrap' } }}>
-                                                        {shouldPaginate && <HeaderPageControl totalPages={totalPages} page={page} onChange={setPage} />}
-                                                        {shouldPaginate && (
-                                                            <FormControl size="small" sx={{ minWidth: 94 }}>
-                                                                <Select
-                                                                    value={limit}
-                                                                    onChange={handleChangeLimit}
-                                                                    inputProps={{ 'aria-label': 'Rows per page' }}
-                                                                    renderValue={(value) => `${value} / page`}
-                                                                    sx={{
-                                                                        height: 32,
-                                                                        bgcolor: theme.palette.background.paper,
-                                                                        fontSize: '0.78rem',
-                                                                        fontWeight: 650,
-                                                                        '& .MuiSelect-select': { py: 0.45, display: 'flex', alignItems: 'center' },
-                                                                    }}
-                                                                >
-                                                                    {[25, 50, 100, 200].map((v) => (
-                                                                        <MenuItem key={v} value={v} dense>{v}</MenuItem>
-                                                                    ))}
-                                                                </Select>
-                                                            </FormControl>
-                                                        )}
-                                                        <UpdatingStatus active={isRefreshing} />
-                                                        <Button
-                                                            size="small"
-                                                            startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
-                                                            onClick={handleDownloadTsv}
-                                                            disabled={!totalCount || downloading}
-                                                            sx={{
-                                                                textTransform: 'none',
-                                                                fontSize: '0.74rem',
-                                                                color: '#245089',
-                                                                border: `1px solid ${alpha('#245089', 0.18)}`,
-                                                                bgcolor: alpha('#245089', 0.045),
-                                                                minWidth: 116,
-                                                                height: 32,
-                                                                py: 0.38,
-                                                                flexShrink: 0,
-                                                                '&:hover': {
-                                                                    bgcolor: alpha('#245089', 0.08),
-                                                                    borderColor: alpha('#245089', 0.28),
-                                                                },
-                                                            }}
-                                                        >
-                                                            {downloading ? 'Preparing' : 'Download TSV'}
-                                                        </Button>
-                                                    </Box>
-                                                </Box>
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
                                     <TableRow>
                                         {columns.map((column) => {
                                             const columnAlign = getColumnAlign(column);
@@ -938,7 +906,7 @@ export default function GwasDataList({
                                                     letterSpacing: '0.03em',
                                                     textTransform: 'none',
                                                     py: 1.2,
-                                                    top: title ? GWAS_TABLE_TITLE_HEADER_HEIGHT : 0,
+                                                    top: 0,
                                                     ...columnLayoutSx(column),
                                                     ...headerLayoutSx(column),
                                                 })}
@@ -1024,8 +992,7 @@ export default function GwasDataList({
                             )}
                         </Box>
                     )}
-                </CardContent>
-            </Card>
+            </Paper>
         </Box>
     );
 }

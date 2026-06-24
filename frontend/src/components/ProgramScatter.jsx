@@ -336,8 +336,8 @@ export default function ProgramScatter({ fileId }) {
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
     const tableTones = useMemo(() => ({
         program: {
-            ...tableTone(theme, 'warning'),
-            rankCell: alpha(theme.palette.warning.main, 0.14),
+            ...tableTone(theme, 'primary'),
+            rankCell: alpha(theme.palette.primary.main, 0.12),
         },
         regulator: {
             ...tableTone(theme, 'primary'),

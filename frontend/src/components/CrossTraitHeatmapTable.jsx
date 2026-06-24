@@ -69,8 +69,8 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
         Math.abs(Number(payload?.summary?.valueRange?.max) || 0),
         0.0001,
     ), [payload?.summary?.valueRange?.max, payload?.summary?.valueRange?.min]);
-    const neutralTone = tableTone(theme, 'neutral');
-    const effectTone = tableTone(theme, 'primary');
+    const geneTone = tableTone(theme, 'primary');
+    const traitTone = tableTone(theme, 'primary');
 
     useEffect(() => {
         setForceRenderTable(false);
@@ -180,7 +180,7 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                     <TableHead>
                         <TableRow>
                             <TableCell
-                                sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', {
+                                sx={stickyTableHeaderCellSx(theme, geneTone, 'left', {
                                     left: 0,
                                     zIndex: '46 !important',
                                     minWidth: GENE_COL_WIDTH,
@@ -189,11 +189,11 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                 Gene
                             </TableCell>
                             <TableCell
-                                sx={stickyTableHeaderCellSx(theme, neutralTone, 'left', {
+                                sx={stickyTableHeaderCellSx(theme, geneTone, 'left', {
                                     left: GENE_COL_WIDTH,
                                     zIndex: '47 !important',
                                     minWidth: ENSG_COL_WIDTH,
-                                    boxShadow: `8px 0 12px -12px ${alpha(theme.palette.common.black, 0.42)}, 0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${neutralTone.headerBorder}`,
+                                    boxShadow: `8px 0 12px -12px ${alpha(theme.palette.common.black, 0.42)}, 0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${geneTone.headerBorder}`,
                                 })}
                             >
                                 ENSG
@@ -203,7 +203,7 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                      key={target.file_id}
                                      align="right"
                                      onClick={() => navigate(`/trait/${encodeURIComponent(target.file_id)}`)}
-                                     sx={stickyTableHeaderCellSx(theme, effectTone, 'right', {
+                                     sx={stickyTableHeaderCellSx(theme, traitTone, 'right', {
                                          cursor: 'pointer',
                                          whiteSpace: 'normal',
                                          wordBreak: 'break-word',
@@ -234,7 +234,7 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                     left: 0,
                                     zIndex: '4 !important',
                                     py: 0.72,
-                                    bgcolor: `${theme.palette.background.paper} !important`,
+                                    bgcolor: `${geneTone.cellStrong} !important`,
                                     borderBottom: `1px solid ${theme.custom.border.soft}`,
                                     fontSize: '0.74rem',
                                     fontWeight: 680,
@@ -248,7 +248,7 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                     left: GENE_COL_WIDTH,
                                     zIndex: '5 !important',
                                     py: 0.72,
-                                    bgcolor: `${theme.palette.background.paper} !important`,
+                                    bgcolor: `${geneTone.cellSoft} !important`,
                                     borderBottom: `1px solid ${theme.custom.border.soft}`,
                                     fontSize: '0.68rem',
                                     color: theme.palette.text.secondary,

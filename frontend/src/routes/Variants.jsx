@@ -1639,7 +1639,7 @@ export default function DataBrowser() {
                         gap: 1,
                         flexDirection: { xs: 'column', sm: 'row' },
                     })}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>Data Browser</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>Download Browser</Typography>
                         <Button variant="outlined" size="small" onClick={returnFromDataBrowser} sx={{ textTransform: 'none' }}>
                             Back to downloads
                         </Button>
@@ -1669,10 +1669,10 @@ export default function DataBrowser() {
                 background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.11)}, ${alpha(theme.palette.secondary.main, 0.055)} 48%, ${theme.palette.background.paper})`,
             })}>
                 <Box sx={{ display: 'flex', alignItems: { xs: 'stretch', md: 'center' }, justifyContent: 'space-between', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
-                    <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0 })}>Data Downloads</Typography>
+                    <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0 })}>Downloads</Typography>
                     <Button variant="outlined" onClick={showDataBrowser} sx={{ textTransform: 'none', bgcolor: alpha(theme.palette.background.paper, 0.72) }}>
                         <FolderOpen sx={{ fontSize: 18, mr: 0.7 }} />
-                        Data browser
+                        Browse downloads
                     </Button>
                 </Box>
             </Paper>
@@ -1681,45 +1681,6 @@ export default function DataBrowser() {
             {error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setError('')}>{error}</Alert>}
             {downloadState.error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setDownloadState({ path: null, error: '' })}>{downloadState.error}</Alert>}
             {packageError && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setPackageError('')}>{packageError}</Alert>}
-
-            <Paper elevation={0} sx={plotFrameSx(theme, { mb: 2, borderRadius: 3, overflow: 'hidden' })}>
-                <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.25 })}>
-                    <FileDownload sx={{ fontSize: 18, color: theme.palette.primary.main }} />
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Database tables</Typography>
-                    <Box sx={{ flex: 1 }} />
-                    <Button size="small" variant="outlined" disabled={packageLoading} onClick={() => setPackageRefreshKey((value) => value + 1)} sx={{ textTransform: 'none' }}>
-                        <Refresh sx={{ fontSize: 15, mr: 0.4 }} />Refresh
-                    </Button>
-                </Box>
-                {packageLoading && <LinearProgress sx={{ height: 3 }} />}
-                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                    <Table size="small" sx={stickyTableSx(theme)}>
-                        <TableHead><TableRow>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone)}>Export</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Tables</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Archive</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Date</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'center')} align="center">Action</TableCell>
-                        </TableRow></TableHead>
-                        <TableBody>
-                            {!packageLoading && packagePayload.data.length === 0 && <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}>Database export not prepared.</TableCell></TableRow>}
-                            {packagePayload.data.map((item, index) => {
-                                const archiveReady = Boolean(item.archive?.exists);
-                                const isDownloading = packageDownloadId === item.id;
-                                return <TableRow key={item.id} hover sx={tableRowRevealSx(theme, index)}>
-                                    <TableCell><Typography variant="body2" sx={{ fontWeight: 700 }}>{item.title}</Typography></TableCell>
-                                    <TableCell align="right"><Typography variant="body2" color="text.secondary">{item.tableCount || 0}</Typography></TableCell>
-                                    <TableCell align="right">
-                                        {archiveReady ? <Tooltip title={getArchiveTooltip(item.archive)} arrow><Typography variant="body2" sx={{ fontWeight: 760 }}>{fmtSize(item.archive.size)}</Typography></Tooltip> : <Typography variant="body2" color="text.secondary">Not prepared</Typography>}
-                                    </TableCell>
-                                    <TableCell align="right"><Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{formatArchiveDate(item.archive?.mtime)}</Typography></TableCell>
-                                    <TableCell align="center"><Button size="small" variant="contained" disabled={isDownloading || !archiveReady} onClick={() => { void downloadPackage(item.id); }} sx={{ textTransform: 'none', boxShadow: 'none' }}><Download sx={{ fontSize: 16, mr: 0.45 }} />{isDownloading ? 'Starting...' : 'Download'}</Button></TableCell>
-                                </TableRow>;
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
 
             <Paper elevation={0} sx={plotFrameSx(theme, { borderRadius: 3, overflow: 'hidden' })}>
                 <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.25 })}>
@@ -1756,6 +1717,45 @@ export default function DataBrowser() {
                     </Table>
                 </TableContainer>
                 {payload.totalPages > 1 && <Box sx={{ py: 1.2, display: 'flex', justifyContent: 'center', borderTop: `1px solid ${theme.custom.border.soft}` }}><Pagination count={payload.totalPages} page={page} onChange={(_, value) => setPage(value)} size="small" /></Box>}
+            </Paper>
+
+            <Paper elevation={0} sx={plotFrameSx(theme, { mt: 2, borderRadius: 3, overflow: 'hidden' })}>
+                <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.25 })}>
+                    <FileDownload sx={{ fontSize: 18, color: theme.palette.primary.main }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Table downloads</Typography>
+                    <Box sx={{ flex: 1 }} />
+                    <Button size="small" variant="outlined" disabled={packageLoading} onClick={() => setPackageRefreshKey((value) => value + 1)} sx={{ textTransform: 'none' }}>
+                        <Refresh sx={{ fontSize: 15, mr: 0.4 }} />Refresh
+                    </Button>
+                </Box>
+                {packageLoading && <LinearProgress sx={{ height: 3 }} />}
+                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
+                    <Table size="small" sx={stickyTableSx(theme)}>
+                        <TableHead><TableRow>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone)}>Export</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Tables</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Archive</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Date</TableCell>
+                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'center')} align="center">Action</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {!packageLoading && packagePayload.data.length === 0 && <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}>Database export not prepared.</TableCell></TableRow>}
+                            {packagePayload.data.map((item, index) => {
+                                const archiveReady = Boolean(item.archive?.exists);
+                                const isDownloading = packageDownloadId === item.id;
+                                return <TableRow key={item.id} hover sx={tableRowRevealSx(theme, index)}>
+                                    <TableCell><Typography variant="body2" sx={{ fontWeight: 700 }}>{item.title}</Typography></TableCell>
+                                    <TableCell align="right"><Typography variant="body2" color="text.secondary">{item.tableCount || 0}</Typography></TableCell>
+                                    <TableCell align="right">
+                                        {archiveReady ? <Tooltip title={getArchiveTooltip(item.archive)} arrow><Typography variant="body2" sx={{ fontWeight: 760 }}>{fmtSize(item.archive.size)}</Typography></Tooltip> : <Typography variant="body2" color="text.secondary">Not prepared</Typography>}
+                                    </TableCell>
+                                    <TableCell align="right"><Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{formatArchiveDate(item.archive?.mtime)}</Typography></TableCell>
+                                    <TableCell align="center"><Button size="small" variant="contained" disabled={isDownloading || !archiveReady} onClick={() => { void downloadPackage(item.id); }} sx={{ textTransform: 'none', boxShadow: 'none' }}><Download sx={{ fontSize: 16, mr: 0.45 }} />{isDownloading ? 'Starting...' : 'Download'}</Button></TableCell>
+                                </TableRow>;
+                            })}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
             </Paper>
         </Box>
     );

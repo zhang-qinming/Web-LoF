@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
@@ -24,9 +23,7 @@ import ArrowForward from '@mui/icons-material/ArrowForward';
 import Biotech from '@mui/icons-material/Biotech';
 import Close from '@mui/icons-material/Close';
 import FileDownload from '@mui/icons-material/FileDownload';
-import Folder from '@mui/icons-material/Folder';
 import Hub from '@mui/icons-material/Hub';
-import InsertDriveFile from '@mui/icons-material/InsertDriveFile';
 import Search from '@mui/icons-material/Search';
 import TableChart from '@mui/icons-material/TableChart';
 import axios from 'axios';
@@ -34,7 +31,6 @@ import useSWR from 'swr';
 import ReleaseLogSection from '../components/ReleaseLogSection';
 import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
 import { getHomeStats } from '../api/gwas';
-import { downloadDataPaths } from '../utils/download';
 import { createTtlCache } from '../utils/cache';
 import { detailSummarySWRConfig } from '../utils/swrOptions';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
@@ -58,7 +54,6 @@ import homeFigureVariantDetail from '../assets/home/home-figure-variant-detail.s
 
 const accent = '#ff6b4a';
 const siteName = 'TraitCircuit';
-const SEARCH_API = axios.create({ baseURL: '/api/data' });
 const EMPTY_ENTITY_RESULTS = { traits: [], genes: [], programs: [] };
 const EMPTY_ENTITY_META = { traits: 0, genes: 0, programs: 0 };
 const SEARCH_DEBOUNCE_MS = 220;
@@ -78,23 +73,19 @@ const compactNumberFormatter = new Intl.NumberFormat('en-US', {
 });
 
 const quickSearchSeeds = [
-    { label: 'Trait GCST', query: 'GCST90081631' },
-    { label: 'Trait name', query: 'Non-cancer illness' },
     { label: 'Gene BRCA1', query: 'BRCA1' },
+    { label: 'Gene LDLR', query: 'LDLR' },
     { label: 'Program P1', query: 'P1' },
-    { label: 'ATP activity', query: 'ATP dependent activity' },
-    { label: 'Manhattan plot', query: 'manhattan' },
-    { label: 'LoF burden', query: 'burden_volcano' },
-    { label: 'Cross-trait', query: 'cross_trait_heatmap' },
-    { label: 'Posterior', query: 'posterior_volcano' },
+    { label: 'Program function', query: 'ATP dependent activity' },
+    { label: 'Trait GCST', query: 'GCST90081631' },
+    { label: 'Trait PA ID', query: 'PA00638' },
+    { label: 'Trait name', query: 'Non-cancer illness' },
 ];
 
 const searchPlaceholderExamples = [
-    'Try a trait ID: GCST90081631 or PA00638',
-    'Try a gene: BRCA1, LDLR, or an ENSG ID',
-    'Try a program: P1 or ATP dependent activity',
-    'Try a trait phrase: non-cancer illness',
-    'Try an output synonym: manhattan, burden, heatmap, posterior',
+    'Search genes: BRCA1, LDLR, or an ENSG ID',
+    'Search programs: P1 or ATP dependent activity',
+    'Search traits: GCST90081631, PA00638, or non-cancer illness',
 ];
 
 const loadingBarSx = {
@@ -248,13 +239,6 @@ function fmtMetricCount(value, compact = false) {
     return compact ? compactNumberFormatter.format(numericValue) : numberFormatter.format(numericValue);
 }
 
-function fmtSize(bytes) {
-    if (!bytes) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-}
-
 function CoverageGlyph({ color, kind }) {
     const common = {
         fill: 'none',
@@ -321,14 +305,6 @@ function getRequestErrorMessage(err, fallback) {
 
 function getCachedSearchResult(query) {
     return SEARCH_CACHE.get(query) || null;
-}
-
-function buildDataBrowserHref({ path = '', search = '' } = {}) {
-    const params = new URLSearchParams({ view: 'browser' });
-    if (path) params.set('dir', path);
-    else if (search) params.set('q', search);
-    const queryString = params.toString();
-    return `/data${queryString ? `?${queryString}` : ''}`;
 }
 
 function buildGeneHref(gene) {
@@ -420,44 +396,22 @@ function EntityResultItem({ icon, title, secondary, chipLabel, chipSx, to, theme
 
 function SearchResultsPanel({
     canSearch,
-    checked,
-    checkedFiles,
-    downloading,
     entityErrors,
     entityMeta,
     entityResults,
     error,
-    fileResults,
-    folderResults,
-    handleDownloadSelection,
     loading,
-    meta,
-    getResultsBrowserHref,
     panelOpen,
-    results,
-    resultsBrowserHref,
-    setChecked,
     setError,
     theme,
-    toggleAllFiles,
-    toggleFile,
     trimmedQ,
 }) {
     const traitResults = entityResults.traits || [];
     const geneResults = entityResults.genes || [];
     const programResults = entityResults.programs || [];
     const entityResultCount = traitResults.length + geneResults.length + programResults.length;
-    const allFilesChecked = fileResults.length > 0 && checkedFiles.length === fileResults.length;
-    const someFilesChecked = checkedFiles.length > 0 && !allFilesChecked;
-    const displayedResultCount = results.length + entityResultCount;
-    const quickMatchSummary = meta.truncated ? `Top ${displayedResultCount} quick matches` : `${displayedResultCount} quick matches`;
-    const indexedPathSummary = meta.totalCount === 0
-        ? 'No indexed matches'
-        : meta.totalCount === 1
-        ? '1 indexed path matches'
-        : `${fmtCount(meta.totalCount)} indexed paths match`;
-    const hasMoreMatches = meta.truncated || meta.totalCount > results.length;
-    const hasAnyResults = results.length > 0 || entityResultCount > 0;
+    const quickMatchSummary = `${entityResultCount} gene/program/trait matches`;
+    const hasAnyResults = entityResultCount > 0;
     const entityErrorText = Object.values(entityErrors || {}).filter(Boolean).join(' ');
 
     if (!panelOpen || !canSearch) return null;
@@ -477,7 +431,7 @@ function SearchResultsPanel({
                 boxShadow: '0 22px 48px rgba(15,23,42,0.16)',
             })}
         >
-            {(loading || downloading) && <LinearProgress sx={loadingBarSx} />}
+            {loading && <LinearProgress sx={loadingBarSx} />}
             <Box
                 sx={{
                     px: 2,
@@ -493,10 +447,8 @@ function SearchResultsPanel({
                 aria-live="polite"
             >
                 <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
-                    <Chip label="Files + main tables" size="small" sx={summaryChipSx(theme)} />
+                    <Chip label="Genes + programs + traits" size="small" sx={summaryChipSx(theme)} />
                     <Chip label={quickMatchSummary} size="small" sx={summaryChipSx(theme)} />
-                    <Chip label={indexedPathSummary} size="small" sx={summaryChipSx(theme)} />
-                    <Chip label={`${fileResults.length} files`} size="small" sx={summaryChipSx(theme)} />
                     {traitResults.length > 0 && (
                         <Chip label={`${traitResults.length} traits`} size="small" sx={summaryChipSx(theme)} />
                     )}
@@ -506,34 +458,6 @@ function SearchResultsPanel({
                     {programResults.length > 0 && (
                         <Chip label={`${programResults.length} programs`} size="small" sx={summaryChipSx(theme)} />
                     )}
-                    {folderResults.length > 0 && (
-                        <Chip label={`${folderResults.length} folders`} size="small" sx={summaryChipSx(theme)} />
-                    )}
-                </Stack>
-                <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap">
-                    {checkedFiles.length > 0 && (
-                        <>
-                            <Chip
-                                label={`${checkedFiles.length} selected`}
-                                size="small"
-                                color="primary"
-                                onDelete={() => setChecked(new Set())}
-                            />
-                            <Button size="small" variant="contained" disabled={downloading} onClick={handleDownloadSelection}>
-                                <FileDownload sx={{ fontSize: 16, mr: 0.5 }} />
-                                {downloading ? 'Preparing...' : 'Download'}
-                            </Button>
-                        </>
-                    )}
-                    <Button
-                        size="small"
-                        variant="text"
-                        endIcon={<ArrowForward sx={{ fontSize: 15 }} />}
-                        component={RouterLink}
-                        to={resultsBrowserHref}
-                    >
-                        Open full browser
-                    </Button>
                 </Stack>
             </Box>
 
@@ -607,145 +531,13 @@ function SearchResultsPanel({
                                 />
                             ))}
                         </EntityResultSection>
-                        {fileResults.length > 0 && (
-                            <>
-                                <Box
-                                    sx={{
-                                        px: 2,
-                                        py: 0.8,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        bgcolor: theme.custom.surface.subtle,
-                                        borderBottom: `1px solid ${theme.custom.border.soft}`,
-                                    }}
-                                >
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Checkbox
-                                            size="small"
-                                            checked={allFilesChecked}
-                                            indeterminate={someFilesChecked}
-                                            onChange={toggleAllFiles}
-                                            inputProps={{ 'aria-label': allFilesChecked ? 'Deselect all listed files' : 'Select all listed files' }}
-                                            sx={{ p: 0.2 }}
-                                        />
-                                        <Typography variant="overline" sx={{ fontWeight: 700, color: theme.palette.text.secondary }}>
-                                            Files
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                                {fileResults.map((item, index) => {
-                                    const checkboxId = `home-file-result-${index}`;
-
-                                    return (
-                                        <Box
-                                            key={item.path}
-                                            component="li"
-                                            sx={{ listStyle: 'none', borderBottom: `1px solid ${theme.custom.border.soft}` }}
-                                        >
-                                            <Box
-                                                component="label"
-                                                htmlFor={checkboxId}
-                                                sx={{
-                                                    px: 1.75,
-                                                    py: 1,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 0.8,
-                                                    cursor: 'pointer',
-                                                    '&:hover': { bgcolor: theme.custom.surface.subtle },
-                                                }}
-                                            >
-                                                <Checkbox
-                                                    id={checkboxId}
-                                                    size="small"
-                                                    sx={{ p: 0.3 }}
-                                                    checked={checked.has(item.path)}
-                                                    onChange={() => toggleFile(item.path)}
-                                                    inputProps={{ 'aria-label': `Select file ${item.name}` }}
-                                                />
-                                                <ListItemIcon sx={{ minWidth: 30 }}>
-                                                    <InsertDriveFile sx={{ fontSize: 17, color: '#94a3b8' }} />
-                                                </ListItemIcon>
-                                                <Box sx={{ minWidth: 0, flex: 1 }}>
-                                                    <Typography sx={{ fontSize: '0.84rem', fontWeight: 600, color: theme.palette.text.primary }} title={item.name}>
-                                                        {item.name}
-                                                    </Typography>
-                                                    <Typography sx={{ fontSize: '0.73rem', color: theme.palette.text.secondary, lineHeight: 1.35 }} noWrap title={item.path}>
-                                                        {item.path}
-                                                    </Typography>
-                                                </Box>
-                                                <Chip label={fmtSize(item.size) || 'file'} size="small" sx={summaryChipSx(theme)} />
-                                            </Box>
-                                        </Box>
-                                    );
-                                })}
-                            </>
-                        )}
-                        {folderResults.length > 0 && (
-                            <>
-                                <Box sx={{ px: 2, py: 0.8, bgcolor: theme.custom.surface.subtle, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
-                                    <Typography variant="overline" sx={{ fontWeight: 700, color: theme.palette.text.secondary }}>
-                                        Folders
-                                    </Typography>
-                                </Box>
-                                {folderResults.map((item) => (
-                                    <ListItemButton
-                                        key={item.path}
-                                        component={RouterLink}
-                                        to={getResultsBrowserHref({ path: item.path })}
-                                        sx={{ px: 1.75, py: 1, textDecoration: 'none', color: 'inherit' }}
-                                    >
-                                        <ListItemIcon sx={{ minWidth: 30 }}>
-                                            <Folder sx={{ fontSize: 18, color: '#d97706' }} />
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={item.name}
-                                            secondary={item.path}
-                                            primaryTypographyProps={{ fontSize: '0.84rem', fontWeight: 600 }}
-                                            secondaryTypographyProps={{ fontSize: '0.73rem', noWrap: true }}
-                                        />
-                                        <Chip label="folder" size="small" sx={summaryChipSx(theme, { bgcolor: alpha(theme.palette.warning.main, 0.09) })} />
-                                    </ListItemButton>
-                                ))}
-                            </>
-                        )}
                     </List>
                 </Box>
             ) : (
                 <Box sx={{ px: 2, py: 2.2 }}>
                     <Typography sx={captionSx(theme, { fontSize: '0.86rem' })}>
-                        No files, traits, genes, or programs matched "{trimmedQ}".
+                        No traits, genes, or programs matched "{trimmedQ}".
                     </Typography>
-                </Box>
-            )}
-            {hasMoreMatches && !loading && results.length > 0 && (
-                <Box
-                    sx={{
-                        px: 2,
-                        py: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 1,
-                        flexWrap: 'wrap',
-                        bgcolor: theme.custom.surface.subtle,
-                        borderTop: `1px solid ${theme.custom.border.soft}`,
-                    }}
-                >
-                    <Typography sx={captionSx(theme, { fontSize: '0.78rem', lineHeight: 1.4 })}>
-                        Showing the first {results.length} matches. Open Data Browser to review all {fmtCount(meta.totalCount)} indexed paths.
-                    </Typography>
-                    <Button
-                        size="small"
-                        variant="text"
-                        endIcon={<ArrowForward sx={{ fontSize: 15 }} />}
-                        component={RouterLink}
-                        to={resultsBrowserHref}
-                        sx={{ flexShrink: 0 }}
-                    >
-                        Review all
-                    </Button>
                 </Box>
             )}
         </Paper>
@@ -760,36 +552,20 @@ function HomeSearch({
     statsLoading,
     theme,
 }) {
-    const navigate = useNavigate();
     const [q, setQ] = useState('');
-    const [results, setResults] = useState([]);
-    const [meta, setMeta] = useState({ totalCount: 0, truncated: false });
     const [entityResults, setEntityResults] = useState(EMPTY_ENTITY_RESULTS);
     const [entityMeta, setEntityMeta] = useState(EMPTY_ENTITY_META);
     const [entityErrors, setEntityErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
-    const [checked, setChecked] = useState(new Set());
-    const [downloading, setDownloading] = useState(false);
     const [error, setError] = useState('');
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
     const trimmedQ = q.trim();
     const searchKey = trimmedQ.toLowerCase();
     const canSearch = trimmedQ.length >= 2;
-    const fileResults = useMemo(() => results.filter((item) => item.type === 'file'), [results]);
-    const folderResults = useMemo(() => results.filter((item) => item.type === 'dir'), [results]);
-    const checkedFiles = useMemo(
-        () => fileResults.filter((item) => checked.has(item.path)).map((item) => item.path),
-        [checked, fileResults],
-    );
     const panelOpen = open && canSearch;
-    const resultsBrowserHref = buildDataBrowserHref({ search: trimmedQ });
     const searchPlaceholder = searchPlaceholderExamples[placeholderIndex % searchPlaceholderExamples.length];
-
-    useEffect(() => {
-        setChecked(new Set());
-    }, [searchKey]);
 
     useEffect(() => {
         if (q) return undefined;
@@ -803,8 +579,6 @@ function HomeSearch({
 
     useEffect(() => {
         if (!canSearch) {
-            setResults([]);
-            setMeta({ totalCount: 0, truncated: false });
             setEntityResults(EMPTY_ENTITY_RESULTS);
             setEntityMeta(EMPTY_ENTITY_META);
             setEntityErrors({});
@@ -815,16 +589,12 @@ function HomeSearch({
 
         const cached = getCachedSearchResult(searchKey);
         if (cached) {
-            setResults(cached.results);
-            setMeta(cached.meta);
             setEntityResults(cached.entityResults || EMPTY_ENTITY_RESULTS);
             setEntityMeta(cached.entityMeta || EMPTY_ENTITY_META);
             setEntityErrors(cached.entityErrors || {});
             setLoading(false);
             setError('');
         } else {
-            setResults([]);
-            setMeta({ totalCount: 0, truncated: false });
             setEntityResults(EMPTY_ENTITY_RESULTS);
             setEntityMeta(EMPTY_ENTITY_META);
             setEntityErrors({});
@@ -836,51 +606,24 @@ function HomeSearch({
         const timer = window.setTimeout(async () => {
             setLoading(true);
             try {
-                const [fileSearch, entitySearch] = await Promise.allSettled([
-                    SEARCH_API.get('/search', {
-                        params: { q: trimmedQ, limit: 12 },
-                        signal: controller.signal,
-                    }),
-                    axios.get('/api/home/search', {
-                        params: { q: trimmedQ, limit: 6 },
-                        signal: controller.signal,
-                    }),
-                ]);
+                const entitySearch = await axios.get('/api/home/search', {
+                    params: { q: trimmedQ, limit: 6 },
+                    signal: controller.signal,
+                });
                 if (cancelled) return;
-                if (fileSearch.status === 'rejected' && entitySearch.status === 'rejected') {
-                    throw fileSearch.reason || entitySearch.reason;
-                }
-                const fileData = fileSearch.status === 'fulfilled' ? fileSearch.value.data : {};
-                const entityData = entitySearch.status === 'fulfilled'
-                    ? normalizeHomeEntitySearchPayload(entitySearch.value.data)
-                    : {
-                        entityResults: EMPTY_ENTITY_RESULTS,
-                        entityMeta: EMPTY_ENTITY_META,
-                        entityErrors: { all: getRequestErrorMessage(entitySearch.reason, 'Table search failed') },
-                    };
+                const entityData = normalizeHomeEntitySearchPayload(entitySearch.data);
                 const payload = {
-                    results: fileData?.results || [],
-                    meta: {
-                        totalCount: fileData?.totalCount || 0,
-                        truncated: Boolean(fileData?.truncated),
-                        page: fileData?.page || 1,
-                        totalPages: fileData?.totalPages || 1,
-                    },
                     ...entityData,
                 };
                 SEARCH_CACHE.set(searchKey, payload);
-                setResults(payload.results);
-                setMeta(payload.meta);
                 setEntityResults(payload.entityResults);
                 setEntityMeta(payload.entityMeta);
                 setEntityErrors(payload.entityErrors);
-                setError(fileSearch.status === 'rejected' ? getRequestErrorMessage(fileSearch.reason, 'File search failed') : '');
+                setError('');
             } catch (err) {
                 if (cancelled || axios.isCancel?.(err) || err.code === 'ERR_CANCELED') return;
                 if (!cancelled) {
                     if (!cached) {
-                        setResults([]);
-                        setMeta({ totalCount: 0, truncated: false });
                         setEntityResults(EMPTY_ENTITY_RESULTS);
                         setEntityMeta(EMPTY_ENTITY_META);
                         setEntityErrors({});
@@ -899,57 +642,12 @@ function HomeSearch({
         };
     }, [canSearch, searchKey, trimmedQ]);
 
-    const toggleFile = (path) => {
-        setChecked((prev) => {
-            const next = new Set(prev);
-            if (next.has(path)) next.delete(path);
-            else next.add(path);
-            return next;
-        });
-    };
-
-    const toggleAllFiles = () => {
-        setChecked((prev) => {
-            const next = new Set(prev);
-            const allChecked = fileResults.length > 0 && fileResults.every((item) => next.has(item.path));
-            fileResults.forEach((item) => {
-                if (allChecked) next.delete(item.path);
-                else next.add(item.path);
-            });
-            return next;
-        });
-    };
-
-    const openResultsInBrowser = (path = '') => {
-        navigate(buildDataBrowserHref({ path, search: trimmedQ }));
-    };
-
-    const getResultsBrowserHref = ({ path = '' } = {}) => {
-        return buildDataBrowserHref({ path, search: trimmedQ });
-    };
-
-    const handleDownloadSelection = async () => {
-        if (checkedFiles.length === 0) return;
-        setDownloading(true);
-        setError('');
-        try {
-            await downloadDataPaths(checkedFiles);
-        } catch (err) {
-            setError(getRequestErrorMessage(err, 'Download failed'));
-        } finally {
-            setDownloading(false);
-        }
-    };
-
     const clearSearch = () => {
         setQ('');
         setOpen(false);
-        setResults([]);
-        setMeta({ totalCount: 0, truncated: false });
         setEntityResults(EMPTY_ENTITY_RESULTS);
         setEntityMeta(EMPTY_ENTITY_META);
         setEntityErrors({});
-        setChecked(new Set());
         setError('');
     };
 
@@ -958,15 +656,12 @@ function HomeSearch({
         const nextKey = nextQ.toLowerCase();
         setQ(nextQ);
         setOpen(true);
-        setChecked(new Set());
         setError('');
 
         if (nextQ.length < 2) return;
 
         const cached = getCachedSearchResult(nextKey);
         if (cached) {
-            setResults(cached.results);
-            setMeta(cached.meta);
             setEntityResults(cached.entityResults || EMPTY_ENTITY_RESULTS);
             setEntityMeta(cached.entityMeta || EMPTY_ENTITY_META);
             setEntityErrors(cached.entityErrors || {});
@@ -974,8 +669,6 @@ function HomeSearch({
             return;
         }
 
-        setResults([]);
-        setMeta({ totalCount: 0, truncated: false });
         setEntityResults(EMPTY_ENTITY_RESULTS);
         setEntityMeta(EMPTY_ENTITY_META);
         setEntityErrors({});
@@ -984,6 +677,7 @@ function HomeSearch({
 
     return (
         <Box
+            id="home-search"
             component={embedded ? 'div' : 'section'}
             sx={{
                 maxWidth: embedded ? '100%' : 1040,
@@ -1024,7 +718,7 @@ function HomeSearch({
                             <TextField
                                 fullWidth
                                 placeholder={searchPlaceholder}
-                                inputProps={{ 'aria-label': 'Search files, traits, genes, and programs' }}
+                                inputProps={{ 'aria-label': 'Search genes, programs, and traits' }}
                                 value={q}
                                 onChange={(event) => {
                                     setQ(event.target.value);
@@ -1037,7 +731,7 @@ function HomeSearch({
                                     if (event.key === 'Escape') setOpen(false);
                                     if (event.key === 'Enter' && canSearch) {
                                         event.preventDefault();
-                                        openResultsInBrowser();
+                                        setOpen(true);
                                     }
                                 }}
                                 InputProps={{
@@ -1049,7 +743,7 @@ function HomeSearch({
                                     endAdornment: loading
                                         ? <CircularProgress size={18} sx={{ mr: 1 }} />
                                         : (q && (
-                                            <IconButton size="small" aria-label="Clear file search" onClick={clearSearch}>
+                                            <IconButton size="small" aria-label="Clear search" onClick={clearSearch}>
                                                 <Close fontSize="small" />
                                             </IconButton>
                                         )),
@@ -1057,27 +751,14 @@ function HomeSearch({
                             />
                             <SearchResultsPanel
                                 canSearch={canSearch}
-                                checked={checked}
-                                checkedFiles={checkedFiles}
-                                downloading={downloading}
                                 entityErrors={entityErrors}
                                 entityMeta={entityMeta}
                                 entityResults={entityResults}
                                 error={error}
-                                fileResults={fileResults}
-                                folderResults={folderResults}
-                                handleDownloadSelection={handleDownloadSelection}
-                                getResultsBrowserHref={getResultsBrowserHref}
                                 loading={loading}
-                                meta={meta}
                                 panelOpen={panelOpen}
-                                results={results}
-                                resultsBrowserHref={resultsBrowserHref}
-                                setChecked={setChecked}
                                 setError={setError}
                                 theme={theme}
-                                toggleAllFiles={toggleAllFiles}
-                                toggleFile={toggleFile}
                                 trimmedQ={trimmedQ}
                             />
                             </Box>
@@ -1454,8 +1135,8 @@ function ProgramCentricIntro() {
                         <Button component={RouterLink} to="/trait" variant="contained" endIcon={<ArrowForward />} sx={{ borderRadius: 999 }}>
                             Start with traits
                         </Button>
-                        <Button component={RouterLink} to="/data?view=browser" variant="outlined" startIcon={<Search />} sx={{ borderRadius: 999 }}>
-                            Search resources
+                        <Button component="a" href="#home-search" variant="outlined" startIcon={<Search />} sx={{ borderRadius: 999 }}>
+                            Search genes, programs, traits
                         </Button>
                     </Stack>
                 </Box>

@@ -45,11 +45,11 @@ const MIN_EFFECT_SPAN = 0.65;
 const PLOT_HEIGHT = RESPONSIVE_COMPACT_PLOT_HEIGHT;
 
 const CLASS_STYLE = {
-    nodata:      { color: '#d8dde6', size: 4, opacity: 0.26, name: 'No data' },
-    ns:          { color: '#c3ccd8', size: 6, opacity: 0.44, name: 'Background' },
-    sig_up:      { color: '#fb986d', size: 7, opacity: 0.62, name: 'Positive hit' },
-    sig_down:    { color: '#79b9f2', size: 7, opacity: 0.62, name: 'Negative hit' },
-    top100_up:   { color: '#dc7141', size: 8, opacity: 0.88, name: 'Top positive' },
+    nodata: { color: '#d8dde6', size: 4, opacity: 0.26, name: 'No data' },
+    ns: { color: '#c3ccd8', size: 6, opacity: 0.44, name: 'Background' },
+    sig_up: { color: '#fb986d', size: 7, opacity: 0.62, name: 'Positive hit' },
+    sig_down: { color: '#79b9f2', size: 7, opacity: 0.62, name: 'Negative hit' },
+    top100_up: { color: '#dc7141', size: 8, opacity: 0.88, name: 'Top positive' },
     top100_down: { color: '#4b92df', size: 8, opacity: 0.88, name: 'Top negative' },
 };
 
@@ -119,11 +119,11 @@ export default function GeneRegulation({ programId }) {
         if (!Array.isArray(data?.data)) return [];
         return data.data.map((r) => {
             const es = parseFloat(r.lm_es);
-            const p  = parseFloat(r.lm_p);
+            const p = parseFloat(r.lm_p);
             return {
-                gene:  r.GENE || '',
-                es:    Number.isFinite(es) ? es : null,
-                p:     Number.isFinite(p) ? p : null,
+                gene: r.GENE || '',
+                es: Number.isFinite(es) ? es : null,
+                p: Number.isFinite(p) ? p : null,
                 negLogP: p > 0 ? -Math.log10(p) : null,
             };
         });

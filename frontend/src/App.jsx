@@ -1,6 +1,6 @@
 import './App.css';
 import React, { Suspense } from 'react';
-import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useSWRConfig } from 'swr';
 import { fetcher, getGenes, getHomeStats } from './api/gwas.js';
 import MobileNavDrawer from './components/MobileNavDrawer.jsx';
@@ -9,7 +9,6 @@ import { StatePanel } from './components/PageScaffold.jsx';
 
 import Home from './routes/Home.jsx';
 const About = React.lazy(() => import('./routes/About.jsx'));
-const Contact = React.lazy(() => import('./routes/Contact.jsx'));
 const Help = React.lazy(() => import('./routes/Help.jsx'));
 const Trait = React.lazy(() => import('./routes/Trait.jsx'));
 const Genes = React.lazy(() => import('./routes/Genes.jsx'));
@@ -21,15 +20,13 @@ const navLinks = [
     { to: '/genes', icon: <NavIcon name="genes" />, label: 'Genes' },
     { to: '/programs', icon: <NavIcon name="programs" />, label: 'Programs' },
     { to: '/trait', icon: <NavIcon name="trait" />, label: 'Trait' },
-    { to: '/data', icon: <NavIcon name="data" />, label: 'Data' },
+    { to: '/data', icon: <NavIcon name="data" />, label: 'Downloads' },
     { to: '/help', icon: <NavIcon name="guide" />, label: 'Guide' },
-    { to: '/contact', icon: <NavIcon name="contact" />, label: 'Contact' },
     { to: '/about', icon: <NavIcon name="about" />, label: 'About' },
 ];
 
 const routePreloaders = {
     '/about': () => import('./routes/About.jsx'),
-    '/contact': () => import('./routes/Contact.jsx'),
     '/help': () => import('./routes/Help.jsx'),
     '/trait': loadTraitRoute,
     '/genes': loadGenesRoute,
@@ -100,7 +97,7 @@ function AnimatedRoutes() {
                 <Routes location={location}>
                     <Route path="/" element={<Home />} />
                     <Route path="/about" element={<About />} />
-                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/contact" element={<Navigate to="/about" replace />} />
                     <Route path="/trait" element={<Trait />} />
                     <Route path="/trait/:traitName" element={<Trait />} />
                     <Route path="/genes" element={<Genes />} />

@@ -18,7 +18,6 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import {
     groupedTableColumnHeaderCellSx,
-    groupedTableHeaderCellSx,
     highlightedRowSx,
     metricChipTone,
     plotFrameSx,
@@ -58,14 +57,6 @@ function getColumnSpecs({ effectLabel = 'Beta', includePosteriorColumns = false 
     ];
 }
 
-function getColumnGroups(includePosteriorColumns = false) {
-    return [
-        { label: 'Gene', span: 2, tone: 'info' },
-        { label: 'Effect', span: includePosteriorColumns ? 7 : 4, tone: 'effect' },
-        { label: 'Annotation', span: 2, tone: 'annotation' },
-    ];
-}
-
 function justifyForAlign(align = 'left') {
     if (align === 'right') return 'flex-end';
     if (align === 'center') return 'center';
@@ -85,7 +76,7 @@ const sortLabelSx = {
 };
 
 function headerCellSx(theme, align, tone) {
-    return groupedTableColumnHeaderCellSx(theme, tone, align);
+    return groupedTableColumnHeaderCellSx(theme, tone, align, { top: 0 });
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
@@ -183,16 +174,15 @@ export default function BurdenVolcanoTable({
 }) {
     const theme = useTheme();
     const TONES = {
-        info: tableTone(theme, 'neutral'),
+        info: tableTone(theme, 'primary'),
         effect: tableTone(theme, 'primary'),
-        annotation: tableTone(theme, 'accent'),
+        annotation: tableTone(theme, 'primary'),
     };
     if (!rows.length) return null;
 
     const shouldPaginate = sortedRows.length > 50;
     const visibleRows = shouldPaginate ? pagedRows : sortedRows;
     const columnSpecs = getColumnSpecs({ effectLabel, includePosteriorColumns });
-    const columnGroups = getColumnGroups(includePosteriorColumns);
     const tableMinWidth = includePosteriorColumns ? 1320 : 1040;
 
     return (
@@ -253,20 +243,6 @@ export default function BurdenVolcanoTable({
                             ))}
                         </colgroup>
                         <TableHead>
-                            <TableRow>
-                                {columnGroups.map((group) => {
-                                    const palette = TONES[group.tone];
-                                    return (
-                                        <TableCell
-                                            key={group.label}
-                                            colSpan={group.span}
-                                            sx={groupedTableHeaderCellSx(theme, palette)}
-                                        >
-                                            {group.label}
-                                        </TableCell>
-                                    );
-                                })}
-                            </TableRow>
                             <TableRow>
                                 {columnSpecs.map((column) => (
                                     <TableCell key={column.key} sx={headerCellSx(theme, column.align, TONES[column.tone])}>

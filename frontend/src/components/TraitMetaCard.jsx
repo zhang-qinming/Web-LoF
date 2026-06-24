@@ -411,13 +411,6 @@ export default function TraitMetaCard({ fileId }) {
                     '& > *': {
                         minWidth: 0,
                     },
-                    '@media (min-width: 2200px)': {
-                        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                        gap: 3,
-                        '& > *': {
-                            mt: '0 !important',
-                        },
-                    },
                 }}
             >
                 <TraitInfoTable title="Trait information" rows={traitRows} theme={theme} action={exportButton} />

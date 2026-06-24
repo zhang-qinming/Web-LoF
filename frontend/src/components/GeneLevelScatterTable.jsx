@@ -18,7 +18,6 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import {
     groupedTableColumnHeaderCellSx,
-    groupedTableHeaderCellSx,
     highlightedRowSx,
     metricChipTone,
     plotFrameSx,
@@ -43,13 +42,6 @@ const COLUMN_SPECS = [
     { key: 'labelReason', label: 'Label reason', align: 'left', tone: 'evidence', width: 130 },
 ];
 
-const COLUMN_GROUPS = [
-    { label: 'Gene', span: 2, tone: 'gene' },
-    { label: 'Posterior', span: 1, tone: 'posterior' },
-    { label: 'Perturb-seq regulation', span: 4, tone: 'regulation' },
-    { label: 'Evidence', span: 3, tone: 'evidence' },
-];
-
 function justifyForAlign(align = 'left') {
     if (align === 'right') return 'flex-end';
     if (align === 'center') return 'center';
@@ -71,7 +63,7 @@ function sortLabelSx() {
 }
 
 function headerCellSx(theme, align, tone) {
-    return groupedTableColumnHeaderCellSx(theme, tone, align);
+    return groupedTableColumnHeaderCellSx(theme, tone, align, { top: 0 });
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
@@ -142,10 +134,10 @@ export default function GeneLevelScatterTable({
 }) {
     const theme = useTheme();
     const TONES = {
-        gene: tableTone(theme, 'neutral'),
-        posterior: tableTone(theme, 'warning'),
+        gene: tableTone(theme, 'primary'),
+        posterior: tableTone(theme, 'primary'),
         regulation: tableTone(theme, 'primary'),
-        evidence: tableTone(theme, 'accent'),
+        evidence: tableTone(theme, 'primary'),
     };
 
     if (!rows.length) return null;
@@ -200,20 +192,6 @@ export default function GeneLevelScatterTable({
                             ))}
                         </colgroup>
                         <TableHead>
-                            <TableRow>
-                                {COLUMN_GROUPS.map((group) => {
-                                    const tone = TONES[group.tone];
-                                    return (
-                                        <TableCell
-                                            key={group.label}
-                                            colSpan={group.span}
-                                            sx={groupedTableHeaderCellSx(theme, tone)}
-                                        >
-                                            {group.label}
-                                        </TableCell>
-                                    );
-                                })}
-                            </TableRow>
                             <TableRow>
                                 {COLUMN_SPECS.map((column) => (
                                     <TableCell key={column.key} sx={headerCellSx(theme, column.align, TONES[column.tone])}>

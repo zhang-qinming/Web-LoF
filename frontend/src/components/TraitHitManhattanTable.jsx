@@ -21,7 +21,6 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import Search from '@mui/icons-material/Search';
 import {
     groupedTableColumnHeaderCellSx,
-    groupedTableHeaderCellSx,
     highlightedRowSx,
     metricChipTone,
     plotFrameSx,
@@ -45,14 +44,8 @@ const COLUMN_SPECS = [
     { key: 'primaryGeneset', label: 'Geneset', align: 'left', width: 144, tone: 'program' },
 ];
 
-const GROUPS = [
-    { label: 'Locus', span: 5, tone: 'locus' },
-    { label: 'Annotation', span: 2, tone: 'annotation' },
-    { label: 'Mapping', span: 2, tone: 'program' },
-];
-
 function headerCellSx(theme, align, tone) {
-    return groupedTableColumnHeaderCellSx(theme, tone, align);
+    return groupedTableColumnHeaderCellSx(theme, tone, align, { top: 0 });
 }
 
 function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
@@ -199,10 +192,10 @@ export default function TraitHitManhattanTable({
     const shouldPaginate = sortedRows.length > 50;
     const visibleRows = shouldPaginate ? pagedRows : sortedRows;
     const TONES = {
-        neutral: tableTone(theme, 'neutral'),
+        neutral: tableTone(theme, 'primary'),
         locus: tableTone(theme, 'primary'),
-        annotation: tableTone(theme, 'success'),
-        program: tableTone(theme, 'accent'),
+        annotation: tableTone(theme, 'primary'),
+        program: tableTone(theme, 'primary'),
     };
 
     const handleLocateRow = useCallback(() => {
@@ -329,20 +322,6 @@ export default function TraitHitManhattanTable({
                             ))}
                         </colgroup>
                         <TableHead>
-                            <TableRow>
-                                {GROUPS.map((group) => {
-                                    const palette = TONES[group.tone];
-                                    return (
-                                        <TableCell
-                                            key={group.label}
-                                            colSpan={group.span}
-                                            sx={groupedTableHeaderCellSx(theme, palette)}
-                                        >
-                                            {group.label}
-                                        </TableCell>
-                                    );
-                                })}
-                            </TableRow>
                             <TableRow>
                                 {COLUMN_SPECS.map((column) => (
                                     <TableCell key={column.key} sx={headerCellSx(theme, column.align, TONES[column.tone])}>

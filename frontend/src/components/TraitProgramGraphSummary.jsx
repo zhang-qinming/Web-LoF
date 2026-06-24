@@ -43,7 +43,7 @@ export default function TraitProgramGraphSummary({
     const [filter, setFilter] = React.useState('all');
     const [tablePage, setTablePage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(25);
-    const headerTone = tableTone(theme, 'neutral');
+    const headerTone = tableTone(theme, 'primary');
     const programCount = modules.filter((module) => (module.side || side) === 'program').length;
     const regulatorCount = modules.filter((module) => (module.side || side) === 'regulator').length;
     const filteredModules = React.useMemo(() => modules.filter((module) => {

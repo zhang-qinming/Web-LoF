@@ -11,10 +11,14 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
 import BiotechOutlined from '@mui/icons-material/BiotechOutlined';
+import BugReportOutlined from '@mui/icons-material/BugReportOutlined';
+import ContactSupportOutlined from '@mui/icons-material/ContactSupportOutlined';
 import DataObjectOutlined from '@mui/icons-material/DataObjectOutlined';
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
 import InsightsOutlined from '@mui/icons-material/InsightsOutlined';
 import LanguageOutlined from '@mui/icons-material/LanguageOutlined';
 import LaunchOutlined from '@mui/icons-material/LaunchOutlined';
+import SearchOutlined from '@mui/icons-material/SearchOutlined';
 import StorageOutlined from '@mui/icons-material/StorageOutlined';
 import { PageFrame } from '../components/PageScaffold';
 import AboutDataStatistics from '../components/AboutDataStatistics';
@@ -144,7 +148,7 @@ const COPY = {
                     'Home provides rapid search across files, directories, GCST accessions, common output labels, featured figures, and release milestones.',
                     'Trait is the primary analysis surface for metadata and figure views, including program scatter, trait-program graphs, Manhattan plots, volcano plots, gene evidence, gene QQ plots, and cross-trait heatmaps.',
                     'Gene and Program pages provide focused drilldowns for gene evidence, cNMF program annotation, regulator direction, and associated traits.',
-                    'The Data Browser handles raw files, folders, global search, ZIP export, and batch download, while Guide, Contact, and About provide page-level context.',
+                    'The Data Browser handles raw files, folders, global search, ZIP export, and batch download, while Guide and About provide page-level context.',
                 ],
             },
             {
@@ -159,6 +163,71 @@ const COPY = {
                 ],
             },
         ],
+        support: {
+            title: 'Support and Reporting',
+            body: 'Operational support guidance now lives here so browser scope and issue triage stay in one reference page.',
+            sections: [
+                {
+                    icon: ContactSupportOutlined,
+                    title: 'When To Reach Out',
+                    body: 'Reach out when browser behavior blocks analysis, when a rendered value disagrees with the underlying result file, or when a route cannot expose data that should exist.',
+                    bullets: [
+                        'A Trait tab such as Manhattan, Program Scatter, Gene Evidence, Gene QQ, or Cross-trait Heatmap is missing a result file that should exist.',
+                        'A download fails repeatedly, returns the wrong artifact, or packages an unexpected folder.',
+                        'Trait metadata, Trait IDs, GWAS IDs, burden phenotypes, program IDs, gene symbols, rsID, or chart-linked table values look inconsistent.',
+                        'A Programs or Genes drilldown cannot find records that are present in the indexed output files.',
+                    ],
+                },
+                {
+                    icon: DescriptionOutlined,
+                    title: 'What To Include',
+                    body: 'A short, concrete report makes the issue reproducible from the same page, route, and filter state.',
+                    bullets: [
+                        'The exact route, such as /trait/GCST90081631?tab=manhattan, /programs/P12, /genes?query=PTMA, or /data?mode=global.',
+                        'The trait name, Trait ID, GWAS ID, burden phenotype, program ID, gene symbol, rsID, or file path involved.',
+                        'What you expected to see and what actually happened.',
+                        'The visible filter state, active tab, selected download paths, browser screenshot, and approximate time of the issue.',
+                    ],
+                },
+                {
+                    icon: SearchOutlined,
+                    title: 'Where To Check First',
+                    body: 'Use the page that matches the failing workflow before escalating so the report can point to the right data layer.',
+                    bullets: [
+                        'For trait plots and chart-linked tables, compare the Trait page with the matching TSV or folder in Downloads.',
+                        'For gene evidence, check both the Genes page and the trait-level Gene Evidence or Gene QQ tab when available.',
+                        'For program annotation or regulator direction, check Programs and the Trait Program Graph or Program Scatter tab.',
+                        'For empty states, use Guide to confirm whether the component is expected to show a fallback panel.',
+                    ],
+                },
+                {
+                    icon: BugReportOutlined,
+                    title: 'Issue Categories',
+                    body: 'Framing the issue clearly helps route it to the maintainer, data owner, or frontend owner faster.',
+                    bullets: [
+                        'Data issue: missing rows, mismatched identifiers, incorrect counts, unexpected file contents, or stale indexed paths.',
+                        'Interface issue: broken layout, navigation problems, disabled controls, chart interaction failures, or text overflow.',
+                        'Workflow issue: unclear starting point, confusing export path, unsupported filter combination, or missing explanation in the UI.',
+                    ],
+                },
+            ],
+            triageTitle: 'Triage Route Hints',
+            triageBody: 'Most reports can be narrowed quickly by checking the page that owns the failing data surface.',
+            triageItems: [
+                { label: 'Trait plot or tab', route: '/trait/:traitId', owner: 'Trait figure data and linked table state' },
+                { label: 'Gene evidence', route: '/genes?query=GENE', owner: 'Gene index, program relationships, trait evidence rows' },
+                { label: 'Program annotation', route: '/programs/PID', owner: 'Program metadata, program genes, associated traits' },
+                { label: 'Raw file or download', route: '/data?mode=global', owner: 'Indexed paths, folder ZIP, selected-file downloads' },
+            ],
+            templateTitle: 'Report Template',
+            templateRows: [
+                ['Route', '/trait/GCST90081631?tab=manhattan'],
+                ['Object', 'Trait, GWAS ID, gene, program, rsID, or file path'],
+                ['Expected', 'What should have appeared or downloaded'],
+                ['Actual', 'What appeared, failed, or looked inconsistent'],
+                ['State', 'Active tab, filters, selected files, browser, and approximate time'],
+            ],
+        },
         footerTitle: 'Scope',
         footerBody: 'TraitVista is intended for exploration, interpretation, verification, and export of project outputs. It is not a general-purpose genomics database and does not replace statistical review of the underlying GWAS and loss-of-function analyses.',
         footerChip: 'Project result browser',
@@ -365,11 +434,111 @@ function SectionCard({ section, index }) {
     );
 }
 
+function TriageHints({ supportCopy }) {
+    const theme = useTheme();
+
+    return (
+        <Paper
+            elevation={0}
+            sx={panelSx(theme, {
+                p: { xs: 1.6, md: 2 },
+                mb: 2,
+                backgroundColor: theme.custom.surface.raised,
+            })}
+        >
+            <Box sx={{ mb: 1.2 }}>
+                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
+                    {supportCopy.triageTitle}
+                </Typography>
+                <Typography variant="body2" sx={captionSx(theme, { color: theme.palette.text.primary, mb: 0 })}>
+                    {supportCopy.triageBody}
+                </Typography>
+            </Box>
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(4, minmax(0, 1fr))' },
+                    gap: 1,
+                }}
+            >
+                {supportCopy.triageItems.map((item, index) => (
+                    <Box
+                        key={item.label}
+                        sx={{
+                            p: 1.15,
+                            borderRadius: 1,
+                            border: `1px solid ${theme.custom.border.soft}`,
+                            bgcolor: index % 2 === 0 ? theme.palette.background.paper : alpha(theme.palette.warning.main, 0.045),
+                        }}
+                    >
+                        <Typography variant="subtitle2" sx={{ fontWeight: 740, color: theme.palette.text.primary, lineHeight: 1.25 }}>
+                            {item.label}
+                        </Typography>
+                        <Typography variant="body2" sx={captionSx(theme, { mt: 0.6, mb: 0.7, color: theme.palette.text.primary })}>
+                            {item.owner}
+                        </Typography>
+                        <Chip
+                            label={item.route}
+                            size="small"
+                            sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
+                        />
+                    </Box>
+                ))}
+            </Box>
+        </Paper>
+    );
+}
+
+function ReportTemplate({ supportCopy }) {
+    const theme = useTheme();
+
+    return (
+        <Paper
+            elevation={0}
+            sx={panelSx(theme, {
+                p: { xs: 1.6, md: 2 },
+                mb: 2,
+                backgroundColor: theme.palette.background.paper,
+            })}
+        >
+            <Box sx={{ mb: 1.2 }}>
+                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.35 })}>
+                    {supportCopy.templateTitle}
+                </Typography>
+            </Box>
+            <Stack spacing={0.75}>
+                {supportCopy.templateRows.map(([label, value]) => (
+                    <Box
+                        key={label}
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', sm: '132px minmax(0, 1fr)' },
+                            gap: { xs: 0.35, sm: 1 },
+                            p: 1,
+                            borderRadius: 1,
+                            border: `1px solid ${theme.custom.border.soft}`,
+                            bgcolor: theme.custom.surface.raised,
+                        }}
+                    >
+                        <Typography variant="body2" sx={{ fontWeight: 740, color: theme.palette.text.primary }}>
+                            {label}
+                        </Typography>
+                        <Typography variant="body2" sx={captionSx(theme, { color: theme.palette.text.primary, mb: 0 })}>
+                            {value}
+                        </Typography>
+                    </Box>
+                ))}
+            </Stack>
+        </Paper>
+    );
+}
+
 export default function About() {
     const theme = useTheme();
     const location = useLocation();
     const [language, setLanguage] = React.useState('en');
     const copy = COPY[language];
+    const supportCopy = copy.support || COPY.en.support;
 
     React.useEffect(() => {
         if (!location.hash) return undefined;
@@ -458,6 +627,38 @@ export default function About() {
                     <SectionCard key={section.title} section={section} index={index} />
                 ))}
             </Box>
+
+            <Paper
+                elevation={0}
+                sx={panelSx(theme, {
+                    p: { xs: 1.7, md: 2.1 },
+                    mb: 1.6,
+                    backgroundColor: theme.custom.surface.raised,
+                })}
+            >
+                <Typography variant="h6" sx={sectionTitleSx(theme, { mb: 0.45 })}>
+                    {supportCopy.title}
+                </Typography>
+                <Typography variant="body2" sx={captionSx(theme, { color: theme.palette.text.primary, mb: 0 })}>
+                    {supportCopy.body}
+                </Typography>
+            </Paper>
+
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                    gap: 1.5,
+                    mb: 2,
+                }}
+            >
+                {supportCopy.sections.map((section, index) => (
+                    <SectionCard key={section.title} section={section} index={index} />
+                ))}
+            </Box>
+
+            <TriageHints supportCopy={supportCopy} />
+            <ReportTemplate supportCopy={supportCopy} />
 
             <ReleaseLogSection
                 anchorId={RELEASE_LOG_ANCHOR}

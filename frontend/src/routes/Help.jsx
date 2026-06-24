@@ -94,7 +94,7 @@ const TEXT = {
                         route: '/',
                         role: 'Primary desktop navigation bar.',
                         usage: [
-                            'Use Home, Trait, Programs, Genes, Data, Guide, Contact, and About to move across the app.',
+                            'Use Home, Trait, Programs, Genes, Data, Guide, and About to move across the app.',
                             'The current route is highlighted, and the browser URL can be copied to share the current page.',
                         ],
                     },
@@ -510,7 +510,7 @@ const TEXT = {
                 id: 'support-pages',
                 title: 'Other Pages',
                 icon: InfoOutlined,
-                summary: 'About, Contact, and shared floating legends.',
+                summary: 'About, merged support guidance, and shared floating legends.',
                 items: [
                     {
                         name: 'About',
@@ -522,11 +522,11 @@ const TEXT = {
                         ],
                     },
                     {
-                        name: 'Contact',
-                        route: '/contact',
-                        role: 'Support checklist for data, route, chart, and download issues.',
+                        name: 'About Support',
+                        route: '/about',
+                        role: 'Support checklist for data, route, chart, and download issues now merged into About.',
                         usage: [
-                            'Use it before escalating a missing file, inconsistent identifier, chart-linked table mismatch, download failure, or confusing workflow.',
+                            'Use the support and reporting section on About before escalating a missing file, inconsistent identifier, chart-linked table mismatch, download failure, or confusing workflow.',
                             'Include the exact route, active tab, trait, gene, program, rsID, file path, filter state, screenshot, and approximate time when reporting an issue.',
                         ],
                     },
@@ -589,7 +589,7 @@ const TEXT = {
                     { name: 'Programs', target: 'Programs Table' },
                     { name: 'Variants / DataBrowser', target: 'DataBrowser' },
                     { name: 'Guide', target: 'Guide' },
-                    { name: 'Contact', target: 'Contact' },
+                    { name: 'About Support', target: 'About Support' },
                     { name: 'About', target: 'About' },
                 ],
             },
@@ -1128,8 +1128,8 @@ const TEXT = {
                         ],
                     },
                     {
-                        name: 'Contact',
-                        route: '/contact',
+                        name: 'About Support',
+                        route: '/about',
                         role: '数据、路由、图表和下载问题的支持检查清单。',
                         usage: [
                             '在上报缺失文件、标识符不一致、图表联动表格不匹配、下载失败或流程不清晰之前，先按此页检查。',
@@ -1195,7 +1195,7 @@ const TEXT = {
                     { name: 'Programs', target: 'Programs Table' },
                     { name: 'Variants / DataBrowser', target: 'DataBrowser' },
                     { name: 'Guide', target: 'Guide' },
-                    { name: 'Contact', target: 'Contact' },
+                    { name: 'About Support', target: 'About Support' },
                     { name: 'About', target: 'About' },
                 ],
             },
