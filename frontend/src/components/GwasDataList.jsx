@@ -472,8 +472,6 @@ function TraitRow({ row, index, columns, theme }) {
                         >
                             {String(row[col.id] || '').replace(/^["']+|["']+$/g, '')}
                         </Link>
-                    ) : (col.id === 'sample_size' || col.id === 'Sample Size') ? (
-                        <MetricValue value={formatCellValue(row, col.id)} tone="primary" theme={theme} align={columnAlign} />
                     ) : (col.id === 'n_variants' || col.id === 'Variants') ? (
                         <MetricValue value={formatCellValue(row, col.id)} tone="cyan" theme={theme} align={columnAlign} />
                     ) : (col.id === 'n_sig' || col.id === 'Significant Loci') ? (
@@ -734,8 +732,7 @@ export default function GwasDataList({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'flex-start',
-                                gap: 0.65,
-                                flexWrap: 'wrap',
+                                gap: 0.55,
                                 maxWidth: { lg: 280 },
                                 '@media (min-width: 2200px)': {
                                     maxWidth: 420,
@@ -744,13 +741,6 @@ export default function GwasDataList({
                         >
                             <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b5f', lineHeight: 1.15 })}>
                                 {title}
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.76rem', fontWeight: 680, color: '#245089', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
-                                {previewingSearch
-                                    ? `${visibleRows.length.toLocaleString()} visible; updating`
-                                    : normalizedSearch
-                                        ? `${totalCount.toLocaleString()} matches`
-                                        : `${totalCount.toLocaleString()} records`}
                             </Typography>
                         </Box>
                         <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'center' }, gap: 0.55, flexWrap: 'wrap', minWidth: 0 }}>
@@ -764,12 +754,12 @@ export default function GwasDataList({
                                 placeholder={searchPlaceholder}
                                 sx={{
                                     width: '100%',
-                                    maxWidth: { lg: 260 },
+                                    maxWidth: { lg: 320 },
                                     '@media (min-width: 2200px)': {
-                                        maxWidth: 360,
+                                        maxWidth: 420,
                                     },
                                     '& .MuiOutlinedInput-root': {
-                                        height: 32,
+                                        height: 36,
                                         bgcolor: theme.palette.background.paper,
                                         borderRadius: 1,
                                         borderColor: alpha('#245089', 0.16),
@@ -834,21 +824,25 @@ export default function GwasDataList({
                                 disabled={!totalCount || downloading}
                                 sx={{
                                     textTransform: 'none',
-                                    fontSize: '0.74rem',
-                                    color: '#245089',
-                                    border: `1px solid ${alpha('#245089', 0.18)}`,
-                                    bgcolor: alpha('#245089', 0.045),
-                                    minWidth: 116,
-                                    height: 32,
-                                    py: 0.38,
+                                    fontSize: '0.76rem',
+                                    fontWeight: 700,
+                                    color: '#173b5f',
+                                    border: `1px solid ${alpha('#173b5f', 0.16)}`,
+                                    bgcolor: theme.palette.background.paper,
+                                    minWidth: 136,
+                                    height: 36,
+                                    px: 1.35,
+                                    py: 0.45,
                                     flexShrink: 0,
+                                    boxShadow: 'none',
                                     '&:hover': {
-                                        bgcolor: alpha('#245089', 0.08),
-                                        borderColor: alpha('#245089', 0.28),
+                                        bgcolor: alpha('#173b5f', 0.05),
+                                        borderColor: alpha('#173b5f', 0.26),
+                                        boxShadow: 'none',
                                     },
                                 }}
                             >
-                                {downloading ? 'Preparing' : 'Download TSV'}
+                                {downloading ? 'Preparing' : 'Download Table'}
                             </Button>
                         </Box>
                     </Box>

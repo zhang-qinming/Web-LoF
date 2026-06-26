@@ -2,7 +2,7 @@
   <rect width="720" height="420" rx="28" fill="#F8FAFC"/>
   <rect x="42" y="42" width="636" height="336" rx="22" fill="white" stroke="#E2E8F0" stroke-width="2"/>
   <text x="62" y="82" fill="#A21CAF" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Posterior volcano</text>
-  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">GCST90081631 posterior effect distribution</text>
+  <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">GCST90083727 posterior effect distribution</text>
   <line x1="104" y1="318" x2="620" y2="318" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="104" y1="318" x2="104" y2="118" stroke="#CBD5E1" stroke-width="2"/>
   <line x1="360" y1="318" x2="360" y2="118" stroke="#CBD5E1" stroke-width="1.6" stroke-dasharray="7 7"/>

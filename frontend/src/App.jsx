@@ -8,7 +8,6 @@ import NavIcon from './components/NavIcons.jsx';
 import { StatePanel } from './components/PageScaffold.jsx';
 
 import Home from './routes/Home.jsx';
-const About = React.lazy(() => import('./routes/About.jsx'));
 const Help = React.lazy(() => import('./routes/Help.jsx'));
 const Trait = React.lazy(() => import('./routes/Trait.jsx'));
 const Genes = React.lazy(() => import('./routes/Genes.jsx'));
@@ -17,16 +16,14 @@ const Programs = React.lazy(() => import('./routes/Programs.jsx'));
 
 const navLinks = [
     { to: '/', icon: <NavIcon name="home" />, label: 'Home' },
-    { to: '/genes', icon: <NavIcon name="genes" />, label: 'Genes' },
-    { to: '/programs', icon: <NavIcon name="programs" />, label: 'Programs' },
     { to: '/trait', icon: <NavIcon name="trait" />, label: 'Trait' },
+    { to: '/programs', icon: <NavIcon name="programs" />, label: 'Programs' },
+    { to: '/genes', icon: <NavIcon name="genes" />, label: 'Genes' },
     { to: '/data', icon: <NavIcon name="data" />, label: 'Downloads' },
-    { to: '/help', icon: <NavIcon name="guide" />, label: 'Guide' },
-    { to: '/about', icon: <NavIcon name="about" />, label: 'About' },
+    { to: '/help', icon: <NavIcon name="guide" />, label: 'Help' },
 ];
 
 const routePreloaders = {
-    '/about': () => import('./routes/About.jsx'),
     '/help': () => import('./routes/Help.jsx'),
     '/trait': loadTraitRoute,
     '/genes': loadGenesRoute,
@@ -96,15 +93,15 @@ function AnimatedRoutes() {
             <Suspense fallback={<RouteModuleFallback />}>
                 <Routes location={location}>
                     <Route path="/" element={<Home />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/contact" element={<Navigate to="/about" replace />} />
+                    <Route path="/about" element={<Navigate to="/help" replace />} />
+                    <Route path="/contact" element={<Navigate to="/help" replace />} />
                     <Route path="/trait" element={<Trait />} />
                     <Route path="/trait/:traitName" element={<Trait />} />
+                    <Route path="/programs" element={<Programs />} />
+                    <Route path="/programs/:programId" element={<Programs />} />
                     <Route path="/genes" element={<Genes />} />
                     <Route path="/data" element={<Variants />} />
                     <Route path="/help" element={<Help />} />
-                    <Route path="/programs" element={<Programs />} />
-                    <Route path="/programs/:programId" element={<Programs />} />
                     <Route path="*" element={<NotFound />} />
                 </Routes>
             </Suspense>

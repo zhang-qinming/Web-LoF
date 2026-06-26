@@ -27,6 +27,20 @@ async function getProgramInfoColumns() {
     return programInfoColumnsPromise;
 }
 
+function parseRepresentativeGenes(value) {
+    return String(value || '')
+        .split(/[;,]\s*/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 10)
+        .map((gene) => ({
+            label: gene,
+            query: gene,
+            geneSymbol: gene,
+            ensgId: '',
+        }));
+}
+
 async function getProgramInfo() {
     const columns = await getProgramInfoColumns();
     const goTermSelect = columns.has('go_term') ? 'go_term' : 'representative_go AS go_term';
@@ -40,7 +54,11 @@ async function getProgramInfo() {
     );
     const map = {};
     for (const r of rows) {
-        map[r.program] = r;
+        const representativeGenes = parseRepresentativeGenes(r.top10_genes);
+        map[r.program] = {
+            ...r,
+            representative_genes: representativeGenes,
+        };
     }
     return map;
 }

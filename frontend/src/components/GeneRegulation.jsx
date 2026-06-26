@@ -3,36 +3,31 @@ import Plot, { Plotly } from '../lib/plotly';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
-import CircularProgress from '@mui/material/CircularProgress';
 import Button from '@mui/material/Button';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import ToggleButton from '@mui/material/ToggleButton';
 import { useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
-import FloatingLegend from './FloatingLegend';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
-import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { useIdleRenderGate } from '../utils/renderScheduling';
+import ExportPlotDialog from './ExportPlotDialog';
+import FigureLoadingPanel from './FigureLoadingPanel';
 import GeneRegulationTable from './GeneRegulationTable';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneNeutral,
     chartLayoutTokens,
-    compactToggleGroupSx,
     plotFrameSx,
     RESPONSIVE_COMPACT_PLOT_HEIGHT,
     sectionPanelHeaderSx,
@@ -87,7 +82,6 @@ function getEffectRange(rows) {
 export default function GeneRegulation({ programId }) {
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
-    const compactToggleStyles = useMemo(() => compactToggleGroupSx(theme), [theme]);
     const regulationKey = programId ? `/api/regulation/${programId}` : null;
     const regulationResource = useCachedResourceState(
         useSWR(regulationKey, fetcher, figureResourceSWRConfig),
@@ -101,16 +95,6 @@ export default function GeneRegulation({ programId }) {
     const infoData = infoResource.displayData;
     const pinfo = (infoData && programId) ? (infoData[`P${programId}`] || infoData[programId]) : null;
     const afterFirstPaint = useAfterFirstPaint(regulationKey || 'gene-regulation-empty');
-
-    const plotElRef = useRef(null);
-    const fullscreenPlotElRef = useRef(null);
-
-    const onInitialized = useCallback((_figure, graphDiv) => {
-        plotElRef.current = graphDiv;
-    }, []);
-    const onFullscreenInitialized = useCallback((_figure, graphDiv) => {
-        fullscreenPlotElRef.current = graphDiv;
-    }, []);
 
     useEffect(() => { setPage(1); }, [programId]);
 
@@ -174,14 +158,6 @@ export default function GeneRegulation({ programId }) {
     }, [rows]);
 
     const titleText = `Program ${programId || ''}${pinfo?.curated_annotation ? ` — ${pinfo.curated_annotation}` : ''}`;
-    const legendItems = useMemo(() => ['ns', 'sig_down', 'sig_up', 'top100_down', 'top100_up', 'nodata']
-        .map((key) => ({
-            key,
-            label: CLASS_STYLE[key].name,
-            color: CLASS_STYLE[key].color,
-            count: rows.filter((row) => classify(row.es, row.p) === key).length,
-        }))
-        .filter((item) => item.count > 0), [classify, rows]);
 
     // ---- Plotly 数据 ----
     const { plotData, layout } = useMemo(() => {
@@ -229,7 +205,23 @@ export default function GeneRegulation({ programId }) {
             margin: { l: 74, r: 18, t: 58, b: 56 },
             plot_bgcolor: chartTokens.plotBg,
             paper_bgcolor: chartTokens.paperBg,
-            showlegend: false,
+            showlegend: true,
+            legend: {
+                x: 0.985,
+                y: 0.985,
+                xanchor: 'right',
+                yanchor: 'top',
+                orientation: 'v',
+                bgcolor: 'rgba(255,255,255,0.82)',
+                bordercolor: chartTokens.axisSoft,
+                borderwidth: 1,
+                font: {
+                    size: 11,
+                    color: chartTokens.axisColor,
+                    family: theme.typography.fontFamily,
+                },
+                traceorder: 'normal',
+            },
             shapes: [
                 {
                     type: 'line',
@@ -385,13 +377,10 @@ export default function GeneRegulation({ programId }) {
     }), []);
 
     // ---- 表格 ----
-    const [tableOpen, setTableOpen] = useState(false);
     const [sortBy, setSortBy] = useState('p');
     const [sortDir, setSortDir] = useState('asc');
     const [highlightGene, setHighlightGene] = useState({ gene: null, key: 0 });
     const [fullscreen, setFullscreen] = useState(false);
-    const [legendCollapsed, setLegendCollapsed] = useState(false);
-
     useEffect(() => {
         if (!fullscreen) return;
         const onEsc = (e) => { if (e.key === 'Escape') setFullscreen(false); };
@@ -399,7 +388,7 @@ export default function GeneRegulation({ programId }) {
         return () => window.removeEventListener('keydown', onEsc);
     }, [fullscreen]);
     const [page, setPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const [jumpInput, setJumpInput] = useState('');
     const tablePaperRef = useRef(null);
     const tableRowRefs = useRef({});
@@ -419,7 +408,7 @@ export default function GeneRegulation({ programId }) {
         });
     }, [rows, sortBy, sortDir, collator]);
 
-    const shouldPaginateTable = sortedRows.length > 50;
+    const shouldPaginateTable = sortedRows.length > 10;
     const totalPages = shouldPaginateTable ? Math.max(1, Math.ceil(sortedRows.length / rowsPerPage)) : 1;
     useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
 
@@ -435,7 +424,7 @@ export default function GeneRegulation({ programId }) {
     );
 
     useEffect(() => {
-        if (!highlightGene.gene || !tableOpen) return undefined;
+        if (!highlightGene.gene) return undefined;
         const idx = sortedRows.findIndex((r) => r.gene === highlightGene.gene);
         if (idx >= 0) {
             const nextPage = shouldPaginateTable ? Math.floor(idx / rowsPerPage) + 1 : 1;
@@ -447,13 +436,13 @@ export default function GeneRegulation({ programId }) {
             const timeoutId = window.setTimeout(() => {
                 scrollElementNearViewportCenter(tablePaperRef.current, { viewportOffset: 0.08 });
                 const rowEl = tableRowRefs.current[highlightGene.gene];
-                if (rowEl) rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (rowEl) scrollElementIntoNearestView(rowEl);
             }, 140);
 
             return () => window.clearTimeout(timeoutId);
         }
         return undefined;
-    }, [highlightGene, page, rowsPerPage, shouldPaginateTable, sortedRows, tableOpen]);
+    }, [highlightGene, page, rowsPerPage, shouldPaginateTable, sortedRows]);
 
     const handleJumpToPage = useCallback(() => {
         const n = parseInt(jumpInput, 10);
@@ -478,12 +467,6 @@ export default function GeneRegulation({ programId }) {
     }, [rows, data?.fileName, programId]);
 
     // ---- 统计 ----
-    const stats = useMemo(() => {
-        let top100 = 0, sig = 0;
-        rows.forEach(r => { const c = classify(r.es, r.p); if (c.startsWith('top100')) top100++; if (c.startsWith('sig') || c.startsWith('top100')) sig++; });
-        return { total: rows.length, sig, top100 };
-    }, [rows, classify]);
-
     // ----
     if (error) return <Alert severity="error" sx={{ m: 2 }}>{error.message}</Alert>;
 
@@ -500,9 +483,10 @@ export default function GeneRegulation({ programId }) {
                     })}
                 >
                     {isLoading && (
-                        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: chartTokens.overlay, zIndex: 10 }}>
-                            <CircularProgress size={40} />
-                        </Box>
+                        <FigureLoadingPanel
+                            minHeight={PLOT_HEIGHT}
+                            message="Loading gene regulation data..."
+                        />
                     )}
                     {plotData.length > 0 && (
                         <>
@@ -520,19 +504,20 @@ export default function GeneRegulation({ programId }) {
                                     <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: theme.palette.text.primary }}>
                                         Volcano plot
                                     </Typography>
+                                    <Typography sx={{ mt: 0.35, fontSize: '0.73rem', lineHeight: 1.45, color: theme.palette.text.secondary }}>
+                                        Colors encode signal class: gray points are background, light orange and light blue are significant positive or negative hits, and darker orange and darker blue mark the top 100 strongest signals by P-value.
+                                    </Typography>
                                 </Box>
                                 <UpdatingStatus active={isRefreshing} />
                             </Box>
                             {afterFirstPaint ? (
                                 <>
                                     <Plot
-                                        onInitialized={onInitialized}
                                         onClick={(evt) => {
                                             if (!evt?.points?.length) return;
                                             const gene = evt.points[0].customdata?.[0];
                                             if (gene) {
                                                 setHighlightGene(prev => ({ gene, key: prev.key + 1 }));
-                                                setTableOpen(true);
                                             }
                                         }}
                                         data={plotData}
@@ -541,28 +526,14 @@ export default function GeneRegulation({ programId }) {
                                         useResizeHandler
                                         style={{ width: '100%', height: PLOT_HEIGHT }}
                                     />
-                                    <FloatingLegend
-                                        items={legendItems}
-                                        collapsed={legendCollapsed}
-                                        onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
-                                        title="Signals"
-                                        width={{ expanded: 192, collapsed: 118 }}
-                                        defaultPlacement="right"
-                                        defaultTop={78}
-                                        defaultSideOffset={10}
-                                        anchorPlotRef={plotElRef}
-                                    />
                                     {shouldRenderTable && (
                                         <GeneRegulationTable
                                             rows={rows}
                                             pagedRows={pagedRows}
-                                            tableOpen={tableOpen}
-                                            setTableOpen={setTableOpen}
                                             sortBy={sortBy}
                                             sortDir={sortDir}
                                             handleSort={handleSort}
                                             highlightGene={highlightGene}
-                                            setHighlightGene={setHighlightGene}
                                             page={page}
                                             setPage={setPage}
                                             rowsPerPage={rowsPerPage}
@@ -575,41 +546,32 @@ export default function GeneRegulation({ programId }) {
                                             tablePaperRef={tablePaperRef}
                                             tableRowRefs={tableRowRefs}
                                             downloadCSV={downloadCSV}
-                                            stats={stats}
-                                            annotation={pinfo?.curated_annotation}
                                             embedded
                                         />
                                     )}
                                 </>
                             ) : (
-                                <Box sx={{ height: PLOT_HEIGHT }} />
+                                <FigureLoadingPanel
+                                    minHeight={PLOT_HEIGHT}
+                                    message="Rendering gene regulation plot..."
+                                />
                             )}
                         </>
                     )}
                 </Paper>
             )}
 
-            {/* 导出对话框 */}
-            <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
-                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>
-                <DialogContent>
-                    <ToggleButtonGroup value={expFmt} exclusive size="small"
-                        onChange={(e, v) => v && setExpFmt(v)} sx={{ ...compactToggleStyles, mb: 2 }}>
-                        <ToggleButton value="svg">SVG</ToggleButton>
-                        <ToggleButton value="png">PNG</ToggleButton>
-                    </ToggleButtonGroup>
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                        <TextField label="Width" type="number" value={expW}
-                            onChange={e => setExpW(Number(e.target.value))} size="small" />
-                        <TextField label="Height" type="number" value={expH}
-                            onChange={e => setExpH(Number(e.target.value))} size="small" />
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setExportOpen(false)}>Cancel</Button>
-                    <Button variant="contained" onClick={() => { doExport(); setExportOpen(false); }}>Export</Button>
-                </DialogActions>
-            </Dialog>
+            <ExportPlotDialog
+                open={exportOpen}
+                onClose={() => setExportOpen(false)}
+                width={expW}
+                onWidthChange={(value) => setExpW(Number(value))}
+                height={expH}
+                onHeightChange={(value) => setExpH(Number(value))}
+                format={expFmt}
+                onFormatChange={setExpFmt}
+                onExport={doExport}
+            />
 
             {/* 全屏覆盖 */}
             {fullscreen && (
@@ -620,29 +582,15 @@ export default function GeneRegulation({ programId }) {
                         data={plotData}
                         layout={{ ...layout, title: titleText, margin: { l: 80, r: 30, t: 50, b: 50 } }}
                         config={plotConfig}
-                        onInitialized={onFullscreenInitialized}
-                        onUpdate={onFullscreenInitialized}
                         onClick={(evt) => {
                             if (!evt?.points?.length) return;
                             const gene = evt.points[0].customdata?.[0];
                             if (gene) {
                                 setHighlightGene(prev => ({ gene, key: prev.key + 1 }));
-                                setTableOpen(true);
                             }
                         }}
                         useResizeHandler
                         style={{ width: '100%', height: '100%' }}
-                    />
-                    <FloatingLegend
-                        items={legendItems}
-                        collapsed={legendCollapsed}
-                        onToggleCollapsed={() => setLegendCollapsed((prev) => !prev)}
-                        title="Signals"
-                        width={{ expanded: 192, collapsed: 118 }}
-                        defaultPlacement="right"
-                        defaultTop={58}
-                        defaultSideOffset={18}
-                        anchorPlotRef={fullscreenPlotElRef}
                     />
                 </Box>
             )}

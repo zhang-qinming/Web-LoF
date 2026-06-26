@@ -512,6 +512,118 @@ const releaseEntryDrafts = [
             note: '该版本重点改善联动浏览体验，而不是新增分析类别。',
         },
     },
+    {
+        icon: Storage,
+        color: '#0f766e',
+        en: {
+            date: 'Jun 08, 2026',
+            label: 'Table',
+            title: 'Responsive layout and table presentation were beautified',
+            summary: 'Table styles, column alignments, responsive width rules, and spacing were standardized across all analytical routes to improve readability on various screen sizes.',
+            highlights: [
+                'Responsive layout rules were applied so page surfaces automatically adapt to wide and narrow screens.',
+                'Header styling, padding, and alignments were unified across Trait, Genes, and Programs lists.',
+                'Text wrapping and column widths were refined to minimize horizontal scrolling.',
+            ],
+            note: 'This pass ensured tables function cleanly as dense information dashboards.',
+        },
+        zh: {
+            date: '2026-06-08',
+            label: '表格',
+            title: '响应式布局与表格呈现优化',
+            summary: '在所有分析路由中统一了表格样式、列对齐、响应式宽度规则及间距，从而提升了不同屏幕尺寸下的可读性。',
+            highlights: [
+                '应用响应式布局规则，使页面自适应宽屏与窄屏显示。',
+                '统一了性状、基因和程序列表的表头样式、边距及对齐方式。',
+                '优化了文本折行和列宽，最大限度减少不必要的水平滚动。',
+            ],
+            note: '此轮优化确保了表格能作为密集信息看板清晰高效地工作。',
+        },
+    },
+    {
+        icon: QueryStats,
+        color: '#ea580c',
+        en: {
+            date: 'Jun 13, 2026',
+            label: 'Analysis',
+            title: 'Trait effect correlation and page streamlining',
+            summary: 'A dedicated Trait Effect Correlation view was introduced and pages were streamlined to provide direct access to core associations.',
+            highlights: [
+                'Implemented the Trait Effect Correlation component to help users analyze concordance and profile similarity.',
+                'Integrated LDSC (linkage disequilibrium score regression) heritability metadata fields into trait summaries.',
+                'Streamlined routing structure and simplified view layouts to accelerate navigation.',
+            ],
+            note: 'This release added a new dimension of comparison while reducing visual clutter.',
+        },
+        zh: {
+            date: '2026-06-13',
+            label: '分析',
+            title: '引入性状效应相关性并简化页面',
+            summary: '引入了专门的性状效应相关性分析视图，并对页面进行了流线型整理，提供了对核心关联的更直接访问。',
+            highlights: [
+                '实现了性状效应相关性组件，辅助用户分析效应一致性与轮廓相似度。',
+                '在性状元数据中集成了 LDSC 遗传力指标及扩展字段。',
+                '精简了路由结构，简化页面布局以加快导航速度。',
+            ],
+            note: '该版本在增加全新比较维度的同时，降低了界面的视觉杂乱感。',
+        },
+    },
+    {
+        icon: Storage,
+        color: '#2563eb',
+        en: {
+            date: 'Jun 17, 2026',
+            label: 'Speed',
+            title: 'Unified caching rules accelerated page loads',
+            summary: 'Unified caching and data pre-retrieval rules were implemented across the backend and frontend, achieving faster page transition times.',
+            highlights: [
+                'Implemented server-side metadata caching and directory-level file list caching to avoid repeated disk reads.',
+                'Unified API request-deduplication and response caching on the frontend to speed up repeated route hits.',
+                'Optimized data payload sizes for full-mode Manhattan and cross-trait requests.',
+            ],
+            note: 'These changes resolved sluggish navigation by reducing cold-start API times.',
+        },
+        zh: {
+            date: '2026-06-17',
+            label: '速度',
+            title: '统一缓存规则大幅提升加载速度',
+            summary: '在前后端实现了统一的缓存和数据预取规则，大幅缩短了页面切换的加载等待时间。',
+            highlights: [
+                '实现了服务端元数据缓存与目录级文件列表缓存，避免重复的磁盘扫描。',
+                '在前端统一了 API 请求去重与响应缓存，以加速对已访问路由重新装载。',
+                '优化了全量曼哈顿图和跨性状请求的数据传输量，提高了大文件解析效率。',
+            ],
+            note: '这些更改通过缩短冷启动 API 响应时间，解决了页面切换时的卡顿问题。',
+        },
+    },
+    {
+        icon: Biotech,
+        color: '#7c3aed',
+        en: {
+            date: 'Jun 25, 2026',
+            label: 'UX Polish',
+            title: 'Polished interactive components and page visual style',
+            summary: 'Finished a comprehensive visual polish across the site, refining the Data Browser layout, resolving drag boundary bugs, and improving table column wrapping.',
+            highlights: [
+                'Beautified the Data Browser page with a clean sidebar folder layout, visual card grid, and inline action buttons.',
+                'Resolved the Floating Legend boundary constraint bug to prevent erratic movement inside non-positioned containers.',
+                'Implemented auto-wrapping responsive text rules for table cells to keep text-dense tables readable.',
+            ],
+            note: 'This release represents the latest refinement in user interaction and visual quality.',
+        },
+        zh: {
+            date: '2026-06-25',
+            label: '体验',
+            title: '交互组件细节优化与视觉润色',
+            summary: '完成了全站范围内的视觉和体验润色，重构了数据浏览器页面布局，修复了拖拽边界问题，并优化了表格内容折行。',
+            highlights: [
+                '美化数据浏览器页面，增加了侧边栏文件夹树、文件卡片网格和行内操作按钮。',
+                '修复了悬浮图例在非定位父容器中的拖拽边界计算 bug，防止其出现异常移动。',
+                '为所有数据表格引入了自适应文本折行规则，提升了文字密集型表格的可读性。',
+            ],
+            note: '该版本代表了用户交互体验与界面细节品质上的最新优化。',
+        },
+    },
 ];
 
 function buildReleaseEntries(locale) {

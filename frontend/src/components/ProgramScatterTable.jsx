@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -30,19 +30,17 @@ import {
 } from '../themeUtils';
 
 const COLUMN_SPECS = [
-    { key: 'program', label: 'Program', align: 'left', tone: 'program', width: 118 },
-    { key: 'color', label: 'Class', align: 'left', tone: 'info', width: 126 },
-    { key: 'progScore', label: 'Score', align: 'right', tone: 'program', width: 92 },
-    { key: 'rankProg', label: 'Rank', align: 'center', tone: 'program', width: 70 },
-    { key: 'progP', label: 'P-value', align: 'right', tone: 'program', width: 92 },
-    { key: 'progGamma', label: 'Mean gamma', align: 'right', tone: 'program', width: 104 },
-    { key: 'regScore', label: 'Score', align: 'right', tone: 'regulator', width: 92 },
-    { key: 'rankReg', label: 'Rank', align: 'center', tone: 'regulator', width: 70 },
-    { key: 'regP', label: 'P-value', align: 'right', tone: 'regulator', width: 92 },
-    { key: 'regBeta', label: 'Reg beta', align: 'right', tone: 'regulator', width: 92 },
-];
-
-function justifyForAlign(align = 'left') {
+    { key: 'program', label: 'Program', align: 'center', tone: 'program', width: 118 },
+    { key: 'color', label: 'Enrichment Class', align: 'center', tone: 'info', width: 150 },
+    { key: 'progScore', label: 'Program Burden Score', align: 'center', tone: 'program', width: 156 },
+    { key: 'rankProg', label: 'Program Rank', align: 'center', tone: 'program', width: 112 },
+    { key: 'progP', label: 'Program P-value', align: 'center', tone: 'program', width: 128 },
+    { key: 'progGamma', label: 'Program Mean Gamma', align: 'center', tone: 'program', width: 154 },
+    { key: 'regScore', label: 'Regulator-Burden Score', align: 'center', tone: 'regulator', width: 180 },
+    { key: 'rankReg', label: 'Regulator Rank', align: 'center', tone: 'regulator', width: 124 },
+    { key: 'regP', label: 'Regulator P-value', align: 'center', tone: 'regulator', width: 144 },
+    { key: 'regBeta', label: 'Regulator Beta', align: 'center', tone: 'regulator', width: 130 },
+];function justifyForAlign(align = 'left') {
     if (align === 'right') return 'flex-end';
     if (align === 'center') return 'center';
     return 'flex-start';
@@ -74,8 +72,9 @@ function renderCell(column, row, helpers) {
         return (
             <TableCell
                 key={column.key}
+                align="center"
                 sx={{
-                    ...tdSx('left', 'monospace', 500),
+                    ...tdSx('center', 'monospace', 500),
                     cursor: 'pointer',
                     color: '#1976D2',
                     '&:hover': { color: '#0D47A1', textDecoration: 'underline' },
@@ -91,8 +90,8 @@ function renderCell(column, row, helpers) {
         );
     case 'color':
         return (
-            <TableCell key={column.key} sx={tdSx('left')}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+            <TableCell key={column.key} align="center" sx={tdSx('center')}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.6 }}>
                     <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: COLORS[row.color], flexShrink: 0 }} />
                     <Box component="span" sx={{ color: row.color === 'other' ? '#667085' : COLORS[row.color], fontWeight: row.color === 'other' ? 400 : 600 }}>
                         {LEGEND_LABELS[row.color]}
@@ -101,21 +100,21 @@ function renderCell(column, row, helpers) {
             </TableCell>
         );
     case 'progScore':
-        return <TableCell key={column.key} sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progScore?.toFixed(3) ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progScore?.toFixed(3) ?? '—'}</TableCell>;
     case 'rankProg':
-        return <TableCell key={column.key} sx={{ ...tdSx('center', undefined, isTopProg ? 700 : 400, TABLE_TONES.program.rankCell), color: isTopProg ? TABLE_TONES.program.headerColor : '#888' }}>{row.rankProg ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={{ ...tdSx('center', undefined, isTopProg ? 700 : 400, TABLE_TONES.program.rankCell), color: isTopProg ? TABLE_TONES.program.headerColor : '#888' }}>{row.rankProg ?? '—'}</TableCell>;
     case 'progP':
-        return <TableCell key={column.key} sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellSoft)}>{row.progP != null ? row.progP.toExponential(2) : '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellSoft)}>{row.progP != null ? row.progP.toExponential(2) : '—'}</TableCell>;
     case 'progGamma':
-        return <TableCell key={column.key} sx={tdSx('right', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progGamma?.toFixed(4) ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progGamma?.toFixed(4) ?? '—'}</TableCell>;
     case 'regScore':
-        return <TableCell key={column.key} sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regScore?.toFixed(3) ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regScore?.toFixed(3) ?? '—'}</TableCell>;
     case 'rankReg':
-        return <TableCell key={column.key} sx={{ ...tdSx('center', undefined, isTopReg ? 700 : 400, TABLE_TONES.regulator.rankCell), color: isTopReg ? TABLE_TONES.regulator.headerColor : '#888' }}>{row.rankReg ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={{ ...tdSx('center', undefined, isTopReg ? 700 : 400, TABLE_TONES.regulator.rankCell), color: isTopReg ? TABLE_TONES.regulator.headerColor : '#888' }}>{row.rankReg ?? '—'}</TableCell>;
     case 'regP':
-        return <TableCell key={column.key} sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellSoft)}>{row.regP != null ? row.regP.toExponential(2) : '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellSoft)}>{row.regP != null ? row.regP.toExponential(2) : '—'}</TableCell>;
     case 'regBeta':
-        return <TableCell key={column.key} sx={tdSx('right', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regBeta?.toFixed(4) ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regBeta?.toFixed(4) ?? '—'}</TableCell>;
     default:
         return null;
     }
@@ -191,7 +190,7 @@ export default function ProgramScatterTable({
             </Box>
             <Collapse in={tableOpen}>
                 <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 980 })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1396 })}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />
@@ -204,6 +203,7 @@ export default function ProgramScatterTable({
                                     return (
                                         <TableCell
                                             key={column.key}
+                                            align={column.align}
                                             sx={{
                                                 ...thSx(column.align),
                                                 ...groupedTableColumnHeaderCellSx(theme, tone, column.align, { top: 0 }),
@@ -268,3 +268,4 @@ export default function ProgramScatterTable({
         </Paper>
     );
 }
+

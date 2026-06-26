@@ -135,7 +135,9 @@ backend (Express 5 + MySQL2, port 4000)
 | `Genes` | Gene index、Gene detail 和相关导出 |
 | `ProgramScatter` / `TraitProgramGraph` | Program/Trait 关联可视化 |
 
-路由：`/` Home, `/trait`, `/trait/:traitName`, `/genes`, `/programs`, `/programs/:programId`, `/data`, `/help`, `/contact`, `/about`。
+路由：`/` Home, `/trait`, `/trait/:traitName`, `/genes`, `/programs`, `/programs/:programId`, `/data`, `/help`。
+
+`/about` 和 `/contact` 当前会重定向到 `/help`，不再有独立页面组件。
 
 `/variants` 和 `/browse` 当前不是已注册路由。如需兼容旧链接，应显式添加 alias。
 

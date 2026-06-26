@@ -6,11 +6,6 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import Slider from '@mui/material/Slider';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -30,7 +25,7 @@ import { getDataFileText } from '../api/gwas';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { parseNullableNumber } from '../utils/numbers';
-import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
@@ -38,16 +33,14 @@ import { useDebouncedControlValue, useIdleRenderGate } from '../utils/renderSche
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
-    controlFieldSx,
     metricChipTone,
-    plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
     RESPONSIVE_TALL_PLOT_HEIGHT,
-    sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
-    toolbarSx,
 } from '../themeUtils';
+import ExportPlotDialog from './ExportPlotDialog';
+import FigureLoadingPanel from './FigureLoadingPanel';
 import FloatingLegend from './FloatingLegend';
 import GeneLevelScatterTable from './GeneLevelScatterTable';
 
@@ -739,7 +732,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
         const timeoutId = window.setTimeout(() => {
             scrollElementNearViewportCenter(tableSectionRef.current, { viewportOffset: 0.08 });
             const el = tableRowRefs.current[highlight.rowKey];
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (el) scrollElementIntoNearestView(el);
         }, 180);
         return () => window.clearTimeout(timeoutId);
     }, [highlight, sortedRows, tableOpen, tablePage, tableRowsPerPage]);
@@ -828,97 +821,149 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={toolbarSx(theme)}>
-                <Box sx={{ minWidth: 270, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
-                        Gene-level scatter
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* CARD 1: Filters & Options */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <Box sx={{ px: 2.5, py: 1.5, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                        Gene-level Scatter Controls
                     </Typography>
-                    <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
-                        Posterior effect vs regulation evidence
-                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                        <Button 
+                            variant="text" 
+                            size="small"
+                            startIcon={<RestartAlt />} 
+                            onClick={resetControls} 
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, fontSize: '0.78rem' }}
+                        >
+                            Reset
+                        </Button>
+                        <Button 
+                            variant="text" 
+                            size="small"
+                            startIcon={<Download />} 
+                            onClick={downloadCSV} 
+                            disabled={!rows.length} 
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, fontSize: '0.78rem' }}
+                        >
+                            CSV
+                        </Button>
+                    </Stack>
                 </Box>
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3.5, alignItems: 'center' }}>
+                        {/* Locus direction mode */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Effect Direction:
+                            </Typography>
+                            <ToggleButtonGroup
+                                exclusive
+                                size="small"
+                                value={directionMode}
+                                onChange={(_, value) => { if (value) setDirectionMode(value); }}
+                                sx={statusToggleSx(theme)}
+                            >
+                                <ToggleButton value={DIRECTION_MODES.ALL}>Any sign</ToggleButton>
+                                <ToggleButton value={DIRECTION_MODES.CONCORDANT}>Concordant</ToggleButton>
+                                <ToggleButton value={DIRECTION_MODES.DISCORDANT}>Opposite</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
 
-                <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    value={directionMode}
-                    onChange={(_, value) => { if (value) setDirectionMode(value); }}
-                    sx={statusToggleSx(theme)}
-                >
-                    <ToggleButton value={DIRECTION_MODES.ALL}>Any sign</ToggleButton>
-                    <ToggleButton value={DIRECTION_MODES.CONCORDANT}>Concordant</ToggleButton>
-                    <ToggleButton value={DIRECTION_MODES.DISCORDANT}>Opposite</ToggleButton>
-                </ToggleButtonGroup>
-
-                <TextField
-                    size="small"
-                    label="Gene"
-                    value={geneQuery}
-                    onChange={(event) => {
-                        setGeneQuery(event.target.value);
-                        setTablePage(0);
-                    }}
-                    sx={controlFieldSx(theme, { width: 180 })}
-                />
-
-                <Chip icon={<Biotech />} label={`${counts.filtered.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                <Chip icon={<Insights />} label={`${counts.supported.toLocaleString()} supported`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'regulation_supported'))} />
-                <Chip icon={<FilterAlt />} label={`${counts.discordant.toLocaleString()} discordant`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'direction_discordant'))} />
-                <Chip icon={<Science />} label={`${counts.posteriorHigh.toLocaleString()} high posterior`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'posterior_high', 0.1, 0.24))} />
-                <UpdatingStatus active={isRefreshing} />
-            </Box>
-
-            <Box sx={toolbarSx(theme)}>
-                <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 260 }}>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
-                        Point
-                    </Typography>
-                    <Slider
-                        value={Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
-                        min={3}
-                        max={14}
-                        step={1}
-                        onChange={(_, value) => setPointSizeDraft(Number(value))}
-                        onChangeCommitted={(_, value) => commitPointSize(Number(value))}
-                        sx={{ width: 120, color: theme.palette.primary.main, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
-                    />
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20 }}>{Number(pointSizeDraft) || DEFAULT_POINT_SIZE}</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1.2} alignItems="center" sx={{ minWidth: 250 }}>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none' }}>
-                        Labels
-                    </Typography>
-                    <Slider
-                        value={Number(labelLimitDraft) || 0}
-                        min={0}
-                        max={30}
-                        step={1}
-                        onChange={(_, value) => setLabelLimitDraft(Number(value))}
-                        onChangeCommitted={(_, value) => commitLabelLimit(Number(value))}
-                        sx={{ width: 120, color: theme.palette.text.secondary, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
-                    />
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 24 }}>{Number(labelLimitDraft) || 0}</Typography>
-                </Stack>
-                <Button variant="text" startIcon={<RestartAlt />} onClick={resetControls} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}>
-                    Reset
-                </Button>
-                <Button variant="text" startIcon={<Download />} onClick={downloadCSV} disabled={!rows.length} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}>
-                    CSV
-                </Button>
-            </Box>
-
-            <Card elevation={0} sx={plotFrameSx(theme)}>
-                <CardContent sx={{ p: 0, position: 'relative' }}>
-                    {isLoading && (
-                        <Box sx={{ minHeight: GENE_EVIDENCE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    Loading gene-level scatter TSV...
+                        {/* Point size slider */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Point Size:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 150 }}>
+                                <Slider
+                                    value={Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
+                                    min={3}
+                                    max={14}
+                                    step={1}
+                                    onChange={(_, value) => setPointSizeDraft(Number(value))}
+                                    onChangeCommitted={(_, value) => commitPointSize(Number(value))}
+                                    sx={{
+                                        width: 100,
+                                        color: theme.palette.text.secondary,
+                                        '& .MuiSlider-thumb': { width: 14, height: 14 },
+                                        '& .MuiSlider-rail': { opacity: 0.25 },
+                                    }}
+                                />
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.72rem', minWidth: 20 }}>
+                                    {Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
                                 </Typography>
                             </Box>
-                        </Box>
+                        </Stack>
+
+                        {/* Labels slider */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Labels Limit:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 150 }}>
+                                <Slider
+                                    value={Number(labelLimitDraft) || 0}
+                                    min={0}
+                                    max={30}
+                                    step={1}
+                                    onChange={(_, value) => setLabelLimitDraft(Number(value))}
+                                    onChangeCommitted={(_, value) => commitLabelLimit(Number(value))}
+                                    sx={{
+                                        width: 100,
+                                        color: theme.palette.text.secondary,
+                                        '& .MuiSlider-thumb': { width: 14, height: 14 },
+                                        '& .MuiSlider-rail': { opacity: 0.25 },
+                                    }}
+                                />
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.72rem', minWidth: 20 }}>
+                                    {Number(labelLimitDraft) || 0}
+                                </Typography>
+                            </Box>
+                        </Stack>
+                    </Box>
+
+                </CardContent>
+            </Card>
+
+            {/* CARD 2: Interactive Plot */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <Box sx={{ px: 2.5, py: 1.2, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                    <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" alignItems="center">
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            Gene-level Scatter Plot
+                        </Typography>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', mr: 0.5, fontSize: '0.74rem' }}>
+                                Summary Stats:
+                            </Typography>
+                            <Chip icon={<Biotech sx={{ fontSize: '14px !important' }} />} label={`${counts.filtered.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                            <Chip icon={<Insights sx={{ fontSize: '14px !important' }} />} label={`${counts.supported.toLocaleString()} supported`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'regulation_supported'))} />
+                            <Chip icon={<FilterAlt sx={{ fontSize: '14px !important' }} />} label={`${counts.discordant.toLocaleString()} discordant`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'direction_discordant'))} />
+                            <Chip icon={<Science sx={{ fontSize: '14px !important' }} />} label={`${counts.posteriorHigh.toLocaleString()} high posterior`} size="small" sx={summaryChipSx(theme, evidenceChipTone(theme, 'posterior_high', 0.1, 0.24))} />
+                        </Stack>
+                    </Stack>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <UpdatingStatus active={isRefreshing} />
+                        {!isLoading && hasVisiblePoints && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Download />}
+                                onClick={() => setExportOpen(true)}
+                                sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                                Export Image
+                            </Button>
+                        )}
+                    </Box>
+                </Box>
+                <CardContent sx={{ p: 0, position: 'relative' }}>
+                    {isLoading && (
+                        <FigureLoadingPanel
+                            minHeight={GENE_EVIDENCE_PLOT_HEIGHT}
+                            message="Loading gene-level scatter TSV..."
+                        />
                     )}
 
                     {!isLoading && rows.length === 0 && (
@@ -938,7 +983,10 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     )}
 
                     {!isLoading && hasVisiblePoints && !afterFirstPaint && (
-                        <Box sx={{ minHeight: GENE_EVIDENCE_PLOT_HEIGHT }} />
+                        <FigureLoadingPanel
+                            minHeight={GENE_EVIDENCE_PLOT_HEIGHT}
+                            message="Rendering gene evidence plot..."
+                        />
                     )}
 
                     {!isLoading && hasVisiblePoints && afterFirstPaint && (
@@ -999,32 +1047,22 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                     downloadCSV={downloadCSV}
                     highlight={highlight}
                     tableRowRefs={tableRowRefs}
+                    geneQuery={geneQuery}
+                    setGeneQuery={setGeneQuery}
                 />
             )}
 
-            <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>
-                <DialogContent sx={{ pt: 1 }}>
-                    <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-                        <TextField label="Width" type="number" size="small" value={exportWidth} onChange={(event) => setExportWidth(event.target.value)} sx={controlFieldSx(theme)} />
-                        <TextField label="Height" type="number" size="small" value={exportHeight} onChange={(event) => setExportHeight(event.target.value)} sx={controlFieldSx(theme)} />
-                    </Stack>
-                    <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={exportFmt}
-                        onChange={(_, value) => { if (value) setExportFmt(value); }}
-                        sx={statusToggleSx(theme, { '& .MuiToggleButton-root': { textTransform: 'none', px: 2.5 } })}
-                    >
-                        <ToggleButton value="svg">SVG</ToggleButton>
-                        <ToggleButton value="png">PNG</ToggleButton>
-                    </ToggleButtonGroup>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setExportOpen(false)} sx={{ textTransform: 'none', color: theme.palette.text.secondary }}>Cancel</Button>
-                    <Button variant="contained" onClick={() => { handleExport(); setExportOpen(false); }} sx={{ textTransform: 'none' }}>Export</Button>
-                </DialogActions>
-            </Dialog>
+            <ExportPlotDialog
+                open={exportOpen}
+                onClose={() => setExportOpen(false)}
+                width={exportWidth}
+                onWidthChange={setExportWidth}
+                height={exportHeight}
+                onHeightChange={setExportHeight}
+                format={exportFmt}
+                onFormatChange={setExportFmt}
+                onExport={handleExport}
+            />
         </Box>
     );
 }

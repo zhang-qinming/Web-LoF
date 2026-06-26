@@ -16,6 +16,7 @@ import { useTheme } from '@mui/material/styles';
 import Download from '@mui/icons-material/Download';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import TableSearchField from './TableSearchField';
 import {
     groupedTableColumnHeaderCellSx,
     highlightedRowSx,
@@ -25,21 +26,23 @@ import {
     stickyTableContainerSx,
     stickyTableSx,
     summaryChipSx,
+    tableToolbarActionButtonSx,
+    tableToolbarGroupSx,
     tableRowRevealSx,
     tableTone,
 } from '../themeUtils';
 
 const COLUMN_SPECS = [
-    { key: 'gene', label: 'Gene', align: 'left', tone: 'gene', width: 118 },
-    { key: 'ensg', label: 'ENSG', align: 'left', tone: 'gene', width: 148 },
-    { key: 'postMean', label: 'LoF effect', align: 'right', tone: 'posterior', width: 108 },
-    { key: 'signedLogP', label: 'signed -log10(P)', align: 'right', tone: 'regulation', width: 128 },
-    { key: 'beta', label: 'Reg beta', align: 'right', tone: 'regulation', width: 92 },
-    { key: 'p', label: 'P', align: 'right', tone: 'regulation', width: 104 },
-    { key: 'fdr', label: 'FDR', align: 'right', tone: 'regulation', width: 104 },
-    { key: 'evidenceClassLabel', label: 'Evidence', align: 'left', tone: 'evidence', width: 180 },
-    { key: 'combinedScore', label: 'Score', align: 'right', tone: 'evidence', width: 94 },
-    { key: 'labelReason', label: 'Label reason', align: 'left', tone: 'evidence', width: 130 },
+    { key: 'gene', label: 'Gene', align: 'center', tone: 'gene', width: 118 },
+    { key: 'ensg', label: 'ENSG', align: 'center', tone: 'gene', width: 148 },
+    { key: 'postMean', label: 'LoF effect', align: 'center', tone: 'posterior', width: 108 },
+    { key: 'signedLogP', label: 'signed -log10(P)', align: 'center', tone: 'regulation', width: 128 },
+    { key: 'beta', label: 'Reg beta', align: 'center', tone: 'regulation', width: 92 },
+    { key: 'p', label: 'P', align: 'center', tone: 'regulation', width: 104 },
+    { key: 'fdr', label: 'FDR', align: 'center', tone: 'regulation', width: 104 },
+    { key: 'evidenceClassLabel', label: 'Evidence', align: 'center', tone: 'evidence', width: 180 },
+    { key: 'combinedScore', label: 'Score', align: 'center', tone: 'evidence', width: 94 },
+    { key: 'labelReason', label: 'Label reason', align: 'center', tone: 'evidence', width: 130 },
 ];
 
 function justifyForAlign(align = 'left') {
@@ -50,7 +53,7 @@ function justifyForAlign(align = 'left') {
 
 function sortLabelSx() {
     return {
-        display: 'inline-flex',
+        display: 'flex',
         alignItems: 'center',
         gap: 0.15,
         fontSize: '0.67rem',
@@ -66,23 +69,24 @@ function headerCellSx(theme, align, tone) {
     return groupedTableColumnHeaderCellSx(theme, tone, align, { top: 0 });
 }
 
-function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'nowrap' }) {
+function bodyCellSx({ align, tone, fontFamily, fontWeight = 400, whiteSpace = 'normal' }) {
     const useDataFont = fontFamily === 'monospace';
     return {
         px: 1,
         py: 0.62,
         textAlign: align,
         whiteSpace,
+        wordBreak: whiteSpace === 'normal' ? 'break-word' : undefined,
+        overflowWrap: whiteSpace === 'normal' ? 'anywhere' : undefined,
         fontSize: '0.71rem',
-        fontFamily: useDataFont ? 'inherit' : fontFamily,
+        fontFamily: useDataFont ? 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' : fontFamily,
         fontVariantNumeric: useDataFont ? 'tabular-nums' : undefined,
         fontFeatureSettings: useDataFont ? '"tnum" 1' : undefined,
         fontWeight,
         color: '#334155',
         bgcolor: tone.cellSoft,
         borderBottom: '1px solid rgba(226,232,240,0.72)',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
+        verticalAlign: 'middle',
     };
 }
 
@@ -131,6 +135,8 @@ export default function GeneLevelScatterTable({
     downloadCSV,
     highlight,
     tableRowRefs,
+    geneQuery,
+    setGeneQuery,
 }) {
     const theme = useTheme();
     const TONES = {
@@ -142,7 +148,7 @@ export default function GeneLevelScatterTable({
 
     if (!rows.length) return null;
 
-    const shouldPaginate = sortedRows.length > 50;
+    const shouldPaginate = rows.length > 50;
     const visibleRows = shouldPaginate ? pagedRows : sortedRows;
 
     return (
@@ -157,7 +163,10 @@ export default function GeneLevelScatterTable({
                 zIndex: 2,
             })}
         >
-            <Box sx={sectionPanelHeaderSx(theme, { borderBottom: tableOpen ? `1px solid ${theme.custom.border.soft}` : 'none' })}>
+            <Box sx={sectionPanelHeaderSx(theme, {
+                borderBottom: tableOpen ? `1px solid ${theme.custom.border.soft}` : 'none',
+                flexWrap: 'wrap',
+            })}>
                 <Button
                     onClick={() => setTableOpen((prev) => !prev)}
                     endIcon={tableOpen ? <ExpandLess /> : <ExpandMore />}
@@ -173,19 +182,35 @@ export default function GeneLevelScatterTable({
                     )}
                 </Button>
                 <Box sx={{ flex: 1 }} />
-                <Button
-                    size="small"
-                    startIcon={<Download />}
-                    onClick={downloadCSV}
-                    sx={{ textTransform: 'none', fontSize: '0.74rem', color: theme.palette.text.secondary }}
-                >
-                    CSV
-                </Button>
+                <Box sx={tableToolbarGroupSx(theme, { ml: 'auto', width: { xs: '100%', sm: 'auto' } })}>
+                    <TableSearchField
+                        label="Search"
+                        value={geneQuery}
+                        placeholder="Gene or ENSG"
+                        onChange={(value) => {
+                            setGeneQuery(value);
+                            setTablePage(0);
+                        }}
+                        onClear={() => {
+                            setGeneQuery('');
+                            setTablePage(0);
+                        }}
+                        width={{ xs: '100%', sm: 260 }}
+                    />
+                    <Button
+                        size="small"
+                        startIcon={<Download />}
+                        onClick={downloadCSV}
+                        sx={tableToolbarActionButtonSx(theme)}
+                    >
+                        Export CSV
+                    </Button>
+                </Box>
             </Box>
 
             <Collapse in={tableOpen}>
                 <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: 1210 })}>
+                    <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', width: '100%', minWidth: { xs: 1210, lg: 'unset' } })}>
                         <colgroup>
                             {COLUMN_SPECS.map((column) => (
                                 <col key={column.key} style={{ width: column.width }} />
@@ -194,7 +219,7 @@ export default function GeneLevelScatterTable({
                         <TableHead>
                             <TableRow>
                                 {COLUMN_SPECS.map((column) => (
-                                    <TableCell key={column.key} sx={headerCellSx(theme, column.align, TONES[column.tone])}>
+                                    <TableCell key={column.key} align={column.align} sx={headerCellSx(theme, column.align, TONES[column.tone])}>
                                         <TableSortLabel
                                             active={sortBy === column.key}
                                             direction={sortBy === column.key ? sortDir : 'asc'}
@@ -209,7 +234,22 @@ export default function GeneLevelScatterTable({
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {visibleRows.map((row, index) => {
+                            {visibleRows.length === 0 ? (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={COLUMN_SPECS.length}
+                                        sx={{
+                                            py: 3,
+                                            textAlign: 'center',
+                                            color: theme.palette.text.secondary,
+                                            fontSize: '0.78rem',
+                                            bgcolor: theme.palette.background.paper,
+                                        }}
+                                    >
+                                        No matching rows.
+                                    </TableCell>
+                                </TableRow>
+                            ) : visibleRows.map((row, index) => {
                                 const isHighlighted = highlight.rowKey === row.rowKey;
                                 const absoluteIndex = shouldPaginate ? (tablePage * tableRowsPerPage) + index : index;
                                 const even = absoluteIndex % 2 === 0;
@@ -232,7 +272,7 @@ export default function GeneLevelScatterTable({
                                                     tone: TONES[column.tone],
                                                     fontFamily: ['ensg', 'postMean', 'signedLogP', 'beta', 'p', 'fdr', 'combinedScore'].includes(column.key) ? 'monospace' : undefined,
                                                     fontWeight: ['gene', 'evidenceClassLabel', 'combinedScore'].includes(column.key) ? 600 : 400,
-                                                    whiteSpace: column.key === 'evidenceClassLabel' ? 'normal' : 'nowrap',
+                                                    whiteSpace: ['gene', 'evidenceClassLabel', 'labelReason'].includes(column.key) ? 'normal' : 'nowrap',
                                                 }),
                                             };
 
@@ -254,7 +294,7 @@ export default function GeneLevelScatterTable({
                                             }
 
                                             return (
-                                                <TableCell key={column.key} sx={sx}>
+                                                <TableCell key={column.key} align={column.align} sx={sx}>
                                                     {renderCellContent(column, row)}
                                                 </TableCell>
                                             );

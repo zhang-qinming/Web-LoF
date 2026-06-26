@@ -6,10 +6,10 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Slider from '@mui/material/Slider';
+import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -23,8 +23,9 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import CompareArrows from '@mui/icons-material/CompareArrows';
-import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import Download from '@mui/icons-material/Download';
 import Hub from '@mui/icons-material/Hub';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import Refresh from '@mui/icons-material/Refresh';
 import RestartAlt from '@mui/icons-material/RestartAlt';
 import Search from '@mui/icons-material/Search';
@@ -35,6 +36,7 @@ import {
     getCrossTraitTargets,
     getTraitCorrelation,
 } from '../api/gwas';
+import FigureLoadingPanel from './FigureLoadingPanel';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
@@ -44,19 +46,17 @@ import {
     chartLayoutTokens,
     compactToggleGroupSx,
     metricChipTone,
-    panelSx,
-    plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
     RESPONSIVE_PLOT_MAX_HEIGHT,
     RESPONSIVE_PLOT_HEIGHT,
-    sectionTitleSx,
     stickyTableContainerSx,
     stickyTableHeaderCellSx,
     stickyTableSx,
     summaryChipSx,
+    tableToolbarActionButtonSx,
+    tableToolbarGroupSx,
     tableRowRevealSx,
     tableTone,
-    toolbarSx,
 } from '../themeUtils';
 import { StatePanel, UpdatingStatus } from './PageScaffold';
 import { downloadBlob } from '../utils/download';
@@ -135,7 +135,7 @@ function buildCorrelationCsv(payload) {
         ...traits.map((trait, rowIndex) => [
             trait.trait_name || '',
             trait.file_id || '',
-            ...(payload.matrix?.[rowIndex] || []).map((value) => value ?? ''),
+            ...traits.map((_, colIndex) => payload.matrix?.[rowIndex]?.[colIndex] ?? ''),
         ].map(escapeCsvValue).join(',')),
     ];
     return `${lines.join('\n')}\n`;
@@ -145,13 +145,6 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
     const theme = useTheme();
     const navigate = useNavigate();
     const chartTokens = chartLayoutTokens(theme);
-    const toolbarPanelSx = useMemo(() => ({
-        px: 1,
-        py: 0.7,
-        borderRadius: 2,
-        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-        backgroundColor: alpha(theme.palette.background.paper, 0.82),
-    }), [theme.palette.background.paper, theme.palette.divider]);
     const currentTrait = useMemo(() => normalizeTraitOption({
         file_id: fileId,
         gwas_id: gwasId,
@@ -303,7 +296,12 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
     const plotData = useMemo(() => {
         const traits = payload?.traits || [];
         if (!traits.length || !payload?.matrix?.length) return [];
-        const labels = traits.map((trait) => truncateLabel(trait.trait_name || trait.file_id, 25));
+        const showTraitLabels = traits.length > 2;
+        const labels = traits.map((trait, index) => {
+            if (showTraitLabels) return truncateLabel(trait.trait_name || trait.file_id, 25);
+            if (index === 0) return 'Source trait';
+            return traits.length === 2 ? 'Target trait' : `Target ${index}`;
+        });
         const coefficientSymbol = displayedMethod === 'spearman' ? 'rho' : 'r';
         const showCellLabels = traits.length <= 14;
         const compactHover = traits.length * traits.length > 2500;
@@ -352,7 +350,7 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
             showscale: true,
             colorbar: {
                 title: {
-                    text: displayedMethod === 'spearman' ? 'Effect-rank correlation' : 'Effect correlation',
+                    text: displayedMethod === 'spearman' ? 'Spearman rho' : 'Pearson r',
                     side: 'top',
                     font: { size: 11 },
                 },
@@ -426,9 +424,11 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
 
     if (statusLoading) {
         return (
-            <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'grid', placeItems: 'center' }}>
-                <CircularProgress size={46} />
-            </Box>
+            <FigureLoadingPanel
+                minHeight={RESPONSIVE_EMPTY_PLOT_HEIGHT}
+                message="Checking trait correlation availability..."
+                size={46}
+            />
         );
     }
 
@@ -460,135 +460,146 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-            <Box sx={toolbarSx(theme, { alignItems: 'stretch', px: 1.25, py: 0.85, gap: 0.75 })}>
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                            xs: '1fr',
-                            lg: 'minmax(280px, 1.2fr) minmax(240px, 280px) minmax(250px, 300px)',
-                        },
-                        gap: 0.75,
-                        alignItems: 'stretch',
-                        width: '100%',
-                    }}
-                >
-                    <Box sx={{ ...toolbarPanelSx, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 0.55 }}>
-                        <Box>
-                            <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', color: theme.palette.text.secondary, mb: 0.15 }}>
-                                Trait Effect Correlation
-                            </Typography>
-                            <Typography sx={sectionTitleSx(theme, { fontSize: '0.96rem', lineHeight: 1.2 })}>
-                                Pairwise similarity of GeneBayes effect profiles
-                            </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.45 }}>
-                            <Chip
-                                icon={<CompareArrows />}
-                                label={displayedMethod === 'spearman' ? 'Spearman rho' : 'Pearson r'}
-                                size="small"
-                                sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))}
-                            />
-                            <Chip
-                                icon={<Hub />}
-                                label={`${payload?.summary?.traitCount || selectedTraits.length} traits`}
-                                size="small"
-                                sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
-                            />
-                            <Chip
-                                icon={<Search />}
-                                label={`${payload?.summary?.sharedGeneRange?.min?.toLocaleString?.() || 0}+ shared genes`}
-                                size="small"
-                                sx={summaryChipSx(theme, metricChipTone(theme, 'success'))}
-                            />
-                            {strongestSourceCorrelation && (
-                                <Chip
-                                    label={`max |corr| ${Math.abs(strongestSourceCorrelation.correlation).toFixed(3)}`}
-                                    size="small"
-                                    sx={summaryChipSx(theme, correlationTone(theme, strongestSourceCorrelation.correlation))}
-                                />
-                            )}
-                            <UpdatingStatus active={statusRefreshing || targetsRefreshing || correlationRefreshing} />
-                        </Box>
-                    </Box>
-
-                    <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.4 }}>
-                            Top related traits
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, overflowAnchor: 'none' }}>
+            {/* CARD 1: Filters & Options */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden', overflowAnchor: 'none' }}>
+                <Box sx={{ px: 2.5, py: 1.5, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            Trait Correlation Controls
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                            <Slider
-                                size="small"
-                                value={targetTraitCountDraftValue}
-                                min={MIN_TRAIT_LIMIT}
-                                max={relatedTraitSliderMax}
-                                step={1}
-                                marks={relatedTraitCountMarks}
-                                onChange={(_, value) => setTargetTraitCountDraft(Array.isArray(value) ? value[0] : value)}
-                                onChangeCommitted={(_, value) => commitTargetTraitCount(Array.isArray(value) ? value[0] : value)}
-                                sx={{ flex: 1, mt: 0.35, mb: 0 }}
-                            />
-                            <TextField
-                                size="small"
-                                value={targetTraitCountDraftValue}
-                                onChange={(event) => setTargetTraitCountDraft(event.target.value)}
-                                slotProps={{
-                                    htmlInput: {
-                                        min: MIN_TRAIT_LIMIT,
-                                        max: relatedTraitSliderMax,
-                                        step: 1,
-                                        inputMode: 'numeric',
-                                    },
-                                }}
-                                sx={{
-                                    width: 72,
-                                    '& .MuiInputBase-input': {
-                                        textAlign: 'center',
-                                        fontWeight: 700,
-                                    },
-                                }}
-                            />
-                        </Box>
-                    </Box>
-
-                    <Box sx={{ ...toolbarPanelSx, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.4 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.75 }}>
-                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary }}>
-                                Correlation method
-                            </Typography>
-                            <Tooltip title="Reset trait selection and method">
-                                <IconButton
-                                    size="small"
-                                    aria-label="Reset correlation controls"
-                                    onClick={() => {
-                                        setTargetTraitCount(DEFAULT_TRAIT_LIMIT);
-                                        setSelectedTraits(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TRAIT_LIMIT));
-                                        setMethod('spearman');
-                                        setAppliedTraits([]);
-                                        setAppliedMethod('spearman');
-                                        setRenderVersion(0);
-                                    }}
-                                    sx={{ border: `1px solid ${theme.custom.border.soft}`, borderRadius: 1, p: 0.45 }}
-                                >
-                                    <RestartAlt fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
-                        </Box>
-                        <ToggleButtonGroup
-                            exclusive
-                            size="small"
-                            value={method}
-                            onChange={(_, value) => value && setMethod(value)}
-                            sx={compactToggleGroupSx(theme)}
-                            aria-label="Correlation method"
+                        <Tooltip
+                            title={
+                                displayedMethod === 'spearman'
+                                    ? 'Color legend shows Spearman rank correlation across shared GeneBayes effect profiles; negative values are opposite and positive values are aligned.'
+                                    : 'Color legend shows Pearson correlation across shared GeneBayes effect profiles; negative values are opposite and positive values are aligned.'
+                            }
+                            arrow
                         >
-                            <ToggleButton value="spearman">Spearman</ToggleButton>
-                            <ToggleButton value="pearson">Pearson</ToggleButton>
-                        </ToggleButtonGroup>
+                            <Box
+                                component="span"
+                                tabIndex={0}
+                                aria-label="Trait correlation color legend details"
+                                sx={{
+                                    display: 'inline-flex',
+                                    color: theme.palette.text.secondary,
+                                    opacity: 0.78,
+                                    cursor: 'help',
+                                    '&:focus-visible': {
+                                        outline: `2px solid ${alpha(theme.palette.primary.main, 0.45)}`,
+                                        outlineOffset: 2,
+                                        borderRadius: 1,
+                                    },
+                                }}
+                            >
+                                <InfoOutlined sx={{ fontSize: 14 }} />
+                            </Box>
+                        </Tooltip>
+                    </Box>
+                    <Box sx={tableToolbarGroupSx(theme)}>
+                        <Button
+                            size="small"
+                            startIcon={<RestartAlt />}
+                            onClick={() => {
+                                setTargetTraitCount(DEFAULT_TRAIT_LIMIT);
+                                setSelectedTraits(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TRAIT_LIMIT));
+                                setMethod('spearman');
+                                setAppliedTraits([]);
+                                setAppliedMethod('spearman');
+                                setRenderVersion(0);
+                            }}
+                            sx={tableToolbarActionButtonSx(theme, 'neutral')}
+                        >
+                            Reset
+                        </Button>
+                        {hasRenderedCorrelation && payload && (
+                            <Button
+                                size="small"
+                                startIcon={<Download />}
+                                onClick={() => downloadBlob(
+                                    new Blob([buildCorrelationCsv(payload)], { type: 'text/csv;charset=utf-8;' }),
+                                    `${fileId || 'trait'}-${displayedMethod}-effect-correlation.csv`,
+                                )}
+                                sx={tableToolbarActionButtonSx(theme)}
+                            >
+                                Export CSV
+                            </Button>
+                        )}
                     </Box>
                 </Box>
-            </Box>
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                        {/* Top Related Traits Slider */}
+                        <Stack direction="row" spacing={2} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0, whiteSpace: 'nowrap' }}>
+                                Related Traits:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 240 }}>
+                                <Slider
+                                    size="small"
+                                    value={targetTraitCountDraftValue}
+                                    min={MIN_TRAIT_LIMIT}
+                                    max={relatedTraitSliderMax}
+                                    step={1}
+                                    marks={relatedTraitCountMarks}
+                                    onChange={(_, value) => setTargetTraitCountDraft(Array.isArray(value) ? value[0] : value)}
+                                    onChangeCommitted={(_, value) => commitTargetTraitCount(Array.isArray(value) ? value[0] : value)}
+                                    sx={{ flex: 1, '& .MuiSlider-thumb': { width: 13, height: 13 } }}
+                                />
+                                <TextField
+                                    size="small"
+                                    value={targetTraitCountDraftValue}
+                                    onChange={(event) => setTargetTraitCountDraft(event.target.value)}
+                                    slotProps={{
+                                        htmlInput: {
+                                            min: MIN_TRAIT_LIMIT,
+                                            max: relatedTraitSliderMax,
+                                            step: 1,
+                                            inputMode: 'numeric',
+                                        },
+                                    }}
+                                    sx={{
+                                        width: 58,
+                                        '& .MuiInputBase-input': {
+                                            textAlign: 'center',
+                                            fontWeight: 700,
+                                            py: 0.5,
+                                        },
+                                    }}
+                                />
+                            </Box>
+                        </Stack>
+
+                        {/* Correlation Method */}
+                        <Stack direction="row" spacing={2} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0, whiteSpace: 'nowrap' }}>
+                                Method:
+                            </Typography>
+                            <ToggleButtonGroup
+                                exclusive
+                                size="small"
+                                value={method}
+                                onChange={(_, value) => value && setMethod(value)}
+                                sx={[
+                                    compactToggleGroupSx(theme),
+                                    {
+                                        '& .MuiToggleButton-root': {
+                                            px: 1.25,
+                                            py: 0.35,
+                                            fontSize: '0.78rem',
+                                        },
+                                    },
+                                ]}
+                                aria-label="Correlation method"
+                            >
+                                <ToggleButton value="spearman">Spearman</ToggleButton>
+                                <ToggleButton value="pearson">Pearson</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
+                    </Box>
+
+                </CardContent>
+            </Card>
 
             {correlationError && (
                 <Alert
@@ -603,17 +614,52 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                 </Alert>
             )}
 
-            <Card elevation={0} sx={plotFrameSx(theme)}>
+            {/* CARD 2: Correlation Heatmap Frame */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden', overflowAnchor: 'none' }}>
+                <Box sx={{ px: 2.5, py: 1.2, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                    <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" alignItems="center">
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            Trait Correlation Matrix
+                        </Typography>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', mr: 0.5, fontSize: '0.74rem' }}>
+                                Summary Stats:
+                            </Typography>
+                            <Chip
+                                icon={<CompareArrows sx={{ fontSize: '14px !important' }} />}
+                                label={displayedMethod === 'spearman' ? 'Spearman rho' : 'Pearson r'}
+                                size="small"
+                                sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))}
+                            />
+                            <Chip
+                                icon={<Hub sx={{ fontSize: '14px !important' }} />}
+                                label={`${payload?.summary?.traitCount || selectedTraits.length} traits`}
+                                size="small"
+                                sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
+                            />
+                            <Chip
+                                icon={<Search sx={{ fontSize: '14px !important' }} />}
+                                label={`${payload?.summary?.sharedGeneRange?.min?.toLocaleString?.() || 0}+ shared genes`}
+                                size="small"
+                                sx={summaryChipSx(theme, metricChipTone(theme, 'success'))}
+                            />
+                            {strongestSourceCorrelation && (
+                                <Chip
+                                    label={`max |corr| ${Math.abs(strongestSourceCorrelation.correlation).toFixed(3)}`}
+                                    size="small"
+                                    sx={summaryChipSx(theme, correlationTone(theme, strongestSourceCorrelation.correlation))}
+                                />
+                            )}
+                        </Stack>
+                    </Stack>
+                    <UpdatingStatus active={statusRefreshing || targetsRefreshing || correlationRefreshing} />
+                </Box>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {correlationLoading && (
-                        <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'grid', placeItems: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    Calculating pairwise correlations...
-                                </Typography>
-                            </Box>
-                        </Box>
+                        <FigureLoadingPanel
+                            minHeight={RESPONSIVE_PLOT_HEIGHT}
+                            message="Calculating pairwise correlations..."
+                        />
                     )}
 
                     {!correlationLoading && !correlationError && !hasRenderedCorrelation && plotData.length === 0 && (
@@ -629,7 +675,10 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                     )}
 
                     {!correlationLoading && !correlationError && plotData.length > 0 && !afterFirstPaint && (
-                        <Box sx={{ minHeight: plotHeight }} />
+                        <FigureLoadingPanel
+                            minHeight={plotHeight}
+                            message="Rendering trait correlation matrix..."
+                        />
                     )}
 
                     {!correlationLoading && !correlationError && plotData.length > 0 && afterFirstPaint && (
@@ -655,81 +704,76 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
             </Card>
 
             {shouldRenderTable && (
-                <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
+                <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden', overflowAnchor: 'none' }}>
                     <Box sx={{
-                        px: 1.75,
-                        py: 1.15,
+                        px: 2.5,
+                        py: 1.5,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: 1,
-                        backgroundColor: theme.custom.surface.raised,
-                        borderBottom: `1px solid ${theme.custom.border.soft}`,
+                        bgcolor: theme.custom?.surface?.subtle || 'grey.50',
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
                     }}>
-                        <Box>
-                            <Typography sx={sectionTitleSx(theme, { fontSize: '0.9rem' })}>
-                                Correlation with {payload?.sourceTrait?.trait_name || traitLabel || fileId}
-                            </Typography>
-                        </Box>
-                        <Tooltip title="Download correlation matrix as CSV">
-                            <Button
-                                size="small"
-                                startIcon={<DownloadOutlined />}
-                                onClick={() => downloadBlob(
-                                    new Blob([buildCorrelationCsv(payload)], { type: 'text/csv;charset=utf-8;' }),
-                                    `${fileId || 'trait'}-${displayedMethod}-effect-correlation.csv`,
-                                )}
-                                sx={{ textTransform: 'none', color: theme.palette.text.secondary }}
-                            >
-                                CSV
-                            </Button>
-                        </Tooltip>
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            {sourceCorrelationRows.length <= 1
+                                ? 'Correlation summary'
+                                : `Correlation with ${payload?.sourceTrait?.trait_name || traitLabel || fileId}`}
+                        </Typography>
                     </Box>
                     <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
                         <Table stickyHeader size="small" sx={stickyTableSx(theme, { minWidth: 720 })}>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={stickyTableHeaderCellSx(theme, tableTone(theme, 'neutral'))}>Trait</TableCell>
+                                    <TableCell align="left" sx={stickyTableHeaderCellSx(theme, tableTone(theme, 'neutral'), 'left')}>Trait</TableCell>
                                     <TableCell align="right" sx={stickyTableHeaderCellSx(theme, tableTone(theme, 'primary'), 'right')}>Correlation</TableCell>
                                     <TableCell align="right" sx={stickyTableHeaderCellSx(theme, tableTone(theme, 'success'), 'right')}>Shared genes</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {sourceCorrelationRows.map((row, index) => (
-                                    <TableRow
-                                        hover
-                                        key={row.trait.file_id}
-                                        onClick={() => navigate(`/trait/${encodeURIComponent(row.trait.file_id)}?tab=trait-correlation`)}
-                                        sx={{
-                                            ...tableRowRevealSx(theme, index),
-                                            cursor: 'pointer',
-                                            '&:hover td': { bgcolor: alpha(theme.palette.primary.main, 0.035) },
-                                        }}
-                                    >
-                                        <TableCell sx={{ py: 0.85, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
-                                            <Typography sx={{ fontSize: '0.76rem', fontWeight: 680 }}>
-                                                {row.trait.trait_name || row.trait.file_id}
-                                            </Typography>
-                                            <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary }}>
-                                                {row.trait.file_id}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell align="right" sx={{ py: 0.85, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
-                                            <Chip
-                                                label={formatCorrelation(row.correlation)}
-                                                size="small"
-                                                sx={summaryChipSx(theme, correlationTone(theme, row.correlation))}
-                                            />
-                                        </TableCell>
-                                        <TableCell align="right" sx={{ py: 0.85, borderBottom: `1px solid ${theme.custom.border.soft}`, fontSize: '0.74rem', fontVariantNumeric: 'tabular-nums' }}>
-                                            {row.sharedGenes.toLocaleString()}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                {sourceCorrelationRows.map((row, index) => {
+                                    const traitLabelText = row.trait.trait_name || row.trait.file_id;
+                                    const showTraitId = row.trait.file_id && row.trait.file_id !== traitLabelText;
+
+                                    return (
+                                        <TableRow
+                                            hover
+                                            key={row.trait.file_id}
+                                            onClick={() => navigate(`/trait/${encodeURIComponent(row.trait.file_id)}?tab=trait-correlation`)}
+                                            sx={{
+                                                ...tableRowRevealSx(theme, index),
+                                                cursor: 'pointer',
+                                                '&:hover td': { bgcolor: alpha(theme.palette.primary.main, 0.035) },
+                                            }}
+                                        >
+                                            <TableCell align="left" sx={{ py: 0.85, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
+                                                <Typography sx={{ fontSize: '0.76rem', fontWeight: 680 }}>
+                                                    {traitLabelText}
+                                                </Typography>
+                                                {showTraitId && (
+                                                    <Typography sx={{ fontSize: '0.66rem', color: theme.palette.text.secondary }}>
+                                                        {row.trait.file_id}
+                                                    </Typography>
+                                                )}
+                                            </TableCell>
+                                            <TableCell align="right" sx={{ py: 0.85, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
+                                                <Chip
+                                                    label={formatCorrelation(row.correlation)}
+                                                    size="small"
+                                                    sx={summaryChipSx(theme, correlationTone(theme, row.correlation))}
+                                                />
+                                            </TableCell>
+                                            <TableCell align="right" sx={{ py: 0.85, borderBottom: `1px solid ${theme.custom.border.soft}`, fontSize: '0.74rem', fontVariantNumeric: 'tabular-nums' }}>
+                                                {row.sharedGenes.toLocaleString()}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </TableContainer>
-                </Paper>
+                </Card>
             )}
         </Box>
     );

@@ -7,11 +7,6 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Slider from '@mui/material/Slider';
 import Stack from '@mui/material/Stack';
@@ -21,8 +16,6 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import Download from '@mui/icons-material/Download';
-import FilterAlt from '@mui/icons-material/FilterAlt';
-import Insights from '@mui/icons-material/Insights';
 import Refresh from '@mui/icons-material/Refresh';
 import RestartAlt from '@mui/icons-material/RestartAlt';
 import Timeline from '@mui/icons-material/Timeline';
@@ -31,7 +24,7 @@ import { getCrossTraitTargets, getDataFileText } from '../api/gwas';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { parseNullableNumber } from '../utils/numbers';
-import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
@@ -39,16 +32,14 @@ import { useIdleRenderGate } from '../utils/renderScheduling';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
-    controlFieldSx,
     metricChipTone,
-    plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
     RESPONSIVE_TALL_PLOT_HEIGHT,
-    sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
-    toolbarSx,
 } from '../themeUtils';
+import ExportPlotDialog from './ExportPlotDialog';
+import FigureLoadingPanel from './FigureLoadingPanel';
 import FloatingLegend from './FloatingLegend';
 import GeneLevelQQTable from './GeneLevelQQTable';
 import { computeGeneLevelQQAxisRange } from './geneLevelQQData';
@@ -59,7 +50,7 @@ const DEFAULT_EXPORT_HEIGHT = 820;
 const DEFAULT_POINT_SIZE = 7;
 const DEFAULT_LABEL_LIMIT = 4;
 const DEFAULT_COMPARE_TRAITS = 1;
-const MAX_COMPARE_TRAITS = 12;
+const MAX_COMPARE_TRAITS = 6;
 const GENE_QQ_PLOT_HEIGHT = RESPONSIVE_TALL_PLOT_HEIGHT;
 const MAX_ENVELOPE_POINTS = 360;
 const NOMINAL_LOGP = -Math.log10(0.05);
@@ -148,6 +139,14 @@ function getRequestErrorMessage(error, fallback) {
     return error?.response?.data?.error || error?.message || fallback;
 }
 
+function firstNonEmptyValue(raw, keys) {
+    for (const key of keys) {
+        const value = String(raw?.[key] || '').trim();
+        if (value) return value;
+    }
+    return '';
+}
+
 function parseTsv(text) {
     const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.length > 0);
     if (lines.length < 2) return [];
@@ -164,8 +163,9 @@ function parseTsv(text) {
         const tailSide = TAIL_META[raw.tail_side]
             ? raw.tail_side
             : (beta == null ? '' : (beta >= 0 ? 'positive' : 'negative'));
-        const ensg = String(raw.ensg || '').trim();
-        const gene = String(raw.gene || raw.GENE || '').trim() || ensg;
+        const ensg = firstNonEmptyValue(raw, ['ensg', 'ENSG', 'ensg_id', 'ensembl', 'Ensembl']);
+        const gene = firstNonEmptyValue(raw, ['gene', 'GENE', 'gene_symbol', 'geneSymbol', 'symbol', 'SYMBOL']);
+        const geneLabel = gene || ensg;
         const expected = toFiniteNumber(raw.expected);
         const observed = toFiniteNumber(raw.observed);
         const deviation = Number.isFinite(expected) && Number.isFinite(observed) ? observed - expected : null;
@@ -173,11 +173,12 @@ function parseTsv(text) {
         const p = toFiniteNumber(raw.P_withShet);
 
         return {
-            rowKey: `${ensg || gene || 'gene'}-${tailSide}-${index}`,
+            rowKey: `${geneLabel || 'gene'}-${tailSide}-${index}`,
             raw,
             index,
             ensg,
             gene,
+            geneLabel,
             tailSide,
             p,
             fdr: null,
@@ -535,13 +536,12 @@ function buildEnvelope(rows, resolveColor) {
 export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = [] }) {
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
-    const toolbarPanelSx = useMemo(() => ({
-        px: 1,
-        py: 0.7,
-        borderRadius: 2,
-        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-        backgroundColor: alpha(theme.palette.background.paper, 0.82),
-    }), [theme.palette.background.paper, theme.palette.divider]);
+    const compactMetricChipSx = useCallback((tone) => summaryChipSx(theme, {
+        ...tone,
+        height: 22,
+        fontSize: '0.68rem',
+        '& .MuiChip-label': { px: 0.85 },
+    }), [theme]);
     const plotRef = useRef(null);
     const plotElRef = useRef(null);
     const tableRowRefs = useRef({});
@@ -655,7 +655,13 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         return rows.filter((row) => {
             if (tailMode === TAIL_MODES.POSITIVE && row.tailSide !== 'positive') return false;
             if (tailMode === TAIL_MODES.NEGATIVE && row.tailSide !== 'negative') return false;
-            if (query && !`${row.gene} ${row.ensg}`.toLowerCase().includes(query)) return false;
+            if (query) {
+                const searchable = [row.geneLabel, row.gene, row.ensg]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                if (!searchable.includes(query)) return false;
+            }
             return true;
         });
     }, [geneQuery, rows, tailMode]);
@@ -856,11 +862,14 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             const traceColor = useTailColors
                 ? TAIL_META[group.tailSide].color
                 : traitColorMap.get(group.traitId) || TAIL_META[group.tailSide].color;
+            const traceName = useTailColors
+                ? TAIL_META[group.tailSide].label
+                : `${group.traitName} - ${TAIL_META[group.tailSide].label}`;
 
             return {
                 type: 'scattergl',
                 mode: 'markers',
-                name: `${group.traitName} — ${TAIL_META[group.tailSide].label}`,
+                name: traceName,
                 x: group.x,
                 y: group.y,
                 hovertext: group.hovertext,
@@ -937,7 +946,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             .filter((trait) => filteredRows.some((row) => row.sourceFileId === trait.file_id))
             .map((trait) => ({
                 key: trait.file_id,
-                label: trait.trait_name,
+                label: activeTraits.length === 1 ? 'Observed genes' : trait.trait_name,
                 note: useTailColors
                     ? 'Blue diamond: negative; orange circle: positive.'
                     : '',
@@ -1068,7 +1077,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         return {
             autosize: true,
             title: {
-                text: `${traitLabel || payload.fileId || fileId} - Gene-level QQ`,
+                text: activeTraits.length === 1 ? 'Gene-level QQ' : `${traitLabel || payload.fileId || fileId} - Gene-level QQ`,
                 font: { size: 18, color: theme.palette.text.primary, family: theme.typography.fontFamily },
                 x: 0.02,
                 xanchor: 'left',
@@ -1097,7 +1106,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             shapes,
             annotations,
         };
-    }, [axisRange, axisStyle, chartTokens.plotBg, chartTokens.threshold, fdrGuide, fileId, payload.fileId, showExpectedLine, showFdrLine, showNominalLine, theme, traitLabel]);
+    }, [activeTraits.length, axisRange, axisStyle, chartTokens.plotBg, chartTokens.threshold, fdrGuide, fileId, payload.fileId, showExpectedLine, showFdrLine, showNominalLine, theme, traitLabel]);
 
     const plotConfig = useMemo(() => ({
         responsive: true,
@@ -1116,8 +1125,10 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         const dir = sortDir === 'asc' ? 1 : -1;
         const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
         return [...filteredRows].sort((a, b) => {
-            if (['gene', 'ensg', 'tailSide'].includes(sortBy)) {
-                return collator.compare(String(a[sortBy] || ''), String(b[sortBy] || '')) * dir;
+            if (['gene', 'tailSide'].includes(sortBy)) {
+                const left = sortBy === 'gene' ? (a.geneLabel || a.gene || a.ensg || '') : (a[sortBy] || '');
+                const right = sortBy === 'gene' ? (b.geneLabel || b.gene || b.ensg || '') : (b[sortBy] || '');
+                return collator.compare(String(left), String(right)) * dir;
             }
             const av = a[sortBy] ?? -Infinity;
             const bv = b[sortBy] ?? -Infinity;
@@ -1153,7 +1164,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         const timeoutId = window.setTimeout(() => {
             scrollElementNearViewportCenter(tableSectionRef.current, { viewportOffset: 0.08 });
             const el = tableRowRefs.current[highlight.rowKey];
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (el) scrollElementIntoNearestView(el);
         }, 180);
         return () => window.clearTimeout(timeoutId);
     }, [highlight, sortedRows, tableOpen, tablePage, tableRowsPerPage]);
@@ -1164,7 +1175,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             return;
         }
         setSortBy(column);
-        setSortDir(['gene', 'ensg', 'tailSide'].includes(column) ? 'asc' : 'desc');
+        setSortDir(['gene', 'tailSide'].includes(column) ? 'asc' : 'desc');
     }, [sortBy]);
 
     const resetControls = useCallback(() => {
@@ -1196,7 +1207,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
         const cols = ['gene', 'ensg', 'tail_side', 'expected', 'observed', 'deviation', 'P_withShet', 'FDR', 'beta_withShet', 'qq_rank'];
         const header = cols.join(',');
         const body = rows.map((row) => [
-            row.gene,
+            row.geneLabel || row.gene || row.ensg || '',
             row.ensg,
             row.tailSide,
             row.expected ?? '',
@@ -1276,138 +1287,167 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                 </Alert>
             )}
 
-            <Box sx={toolbarSx(theme, { px: 1.25, py: 0.85, gap: 0.75 })}>
-                <Box sx={{ minWidth: 240, mr: 0.25 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.15 }}>
-                        Gene-level QQ
+            {/* CARD 1: Filters & Options */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <Box sx={{ px: 2.5, py: 1.5, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                        Gene-level QQ Controls
                     </Typography>
-                    <Typography sx={sectionTitleSx(theme, { fontSize: '0.96rem', lineHeight: 1.2 })}>
-                        Signed deviation from expectation
-                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                        <Button 
+                            variant="text" 
+                            size="small"
+                            startIcon={<RestartAlt />} 
+                            onClick={resetControls} 
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, fontSize: '0.78rem' }}
+                        >
+                            Reset
+                        </Button>
+                        <Button 
+                            variant="text" 
+                            size="small"
+                            startIcon={<Download />} 
+                            onClick={downloadCSV} 
+                            disabled={!rows.length} 
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, fontSize: '0.78rem' }}
+                        >
+                            CSV
+                        </Button>
+                    </Stack>
                 </Box>
-
-                <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    value={tailMode}
-                    onChange={(_, value) => { if (value) setTailMode(value); }}
-                    sx={[
-                        statusToggleSx(theme),
-                        {
-                            '& .MuiToggleButton-root': {
-                            px: 1.5,
-                            py: 0.4,
-                            },
-                        },
-                    ]}
-                >
-                    <ToggleButton value={TAIL_MODES.BOTH}>Both tails</ToggleButton>
-                    <ToggleButton value={TAIL_MODES.POSITIVE}>Positive</ToggleButton>
-                    <ToggleButton value={TAIL_MODES.NEGATIVE}>Negative</ToggleButton>
-                </ToggleButtonGroup>
-
-                <TextField
-                    size="small"
-                    label="Gene"
-                    value={geneQuery}
-                    onChange={(event) => {
-                        setGeneQuery(event.target.value);
-                        setTablePage(0);
-                    }}
-                    sx={controlFieldSx(theme, {
-                        width: 160,
-                        '& .MuiInputBase-root': { minHeight: 36 },
-                    })}
-                />
-
-                <Chip
-                    icon={<Timeline />}
-                    label={renderedRows.length < counts.filtered
-                        ? `${renderedRows.length.toLocaleString()} / ${counts.filtered.toLocaleString()} plotted`
-                        : `${counts.filtered.toLocaleString()} genes`}
-                    size="small"
-                    sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
-                />
-                <Chip icon={<FilterAlt />} label={`${activeTraits.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
-                <Chip icon={<Insights />} label={`${counts.fdr.toLocaleString()} FDR hits`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(chartTokens.threshold, 0.08), color: chartTokens.threshold, border: `1px solid ${alpha(chartTokens.threshold, 0.22)}` })} />
-                <Chip icon={<FilterAlt />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.positive.color, 0.08), color: TAIL_META.positive.color, border: `1px solid ${alpha(TAIL_META.positive.color, 0.2)}` })} />
-                <Chip icon={<FilterAlt />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(TAIL_META.negative.color, 0.08), color: TAIL_META.negative.color, border: `1px solid ${alpha(TAIL_META.negative.color, 0.2)}` })} />
-                <UpdatingStatus active={targetsRefreshing || isRefreshing} />
-            </Box>
-
-            <Box sx={toolbarSx(theme, { alignItems: 'stretch', px: 1.25, py: 0.85, gap: 0.75 })}>
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                            xs: '1fr',
-                            md: 'minmax(210px, 240px) minmax(320px, 1fr)',
-                            lg: 'minmax(190px, 220px) minmax(300px, 1fr) minmax(260px, 320px)',
-                        },
-                        gap: 0.75,
-                        alignItems: 'stretch',
-                        width: '100%',
-                    }}
-                >
-                    <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.4 }}>
-                            Trait overlays
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                            <Slider
-                                aria-label="Trait overlays"
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3.5, alignItems: 'center' }}>
+                        {/* Tail Mode */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0, whiteSpace: 'nowrap' }}>
+                                Tail Mode:
+                            </Typography>
+                            <ToggleButtonGroup
+                                exclusive
                                 size="small"
-                                value={comparisonTraitCountDraftValue}
-                                min={DEFAULT_COMPARE_TRAITS}
-                                max={relatedTraitSliderMax}
-                                step={1}
-                                marks={comparisonTraitCountMarks}
-                                onChange={(_, value) => setComparisonTraitCountDraft(String(Array.isArray(value) ? value[0] : value))}
-                                onChangeCommitted={(_, value) => commitComparisonTraitCount(Array.isArray(value) ? value[0] : value)}
-                                sx={{ flex: 1, mt: 0.35, mb: 0 }}
-                            />
-                            <TextField
-                                size="small"
-                                value={comparisonTraitCountDraft}
-                                onChange={(event) => setComparisonTraitCountDraft(event.target.value)}
-                                onBlur={() => commitComparisonTraitCount()}
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter') {
-                                        commitComparisonTraitCount();
-                                        event.currentTarget.blur();
-                                    }
-                                }}
-                                slotProps={{
-                                    htmlInput: {
-                                        min: DEFAULT_COMPARE_TRAITS,
-                                        max: relatedTraitSliderMax,
-                                        step: 1,
-                                        inputMode: 'numeric',
+                                value={tailMode}
+                                onChange={(_, value) => { if (value) setTailMode(value); }}
+                                sx={[
+                                    statusToggleSx(theme),
+                                    {
+                                        '& .MuiToggleButton-root': {
+                                            px: 1.15,
+                                            py: 0.32,
+                                            fontSize: '0.78rem',
+                                        },
                                     },
-                                }}
-                                sx={{
-                                    width: 64,
-                                    '& .MuiInputBase-input': {
-                                        textAlign: 'center',
-                                        fontWeight: 700,
-                                    },
-                                }}
-                            />
-                        </Box>
+                                ]}
+                            >
+                                <ToggleButton value={TAIL_MODES.BOTH}>Both tails</ToggleButton>
+                                <ToggleButton value={TAIL_MODES.POSITIVE}>Positive</ToggleButton>
+                                <ToggleButton value={TAIL_MODES.NEGATIVE}>Negative</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
+
+                        {/* Trait Overlays */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0, whiteSpace: 'nowrap' }}>
+                                Trait Overlays:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 200 }}>
+                                <Slider
+                                    aria-label="Trait overlays"
+                                    size="small"
+                                    value={comparisonTraitCountDraftValue}
+                                    min={DEFAULT_COMPARE_TRAITS}
+                                    max={relatedTraitSliderMax}
+                                    step={1}
+                                    marks={comparisonTraitCountMarks}
+                                    onChange={(_, value) => setComparisonTraitCountDraft(String(Array.isArray(value) ? value[0] : value))}
+                                    onChangeCommitted={(_, value) => commitComparisonTraitCount(Array.isArray(value) ? value[0] : value)}
+                                    sx={{ flex: 1, '& .MuiSlider-thumb': { width: 13, height: 13 } }}
+                                />
+                                <TextField
+                                    size="small"
+                                    value={comparisonTraitCountDraft}
+                                    onChange={(event) => setComparisonTraitCountDraft(event.target.value)}
+                                    onBlur={() => commitComparisonTraitCount()}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                            commitComparisonTraitCount();
+                                            event.currentTarget.blur();
+                                        }
+                                    }}
+                                    slotProps={{
+                                        htmlInput: {
+                                            min: DEFAULT_COMPARE_TRAITS,
+                                            max: relatedTraitSliderMax,
+                                            step: 1,
+                                            inputMode: 'numeric',
+                                        },
+                                    }}
+                                    sx={{
+                                        width: 58,
+                                        '& .MuiInputBase-input': {
+                                            textAlign: 'center',
+                                            fontWeight: 700,
+                                            py: 0.5,
+                                        },
+                                    }}
+                                />
+                            </Box>
+                        </Stack>
+
+                        {/* Point size slider */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Point Size:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 120 }}>
+                                <Slider
+                                    aria-label="Point size"
+                                    value={pointSizeDraft}
+                                    min={3}
+                                    max={14}
+                                    step={1}
+                                    onChange={(_, value) => setPointSizeDraft(Number(value))}
+                                    onChangeCommitted={(_, value) => commitPointSize(Number(value))}
+                                    sx={{ color: theme.palette.text.secondary, '& .MuiSlider-thumb': { width: 12, height: 12 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
+                                />
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 16 }}>{pointSizeDraft}</Typography>
+                            </Box>
+                        </Stack>
+
+                        {/* Labels slider */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Labels Limit:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 120 }}>
+                                <Slider
+                                    aria-label="Label count"
+                                    value={labelLimitDraft}
+                                    min={0}
+                                    max={30}
+                                    step={1}
+                                    onChange={(_, value) => setLabelLimitDraft(Number(value))}
+                                    onChangeCommitted={(_, value) => commitLabelLimit(Number(value))}
+                                    disabled={!showTopLabels}
+                                    sx={{ color: theme.palette.text.secondary, '& .MuiSlider-thumb': { width: 12, height: 12 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
+                                />
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 16 }}>{labelLimitDraft}</Typography>
+                            </Box>
+                        </Stack>
                     </Box>
 
-                    <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.3 }}>
-                            Guides
+                    {/* Checkboxes row */}
+                    <Box sx={{ mt: 2.5, display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                            Plot Elements:
                         </Typography>
-                        <Box
-                            sx={{
-                                display: 'grid',
-                                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' },
-                                columnGap: 0.35,
-                                rowGap: 0,
-                            }}
-                        >
+                        <Stack direction="row" spacing={2.5} useFlexGap flexWrap="wrap" sx={{
+                            '& .MuiFormControlLabel-label': {
+                                fontSize: '0.8rem',
+                                color: theme.palette.text.primary,
+                                fontWeight: 500,
+                            },
+                            '& .MuiCheckbox-root': { p: 0.5 },
+                        }}>
                             <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showExpectedLine} onChange={(event) => setShowExpectedLine(event.target.checked)} size="small" />} label="Expected line" />
                             <FormControlLabel
                                 sx={{ m: 0 }}
@@ -1424,90 +1464,58 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                             <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showNominalLine} onChange={(event) => setShowNominalLine(event.target.checked)} size="small" />} label="P=0.05" />
                             <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showEnvelope} onChange={(event) => setShowEnvelope(event.target.checked)} size="small" />} label="95% envelope" />
                             <FormControlLabel sx={{ m: 0 }} control={<Checkbox checked={showTopLabels} onChange={(event) => setShowTopLabels(event.target.checked)} size="small" />} label="Top labels" />
-                        </Box>
-                    </Box>
-
-                    <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
-                            Density
-                        </Typography>
-                        <Stack spacing={0.55}>
-                            <Stack direction="row" spacing={0.8} alignItems="center">
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none', minWidth: 42 }}>
-                                    Point
-                                </Typography>
-                                <Slider
-                                    aria-label="Point size"
-                                    value={pointSizeDraft}
-                                    min={3}
-                                    max={14}
-                                    step={1}
-                                    onChange={(_, value) => setPointSizeDraft(Number(value))}
-                                    onChangeCommitted={(_, value) => commitPointSize(Number(value))}
-                                    sx={{ flex: 1, color: theme.palette.primary.main, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
-                                />
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 20, textAlign: 'right' }}>{pointSizeDraft}</Typography>
-                            </Stack>
-
-                            <Stack direction="row" spacing={0.8} alignItems="center">
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'none', minWidth: 42 }}>
-                                    Labels
-                                </Typography>
-                                <Slider
-                                    aria-label="Label count"
-                                    value={labelLimitDraft}
-                                    min={0}
-                                    max={30}
-                                    step={1}
-                                    onChange={(_, value) => setLabelLimitDraft(Number(value))}
-                                    onChangeCommitted={(_, value) => commitLabelLimit(Number(value))}
-                                    disabled={!showTopLabels}
-                                    sx={{ flex: 1, color: theme.palette.text.secondary, '& .MuiSlider-thumb': { width: 14, height: 14 }, '& .MuiSlider-rail': { opacity: 0.25 } }}
-                                />
-                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, minWidth: 24, textAlign: 'right' }}>{labelLimitDraft}</Typography>
-                            </Stack>
-                            <Stack
-                                direction="row"
-                                spacing={0.25}
-                                justifyContent="flex-end"
-                                sx={{ pt: 0.15 }}
-                            >
-                                <Button
-                                    variant="text"
-                                    size="small"
-                                    startIcon={<RestartAlt />}
-                                    onClick={resetControls}
-                                    sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 30 }}
-                                >
-                                    Reset
-                                </Button>
-                                <Button
-                                    variant="text"
-                                    size="small"
-                                    startIcon={<Download />}
-                                    onClick={downloadCSV}
-                                    disabled={!rows.length}
-                                    sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 30 }}
-                                >
-                                    CSV
-                                </Button>
-                            </Stack>
                         </Stack>
                     </Box>
-                </Box>
-            </Box>
 
-            <Card elevation={0} sx={plotFrameSx(theme)}>
+                </CardContent>
+            </Card>
+
+            {/* CARD 2: Interactive Plot */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <Box sx={{ px: 2.5, py: 1.2, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                    <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" alignItems="center">
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            QQ Plot
+                        </Typography>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', mr: 0.5, fontSize: '0.74rem' }}>
+                                Summary Stats:
+                            </Typography>
+                            <Chip
+                                icon={<Timeline sx={{ fontSize: '14px !important' }} />}
+                                label={renderedRows.length < counts.filtered
+                                    ? `${renderedRows.length.toLocaleString()} / ${counts.filtered.toLocaleString()} plotted`
+                                    : `${counts.filtered.toLocaleString()} genes`}
+                                size="small"
+                                sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
+                            />
+                            <Chip label={`${activeTraits.length.toLocaleString()} traits`} size="small" sx={compactMetricChipSx(metricChipTone(theme, 'primary'))} />
+                            <Chip label={`${counts.fdr.toLocaleString()} FDR`} size="small" sx={compactMetricChipSx({ backgroundColor: alpha(chartTokens.threshold, 0.08), color: chartTokens.threshold, border: `1px solid ${alpha(chartTokens.threshold, 0.22)}` })} />
+                            <Chip label={`${counts.positive.toLocaleString()} +`} size="small" sx={compactMetricChipSx({ backgroundColor: alpha(TAIL_META.positive.color, 0.08), color: TAIL_META.positive.color, border: `1px solid ${alpha(TAIL_META.positive.color, 0.2)}` })} />
+                            <Chip label={`${counts.negative.toLocaleString()} -`} size="small" sx={compactMetricChipSx({ backgroundColor: alpha(TAIL_META.negative.color, 0.08), color: TAIL_META.negative.color, border: `1px solid ${alpha(TAIL_META.negative.color, 0.2)}` })} />
+                        </Stack>
+                    </Stack>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <UpdatingStatus active={targetsRefreshing || isRefreshing} />
+                        {!isLoading && rows.length > 0 && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Download />}
+                                onClick={() => setExportOpen(true)}
+                                sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                                Export Image
+                            </Button>
+                        )}
+                    </Box>
+                </Box>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {isLoading && (
-                        <Box sx={{ minHeight: GENE_QQ_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    Loading gene-level QQ TSV...
-                                </Typography>
-                            </Box>
-                        </Box>
+                        <FigureLoadingPanel
+                            minHeight={GENE_QQ_PLOT_HEIGHT}
+                            message="Loading gene-level QQ TSV..."
+                        />
                     )}
 
                     {!isLoading && rows.length === 0 && !hasRenderedQQ && (
@@ -1535,7 +1543,10 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     )}
 
                     {!isLoading && hasVisiblePoints && !afterFirstPaint && (
-                        <Box sx={{ minHeight: GENE_QQ_PLOT_HEIGHT }} />
+                        <FigureLoadingPanel
+                            minHeight={GENE_QQ_PLOT_HEIGHT}
+                            message="Rendering gene QQ plot..."
+                        />
                     )}
 
                     {!isLoading && hasVisiblePoints && afterFirstPaint && (
@@ -1613,32 +1624,22 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                     downloadCSV={downloadCSV}
                     highlight={highlight}
                     tableRowRefs={tableRowRefs}
+                    geneQuery={geneQuery}
+                    setGeneQuery={setGeneQuery}
                 />
             )}
 
-            <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>
-                <DialogContent sx={{ pt: 1 }}>
-                    <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-                        <TextField label="Width" type="number" size="small" value={exportWidth} onChange={(event) => setExportWidth(event.target.value)} sx={controlFieldSx(theme)} />
-                        <TextField label="Height" type="number" size="small" value={exportHeight} onChange={(event) => setExportHeight(event.target.value)} sx={controlFieldSx(theme)} />
-                    </Stack>
-                    <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={exportFmt}
-                        onChange={(_, value) => { if (value) setExportFmt(value); }}
-                        sx={statusToggleSx(theme, { '& .MuiToggleButton-root': { textTransform: 'none', px: 2.5 } })}
-                    >
-                        <ToggleButton value="svg">SVG</ToggleButton>
-                        <ToggleButton value="png">PNG</ToggleButton>
-                    </ToggleButtonGroup>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setExportOpen(false)} sx={{ textTransform: 'none', color: theme.palette.text.secondary }}>Cancel</Button>
-                    <Button variant="contained" onClick={() => { handleExport(); setExportOpen(false); }} sx={{ textTransform: 'none' }}>Export</Button>
-                </DialogActions>
-            </Dialog>
+            <ExportPlotDialog
+                open={exportOpen}
+                onClose={() => setExportOpen(false)}
+                width={exportWidth}
+                onWidthChange={setExportWidth}
+                height={exportHeight}
+                onHeightChange={setExportHeight}
+                format={exportFmt}
+                onFormatChange={setExportFmt}
+                onExport={handleExport}
+            />
         </Box>
     );
 }

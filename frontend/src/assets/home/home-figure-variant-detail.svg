@@ -5,18 +5,18 @@
   <text x="62" y="106" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="13">Trait metadata, identifiers, and available analysis views</text>
 
   <rect x="72" y="126" width="310" height="232" rx="16" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.5"/>
-  <rect x="92" y="144" width="118" height="26" rx="13" fill="#F59E0B" fill-opacity="0.16"/>
-  <text x="151" y="162" text-anchor="middle" fill="#B45309" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="800">GCST90081631</text>
-  <rect x="220" y="144" width="82" height="26" rx="13" fill="#EFF6FF" stroke="#DBEAFE"/>
-  <text x="261" y="162" text-anchor="middle" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700">PA00638</text>
+  <rect x="92" y="144" width="124" height="26" rx="13" fill="#F59E0B" fill-opacity="0.16"/>
+  <text x="154" y="162" text-anchor="middle" fill="#B45309" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="800">GCST90083727</text>
+  <rect x="224" y="144" width="102" height="26" rx="13" fill="#EFF6FF" stroke="#DBEAFE"/>
+  <text x="275" y="162" text-anchor="middle" fill="#2563EB" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700">ICD10 E11.9</text>
 
   <text x="92" y="198" fill="#92400E" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800">Trait name</text>
-  <text x="92" y="218" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="800">Non-cancer illness code</text>
-  <text x="92" y="236" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="11">self-reported phenotype</text>
+  <text x="92" y="218" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="800">Type 2 diabetes mellitus</text>
+  <text x="92" y="236" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="11">without complications</text>
   <line x1="92" y1="250" x2="354" y2="250" stroke="#FDE68A"/>
 
-  <text x="92" y="274" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700">Significant variants</text>
-  <text x="244" y="274" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="800">32,357</text>
+  <text x="92" y="274" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700">Featured tab</text>
+  <text x="244" y="274" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="800">program-scatter</text>
   <line x1="92" y1="286" x2="354" y2="286" stroke="#FDE68A"/>
 
   <text x="92" y="310" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700">Source table</text>
@@ -24,7 +24,7 @@
   <line x1="92" y1="322" x2="354" y2="322" stroke="#FDE68A"/>
 
   <text x="92" y="344" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700">Default route</text>
-  <text x="244" y="344" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="800">/trait/GCST90081631</text>
+  <text x="244" y="344" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="800">/trait/GCST90083727</text>
 
   <rect x="404" y="126" width="252" height="232" rx="16" fill="white" stroke="#E2E8F0" stroke-width="1.5"/>
   <text x="424" y="154" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="800">Analysis modules</text>
@@ -40,7 +40,7 @@
 
   <rect x="424" y="256" width="94" height="44" rx="12" fill="#F5F3FF" stroke="#DDD6FE"/>
   <circle cx="442" cy="278" r="5" fill="#7C3AED"/>
-  <text x="456" y="282" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="800">Gene QQ</text>
+  <text x="456" y="282" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="800">QQ Plot</text>
 
   <rect x="536" y="256" width="94" height="44" rx="12" fill="#F0FDFA" stroke="#CCFBF1"/>
   <circle cx="554" cy="278" r="5" fill="#0F766E"/>

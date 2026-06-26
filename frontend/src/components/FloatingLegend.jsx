@@ -11,6 +11,12 @@ const DEFAULT_OFFSET = 12;
 const SAFE_MARGIN = 8;
 const TOOLBAR_GUARD = { top: 8, right: 10, width: 116, height: 42 };
 
+function getPositionedAncestor(node) {
+    if (!node) return null;
+    const ancestor = node.offsetParent;
+    return ancestor || node.parentElement;
+}
+
 function getAxisPixelBounds(axis, fallbackStart, fallbackEnd) {
     if (!axis) return { start: fallbackStart, end: fallbackEnd };
     const start = Number.isFinite(axis._offset) ? axis._offset : fallbackStart;
@@ -213,8 +219,8 @@ export default function FloatingLegend({
     }, [collapsed]);
 
     const clampPosition = useCallback((nextTop, nextSide, placement = defaultPlacement) => {
-        const parent = rootRef.current?.parentElement;
         const node = rootRef.current;
+        const parent = getPositionedAncestor(node);
         const normalizedPlacement = placement === 'left' ? 'left' : 'right';
         if (!parent || !node) {
             return {
@@ -303,7 +309,7 @@ export default function FloatingLegend({
         if (dragging || manualPosition) return undefined;
 
         const node = rootRef.current;
-        const parent = node?.parentElement;
+        const parent = getPositionedAncestor(node);
         const gd = anchorPlotRef?.current;
         if (!node || !parent) return undefined;
 
@@ -421,7 +427,7 @@ export default function FloatingLegend({
         };
 
         const node = rootRef.current;
-        const parent = node?.parentElement;
+        const parent = getPositionedAncestor(node);
         let rafId = window.requestAnimationFrame(keepInBounds);
         const scheduleClamp = () => {
             window.cancelAnimationFrame(rafId);
@@ -643,24 +649,30 @@ export default function FloatingLegend({
                         const swatchBg = swatchColors
                             ? `linear-gradient(90deg, ${swatchColors[0]} 0 50%, ${swatchColors[1]} 50% 100%)`
                             : item.color;
-
-                        return (
+                        const legendDetail = item.tooltip || item.description || item.note || '';
+                        const legendDetailLabel = typeof legendDetail === 'string' ? legendDetail : '';
+                        const row = (
                             <Box
-                                key={item.key}
                                 sx={{
                                     position: 'relative',
                                     display: 'grid',
-                                gridTemplateColumns: '14px minmax(0, 1fr)',
-                                alignItems: 'start',
-                                columnGap: 0.62,
-                                px: 0.68,
-                                py: 0.58,
-                                borderRadius: 1.4,
-                                transition: `background-color ${surfaceTransition}, transform ${surfaceTransition}, padding ${surfaceTransition}`,
-                                '&:hover': {
-                                    bgcolor: alpha(theme.palette.primary.main, 0.045),
-                                },
-                            }}
+                                    gridTemplateColumns: '14px minmax(0, 1fr)',
+                                    alignItems: 'start',
+                                    columnGap: 0.62,
+                                    px: 0.68,
+                                    py: 0.58,
+                                    borderRadius: 1.4,
+                                    transition: `background-color ${surfaceTransition}, transform ${surfaceTransition}, padding ${surfaceTransition}`,
+                                    '&:hover': {
+                                        bgcolor: alpha(theme.palette.primary.main, 0.045),
+                                    },
+                                    '&:focus-visible': {
+                                        outline: `2px solid ${alpha(theme.palette.primary.main, 0.45)}`,
+                                        outlineOffset: 1,
+                                    },
+                                }}
+                                tabIndex={legendDetail ? 0 : undefined}
+                                aria-label={legendDetailLabel ? `${item.label}. ${legendDetailLabel}` : undefined}
                             >
                                 <Box
                                     sx={{
@@ -732,24 +744,10 @@ export default function FloatingLegend({
                                             </Box>
                                         )}
                                     </Box>
-                                    {item.note && (
-                                        <Typography
-                                            sx={{
-                                                mt: 0.18,
-                                                fontSize: '0.64rem',
-                                                lineHeight: 1.25,
-                                                color: theme.palette.text.secondary,
-                                                whiteSpace: 'normal',
-                                                overflowWrap: 'anywhere',
-                                            }}
-                                        >
-                                            {item.note}
-                                        </Typography>
-                                    )}
                                     {showScale && Number.isFinite(item.count) && (
                                         <Box
                                             sx={{
-                                                mt: item.note ? 0.38 : 0.45,
+                                                mt: 0.45,
                                                 maxHeight: 8,
                                                 overflow: 'hidden',
                                                 transition: `max-height ${surfaceTransition}, opacity ${surfaceTransition}, transform ${surfaceTransition}, margin-top ${surfaceTransition}`,
@@ -779,6 +777,22 @@ export default function FloatingLegend({
                                     )}
                                 </Box>
                             </Box>
+                        );
+
+                        return (
+                            legendDetail ? (
+                                <Tooltip
+                                    key={item.key}
+                                    title={legendDetail}
+                                    arrow
+                                    placement={position.placement === 'right' ? 'left' : 'right'}
+                                    describeChild
+                                >
+                                    {row}
+                                </Tooltip>
+                            ) : (
+                                <React.Fragment key={item.key}>{row}</React.Fragment>
+                            )
                         );
                     })}
                 </Box>

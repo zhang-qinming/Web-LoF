@@ -9,6 +9,7 @@ export const CONTENT_PAGE_MAX_WIDTH = 1600;
 export const APP_TEXT_MAX_WIDTH = 1120;
 export const RESPONSIVE_PLOT_MAX_HEIGHT = 980;
 export const RESPONSIVE_PLOT_HEIGHT = 'clamp(560px, min(64dvh, 38vw), 980px)';
+export const TABLE_RESPONSIVE_BREAKPOINT = 1200;
 export const RESPONSIVE_TALL_PLOT_HEIGHT = 'clamp(600px, min(68dvh, 40vw), 980px)';
 export const RESPONSIVE_COMPACT_PLOT_HEIGHT = 'clamp(400px, min(56dvh, 28vw), 740px)';
 export const RESPONSIVE_EMPTY_PLOT_HEIGHT = 'clamp(280px, min(40dvh, 24vw), 500px)';
@@ -68,6 +69,92 @@ export function toolbarSx(theme, overrides = {}) {
         backgroundColor: theme.custom.surface.subtle,
         border: `1px solid ${theme.custom.border.soft}`,
         ...rest,
+    };
+}
+
+export function figureToolbarSx(theme, overrides = {}) {
+    const { borderRadius, ...rest } = overrides;
+    return {
+        display: 'grid',
+        gridTemplateColumns: {
+            xs: '1fr',
+            lg: 'minmax(190px, 0.62fr) minmax(320px, 1.12fr) minmax(300px, 1fr)',
+        },
+        alignItems: 'stretch',
+        gap: 1,
+        px: 1,
+        py: 1,
+        borderRadius: normalizeRectRadius(borderRadius),
+        backgroundColor: theme.custom.surface.subtle,
+        border: `1px solid ${theme.custom.border.soft}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.72)',
+        ...rest,
+    };
+}
+
+export function figureToolbarPanelSx(theme, tone = 'neutral', overrides = {}) {
+    const tones = {
+        title: {
+            accent: theme.palette.primary.main,
+            bg: theme.palette.background.paper,
+            border: theme.custom.border.soft,
+        },
+        info: {
+            accent: '#3f78a8',
+            bg: '#f8fbff',
+            border: '#cfe0f6',
+        },
+        controls: {
+            accent: '#64748b',
+            bg: theme.palette.background.paper,
+            border: theme.custom.border.strong,
+        },
+        display: {
+            accent: '#8a5b12',
+            bg: '#fffaf4',
+            border: '#edd1a4',
+        },
+    };
+    const selected = tones[tone] || tones.controls;
+
+    return {
+        minWidth: 0,
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        alignContent: 'center',
+        gap: 0.9,
+        px: 1.25,
+        py: 0.95,
+        borderRadius: 1,
+        border: `1px solid ${selected.border}`,
+        borderLeft: `3px solid ${selected.accent}`,
+        backgroundColor: selected.bg,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.74)',
+        ...overrides,
+    };
+}
+
+export function figureToolbarLabelSx(theme, overrides = {}) {
+    return {
+        width: '100%',
+        color: theme.palette.text.secondary,
+        fontSize: '0.7rem',
+        fontWeight: 680,
+        letterSpacing: 0,
+        lineHeight: 1.2,
+        ...overrides,
+    };
+}
+
+export function figureToolbarTitleSx(theme, overrides = {}) {
+    return {
+        color: theme.palette.text.primary,
+        fontSize: '0.86rem',
+        fontWeight: 760,
+        letterSpacing: 0,
+        lineHeight: 1.25,
+        ...overrides,
     };
 }
 
@@ -203,6 +290,7 @@ export function statusToggleSx(theme, overrides = {}) {
 export function plotFrameSx(theme, overrides = {}) {
     return panelSx(theme, {
         overflow: 'hidden',
+        overflowAnchor: 'none',
         backgroundColor: theme.palette.background.paper,
         boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
         ...overrides,
@@ -274,6 +362,71 @@ export function sectionPanelHeaderSx(theme, overrides = {}) {
     };
 }
 
+export function tableToolbarGroupSx(theme, overrides = {}) {
+    return {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 0.75,
+        flexWrap: 'wrap',
+        px: 0.7,
+        py: 0.6,
+        borderRadius: 1.5,
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+        background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.custom.surface.subtle, 0.92)} 100%)`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.84), 0 8px 18px ${alpha('#0f172a', 0.05)}`,
+        ...overrides,
+    };
+}
+
+export function tableToolbarActionButtonSx(theme, tone = 'primary', overrides = {}) {
+    const tones = {
+        primary: {
+            color: '#245089',
+            borderColor: alpha(theme.palette.primary.main, 0.18),
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.12)} 0%, ${alpha(theme.palette.primary.main, 0.06)} 100%)`,
+            hoverBackground: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.16)} 0%, ${alpha(theme.palette.primary.main, 0.1)} 100%)`,
+            shadow: alpha(theme.palette.primary.main, 0.12),
+        },
+        neutral: {
+            color: theme.palette.text.secondary,
+            borderColor: alpha('#64748b', 0.18),
+            background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.custom.surface.subtle, 0.96)} 100%)`,
+            hoverBackground: `linear-gradient(135deg, ${alpha(theme.custom.surface.subtle, 0.98)} 0%, ${alpha('#e2e8f0', 0.98)} 100%)`,
+            shadow: alpha('#64748b', 0.08),
+        },
+    };
+    const selected = tones[tone] || tones.primary;
+
+    return {
+        minHeight: 34,
+        px: 1.3,
+        borderRadius: 1.25,
+        border: `1px solid ${selected.borderColor}`,
+        background: selected.background,
+        color: selected.color,
+        fontSize: '0.73rem',
+        fontWeight: 700,
+        letterSpacing: '0.01em',
+        textTransform: 'none',
+        boxShadow: `0 8px 16px -14px ${selected.shadow}`,
+        transition: `transform ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}, border-color ${theme.custom.motion.swift}, background ${theme.custom.motion.swift}`,
+        '&:hover': {
+            borderColor: selected.borderColor,
+            background: selected.hoverBackground,
+            boxShadow: `0 12px 22px -16px ${selected.shadow}`,
+            transform: 'translateY(-1px)',
+        },
+        '&:disabled': {
+            color: alpha(theme.palette.text.secondary, 0.72),
+            borderColor: alpha('#94a3b8', 0.22),
+            background: alpha(theme.custom.surface.subtle, 0.78),
+            boxShadow: 'none',
+        },
+        ...overrides,
+    };
+}
+
 export function tableTone(theme, tone = 'neutral') {
     const tones = {
         neutral: {
@@ -319,6 +472,12 @@ export const groupedTableHeaderMetrics = {
     groupHeight: 30,
     columnHeight: 36,
 };
+
+function justifyForTableAlign(align = 'left') {
+    if (align === 'right') return 'flex-end';
+    if (align === 'center') return 'center';
+    return 'flex-start';
+}
 
 export function stickyTableContainerSx(theme, overrides = {}) {
     return {
@@ -425,6 +584,8 @@ export function groupedTableHeaderCellSx(theme, tone, overrides = {}) {
 }
 
 export function groupedTableColumnHeaderCellSx(theme, tone, align = 'left', overrides = {}) {
+    const justifyContent = justifyForTableAlign(align);
+
     return {
         position: 'sticky',
         top: groupedTableHeaderMetrics.groupHeight,
@@ -435,7 +596,9 @@ export function groupedTableColumnHeaderCellSx(theme, tone, align = 'left', over
         px: 1,
         lineHeight: 1.15,
         textAlign: align,
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere',
         bgcolor: tone.headerBg,
         backgroundColor: `${tone.headerBg} !important`,
         background: `${tone.headerBg} !important`,
@@ -447,13 +610,23 @@ export function groupedTableColumnHeaderCellSx(theme, tone, align = 'left', over
         boxShadow: `0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${tone.headerBorder}`,
         backgroundClip: 'border-box',
         verticalAlign: 'middle',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
+        '& .MuiTableSortLabel-root': {
+            display: 'flex',
+            alignItems: 'center',
+            width: '100%',
+            justifyContent,
+            textAlign: align,
+        },
+        '& .MuiTableSortLabel-icon': {
+            flexShrink: 0,
+        },
         ...overrides,
     };
 }
 
 export function stickyTableHeaderCellSx(theme, tone, align = 'left', overrides = {}) {
+    const justifyContent = justifyForTableAlign(align);
+
     return {
         position: 'sticky',
         top: 0,
@@ -465,12 +638,22 @@ export function stickyTableHeaderCellSx(theme, tone, align = 'left', overrides =
         color: tone.headerColor,
         borderBottom: `2px solid ${tone.headerBorder}`,
         textAlign: align,
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere',
         backgroundClip: 'border-box',
         boxShadow: `0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${tone.headerBorder}`,
         verticalAlign: 'middle',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
+        '& .MuiTableSortLabel-root': {
+            display: 'flex',
+            alignItems: 'center',
+            width: '100%',
+            justifyContent,
+            textAlign: align,
+        },
+        '& .MuiTableSortLabel-icon': {
+            flexShrink: 0,
+        },
         ...overrides,
     };
 }

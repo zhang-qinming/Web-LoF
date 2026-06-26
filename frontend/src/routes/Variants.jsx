@@ -19,6 +19,8 @@ import Tooltip from '@mui/material/Tooltip';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import LinearProgress from '@mui/material/LinearProgress';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import { alpha, useTheme } from '@mui/material/styles';
 import Download from '@mui/icons-material/Download';
 import Folder from '@mui/icons-material/Folder';
@@ -28,9 +30,9 @@ import FolderOpen from '@mui/icons-material/FolderOpen';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import Close from '@mui/icons-material/Close';
 import FileDownload from '@mui/icons-material/FileDownload';
-import Refresh from '@mui/icons-material/Refresh';
 import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBox from '@mui/icons-material/CheckBox';
+import Storage from '@mui/icons-material/Storage';
 import axios from 'axios';
 import DataBrowseSummary from '../components/DataBrowseSummary';
 import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload, triggerDataPackageDownload } from '../utils/download';
@@ -486,11 +488,11 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                 <Checkbox size="small" sx={{ p: 0.3 }} checked={allCk} indeterminate={someCk}
                                     onChange={() => toggleDirAll(dir, files.map(f => f.path))} />
                             </TableCell>
-                            <TableCell sx={{ ...thSx, cursor: 'pointer' }}
+                            <TableCell sx={{ ...thSx, textAlign: 'center', cursor: 'pointer' }}
                                 onClick={() => { if (sortBy === 'name') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy('name'); setSortDir('asc'); } }}>
                                 Name {sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                             </TableCell>
-                            <TableCell sx={{ ...thSx, width: 56, textAlign: 'right', cursor: 'pointer' }}
+                            <TableCell sx={{ ...thSx, width: 56, textAlign: 'center', cursor: 'pointer' }}
                                 onClick={() => { if (sortBy === 'size') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy('size'); setSortDir('desc'); } }}>
                                 Size {sortBy === 'size' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                             </TableCell>
@@ -527,37 +529,37 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                                 checkedIcon={<CheckBox sx={{ fontSize: 17 }} />}
                                                 onChange={() => toggleFile(f.path)} />}
                                         </TableCell>
-                                        <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}` }}>
+                                        <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, textAlign: 'center' }}>
                                             {f.type === 'dir' ? (
                                                 <Box component="button" onClick={() => onEnter(f.path)}
                                                     sx={{
-                                                        display: 'flex', alignItems: 'center', gap: 0.7, width: '100%',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.7, width: '100%',
                                                         border: 'none', bgcolor: 'transparent', cursor: 'pointer',
                                                         fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', fontSize: '0.79rem', fontWeight: 500,
-                                                        color: theme.palette.primary.main, textAlign: 'left', px: 0, py: 0.2,
+                                                        color: theme.palette.primary.main, textAlign: 'center', px: 0, py: 0.2,
                                                         transition: `color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
                                                         '&:hover': { color: theme.palette.primary.dark, transform: 'translateX(2px)' },
                                                         '&:active': { transform: 'translateX(4px) scale(0.98)' },
                                                     }}>
                                                     <Folder sx={{ fontSize: 17, color: theme.palette.primary.light, flexShrink: 0 }} />
-                                                    <Box component="span" title={f.name} sx={{ minWidth: 0, ...multilineNameSx }}>{f.name}</Box>
+                                                    <Box component="span" title={f.name} sx={{ minWidth: 0, textAlign: 'center', ...multilineNameSx }}>{f.name}</Box>
                                                     <ChevronRight sx={{
-                                                        fontSize: 16, opacity: 0.3, flexShrink: 0, ml: 'auto',
+                                                        fontSize: 16, opacity: 0.3, flexShrink: 0,
                                                         transition: 'opacity .15s, transform .15s',
                                                         '.MuiTableRow-root:hover &': { opacity: 0.7, transform: 'translateX(2px)' },
                                                     }} />
                                                 </Box>
                                             ) : (
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.7 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.7 }}>
                                                     <InsertDriveFile sx={{ fontSize: 15, color: theme.custom.chart.axisSoft, flexShrink: 0 }} />
                                                     <Box component="span" title={f.name}
-                                                        sx={{ minWidth: 0, fontSize: '0.79rem', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', ...multilineNameSx }}>
+                                                        sx={{ minWidth: 0, textAlign: 'center', fontSize: '0.79rem', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', ...multilineNameSx }}>
                                                         {f.name}
                                                     </Box>
                                                 </Box>
                                             )}
                                         </TableCell>
-                                        <TableCell align="right" sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, fontSize: '0.72rem', color: theme.palette.text.secondary }}>
+                                        <TableCell align="center" sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, fontSize: '0.72rem', color: theme.palette.text.secondary }}>
                                             {isFile ? fmtSize(f.size) : ''}
                                         </TableCell>
                                         <TableCell align="center" sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}` }}>
@@ -964,9 +966,9 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                 onChange={handleToggleAllVisible}
                                             />
                                         </TableCell>
-                                        <TableCell sx={{ ...thSx, width: 360 }}>Name</TableCell>
-                                        <TableCell sx={{ ...thSx, width: { xs: 220, sm: 'auto' } }}>Path</TableCell>
-                                        <TableCell sx={{ ...thSx, width: 84, textAlign: 'right' }}>Size</TableCell>
+                                        <TableCell sx={{ ...thSx, width: 360, textAlign: 'center' }}>Name</TableCell>
+                                        <TableCell sx={{ ...thSx, width: { xs: 220, sm: 'auto' }, textAlign: 'center' }}>Path</TableCell>
+                                        <TableCell sx={{ ...thSx, width: 84, textAlign: 'center' }}>Size</TableCell>
                                         <TableCell sx={{ ...thSx, width: 84, textAlign: 'center' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -1013,7 +1015,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                             />
                                                         )}
                                                     </TableCell>
-                                                    <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, width: 360 }}>
+                                                    <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, width: 360, textAlign: 'center' }}>
                                                         {item.type === 'dir' ? (
                                                             <Box
                                                                 component="button"
@@ -1021,6 +1023,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                                 sx={{
                                                                     display: 'flex',
                                                                     alignItems: 'center',
+                                                                    justifyContent: 'center',
                                                                     gap: 0.7,
                                                                     width: '100%',
                                                                     border: 'none',
@@ -1031,7 +1034,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                                     fontSize: '0.79rem',
                                                                     fontWeight: 500,
                                                                     color: theme.palette.primary.main,
-                                                                    textAlign: 'left',
+                                                                    textAlign: 'center',
                                                                     px: 0,
                                                                     py: 0.2,
                                                                     transition: `color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
@@ -1040,25 +1043,25 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                                 }}
                                                             >
                                                                 <Folder sx={{ fontSize: 17, color: theme.palette.primary.light, flexShrink: 0 }} />
-                                                                <Box component="span" title={item.name} sx={{ minWidth: 0, ...multilineNameSx }}>
+                                                                <Box component="span" title={item.name} sx={{ minWidth: 0, textAlign: 'center', ...multilineNameSx }}>
                                                                     {item.name}
                                                                 </Box>
                                                             </Box>
                                                         ) : (
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.7 }}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.7 }}>
                                                                 <InsertDriveFile sx={{ fontSize: 15, color: theme.custom.chart.axisSoft, flexShrink: 0 }} />
-                                                                <Box component="span" title={item.name} sx={{ minWidth: 0, fontSize: '0.79rem', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', ...multilineNameSx }}>
+                                                                <Box component="span" title={item.name} sx={{ minWidth: 0, textAlign: 'center', fontSize: '0.79rem', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', ...multilineNameSx }}>
                                                                     {item.name}
                                                                 </Box>
                                                             </Box>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, width: { xs: 220, sm: 'auto' } }}>
-                                                        <Box title={item.path} sx={{ fontSize: '0.75rem', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, width: { xs: 220, sm: 'auto' }, textAlign: 'center' }}>
+                                                        <Box title={item.path} sx={{ fontSize: '0.75rem', textAlign: 'center', color: theme.palette.text.secondary, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                             {item.path}
                                                         </Box>
                                                     </TableCell>
-                                                    <TableCell align="right" sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, fontSize: '0.72rem', color: theme.palette.text.secondary }}>
+                                                    <TableCell align="center" sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, fontSize: '0.72rem', color: theme.palette.text.secondary }}>
                                                         {isFile ? fmtSize(item.size) : ''}
                                                     </TableCell>
                                                     <TableCell align="center" sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}` }}>
@@ -1163,7 +1166,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
     );
 }
 
-function FullDataBrowser() {
+function FullDataBrowser({ onBackToDownloads } = {}) {
     const theme = useTheme();
     const loadingBarSx = {
         height: 3,
@@ -1324,7 +1327,7 @@ function FullDataBrowser() {
 
     const ctxVal = useMemo(() => ({ checked, toggleFile, toggleDirAll, clearAll }), [checked, toggleFile, toggleDirAll, clearAll]);
 
-    const showIntro = isGlobalSearch || (columns.length === 1 && exitingCols.length === 0);
+    const showIntro = !onBackToDownloads && (isGlobalSearch || (columns.length === 1 && exitingCols.length === 0));
     const compactBrowseLayout = !isGlobalSearch && columns.length === 1 && exitingCols.length === 0;
 
     return (
@@ -1344,28 +1347,32 @@ function FullDataBrowser() {
                 display: 'flex',
                 flexDirection: 'column',
             }}>
-                {/* intro */}
-                <Box sx={{
-                    overflow: 'hidden',
-                    maxHeight: showIntro ? 80 : 0, opacity: showIntro ? 1 : 0,
-                    transform: showIntro ? 'none' : 'translateY(-8px)',
-                    transition: 'max-height .25s ease, opacity .2s ease, transform .22s ease',
-                    mb: showIntro ? 0 : 0,
-                }}>
-                    <Box sx={{ pb: 2 }}>
-                        <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0 })}>
-                            {isGlobalSearch ? 'Global Search' : 'Data Browser'}
-                        </Typography>
+                {showIntro && (
+                    <Box sx={{
+                        overflow: 'hidden',
+                        maxHeight: 80,
+                        opacity: 1,
+                        transform: 'none',
+                        transition: 'max-height .25s ease, opacity .2s ease, transform .22s ease',
+                    }}>
+                        <Box sx={{ pb: 2 }}>
+                            <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0 })}>
+                                {isGlobalSearch ? 'Global Search' : 'Data Browser'}
+                            </Typography>
+                        </Box>
                     </Box>
-                </Box>
+                )}
 
                 {/* toolbar */}
                 <Box sx={toolbarSx(theme, {
-                    flexDirection: compactBrowseLayout ? 'column' : { xs: 'column', sm: 'row' },
-                    alignItems: compactBrowseLayout ? 'stretch' : { xs: 'stretch', sm: 'center' },
-                    mb: 2,
+                    flexDirection: compactBrowseLayout && !onBackToDownloads ? 'column' : { xs: 'column', sm: 'row' },
+                    alignItems: compactBrowseLayout && !onBackToDownloads ? 'stretch' : { xs: 'stretch', sm: 'center' },
+                    mb: onBackToDownloads ? 1.25 : 2,
                     flexShrink: 0,
-                    flexWrap: compactBrowseLayout ? 'nowrap' : 'wrap',
+                    flexWrap: compactBrowseLayout && !onBackToDownloads ? 'nowrap' : 'wrap',
+                    borderRadius: onBackToDownloads ? 2 : undefined,
+                    bgcolor: onBackToDownloads ? alpha(theme.palette.background.paper, 0.94) : undefined,
+                    boxShadow: onBackToDownloads ? '0 10px 22px rgba(15, 23, 42, 0.045)' : undefined,
                 })}>
                     <TextField placeholder={isGlobalSearch ? 'e.g. GCST90081631' : 'e.g. GCST90081631'} size="small"
                         value={filter} onChange={e => setFilter(e.target.value)}
@@ -1441,6 +1448,32 @@ function FullDataBrowser() {
                             )}
                         </Box>
                     )}
+
+                    {onBackToDownloads && (
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={onBackToDownloads}
+                            sx={{
+                                ml: { sm: 'auto' },
+                                alignSelf: { xs: 'stretch', sm: 'center' },
+                                minHeight: 34,
+                                px: 1.45,
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                bgcolor: theme.palette.background.paper,
+                                borderColor: alpha(theme.palette.primary.main, 0.2),
+                                color: theme.palette.text.primary,
+                                '&:hover': {
+                                    borderColor: alpha(theme.palette.primary.main, 0.38),
+                                    bgcolor: alpha(theme.palette.primary.main, 0.04),
+                                },
+                            }}
+                        >
+                            <ChevronRight sx={{ fontSize: 15, mr: 0.45, transform: 'rotate(180deg)' }} />
+                            Back to downloads
+                        </Button>
+                    )}
                 </Box>
                 {downloadState.loading && <LinearProgress sx={{ ...loadingBarSx, mb: 1 }} />}
                 {downloadState.error && (
@@ -1511,12 +1544,16 @@ function getArchiveTooltip(archive) {
     return formatArchiveUpdated(archive?.mtime) || 'Prepared archive';
 }
 
-function formatArchiveDate(value) {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
-}
+const resourceIconSx = (color) => ({
+    width: 36,
+    height: 36,
+    borderRadius: 1,
+    display: 'grid',
+    placeItems: 'center',
+    color: color,
+    bgcolor: alpha(color, 0.06),
+    flexShrink: 0,
+});
 
 export default function DataBrowser() {
     const theme = useTheme();
@@ -1526,6 +1563,7 @@ export default function DataBrowser() {
         || Boolean(searchParams.get('dir'))
         || Boolean(searchParams.get('q'));
     const [showFullBrowser, setShowFullBrowser] = useState(() => initialBrowserView);
+    const [tabValue, setTabValue] = useState(0);
     const [page, setPage] = useState(1);
     const [payload, setPayload] = useState({ data: [], totalPages: 1 });
     const [loading, setLoading] = useState(true);
@@ -1625,33 +1663,9 @@ export default function DataBrowser() {
     }, []);
 
     if (showFullBrowser) {
-        return (
-            <>
-                <Box sx={{ width: '100%', maxWidth: DATA_PAGE_MAX_WIDTH, mx: 'auto', px: { xs: 1.5, sm: 2, md: 3, xl: 4 }, pt: { xs: 1.5, md: 2 } }}>
-                    <Paper elevation={0} sx={plotFrameSx(theme, {
-                        mb: 1.5,
-                        borderRadius: 3,
-                        px: { xs: 1.5, md: 2 },
-                        py: 1.25,
-                        display: 'flex',
-                        alignItems: { xs: 'stretch', sm: 'center' },
-                        justifyContent: 'space-between',
-                        gap: 1,
-                        flexDirection: { xs: 'column', sm: 'row' },
-                    })}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>Download Browser</Typography>
-                        <Button variant="outlined" size="small" onClick={returnFromDataBrowser} sx={{ textTransform: 'none' }}>
-                            Back to downloads
-                        </Button>
-                    </Paper>
-                </Box>
-                <FullDataBrowser />
-            </>
-        );
+        return <FullDataBrowser onBackToDownloads={returnFromDataBrowser} />;
     }
 
-    const packageHeaderTone = tableTone(theme, 'primary');
-    const folderHeaderTone = tableTone(theme, 'neutral');
     const hasFolders = payload.data.length > 0;
 
     return (
@@ -1660,103 +1674,341 @@ export default function DataBrowser() {
             maxWidth: DATA_PAGE_MAX_WIDTH,
             mx: 'auto',
             px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
-            py: { xs: 1.5, md: 2.5 },
+            py: { xs: 2, md: 3 },
         }}>
-            <Paper elevation={0} sx={plotFrameSx(theme, {
-                mb: 2,
-                borderRadius: 4,
-                p: { xs: 2, md: 2.5 },
-                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.11)}, ${alpha(theme.palette.secondary.main, 0.055)} 48%, ${theme.palette.background.paper})`,
-            })}>
-                <Box sx={{ display: 'flex', alignItems: { xs: 'stretch', md: 'center' }, justifyContent: 'space-between', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
-                    <Typography variant="h4" sx={sectionTitleSx(theme, { mb: 0 })}>Downloads</Typography>
-                    <Button variant="outlined" onClick={showDataBrowser} sx={{ textTransform: 'none', bgcolor: alpha(theme.palette.background.paper, 0.72) }}>
-                        <FolderOpen sx={{ fontSize: 18, mr: 0.7 }} />
-                        Browse downloads
-                    </Button>
-                </Box>
+            {/* Header Title Area with Background */}
+            <Paper 
+                elevation={0}
+                sx={{ 
+                    mb: 3,
+                    p: { xs: 2, sm: 2.5 },
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.divider}`,
+                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.03)} 0%, ${alpha(theme.palette.secondary.main, 0.01)} 100%)`,
+                }}
+            >
+                <Typography 
+                    variant="h5" 
+                    sx={{ 
+                        fontWeight: 800, 
+                        color: 'text.primary', 
+                        letterSpacing: '-0.02em',
+                        fontSize: '1.25rem'
+                    }}
+                >
+                    Data Download Hub
+                </Typography>
             </Paper>
 
-            {loading && <LinearProgress sx={{ mb: 1.5, borderRadius: 999 }} />}
-            {error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setError('')}>{error}</Alert>}
-            {downloadState.error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setDownloadState({ path: null, error: '' })}>{downloadState.error}</Alert>}
-            {packageError && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setPackageError('')}>{packageError}</Alert>}
+            {loading && <LinearProgress sx={{ mb: 3, borderRadius: 999, height: 4 }} />}
+            {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
+            {downloadState.error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setDownloadState({ path: null, error: '' })}>{downloadState.error}</Alert>}
+            {packageError && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setPackageError('')}>{packageError}</Alert>}
 
-            <Paper elevation={0} sx={plotFrameSx(theme, { borderRadius: 3, overflow: 'hidden' })}>
-                <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.25 })}>
-                    <Folder sx={{ fontSize: 18, color: theme.palette.primary.main }} />
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Folder archives</Typography>
-                    <Box sx={{ flex: 1 }} />
-                    <Button size="small" variant="outlined" disabled={loading} onClick={() => setFolderRefreshKey((value) => value + 1)} sx={{ textTransform: 'none' }}>
-                        <Refresh sx={{ fontSize: 15, mr: 0.4 }} />Refresh
-                    </Button>
-                </Box>
-                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                    <Table size="small" sx={stickyTableSx(theme)}>
-                        <TableHead><TableRow>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone)}>Folder</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone, 'right')} align="right">Contents</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone, 'right')} align="right">Archive</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone, 'right')} align="right">Date</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, folderHeaderTone, 'center')} align="center">Action</TableCell>
-                        </TableRow></TableHead>
-                        <TableBody>
-                            {!loading && !hasFolders && <TableRow><TableCell colSpan={5} align="center" sx={{ py: 5 }}>No folders available.</TableCell></TableRow>}
-                            {payload.data.map((folder, index) => {
-                                const archiveReady = Boolean(folder.archive?.exists);
-                                const isDownloading = downloadState.path === folder.path;
-                                return <TableRow key={folder.path} hover sx={tableRowRevealSx(theme, index)}>
-                                    <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Folder sx={{ fontSize: 18, color: theme.palette.primary.main }} /><Typography variant="body2" sx={{ fontWeight: 700 }}>{folder.name}</Typography></Box></TableCell>
-                                    <TableCell align="right" sx={{ color: 'text.secondary' }}>{folder.folderCount || 0} folders · {folder.fileCount || 0} files</TableCell>
-                                    <TableCell align="right">{archiveReady ? <Tooltip title={getArchiveTooltip(folder.archive)} arrow><Typography variant="body2" sx={{ fontWeight: 760 }}>{fmtSize(folder.archive.size)}</Typography></Tooltip> : <Typography variant="body2" color="text.secondary">Not prepared</Typography>}</TableCell>
-                                    <TableCell align="right"><Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{formatArchiveDate(folder.archive?.mtime)}</Typography></TableCell>
-                                    <TableCell align="center"><Button size="small" variant="contained" disabled={isDownloading || !archiveReady} onClick={() => { void downloadFolder(folder.path); }} sx={{ textTransform: 'none', boxShadow: 'none' }}><Download sx={{ fontSize: 16, mr: 0.45 }} />{isDownloading ? 'Starting...' : 'Download'}</Button></TableCell>
-                                </TableRow>;
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-                {payload.totalPages > 1 && <Box sx={{ py: 1.2, display: 'flex', justifyContent: 'center', borderTop: `1px solid ${theme.custom.border.soft}` }}><Pagination count={payload.totalPages} page={page} onChange={(_, value) => setPage(value)} size="small" /></Box>}
-            </Paper>
+            {/* Switcher & File Browser Button */}
+            <Box sx={{ 
+                mb: 3, 
+                display: 'flex', 
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'stretch', sm: 'center' },
+                justifyContent: 'space-between',
+                gap: 2,
+                borderBottom: `1px solid ${theme.palette.divider}`,
+                pb: 0.5
+            }}>
+                <Tabs 
+                    value={tabValue} 
+                    onChange={(_, val) => setTabValue(val)} 
+                    aria-label="download categories"
+                    sx={{
+                        minHeight: 0,
+                        '& .MuiTab-root': {
+                            minHeight: 36,
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            color: theme.palette.text.secondary,
+                            px: 2,
+                            '&.Mui-selected': {
+                                color: theme.palette.primary.main,
+                            },
+                        },
+                        '& .MuiTabs-indicator': {
+                            height: 2.5,
+                            borderRadius: '3px 3px 0 0',
+                            bgcolor: theme.palette.primary.main,
+                        }
+                    }}
+                >
+                    <Tab 
+                        label={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                                <Folder sx={{ fontSize: 14 }} />
+                                <span>Folder Archives</span>
+                                <Chip 
+                                    label={payload.data.length} 
+                                    size="small" 
+                                    sx={{ 
+                                        height: 16, 
+                                        fontSize: '0.65rem', 
+                                        fontWeight: 700, 
+                                        bgcolor: tabValue === 0 ? alpha(theme.palette.primary.main, 0.08) : theme.palette.action.hover,
+                                        color: tabValue === 0 ? theme.palette.primary.main : theme.palette.text.secondary,
+                                        border: 'none',
+                                    }} 
+                                />
+                            </Box>
+                        } 
+                    />
+                    <Tab 
+                        label={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                                <Storage sx={{ fontSize: 14 }} />
+                                <span>Database Tables</span>
+                                <Chip 
+                                    label={packagePayload.data.length} 
+                                    size="small" 
+                                    sx={{ 
+                                        height: 16, 
+                                        fontSize: '0.65rem', 
+                                        fontWeight: 700, 
+                                        bgcolor: tabValue === 1 ? alpha(theme.palette.secondary.main, 0.08) : theme.palette.action.hover,
+                                        color: tabValue === 1 ? theme.palette.secondary.main : theme.palette.text.secondary,
+                                        border: 'none',
+                                    }} 
+                                />
+                            </Box>
+                        } 
+                    />
+                </Tabs>
 
-            <Paper elevation={0} sx={plotFrameSx(theme, { mt: 2, borderRadius: 3, overflow: 'hidden' })}>
-                <Box sx={sectionPanelHeaderSx(theme, { px: 2, py: 1.25 })}>
-                    <FileDownload sx={{ fontSize: 18, color: theme.palette.primary.main }} />
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Table downloads</Typography>
-                    <Box sx={{ flex: 1 }} />
-                    <Button size="small" variant="outlined" disabled={packageLoading} onClick={() => setPackageRefreshKey((value) => value + 1)} sx={{ textTransform: 'none' }}>
-                        <Refresh sx={{ fontSize: 15, mr: 0.4 }} />Refresh
-                    </Button>
+                <Button 
+                    variant="outlined" 
+                    onClick={showDataBrowser} 
+                    sx={{ 
+                        textTransform: 'none', 
+                        borderColor: theme.palette.divider,
+                        color: theme.palette.text.primary,
+                        fontWeight: 600,
+                        px: 1.8,
+                        py: 0.5,
+                        borderRadius: 1,
+                        fontSize: '0.78rem',
+                        '&:hover': { 
+                            borderColor: theme.palette.primary.main,
+                            bgcolor: alpha(theme.palette.primary.main, 0.04),
+                        },
+                    }}
+                >
+                    <FolderOpen sx={{ fontSize: 14, mr: 0.6 }} />
+                    Explore File Browser
+                </Button>
+            </Box>
+
+            {/* Folder Archives Content Panel */}
+            {tabValue === 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+                    <Box sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+                        gap: 2.5,
+                    }}>
+                        {!loading && !hasFolders && (
+                            <Paper sx={{ gridColumn: 'span 2', py: 6, textAlign: 'center', bgcolor: theme.palette.background.paper, border: `1px dashed ${theme.palette.divider}`, borderRadius: 1.5 }}>
+                                <FolderOpen sx={{ fontSize: 36, color: theme.palette.text.disabled, mb: 1 }} />
+                                <Typography sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.85rem' }}>No folder archives available.</Typography>
+                            </Paper>
+                        )}
+                        {payload.data.map((folder) => {
+                            const archiveReady = Boolean(folder.archive?.exists);
+                            const isDownloading = downloadState.path === folder.path;
+                            return (
+                                <Paper
+                                    key={folder.path}
+                                    elevation={0}
+                                    sx={{
+                                        p: 2,
+                                        borderRadius: 1.5,
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                        bgcolor: 'background.paper',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 2,
+                                        transition: 'all 0.2s ease-in-out',
+                                        '&:hover': {
+                                            borderColor: theme.palette.primary.main,
+                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+                                        }
+                                    }}
+                                >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
+                                        <Box sx={resourceIconSx(theme.palette.primary.main)}>
+                                            <Folder sx={{ fontSize: 18 }} />
+                                        </Box>
+                                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {folder.name}
+                                            </Typography>
+                                            {archiveReady && folder.archive?.size && (
+                                                <Tooltip title={getArchiveTooltip(folder.archive)} arrow>
+                                                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'inline-block', mt: 0.3, fontSize: '0.72rem', cursor: 'help' }}>
+                                                        {fmtSize(folder.archive.size)}
+                                                    </Typography>
+                                                </Tooltip>
+                                            )}
+                                        </Box>
+                                    </Box>
+
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        disabled={isDownloading || !archiveReady}
+                                        onClick={() => { void downloadFolder(folder.path); }}
+                                        sx={{
+                                            textTransform: 'none',
+                                            boxShadow: 'none',
+                                            borderRadius: 1,
+                                            px: 1.8,
+                                            py: 0.5,
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                            flexShrink: 0,
+                                            '&:hover': {
+                                                boxShadow: 'none',
+                                                bgcolor: theme.palette.primary.dark,
+                                            }
+                                        }}
+                                    >
+                                        {isDownloading ? (
+                                            'Downloading...'
+                                        ) : (
+                                            <>
+                                                <Download sx={{ fontSize: 13, mr: 0.4 }} />
+                                                Download
+                                            </>
+                                        )}
+                                    </Button>
+                                </Paper>
+                            );
+                        })}
+                    </Box>
+                    {payload.totalPages > 1 && (
+                        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                            <Pagination count={payload.totalPages} page={page} onChange={(_, value) => setPage(value)} size="small" />
+                        </Box>
+                    )}
                 </Box>
-                {packageLoading && <LinearProgress sx={{ height: 3 }} />}
-                <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                    <Table size="small" sx={stickyTableSx(theme)}>
-                        <TableHead><TableRow>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone)}>Export</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Tables</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Archive</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'right')} align="right">Date</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, packageHeaderTone, 'center')} align="center">Action</TableCell>
-                        </TableRow></TableHead>
-                        <TableBody>
-                            {!packageLoading && packagePayload.data.length === 0 && <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}>Database export not prepared.</TableCell></TableRow>}
-                            {packagePayload.data.map((item, index) => {
-                                const archiveReady = Boolean(item.archive?.exists);
-                                const isDownloading = packageDownloadId === item.id;
-                                return <TableRow key={item.id} hover sx={tableRowRevealSx(theme, index)}>
-                                    <TableCell><Typography variant="body2" sx={{ fontWeight: 700 }}>{item.title}</Typography></TableCell>
-                                    <TableCell align="right"><Typography variant="body2" color="text.secondary">{item.tableCount || 0}</Typography></TableCell>
-                                    <TableCell align="right">
-                                        {archiveReady ? <Tooltip title={getArchiveTooltip(item.archive)} arrow><Typography variant="body2" sx={{ fontWeight: 760 }}>{fmtSize(item.archive.size)}</Typography></Tooltip> : <Typography variant="body2" color="text.secondary">Not prepared</Typography>}
-                                    </TableCell>
-                                    <TableCell align="right"><Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{formatArchiveDate(item.archive?.mtime)}</Typography></TableCell>
-                                    <TableCell align="center"><Button size="small" variant="contained" disabled={isDownloading || !archiveReady} onClick={() => { void downloadPackage(item.id); }} sx={{ textTransform: 'none', boxShadow: 'none' }}><Download sx={{ fontSize: 16, mr: 0.45 }} />{isDownloading ? 'Starting...' : 'Download'}</Button></TableCell>
-                                </TableRow>;
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
+            )}
+
+            {/* Database Tables Content Panel */}
+            {tabValue === 1 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+                    {packageLoading && <LinearProgress sx={{ height: 3, borderRadius: 999, mb: 1 }} />}
+
+                    <Box sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+                        gap: 2.5,
+                    }}>
+                        {!packageLoading && packagePayload.data.length === 0 && (
+                            <Paper sx={{ gridColumn: 'span 2', py: 6, textAlign: 'center', bgcolor: theme.palette.background.paper, border: `1px dashed ${theme.palette.divider}`, borderRadius: 1.5 }}>
+                                <Storage sx={{ fontSize: 36, color: theme.palette.text.disabled, mb: 1 }} />
+                                <Typography sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.85rem' }}>Database export not prepared.</Typography>
+                            </Paper>
+                        )}
+                        {packagePayload.data.map((item) => {
+                            const archiveReady = Boolean(item.archive?.exists);
+                            const isDownloading = packageDownloadId === item.id;
+                            return (
+                                <Paper
+                                    key={item.id}
+                                    elevation={0}
+                                    sx={{
+                                        p: 2,
+                                        borderRadius: 1.5,
+                                        border: `1px solid ${theme.palette.divider}`,
+                                        bgcolor: theme.palette.background.paper,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 2,
+                                        transition: 'all 0.2s ease-in-out',
+                                        '&:hover': {
+                                            borderColor: theme.palette.secondary.main,
+                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+                                        }
+                                    }}
+                                >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
+                                        <Box
+                                            sx={{
+                                                width: 36,
+                                                height: 36,
+                                                borderRadius: 1,
+                                                display: 'grid',
+                                                placeItems: 'center',
+                                                color: theme.palette.secondary.main,
+                                                bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            <Storage sx={{ fontSize: 18 }} />
+                                        </Box>
+                                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {item.title}
+                                            </Typography>
+                                            {archiveReady && item.archive?.size && (
+                                                <Tooltip title={getArchiveTooltip(item.archive)} arrow>
+                                                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'inline-block', mt: 0.3, fontSize: '0.72rem', cursor: 'help' }}>
+                                                        {fmtSize(item.archive.size)}
+                                                    </Typography>
+                                                </Tooltip>
+                                            )}
+                                        </Box>
+                                    </Box>
+
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        color="secondary"
+                                        disabled={isDownloading || !archiveReady}
+                                        onClick={() => { void downloadPackage(item.id); }}
+                                        sx={{
+                                            textTransform: 'none',
+                                            boxShadow: 'none',
+                                            borderRadius: 1,
+                                            px: 1.5,
+                                            py: 0.4,
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                            flexShrink: 0,
+                                            '&:hover': {
+                                                boxShadow: 'none',
+                                                bgcolor: theme.palette.secondary.dark,
+                                            }
+                                        }}
+                                    >
+                                        {isDownloading ? (
+                                            'Downloading...'
+                                        ) : (
+                                            <>
+                                                <Download sx={{ fontSize: 13, mr: 0.4 }} />
+                                                Download
+                                            </>
+                                        )}
+                                    </Button>
+                                </Paper>
+                            );
+                        })}
+                    </Box>
+                </Box>
+            )}
         </Box>
     );
 }
+

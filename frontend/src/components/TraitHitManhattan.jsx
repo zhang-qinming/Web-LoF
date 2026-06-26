@@ -1,4 +1,4 @@
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Plot, { Plotly } from '../lib/plotly';
 import Alert from '@mui/material/Alert';
@@ -6,11 +6,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import ListItemText from '@mui/material/ListItemText';
@@ -22,7 +17,10 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { alpha, useTheme } from '@mui/material/styles';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import { useTheme } from '@mui/material/styles';
+import Download from '@mui/icons-material/Download';
 import Insights from '@mui/icons-material/Insights';
 import Place from '@mui/icons-material/Place';
 import Refresh from '@mui/icons-material/Refresh';
@@ -34,8 +32,10 @@ import { getTraitManhattanHits } from '../api/gwas';
 import { UpdatingStatus } from './PageScaffold';
 import TraitHitManhattanLegend from './TraitHitManhattanLegend';
 import TraitHitManhattanTable from './TraitHitManhattanTable';
+import ExportPlotDialog from './ExportPlotDialog';
+import FigureLoadingPanel from './FigureLoadingPanel';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
-import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
@@ -47,11 +47,9 @@ import {
     chartLayoutTokens,
     compactToggleGroupSx,
     metricChipTone,
-    plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
     RESPONSIVE_TALL_PLOT_HEIGHT,
     summaryChipSx,
-    toolbarSx,
 } from '../themeUtils';
 
 const UNASSIGNED_COLOR = '#6f7d90';
@@ -192,7 +190,6 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const theme = useTheme();
     const { mutate } = useSWRConfig();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
-    const toolbarStyles = useMemo(() => toolbarSx(theme), [theme]);
     const compactToggleStyles = useMemo(() => compactToggleGroupSx(theme), [theme]);
     const baseChipSx = useCallback((tone = 'neutral', overrides = {}) => (
         summaryChipSx(theme, {
@@ -205,16 +202,17 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const tableRowRefs = useRef({});
     const plotRef = useRef(null);
     const tableSectionRef = useRef(null);
+    const pendingHighlightScrollRef = useRef(null);
+    const sortedRowsRef = useRef(EMPTY_MANHATTAN_ROWS);
+    const tablePageRef = useRef(0);
+    const tableRowsPerPageRef = useRef(25);
     const prefetchedFullKeysRef = useRef(new Set());
     const exportBaseName = useMemo(() => sanitizeFileNamePart(fileId || gwasId || 'trait'), [fileId, gwasId]);
 
     const [variant, setVariant] = useState('hits');
-    const [programOnly, setProgramOnly] = useState(false);
-    const [selectedGenesets, setSelectedGenesets] = useState([]);
-    const [distanceMode, setDistanceMode] = useState('all');
     const [selectedChromosomes, setSelectedChromosomes] = useState([]);
-    const [geneQuery, setGeneQuery] = useState('');
-    const [selectedPrograms, setSelectedPrograms] = useState([]);
+    const [draftChromosomes, setDraftChromosomes] = useState([]);
+    const [chromosomeMenuOpen, setChromosomeMenuOpen] = useState(false);
     const [highlight, setHighlight] = useState({ rowKey: '', key: 0 });
     const [sortBy, setSortBy] = useState('logp');
     const [sortDir, setSortDir] = useState('desc');
@@ -228,7 +226,6 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     const [tablePage, setTablePage] = useState(0);
     const [tableRowsPerPage, setTableRowsPerPage] = useState(25);
     const [retryKey, setRetryKey] = useState(0);
-    const deferredGeneQuery = useDeferredValue(geneQuery);
     const manhattanKey = useMemo(
         () => buildManhattanCacheKey(fileId, gwasId, variant, retryKey),
         [fileId, gwasId, retryKey, variant],
@@ -322,69 +319,40 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }, [error, fileId, gwasId, loading, mutate, payload, rawRows.length, resolvedVariant, retryKey, variant]);
 
     const filterOptions = useMemo(() => {
-        const genesetSet = new Set();
-        const programSet = new Set();
         const chromosomeSet = new Set();
 
         rows.forEach((item) => {
-            item.genesets.forEach((geneset) => {
-                if (geneset) genesetSet.add(geneset);
-            });
-            item.programs.forEach((program) => {
-                if (program) programSet.add(program);
-            });
             const chromosome = normalizeChromosome(item.chr);
             if (chromosome) chromosomeSet.add(chromosome);
         });
 
         return {
-            genesets: [...genesetSet].sort((a, b) => a.localeCompare(b)),
-            programs: [...programSet].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })),
             chromosomes: CHROM_ORDER.filter((chromosome) => chromosomeSet.has(chromosome)),
         };
     }, [rows]);
-    const genesetOptions = filterOptions.genesets;
     const chromosomeOptions = filterOptions.chromosomes;
-    const programOptions = filterOptions.programs;
 
     const selectedChromosomeSet = useMemo(() => new Set(selectedChromosomes), [selectedChromosomes]);
-    const selectedProgramSet = useMemo(() => new Set(selectedPrograms), [selectedPrograms]);
-    const selectedGenesetSet = useMemo(() => new Set(selectedGenesets), [selectedGenesets]);
-    const normalizedGeneQuery = useMemo(() => deferredGeneQuery.trim().toLowerCase(), [deferredGeneQuery]);
+
+    const handleChromosomeMenuOpen = useCallback(() => {
+        setDraftChromosomes(selectedChromosomes);
+        setChromosomeMenuOpen(true);
+    }, [selectedChromosomes]);
+
+    const handleChromosomeMenuClose = useCallback(() => {
+        setChromosomeMenuOpen(false);
+        setSelectedChromosomes(draftChromosomes);
+    }, [draftChromosomes]);
 
     const filteredRows = useMemo(() => {
         let nextRows = rows;
-
-        if (programOnly) {
-            nextRows = nextRows.filter((item) => item.hasProgram);
-        }
 
         if (selectedChromosomeSet.size > 0) {
             nextRows = nextRows.filter((item) => selectedChromosomeSet.has(normalizeChromosome(item.chr)));
         }
 
-        if (selectedProgramSet.size > 0) {
-            nextRows = nextRows.filter((item) => item.programs.some((program) => selectedProgramSet.has(program)));
-        }
-
-        if (selectedGenesetSet.size > 0) {
-            nextRows = nextRows.filter((item) => item.genesets.some((geneset) => selectedGenesetSet.has(geneset)));
-        }
-
-        if (distanceMode !== 'all') {
-            nextRows = nextRows.filter((item) => item.distanceBucket === distanceMode);
-        }
-
-        if (normalizedGeneQuery) {
-            nextRows = nextRows.filter((item) => {
-                const gene = String(item.nearestGene || '').toLowerCase();
-                const snp = String(item.snp || '').toLowerCase();
-                return gene.includes(normalizedGeneQuery) || snp.includes(normalizedGeneQuery);
-            });
-        }
-
         return nextRows;
-    }, [distanceMode, normalizedGeneQuery, programOnly, rows, selectedChromosomeSet, selectedGenesetSet, selectedProgramSet]);
+    }, [rows, selectedChromosomeSet]);
 
     const chromosomeRanges = useMemo(() => {
         const present = new Set();
@@ -607,37 +575,44 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
 
         const items = [];
         if (variantLabel === 'full' && (backgroundCounts[0] > 0 || backgroundCounts[1] > 0)) {
+            const count = backgroundCounts[0] + backgroundCounts[1];
             items.push({
                 key: '__below_threshold__',
                 label: 'below threshold',
-                count: backgroundCounts[0] + backgroundCounts[1],
+                count,
                 color: FULL_BACKGROUND_CHROM_COLORS[0],
                 colors: FULL_BACKGROUND_CHROM_COLORS,
+                tooltip: `Below 5e-8 threshold: ${count.toLocaleString()} loci in the current view.`,
             });
         }
 
         if (counts.has('__unassigned__')) {
+            const count = counts.get('__unassigned__');
             items.push({
                 key: '__unassigned__',
                 label: 'others',
-                count: counts.get('__unassigned__'),
+                count,
                 color: UNASSIGNED_COLOR,
+                tooltip: `${count.toLocaleString()} visible loci without ${colorMode === 'geneset' ? 'geneset' : 'program'} annotation.`,
             });
         }
 
         [...colorMap.entries()]
             .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }))
             .forEach(([category, color]) => {
+                const count = counts.get(category) || 0;
+                const categoryType = colorMode === 'geneset' ? 'Geneset' : 'Program';
                 items.push({
                     key: category,
                     label: category,
-                    count: counts.get(category) || 0,
+                    count,
                     color,
+                    tooltip: `${categoryType} ${category} includes ${count.toLocaleString()} visible loci.`,
                 });
             });
 
         return items;
-    }, [chromosomeIndexMap, colorField, colorMap, processedRows, variantLabel]);
+    }, [chromosomeIndexMap, colorField, colorMap, colorMode, processedRows, variantLabel]);
 
     const highlightedPoint = useMemo(() => {
         if (!highlight.rowKey) return [];
@@ -752,24 +727,16 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }), [highlight.key, processedRows.length, variantLabel]);
 
     const handleResetFilters = () => {
-        setProgramOnly(false);
-        setSelectedGenesets([]);
-        setDistanceMode('all');
         setSelectedChromosomes([]);
-        setSelectedPrograms([]);
-        setGeneQuery('');
+        setDraftChromosomes([]);
         setHighlight({ rowKey: '', key: 0 });
     };
 
     const handleVariantChange = (_, value) => {
         if (!value || value === variantControlValue) return;
         setVariant(value);
-        setProgramOnly(false);
-        setSelectedGenesets([]);
-        setDistanceMode('all');
         setSelectedChromosomes([]);
-        setSelectedPrograms([]);
-        setGeneQuery('');
+        setDraftChromosomes([]);
         setHighlight({ rowKey: '', key: 0 });
         setTablePage(0);
     };
@@ -780,13 +747,14 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             return;
         }
         setSortBy(column);
-        setSortDir(['snp', 'nearestGene', 'normalizedChr', 'primaryProgram', 'primaryGeneset'].includes(column) ? 'asc' : 'desc');
+        setSortDir(['snp', 'nearestGene', 'normalizedChr', 'program', 'geneset', 'primaryProgram', 'primaryGeneset'].includes(column) ? 'asc' : 'desc');
     };
 
     const collator = useMemo(() => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), []);
+    const tableDataKey = `${serializeCacheKey(manhattanKey)}:${processedRows.length}`;
     const tableDataReady = useIdleRenderGate(
-        dataReady && processedRows.length > 0 && tableOpen,
-        `${serializeCacheKey(manhattanKey)}:${processedRows.length}:${sortBy}:${sortDir}`,
+        dataReady && processedRows.length > 0,
+        tableDataKey,
         {
             delay: processedRows.length > 1000 ? 520 : 180,
             timeout: 1800,
@@ -797,7 +765,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         if (!tableDataReady) return EMPTY_MANHATTAN_ROWS;
         const dir = sortDir === 'asc' ? 1 : -1;
         return [...processedRows].sort((a, b) => {
-            if (['snp', 'nearestGene', 'normalizedChr', 'primaryProgram', 'primaryGeneset'].includes(sortBy)) {
+            if (['snp', 'nearestGene', 'normalizedChr', 'program', 'geneset', 'primaryProgram', 'primaryGeneset'].includes(sortBy)) {
                 return collator.compare(String(a[sortBy] || ''), String(b[sortBy] || '')) * dir;
             }
             const av = a[sortBy] ?? -Infinity;
@@ -811,11 +779,19 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         const start = tablePage * tableRowsPerPage;
         return sortedRows.slice(start, start + tableRowsPerPage);
     }, [sortedRows, tablePage, tableRowsPerPage]);
-    const shouldRenderTable = useIdleRenderGate(
-        !loading && !error && dataReady && processedRows.length > 0,
-        `${manhattanKey || 'trait-manhattan-empty'}:${processedRows.length}:${sortedRows.length}`,
-        { delay: 220, timeout: 900 },
-    );
+    const shouldRenderTable = !loading && !error && dataReady && tableDataReady && processedRows.length > 0;
+
+    useEffect(() => {
+        sortedRowsRef.current = sortedRows;
+    }, [sortedRows]);
+
+    useEffect(() => {
+        tablePageRef.current = tablePage;
+    }, [tablePage]);
+
+    useEffect(() => {
+        tableRowsPerPageRef.current = tableRowsPerPage;
+    }, [tableRowsPerPage]);
 
     useEffect(() => {
         const maxPage = Math.max(0, Math.ceil(sortedRows.length / tableRowsPerPage) - 1);
@@ -825,24 +801,34 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }, [sortedRows.length, tablePage, tableRowsPerPage]);
 
     useEffect(() => {
-        if (!highlight.rowKey || !tableOpen) return undefined;
-        const rowIndex = sortedRows.findIndex((item) => item.rowKey === highlight.rowKey);
-        if (rowIndex < 0) return;
-
-        const nextPage = Math.floor(rowIndex / tableRowsPerPage);
-        if (nextPage !== tablePage) {
-            setTablePage(nextPage);
+        if (!highlight.rowKey || !tableOpen) {
+            pendingHighlightScrollRef.current = null;
             return undefined;
         }
 
+        const rowIndex = sortedRowsRef.current.findIndex((item) => item.rowKey === highlight.rowKey);
+        if (rowIndex < 0) {
+            pendingHighlightScrollRef.current = null;
+            return undefined;
+        }
+
+        const nextPage = Math.floor(rowIndex / tableRowsPerPageRef.current);
+        pendingHighlightScrollRef.current = { rowKey: highlight.rowKey, key: highlight.key };
+        if (nextPage !== tablePageRef.current) {
+            setTablePage(nextPage);
+        }
+
         const timeoutId = window.setTimeout(() => {
+            const pending = pendingHighlightScrollRef.current;
+            if (!pending || pending.rowKey !== highlight.rowKey || pending.key !== highlight.key) return;
             scrollElementNearViewportCenter(tableSectionRef.current, { viewportOffset: 0.08 });
             const el = tableRowRefs.current[highlight.rowKey];
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 180);
+            if (el) scrollElementIntoNearestView(el);
+            pendingHighlightScrollRef.current = null;
+        }, nextPage === tablePageRef.current ? 180 : 260);
 
         return () => window.clearTimeout(timeoutId);
-    }, [highlight, sortedRows, tableOpen, tablePage, tableRowsPerPage]);
+    }, [highlight.key, highlight.rowKey, tableOpen]);
 
     const handleExport = useCallback(() => {
         const gd = plotRef.current;
@@ -881,194 +867,213 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }), []);
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={toolbarStyles}>
-                <Box sx={{ minWidth: 220, mr: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
-                        Trait Manhattan
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* CARD 1: Filters & Options */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <Box sx={{ px: 2.5, py: 1.5, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                        Manhattan Loci Filters
                     </Typography>
-                    <Typography sx={{ fontSize: '1.02rem', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.25 }}>
-                        {variantLabel === 'full' ? 'All GWAS Loci Overview' : 'GWAS Hit Loci Overview'}
-                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                        <Button 
+                            variant="text" 
+                            size="small"
+                            startIcon={<RestartAlt />} 
+                            onClick={handleResetFilters} 
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, fontSize: '0.78rem' }}
+                        >
+                            Reset
+                        </Button>
+                        <Button 
+                            variant="text" 
+                            size="small"
+                            startIcon={<Download />} 
+                            onClick={downloadCSV} 
+                            disabled={!processedRows.length} 
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, fontSize: '0.78rem' }}
+                        >
+                            CSV
+                        </Button>
+                    </Stack>
                 </Box>
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5, alignItems: 'center' }}>
+                        {/* Locus data selection */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Data Type:
+                            </Typography>
+                            <ToggleButtonGroup
+                                exclusive
+                                size="small"
+                                value={variantControlValue}
+                                onChange={handleVariantChange}
+                                sx={compactToggleStyles}
+                            >
+                                <ToggleButton value="hits">Hits TSV</ToggleButton>
+                                <ToggleButton value="full" disabled={Boolean(payload) && !payload?.availableVariants?.full}>Full TSV</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
 
-                <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    value={variantControlValue}
-                    onChange={handleVariantChange}
-                    sx={compactToggleStyles}
-                >
-                    <ToggleButton value="hits">Hits TSV</ToggleButton>
-                    <ToggleButton value="full" disabled={Boolean(payload) && !payload?.availableVariants?.full}>Full TSV</ToggleButton>
-                </ToggleButtonGroup>
+                        {/* Color mode */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Color Mode:
+                            </Typography>
+                            <ToggleButtonGroup
+                                exclusive
+                                size="small"
+                                value={colorMode}
+                                onChange={(_, value) => { if (value) setColorMode(value); }}
+                                sx={compactToggleStyles}
+                            >
+                                <ToggleButton value="program">Program</ToggleButton>
+                                <ToggleButton value="geneset">Geneset</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
 
-                <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    value={colorMode}
-                    onChange={(_, value) => { if (value) setColorMode(value); }}
-                    sx={compactToggleStyles}
-                >
-                    <ToggleButton value="program">Program</ToggleButton>
-                    <ToggleButton value="geneset">Geneset</ToggleButton>
-                </ToggleButtonGroup>
+                        {/* Chromosome selection */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Chromosome:
+                            </Typography>
+                            <FormControl size="small" sx={{ minWidth: 160 }}>
+                                <InputLabel id="chromosome-select-label">All Chromosomes</InputLabel>
+                                <Select
+                                    labelId="chromosome-select-label"
+                                    multiple
+                                    open={chromosomeMenuOpen}
+                                    onOpen={handleChromosomeMenuOpen}
+                                    onClose={handleChromosomeMenuClose}
+                                    value={draftChromosomes}
+                                    onChange={(event) => setDraftChromosomes(event.target.value)}
+                                    input={<OutlinedInput label="All Chromosomes" />}
+                                    renderValue={() => selectedChromosomes.length ? (selectedChromosomes.length <= 2 ? selectedChromosomes.join(', ') : `${selectedChromosomes.length} selected`) : 'All'}
+                                    MenuProps={{
+                                        PaperProps: {
+                                            sx: {
+                                                maxHeight: 380,
+                                                width: 380,
+                                                mt: 0.5,
+                                                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                                                border: '1px solid',
+                                                borderColor: 'divider',
+                                            },
+                                        },
+                                        MenuListProps: {
+                                            sx: {
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(4, 1fr)',
+                                                gap: 0.5,
+                                                p: 1,
+                                            },
+                                        },
+                                    }}
+                                >
+                                    {chromosomeOptions.map((chromosome) => (
+                                        <MenuItem
+                                            key={chromosome}
+                                            value={chromosome}
+                                            sx={{
+                                                px: 1,
+                                                py: 0.5,
+                                                borderRadius: 1,
+                                                fontSize: '0.8rem',
+                                                justifyContent: 'flex-start',
+                                                gap: 0.5,
+                                            }}
+                                        >
+                                            <Checkbox
+                                                checked={draftChromosomes.includes(chromosome)}
+                                                size="small"
+                                                sx={{ p: 0.2 }}
+                                            />
+                                            <ListItemText
+                                                primary={`Chr ${chromosome}`}
+                                                primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 500 }}
+                                                sx={{ m: 0 }}
+                                            />
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Stack>
+                    </Box>
 
-                <Chip
-                    icon={<ScatterPlot sx={{ fontSize: 15 }} />}
-                    label={`${summary.totalRows.toLocaleString()} ${isTruncated ? 'loaded' : (variantLabel === 'full' ? 'loci' : 'hits')}`}
-                    size="small"
-                    sx={baseChipSx('neutral')}
-                />
-                <Chip
-                    icon={<Insights sx={{ fontSize: 15 }} />}
-                    label={`${summary.withProgram.toLocaleString()} program`}
-                    size="small"
-                    sx={baseChipSx('primary')}
-                />
-                <Chip
-                    icon={<Timeline sx={{ fontSize: 15 }} />}
-                    label={`${summary.withGeneset.toLocaleString()} geneset`}
-                    size="small"
-                    sx={baseChipSx('accent')}
-                />
-                <Chip
-                    icon={<Place sx={{ fontSize: 15 }} />}
-                    label={`${summary.distanceBuckets.in_gene.toLocaleString()} in-gene`}
-                    size="small"
-                    sx={baseChipSx('success')}
-                />
-                <UpdatingStatus active={isRefreshing} />
-            </Box>
+                    {isTruncated && (
+                        <Alert severity="warning" sx={{ mt: 2, py: 0, px: 2, fontSize: '0.74rem' }}>
+                            The backend marked this TSV response as truncated.
+                        </Alert>
+                    )}
 
-            <Box sx={toolbarStyles}>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel id="chromosome-select-label">Chromosome</InputLabel>
-                    <Select
-                        labelId="chromosome-select-label"
-                        multiple
-                        value={selectedChromosomes}
-                        onChange={(event) => setSelectedChromosomes(event.target.value)}
-                        input={<OutlinedInput label="Chromosome" />}
-                        renderValue={(selected) => selected.length ? selected.join(', ') : 'Chromosome'}
-                    >
-                        {chromosomeOptions.map((chromosome) => (
-                            <MenuItem key={chromosome} value={chromosome}>
-                                <Checkbox checked={selectedChromosomes.includes(chromosome)} />
-                                <ListItemText primary={`Chr ${chromosome}`} />
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+                </CardContent>
+            </Card>
 
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                    <InputLabel id="program-select-label">Program filter</InputLabel>
-                    <Select
-                        labelId="program-select-label"
-                        multiple
-                        value={selectedPrograms}
-                        onChange={(event) => setSelectedPrograms(event.target.value)}
-                        input={<OutlinedInput label="Program filter" />}
-                        renderValue={(selected) => selected.length ? `${selected.length} programs selected` : 'Program filter'}
-                    >
-                        {programOptions.map((program) => (
-                            <MenuItem key={program} value={program}>
-                                <Checkbox checked={selectedPrograms.includes(program)} />
-                                <ListItemText primary={program} />
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-
-                <FormControl size="small" sx={{ minWidth: 250 }}>
-                    <InputLabel id="geneset-select-label">Geneset filter</InputLabel>
-                    <Select
-                        labelId="geneset-select-label"
-                        multiple
-                        value={selectedGenesets}
-                        onChange={(event) => setSelectedGenesets(event.target.value)}
-                        input={<OutlinedInput label="Geneset filter" />}
-                        renderValue={(selected) => selected.length ? `${selected.length} genesets selected` : 'Geneset filter'}
-                    >
-                        {genesetOptions.map((geneset) => (
-                            <MenuItem key={geneset} value={geneset}>
-                                <Checkbox checked={selectedGenesets.includes(geneset)} />
-                                <ListItemText primary={geneset} />
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-
-                <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <InputLabel id="distance-mode-label">distance_to_gene</InputLabel>
-                    <Select
-                        labelId="distance-mode-label"
-                        value={distanceMode}
-                        label="distance_to_gene"
-                        onChange={(event) => setDistanceMode(event.target.value)}
-                    >
-                        <MenuItem value="all">All distances</MenuItem>
-                        <MenuItem value="in_gene">In gene</MenuItem>
-                        <MenuItem value="near">Near gene</MenuItem>
-                        <MenuItem value="moderate">Moderate distance</MenuItem>
-                        <MenuItem value="distal">Distal</MenuItem>
-                    </Select>
-                </FormControl>
-
-                <TextField
-                    size="small"
-                    label="Gene / rsID"
-                    value={geneQuery}
-                    onChange={(event) => setGeneQuery(event.target.value)}
-                    placeholder="e.g. rs11902841"
-                    sx={{ width: 190 }}
-                />
-
-                <Box sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    px: 1.1,
-                    py: 0.55,
-                    borderRadius: 1,
-                    border: `1px solid ${programOnly ? alpha(theme.palette.primary.main, 0.28) : theme.custom.border.strong}`,
-                    bgcolor: programOnly ? alpha(theme.palette.primary.main, 0.08) : theme.palette.background.paper,
-                    transition: `background-color ${theme.custom.motion.swift}, border-color ${theme.custom.motion.swift}`,
-                }}>
-                    <Checkbox checked={programOnly} onChange={(event) => setProgramOnly(event.target.checked)} sx={{ p: 0.3, mr: 0.4 }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.text.primary }}>
-                        Program only
-                    </Typography>
+            {/* CARD 2: Interactive Plot */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <Box sx={{ px: 2.5, py: 1.2, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                    <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" alignItems="center">
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            Interactive Manhattan Plot
+                        </Typography>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', mr: 0.5, fontSize: '0.74rem' }}>
+                                Summary Stats:
+                            </Typography>
+                            <Chip
+                                icon={<ScatterPlot sx={{ fontSize: '14px !important' }} />}
+                                label={`${summary.totalRows.toLocaleString()} ${isTruncated ? 'loaded' : (variantLabel === 'full' ? 'loci' : 'hits')}`}
+                                size="small"
+                                sx={baseChipSx('neutral')}
+                            />
+                            <Chip
+                                icon={<Insights sx={{ fontSize: '14px !important' }} />}
+                                label={`${summary.withProgram.toLocaleString()} program`}
+                                size="small"
+                                sx={baseChipSx('primary')}
+                            />
+                            <Chip
+                                icon={<Timeline sx={{ fontSize: '14px !important' }} />}
+                                label={`${summary.withGeneset.toLocaleString()} geneset`}
+                                size="small"
+                                sx={baseChipSx('accent')}
+                            />
+                            <Chip
+                                icon={<Place sx={{ fontSize: '14px !important' }} />}
+                                label={`${summary.distanceBuckets.in_gene.toLocaleString()} in-gene`}
+                                size="small"
+                                sx={baseChipSx('success')}
+                            />
+                        </Stack>
+                    </Stack>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <UpdatingStatus active={isRefreshing} />
+                        {afterFirstPaint && !loading && !error && processedRows.length > 0 && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Download />}
+                                onClick={() => setExportOpen(true)}
+                                sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                                Export Image
+                            </Button>
+                        )}
+                    </Box>
                 </Box>
-
-                <Button variant="text" startIcon={<RestartAlt />} onClick={handleResetFilters} sx={{ color: theme.palette.text.secondary, minHeight: 38 }}>
-                    Reset filters
-                </Button>
-
-                <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    <strong>distance_to_gene:</strong> 0 = in gene body; hundreds or thousands bp = near; 10000+ bp = distal.
-                </Typography>
-                {isTruncated && (
-                    <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.warning.dark, lineHeight: 1.4 }}>
-                        The backend marked this TSV response as truncated.
-                    </Typography>
-                )}
-            </Box>
-
-            <Box sx={plotFrameSx(theme, { position: 'relative' })}>
-                <Box sx={{ p: 0, position: 'relative' }}>
+                <CardContent sx={{ p: 0, position: 'relative' }}>
                     {loading && (
-                        <Box sx={{ minHeight: MANHATTAN_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    Loading Manhattan data from GWAS TSV...
-                                </Typography>
-                            </Box>
-                        </Box>
+                        <FigureLoadingPanel
+                            minHeight={MANHATTAN_PLOT_HEIGHT}
+                            message="Loading Manhattan data from GWAS TSV..."
+                        />
                     )}
 
                     {!loading && !error && isPreparingData && (
-                        <Box aria-hidden="true" sx={{ minHeight: MANHATTAN_PLOT_HEIGHT }} />
+                        <FigureLoadingPanel
+                            minHeight={MANHATTAN_PLOT_HEIGHT}
+                            message="Preparing Manhattan loci for rendering..."
+                        />
                     )}
 
                     {!loading && error && (
@@ -1111,11 +1116,14 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                     )}
 
                     {!loading && !error && processedRows.length > 0 && !afterFirstPaint && (
-                        <Box sx={{ minHeight: MANHATTAN_PLOT_HEIGHT }} />
+                        <FigureLoadingPanel
+                            minHeight={MANHATTAN_PLOT_HEIGHT}
+                            message="Rendering Manhattan plot..."
+                        />
                     )}
 
                     {!loading && !error && processedRows.length > 0 && afterFirstPaint && (
-                            <Box sx={{ position: 'relative', minHeight: MANHATTAN_PLOT_HEIGHT }}>
+                        <Box sx={{ position: 'relative', minHeight: MANHATTAN_PLOT_HEIGHT }}>
                             <Plot
                                 data={[...plotData, ...highlightedPoint]}
                                 layout={layout}
@@ -1146,8 +1154,8 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                             />
                         </Box>
                     )}
-                </Box>
-            </Box>
+                </CardContent>
+            </Card>
             {shouldRenderTable && (
                 <TraitHitManhattanTable
                     tableSectionRef={tableSectionRef}
@@ -1176,29 +1184,17 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                 />
             )}
 
-            <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
-                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>
-                <DialogContent sx={{ pt: 1 }}>
-                    <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-                        <TextField label="Width" type="number" size="small" value={exportWidth} onChange={(event) => setExportWidth(event.target.value)} />
-                        <TextField label="Height" type="number" size="small" value={exportHeight} onChange={(event) => setExportHeight(event.target.value)} />
-                    </Stack>
-                    <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={exportFmt}
-                        onChange={(_, v) => { if (v) setExportFmt(v); }}
-                        sx={compactToggleStyles}
-                    >
-                        <ToggleButton value="svg">SVG</ToggleButton>
-                        <ToggleButton value="png">PNG</ToggleButton>
-                    </ToggleButtonGroup>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setExportOpen(false)}>Cancel</Button>
-                    <Button variant="contained" onClick={() => { handleExport(); setExportOpen(false); }}>Export</Button>
-                </DialogActions>
-            </Dialog>
+            <ExportPlotDialog
+                open={exportOpen}
+                onClose={() => setExportOpen(false)}
+                width={exportWidth}
+                onWidthChange={setExportWidth}
+                height={exportHeight}
+                onHeightChange={setExportHeight}
+                format={exportFmt}
+                onFormatChange={setExportFmt}
+                onExport={handleExport}
+            />
         </Box>
     );
 }

@@ -14,8 +14,6 @@ import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
@@ -24,11 +22,11 @@ import OpenInNew from '@mui/icons-material/OpenInNew';
 import useSWR from 'swr';
 import { getProgramTraits } from '../api/gwas';
 import { StatePanel, UpdatingStatus } from './PageScaffold';
+import TableSearchField from './TableSearchField';
 import { downloadBlob } from '../utils/download';
 import { detailSummarySWRConfig } from '../utils/swrOptions';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import {
-    compactToggleGroupSx,
     groupedTableColumnHeaderCellSx,
     metricChipTone,
     panelSx,
@@ -36,6 +34,8 @@ import {
     stickyTableContainerSx,
     stickyTableSx,
     summaryChipSx,
+    tableToolbarActionButtonSx,
+    tableToolbarGroupSx,
     tableRowRevealSx,
     tableTone,
 } from '../themeUtils';
@@ -141,6 +141,22 @@ function compareProgramTraits(a, b, sortBy, sortDir) {
     return sortDir === 'desc' ? -result : result;
 }
 
+function matchesProgramTraitRow(row, query) {
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    if (!normalizedQuery) return true;
+
+    return [
+        row?.traitName,
+        row?.traitId,
+        selectionLabel(row),
+        row?.programScore,
+        row?.regulatorScore,
+        row?.loadingGeneCount,
+        row?.regulatorGeneCount,
+        ...(row?.topGenes || []),
+    ].some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
+}
+
 function buildProgramTraitCsv(rows) {
     const header = [
         'Trait',
@@ -224,9 +240,9 @@ export default function ProgramAssociatedTraits({
     };
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(DEFAULT_ROWS_PER_PAGE);
-    const [filter, setFilter] = React.useState('all');
     const [sortBy, setSortBy] = React.useState('programScore');
     const [sortDir, setSortDir] = React.useState('desc');
+    const [searchQuery, setSearchQuery] = React.useState('');
     const traitKey = programId ? ['program-traits', programId] : null;
     const traitResource = useCachedResourceState(
         useSWR(
@@ -244,7 +260,11 @@ export default function ProgramAssociatedTraits({
 
     React.useEffect(() => {
         setPage(0);
-    }, [filter, sortBy, sortDir]);
+    }, [sortBy, sortDir]);
+
+    React.useEffect(() => {
+        setPage(0);
+    }, [searchQuery]);
 
     const handleSort = React.useCallback((key) => {
         if (sortBy === key) {
@@ -272,12 +292,7 @@ export default function ProgramAssociatedTraits({
     }
 
     const traits = data?.traits || [];
-    const filteredTraits = traits.filter((trait) => {
-        if (filter === 'program') return trait.selectedByProgram;
-        if (filter === 'regulator') return trait.selectedByRegulator;
-        if (filter === 'both') return trait.selectedByProgram && trait.selectedByRegulator;
-        return true;
-    });
+    const filteredTraits = traits.filter((row) => matchesProgramTraitRow(row, searchQuery));
     const sortedTraits = [...filteredTraits].sort((a, b) => compareProgramTraits(a, b, sortBy, sortDir));
 
     const handleDownload = () => {
@@ -320,30 +335,26 @@ export default function ProgramAssociatedTraits({
                                             Associated Traits
                                         </Typography>
                                     </Box>
-                                    <Stack direction="row" spacing={0.8} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                                    <Box sx={tableToolbarGroupSx(theme, { width: { xs: '100%', md: 'auto' } })}>
                                         <UpdatingStatus active={isRefreshing} />
-                                        <ToggleButtonGroup
-                                            size="small"
-                                            exclusive
-                                            value={filter}
-                                            onChange={(event, value) => value && setFilter(value)}
-                                            sx={compactToggleGroupSx(theme)}
-                                        >
-                                            <ToggleButton value="all">All</ToggleButton>
-                                            <ToggleButton value="program">Program</ToggleButton>
-                                            <ToggleButton value="regulator">Regulator</ToggleButton>
-                                            <ToggleButton value="both">Both</ToggleButton>
-                                        </ToggleButtonGroup>
+                                        <TableSearchField
+                                            label="Search"
+                                            value={searchQuery}
+                                            placeholder="Trait, gene, relationship"
+                                            onChange={setSearchQuery}
+                                            onClear={() => setSearchQuery('')}
+                                            width={{ xs: '100%', sm: 260 }}
+                                        />
                                         <Button
                                             size="small"
                                             startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
                                             onClick={handleDownload}
                                             disabled={!sortedTraits.length}
-                                            sx={{ textTransform: 'none', fontSize: '0.72rem', color: theme.palette.text.secondary }}
+                                            sx={tableToolbarActionButtonSx(theme)}
                                         >
-                                            CSV
+                                            Export CSV
                                         </Button>
-                                    </Stack>
+                                    </Box>
                                 </Stack>
                             </TableCell>
                         </TableRow>
@@ -367,7 +378,22 @@ export default function ProgramAssociatedTraits({
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {visibleTraits.map((row, index) => (
+                        {visibleTraits.length === 0 ? (
+                            <TableRow>
+                                <TableCell
+                                    colSpan={PROGRAM_TRAIT_COLUMNS.length}
+                                    sx={{
+                                        py: 3,
+                                        textAlign: 'center',
+                                        color: theme.palette.text.secondary,
+                                        fontSize: '0.78rem',
+                                        bgcolor: theme.palette.background.paper,
+                                    }}
+                                >
+                                    No matching rows.
+                                </TableCell>
+                            </TableRow>
+                        ) : visibleTraits.map((row, index) => (
                             <TableRow
                                 key={`${row.traitId}-${row.program}`}
                                 hover

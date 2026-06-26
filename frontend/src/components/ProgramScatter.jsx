@@ -4,29 +4,25 @@ import Plot, { Plotly } from '../lib/plotly';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
-import CircularProgress from '@mui/material/CircularProgress';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import ToggleButton from '@mui/material/ToggleButton';
 import Slider from '@mui/material/Slider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
 import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher, getProgramScatterData } from '../api/gwas';
+import ExportPlotDialog from './ExportPlotDialog';
+import FigureLoadingPanel from './FigureLoadingPanel';
 import FloatingLegend from './FloatingLegend';
 import { UpdatingStatus } from './PageScaffold';
 import ProgramScatterTable from './ProgramScatterTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { parseNullableNumber } from '../utils/numbers';
-import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
@@ -363,8 +359,8 @@ export default function ProgramScatter({ fileId }) {
         color: theme.palette.text.secondary,
         fontSize: '0.72rem',
         textTransform: 'none',
-        letterSpacing: '0.08em',
-        fontWeight: 700,
+        letterSpacing: 0,
+        fontWeight: 680,
     }), [theme.palette.text.secondary]);
     const sliderSx = useMemo(() => ({
         color: theme.palette.primary.main,
@@ -545,7 +541,7 @@ export default function ProgramScatter({ fileId }) {
         const timeoutId = window.setTimeout(() => {
             scrollElementNearViewportCenter(tableSectionRef.current, { viewportOffset: 0.08 });
             const el = tableRowRefs.current[highlight.program];
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (el) scrollElementIntoNearestView(el);
         }, 120);
         return () => window.clearTimeout(timeoutId);
     }, [highlight, tableOpen]);
@@ -1057,17 +1053,10 @@ export default function ProgramScatter({ fileId }) {
                     })}
                 >
                     {isLoading && (
-                        <Box sx={{
-                            position: 'absolute',
-                            inset: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            bgcolor: chartTokens.overlay,
-                            zIndex: 10,
-                        }}>
-                            <CircularProgress size={40} />
-                        </Box>
+                        <FigureLoadingPanel
+                            minHeight={PROGRAM_SCATTER_PLOT_HEIGHT}
+                            message="Loading program scatter data..."
+                        />
                     )}
 
                     {!isLoading && rows.length > 0 && !hasVisiblePoints && (
@@ -1079,7 +1068,10 @@ export default function ProgramScatter({ fileId }) {
                     )}
 
                     {hasVisiblePoints && !afterFirstPaint && (
-                        <Box sx={{ minHeight: PROGRAM_SCATTER_PLOT_HEIGHT }} />
+                        <FigureLoadingPanel
+                            minHeight={PROGRAM_SCATTER_PLOT_HEIGHT}
+                            message="Rendering program scatter plot..."
+                        />
                     )}
 
                     {hasVisiblePoints && afterFirstPaint && (
@@ -1118,26 +1110,17 @@ export default function ProgramScatter({ fileId }) {
                 </Paper>
             )}
 
-            <Dialog open={exportOpen} onClose={() => setExportOpen(false)}>
-                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Export Plot</DialogTitle>
-                <DialogContent>
-                    <ToggleButtonGroup value={expFmt} exclusive size="small"
-                        onChange={(e, v) => v && setExpFmt(v)} sx={{ ...compactToggleStyles, mb: 2 }}>
-                        <ToggleButton value="svg">SVG</ToggleButton>
-                        <ToggleButton value="png">PNG</ToggleButton>
-                    </ToggleButtonGroup>
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                        <TextField label="Width" type="number" value={expW}
-                            onChange={e => setExpW(Number(e.target.value))} size="small" />
-                        <TextField label="Height" type="number" value={expH}
-                            onChange={e => setExpH(Number(e.target.value))} size="small" />
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setExportOpen(false)}>Cancel</Button>
-                    <Button variant="contained" onClick={() => { doExport(); setExportOpen(false); }}>Export</Button>
-                </DialogActions>
-            </Dialog>
+            <ExportPlotDialog
+                open={exportOpen}
+                onClose={() => setExportOpen(false)}
+                width={expW}
+                onWidthChange={(value) => setExpW(Number(value))}
+                height={expH}
+                onHeightChange={(value) => setExpH(Number(value))}
+                format={expFmt}
+                onFormatChange={setExpFmt}
+                onExport={doExport}
+            />
 
             {shouldRenderTable && (
                 <ProgramScatterTable

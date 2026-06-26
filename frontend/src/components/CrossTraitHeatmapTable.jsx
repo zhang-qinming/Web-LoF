@@ -11,7 +11,7 @@ import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import Download from '@mui/icons-material/Download';
 import { useNavigate } from 'react-router-dom';
 import {
     panelSx,
@@ -19,6 +19,8 @@ import {
     stickyTableContainerSx,
     stickyTableHeaderCellSx,
     stickyTableSx,
+    tableToolbarActionButtonSx,
+    tableToolbarGroupSx,
     tableRowRevealSx,
     tableTone,
 } from '../themeUtils';
@@ -40,7 +42,7 @@ function buildMatrixCsv(payload) {
     const rows = (payload?.genes || []).map((gene, rowIndex) => [
         gene.gene || '',
         gene.ensg || '',
-        ...(payload?.matrix?.[rowIndex] || []).map((value) => value ?? ''),
+        ...targets.map((_, colIndex) => payload?.matrix?.[rowIndex]?.[colIndex] ?? ''),
     ]);
     return `${[header, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n')}\n`;
 }
@@ -100,25 +102,24 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                             {genes.length.toLocaleString()} genes × {targets.length.toLocaleString()} traits ({cellCount.toLocaleString()} cells). The table is deferred so the plot stays responsive.
                         </Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Box sx={tableToolbarGroupSx(theme)}>
                         <Tooltip title="Download the displayed matrix as CSV">
                             <Button
                                 size="small"
-                                startIcon={<DownloadOutlined />}
+                                startIcon={<Download />}
                                 onClick={() => downloadBlob(
                                     new Blob([buildMatrixCsv(payload)], { type: 'text/csv;charset=utf-8;' }),
                                     `${fileId || 'trait'}-cross-trait-gene-effects.csv`,
                                 )}
-                                sx={{ textTransform: 'none', color: theme.palette.text.secondary }}
+                                sx={tableToolbarActionButtonSx(theme)}
                             >
-                                CSV
+                                Export CSV
                             </Button>
                         </Tooltip>
                         <Button
                             size="small"
-                            variant="outlined"
                             onClick={() => setForceRenderTable(true)}
-                            sx={{ textTransform: 'none' }}
+                            sx={tableToolbarActionButtonSx(theme, 'neutral')}
                         >
                             Render table
                         </Button>
@@ -144,23 +145,22 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                     <Typography sx={sectionTitleSx(theme, { fontSize: '0.9rem' })}>
                         Cross-trait gene effect matrix
                     </Typography>
-                    <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', mt: 0.2 }}>
-                        All {genes.length.toLocaleString()} displayed genes and {targets.length.toLocaleString()} traits.
-                    </Typography>
                 </Box>
-                <Tooltip title="Download the displayed matrix as CSV">
-                    <Button
-                        size="small"
-                        startIcon={<DownloadOutlined />}
-                        onClick={() => downloadBlob(
-                            new Blob([buildMatrixCsv(payload)], { type: 'text/csv;charset=utf-8;' }),
-                            `${fileId || 'trait'}-cross-trait-gene-effects.csv`,
-                        )}
-                        sx={{ textTransform: 'none', color: theme.palette.text.secondary }}
-                    >
-                        CSV
-                    </Button>
-                </Tooltip>
+                <Box sx={tableToolbarGroupSx(theme)}>
+                    <Tooltip title="Download the displayed matrix as CSV">
+                        <Button
+                            size="small"
+                            startIcon={<Download />}
+                            onClick={() => downloadBlob(
+                                new Blob([buildMatrixCsv(payload)], { type: 'text/csv;charset=utf-8;' }),
+                                `${fileId || 'trait'}-cross-trait-gene-effects.csv`,
+                            )}
+                            sx={tableToolbarActionButtonSx(theme)}
+                        >
+                            Export CSV
+                        </Button>
+                    </Tooltip>
+                </Box>
             </Box>
 
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
@@ -180,7 +180,8 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                     <TableHead>
                         <TableRow>
                             <TableCell
-                                sx={stickyTableHeaderCellSx(theme, geneTone, 'left', {
+                                align="center"
+                                sx={stickyTableHeaderCellSx(theme, geneTone, 'center', {
                                     left: 0,
                                     zIndex: '46 !important',
                                     minWidth: GENE_COL_WIDTH,
@@ -189,7 +190,8 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                 Gene
                             </TableCell>
                             <TableCell
-                                sx={stickyTableHeaderCellSx(theme, geneTone, 'left', {
+                                align="center"
+                                sx={stickyTableHeaderCellSx(theme, geneTone, 'center', {
                                     left: GENE_COL_WIDTH,
                                     zIndex: '47 !important',
                                     minWidth: ENSG_COL_WIDTH,
@@ -201,9 +203,9 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                              {targets.map((target) => (
                                  <TableCell
                                      key={target.file_id}
-                                     align="right"
+                                     align="center"
                                      onClick={() => navigate(`/trait/${encodeURIComponent(target.file_id)}`)}
-                                     sx={stickyTableHeaderCellSx(theme, traitTone, 'right', {
+                                     sx={stickyTableHeaderCellSx(theme, traitTone, 'center', {
                                          cursor: 'pointer',
                                          whiteSpace: 'normal',
                                          wordBreak: 'break-word',
@@ -219,9 +221,11 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                      <Typography sx={{ fontSize: '0.68rem', fontWeight: 720, lineHeight: 1.18 }}>
                                          {target.trait_name || target.file_id}
                                      </Typography>
-                                     <Typography sx={{ mt: 0.25, fontSize: '0.6rem', color: theme.palette.text.secondary }}>
-                                         {target.n_sig == null ? target.file_id : `${Number(target.n_sig).toLocaleString()} loci`}
-                                     </Typography>
+                                     {(target.n_sig != null || (target.trait_name && target.file_id && target.trait_name !== target.file_id)) && (
+                                         <Typography sx={{ mt: 0.25, fontSize: '0.6rem', color: theme.palette.text.secondary, textAlign: 'center' }}>
+                                             {target.n_sig == null ? target.file_id : `${Number(target.n_sig).toLocaleString()} loci`}
+                                         </Typography>
+                                     )}
                                  </TableCell>
                              ))}
                         </TableRow>
@@ -229,40 +233,50 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                     <TableBody>
                         {genes.map((gene, rowIndex) => (
                             <TableRow key={`${gene.ensg || gene.gene}-${rowIndex}`} hover sx={tableRowRevealSx(theme, rowIndex)}>
-                                <TableCell sx={{
-                                    position: 'sticky !important',
-                                    left: 0,
-                                    zIndex: '4 !important',
-                                    py: 0.72,
-                                    bgcolor: `${geneTone.cellStrong} !important`,
-                                    borderBottom: `1px solid ${theme.custom.border.soft}`,
-                                    fontSize: '0.74rem',
-                                    fontWeight: 680,
-                                    whiteSpace: 'nowrap',
-                                    minWidth: GENE_COL_WIDTH,
-                                }}>
-                                    {gene.gene || gene.ensg}
+                                <TableCell
+                                    align="center"
+                                    sx={{
+                                        position: 'sticky !important',
+                                        left: 0,
+                                        zIndex: '4 !important',
+                                        py: 0.72,
+                                        bgcolor: `${geneTone.cellStrong} !important`,
+                                        borderBottom: `1px solid ${theme.custom.border.soft}`,
+                                        fontSize: '0.74rem',
+                                        fontWeight: 680,
+                                        whiteSpace: 'nowrap',
+                                        minWidth: GENE_COL_WIDTH,
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    {gene.gene || '-'}
                                 </TableCell>
-                                <TableCell sx={{
-                                    position: 'sticky !important',
-                                    left: GENE_COL_WIDTH,
-                                    zIndex: '5 !important',
-                                    py: 0.72,
-                                    bgcolor: `${geneTone.cellSoft} !important`,
-                                    borderBottom: `1px solid ${theme.custom.border.soft}`,
-                                    fontSize: '0.68rem',
-                                    color: theme.palette.text.secondary,
-                                    whiteSpace: 'nowrap',
-                                    fontVariantNumeric: 'tabular-nums',
-                                    minWidth: ENSG_COL_WIDTH,
-                                    boxShadow: `8px 0 12px -12px ${alpha(theme.palette.common.black, 0.32)}`,
-                                }}>
+                                <TableCell
+                                    align="center"
+                                    sx={{
+                                        position: 'sticky !important',
+                                        left: GENE_COL_WIDTH,
+                                        zIndex: '5 !important',
+                                        py: 0.72,
+                                        bgcolor: `${geneTone.cellSoft} !important`,
+                                        borderBottom: `1px solid ${theme.custom.border.soft}`,
+                                        fontSize: '0.68rem',
+                                        color: theme.palette.text.secondary,
+                                        whiteSpace: 'nowrap',
+                                        fontVariantNumeric: 'tabular-nums',
+                                        minWidth: ENSG_COL_WIDTH,
+                                        boxShadow: `8px 0 12px -12px ${alpha(theme.palette.common.black, 0.32)}`,
+                                        textAlign: 'center',
+                                    }}
+                                >
                                     {gene.ensg || '-'}
                                 </TableCell>
-                                {(payload?.matrix?.[rowIndex] || []).map((value, colIndex) => (
+                                {targets.map((target, colIndex) => {
+                                    const value = payload?.matrix?.[rowIndex]?.[colIndex];
+                                    return (
                                     <TableCell
-                                        key={`${gene.ensg || gene.gene}-${targets[colIndex]?.file_id || colIndex}`}
-                                        align="right"
+                                        key={`${gene.ensg || gene.gene}-${target.file_id || colIndex}`}
+                                        align="center"
                                         sx={{
                                             py: 0.72,
                                             borderBottom: `1px solid ${theme.custom.border.soft}`,
@@ -270,11 +284,13 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                             fontSize: '0.7rem',
                                             fontWeight: 650,
                                             fontVariantNumeric: 'tabular-nums',
+                                            textAlign: 'center',
                                         }}
                                     >
                                         {formatEffect(value)}
                                     </TableCell>
-                                ))}
+                                    );
+                                })}
                             </TableRow>
                         ))}
                     </TableBody>

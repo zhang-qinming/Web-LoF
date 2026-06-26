@@ -22,7 +22,6 @@ import { alpha, useTheme } from '@mui/material/styles';
 import ArrowForward from '@mui/icons-material/ArrowForward';
 import Biotech from '@mui/icons-material/Biotech';
 import Close from '@mui/icons-material/Close';
-import FileDownload from '@mui/icons-material/FileDownload';
 import Hub from '@mui/icons-material/Hub';
 import Search from '@mui/icons-material/Search';
 import TableChart from '@mui/icons-material/TableChart';
@@ -53,18 +52,24 @@ import homeFigureTraitCorrelation from '../assets/home/home-figure-trait-correla
 import homeFigureVariantDetail from '../assets/home/home-figure-variant-detail.svg';
 
 const accent = '#ff6b4a';
-const siteName = 'TraitCircuit';
+const siteName = 'TraitProgram';
 const EMPTY_ENTITY_RESULTS = { traits: [], genes: [], programs: [] };
 const EMPTY_ENTITY_META = { traits: 0, genes: 0, programs: 0 };
 const SEARCH_DEBOUNCE_MS = 220;
 const SEARCH_CACHE_TTL_MS = 90 * 1000;
 const SEARCH_CACHE = createTtlCache({ ttlMs: SEARCH_CACHE_TTL_MS, maxEntries: 80 });
 const FEATURED_TRAIT = {
-    fileId: 'GCST90081631',
-    gwasId: 'PA00638',
-    name: 'Non-cancer illness code, self-reported',
-    nSig: 32357,
+    fileId: 'GCST90083727',
+    name: 'ICD10 E11.9: Type 2 diabetes mellitus without complications',
 };
+const FEATURED_PROGRAM = {
+    id: 'P1',
+    name: 'ATP dependent activity',
+};
+const FEATURED_GENES = [
+    { symbol: 'BRCA1', name: 'BRCA1 DNA repair associated' },
+    { symbol: 'LDLR', name: 'low density lipoprotein receptor' },
+];
 const FIGURE_FOCUS_HASH = 'trait-figure-panel';
 const numberFormatter = new Intl.NumberFormat('en-US');
 const compactNumberFormatter = new Intl.NumberFormat('en-US', {
@@ -73,19 +78,18 @@ const compactNumberFormatter = new Intl.NumberFormat('en-US', {
 });
 
 const quickSearchSeeds = [
-    { label: 'Gene BRCA1', query: 'BRCA1' },
-    { label: 'Gene LDLR', query: 'LDLR' },
-    { label: 'Program P1', query: 'P1' },
-    { label: 'Program function', query: 'ATP dependent activity' },
-    { label: 'Trait GCST', query: 'GCST90081631' },
-    { label: 'Trait PA ID', query: 'PA00638' },
-    { label: 'Trait name', query: 'Non-cancer illness' },
+    { label: `Trait ${FEATURED_TRAIT.fileId}`, query: FEATURED_TRAIT.fileId },
+    { label: FEATURED_TRAIT.name, query: FEATURED_TRAIT.name },
+    { label: `Program ${FEATURED_PROGRAM.id}: ${FEATURED_PROGRAM.name}`, query: FEATURED_PROGRAM.id },
+    { label: FEATURED_PROGRAM.name, query: FEATURED_PROGRAM.name },
+    { label: `Gene ${FEATURED_GENES[0].symbol}: ${FEATURED_GENES[0].name}`, query: FEATURED_GENES[0].symbol },
+    { label: `Gene ${FEATURED_GENES[1].symbol}: ${FEATURED_GENES[1].name}`, query: FEATURED_GENES[1].symbol },
 ];
 
 const searchPlaceholderExamples = [
-    'Search genes: BRCA1, LDLR, or an ENSG ID',
-    'Search programs: P1 or ATP dependent activity',
-    'Search traits: GCST90081631, PA00638, or non-cancer illness',
+    `Search genes: ${FEATURED_GENES[0].symbol} (${FEATURED_GENES[0].name}) or ${FEATURED_GENES[1].symbol} (${FEATURED_GENES[1].name})`,
+    `Search programs: ${FEATURED_PROGRAM.id} (${FEATURED_PROGRAM.name})`,
+    `Search traits: ${FEATURED_TRAIT.fileId} or ${FEATURED_TRAIT.name}`,
 ];
 
 const loadingBarSx = {
@@ -119,111 +123,87 @@ function traitTabPath(tab) {
 const traitFigureCards = [
     {
         title: 'Program Scatter',
-        description: 'Review program and regulator burden scores with highlighted outlier programs.',
+        description: 'Used to prioritize cellular programs and regulators with outlying effect estimates, supporting trait-relevant mechanism discovery.',
         image: homeFigureProgramScatter,
         to: traitTabPath('program-scatter'),
         color: '#0284c7',
     },
     {
         title: 'Trait Program Graph',
-        description: 'Open the network view linking traits, programs, and gene-level evidence.',
+        description: 'Used to map trait, program, and gene-level evidence into an interpretable network for mechanistic hypothesis generation.',
         image: homeFigureTraitProgramNetwork,
         to: traitTabPath('trait-program-graph'),
         color: '#0f766e',
     },
     {
         title: 'Manhattan',
-        description: 'Inspect genome-wide variant signals by chromosome for the selected trait.',
+        description: 'Used to localize genome-wide association signals across loci and identify the strongest variant-level peaks for a trait.',
         image: homeFigureGwasManhattan,
         to: traitTabPath('manhattan'),
         color: '#2563eb',
     },
     {
         title: 'Burden Volcano',
-        description: 'Compare LoF burden effects and significance across candidate genes.',
+        description: 'Used to evaluate the magnitude and significance of LoF burden associations, enabling rapid nomination of candidate genes.',
         image: homeFigureBurdenVolcano,
         to: traitTabPath('burden-volcano'),
         color: '#ea580c',
     },
     {
         title: 'Posterior Volcano',
-        description: 'Explore GeneBayes LoF effects and gene-level association strength.',
+        description: 'Used to rank genes by posterior effect size and statistical support under the GeneBayes gene-level association framework.',
         image: homeFigurePosteriorVolcano,
         to: traitTabPath('posterior-volcano'),
         color: '#a21caf',
     },
     {
         title: 'Gene Evidence',
-        description: 'Move from trait associations into gene-centered supporting evidence.',
+        description: 'Used to consolidate trait-linked evidence at the gene level and assess whether multiple signals converge on the same target gene.',
         image: homeFigureLofGene,
         to: traitTabPath('gene-evidence'),
         color: '#7c3aed',
     },
     {
-        title: 'Gene QQ',
-        description: 'Check gene-level test calibration and tail behavior in the QQ view.',
+        title: 'QQ Plot',
+        description: 'Used to assess calibration of gene-level association statistics and determine whether the observed tail exceeds null expectation.',
         image: homeFigureQqPlot,
         to: traitTabPath('gene-qq'),
         color: '#1d4ed8',
     },
     {
         title: 'Cross-trait Heatmap',
-        description: 'Compare related traits across shared genes and posterior evidence.',
+        description: 'Used to compare shared gene-level effects across traits and reveal recurrent cross-trait patterns in posterior evidence.',
         image: homeFigureCrossTraitHeatmap,
         to: traitTabPath('cross-trait-heatmap'),
         color: '#c2410c',
     },
     {
         title: 'Trait Correlation',
-        description: 'Compare GeneBayes effect profiles across shared genes with Spearman or Pearson correlation.',
+        description: 'Used to quantify similarity between trait-level gene effect profiles and identify traits with concordant genetic architecture.',
         image: homeFigureTraitCorrelation,
         to: traitTabPath('trait-correlation'),
         color: '#2563eb',
     },
     {
         title: 'Program Volcano',
-        description: 'Review program-trait effects and highlighted cellular program signals.',
+        description: 'Used to evaluate program-level effect direction and significance, highlighting cellular pathways most strongly linked to the trait.',
         image: homeFigureProgramVolcano,
         to: traitTabPath('program-scatter'),
         color: '#7c3aed',
     },
     {
         title: 'Trait Detail',
-        description: 'Open the trait metadata page with available modules and result links.',
+        description: 'Used to contextualize downstream analyses with curated trait metadata, study identifiers, and linked evidence modules.',
         image: homeFigureVariantDetail,
-        to: '/trait',
+        to: `/trait/${encodeURIComponent(FEATURED_TRAIT.fileId)}`,
         color: '#d97706',
     },
     {
         title: 'Data Browser',
-        description: 'Search indexed project outputs and download the underlying result files.',
+        description: 'Used to retrieve indexed result files and supporting outputs for validation, reuse, and reproducible downstream analysis.',
         image: homeFigureDataBrowser,
-        to: '/data?view=browser',
-        color: '#b45309',
-    },
-];
-
-const programCentricHighlights = [
-    {
-        title: 'Connect genes to cellular programs',
-        body: 'Trace how distinct genes converge on shared perturbation-informed programs rather than stopping at isolated gene-trait hits.',
-        icon: <Hub sx={{ fontSize: 22 }} />,
-        to: '/genes',
-        color: '#0f766e',
-    },
-    {
-        title: 'Prioritize trait-relevant programs',
-        body: 'Move from thousands of GWAS datasets into program-trait evidence, burden signals, posteriors, and regulatory context.',
-        icon: <Biotech sx={{ fontSize: 22 }} />,
-        to: '/programs',
-        color: '#7c3aed',
-    },
-    {
-        title: 'Explore, search, and download',
-        body: 'Use interactive modules and indexed result files to inspect candidate mechanisms and export resources for downstream studies.',
-        icon: <FileDownload sx={{ fontSize: 22 }} />,
         to: '/data',
-        color: '#2563eb',
+        color: '#b45309',
     },
 ];
 
@@ -1034,161 +1014,44 @@ function FigureGateway({ items }) {
         >
             <Box
                 sx={{
-                    display: 'grid',
-                    gridTemplateColumns: {
-                        xs: '1fr',
-                        sm: 'repeat(2, minmax(0, 1fr))',
-                        md: 'repeat(3, minmax(0, 1fr))',
-                        xl: 'repeat(4, minmax(0, 1fr))',
-                    },
-                    gap: { xs: 2.2, md: 2.8 },
+                    position: 'relative',
+                    overflow: 'visible',
+                    borderRadius: 1,
+                    border: '1px solid rgba(226,232,240,0.82)',
+                    backgroundColor: 'rgba(255,255,255,0.72)',
+                    boxShadow: '0 12px 34px rgba(15,23,42,0.045)',
+                    px: { xs: 1.4, sm: 2, md: 2.4 },
+                    pt: { xs: 1.8, md: 2.2 },
+                    pb: { xs: 1.4, md: 2 },
                 }}
             >
-                {items.map((item) => (
-                    <FigureCard key={item.title} item={item} />
-                ))}
-            </Box>
-        </Box>
-    );
-}
-
-/* ─── Animated SVG background for the hero ─── */
-function ProgramCentricIntro() {
-    return (
-        <Box
-            component="section"
-            sx={{
-                position: 'relative',
-                zIndex: 1,
-                maxWidth: APP_SHELL_MAX_WIDTH,
-                mx: 'auto',
-                px: { xs: 2, sm: 3, lg: 4, xl: 5 },
-                pt: { xs: 1, md: 2 },
-                pb: { xs: 5, md: 7 },
-            }}
-        >
-            <Box
-                sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.12fr) minmax(360px, 0.88fr)' },
-                    gap: { xs: 2.5, lg: 3 },
-                    alignItems: 'stretch',
-                }}
-            >
-                <Box
+                <Typography
+                    component="h2"
                     sx={{
-                        p: { xs: 2.4, md: 3.4 },
-                        borderRadius: 2,
-                        border: '1px solid rgba(15,23,42,0.08)',
-                        bgcolor: 'rgba(255,255,255,0.92)',
-                        boxShadow: '0 18px 50px rgba(15,23,42,0.075)',
+                        color: '#0f172a',
+                        fontSize: { xs: '1.28rem', sm: '1.45rem', md: '1.65rem' },
+                        fontWeight: 760,
+                        lineHeight: 1.18,
+                        mb: { xs: 1.6, md: 2 },
                     }}
                 >
-                    <Chip
-                        label="Program-centric human genetics"
-                        size="small"
-                        sx={{
-                            mb: 1.6,
-                            color: '#0f766e',
-                            bgcolor: alpha('#0f766e', 0.09),
-                            border: `1px solid ${alpha('#0f766e', 0.16)}`,
-                            fontWeight: 720,
-                        }}
-                    />
-                    <Typography
-                        component="h2"
-                        sx={{
-                            maxWidth: 920,
-                            color: '#0f172a',
-                            fontSize: { xs: '1.75rem', md: '2.55rem' },
-                            fontWeight: 800,
-                            lineHeight: 1.08,
-                            letterSpacing: '-0.025em',
-                            textWrap: 'balance',
-                        }}
-                    >
-                        TraitCircuit links genes, cellular programs, and human traits.
-                    </Typography>
-                    <Typography
-                        sx={{
-                            mt: 1.8,
-                            maxWidth: 960,
-                            color: '#475569',
-                            fontSize: { xs: '0.98rem', md: '1.05rem' },
-                            lineHeight: 1.78,
-                        }}
-                    >
-                        TraitCircuit systematically connects genes, cellular programs, and complex traits by integrating thousands of GWAS datasets with large-scale genetic perturbation analyses. The resource helps researchers move beyond gene-trait associations and identify the cellular programs that may mediate genetic effects on human diseases and traits.
-                    </Typography>
-                    <Typography
-                        sx={{
-                            mt: 1.4,
-                            maxWidth: 960,
-                            color: '#475569',
-                            fontSize: { xs: '0.98rem', md: '1.05rem' },
-                            lineHeight: 1.78,
-                        }}
-                    >
-                        Explore gene-trait, gene-program, and program-trait relationships; compare programs shared across traits; and inspect regulatory networks, trait-specific programs, and cross-trait program sharing through interactive visual modules.
-                    </Typography>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1} sx={{ mt: 2.4 }}>
-                        <Button component={RouterLink} to="/trait" variant="contained" endIcon={<ArrowForward />} sx={{ borderRadius: 999 }}>
-                            Start with traits
-                        </Button>
-                        <Button component="a" href="#home-search" variant="outlined" startIcon={<Search />} sx={{ borderRadius: 999 }}>
-                            Search genes, programs, traits
-                        </Button>
-                    </Stack>
-                </Box>
+                    Explore analysis figures
+                </Typography>
 
-                <Box sx={{ display: 'grid', gap: 1.5 }}>
-                    {programCentricHighlights.map((item) => (
-                        <Box
-                            key={item.title}
-                            component={RouterLink}
-                            to={item.to}
-                            sx={{
-                                display: 'grid',
-                                gridTemplateColumns: 'auto 1fr',
-                                gap: 1.5,
-                                alignItems: 'start',
-                                p: { xs: 2, md: 2.3 },
-                                borderRadius: 2,
-                                border: `1px solid ${alpha(item.color, 0.14)}`,
-                                bgcolor: '#fff',
-                                color: 'inherit',
-                                textDecoration: 'none',
-                                boxShadow: '0 12px 34px rgba(15,23,42,0.055)',
-                                transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
-                                '&:hover': {
-                                    transform: 'translateY(-3px)',
-                                    borderColor: alpha(item.color, 0.32),
-                                    boxShadow: `0 18px 42px ${alpha(item.color, 0.13)}`,
-                                },
-                            }}
-                        >
-                            <Box
-                                sx={{
-                                    width: 42,
-                                    height: 42,
-                                    borderRadius: 1.5,
-                                    display: 'grid',
-                                    placeItems: 'center',
-                                    color: item.color,
-                                    bgcolor: alpha(item.color, 0.09),
-                                }}
-                            >
-                                {item.icon}
-                            </Box>
-                            <Box>
-                                <Typography component="h3" sx={{ color: '#111827', fontWeight: 780, fontSize: '1.02rem', lineHeight: 1.25 }}>
-                                    {item.title}
-                                </Typography>
-                                <Typography sx={{ mt: 0.6, color: '#64748b', fontSize: '0.9rem', lineHeight: 1.62 }}>
-                                    {item.body}
-                                </Typography>
-                            </Box>
-                        </Box>
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                            xs: '1fr',
+                            sm: 'repeat(2, minmax(0, 1fr))',
+                            md: 'repeat(3, minmax(0, 1fr))',
+                            xl: 'repeat(4, minmax(0, 1fr))',
+                        },
+                        gap: { xs: 2.2, md: 2.8 },
+                    }}
+                >
+                    {items.map((item) => (
+                        <FigureCard key={item.title} item={item} />
                     ))}
                 </Box>
             </Box>
@@ -1196,6 +1059,7 @@ function ProgramCentricIntro() {
     );
 }
 
+/* ─── Animated SVG background for the hero ─── */
 function HeroBackground() {
     return (
         <Box
@@ -1372,12 +1236,14 @@ function HeroSection({ stats, statsLoading, theme }) {
                         sx={{
                             maxWidth: 920,
                             mx: 'auto',
+                            px: 1,
                             color: '#0f172a',
                             fontFamily: theme.typography.fontFamily,
-                            fontSize: { xs: '2.1rem', sm: '3.4rem', md: '4.8rem' },
+                            fontSize: { xs: '2rem', sm: '3.2rem', md: '4.6rem', lg: '4.8rem' },
                             fontWeight: 780,
-                            lineHeight: { xs: 1.1, md: 1.02 },
-                            letterSpacing: '-0.02em',
+                            lineHeight: { xs: 1.16, md: 1.1 },
+                            letterSpacing: { xs: '-0.01em', md: '-0.018em' },
+                            overflow: 'visible',
                             textWrap: 'balance',
                             animation: 'heroFadeIn 700ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both',
                         }}
@@ -1386,6 +1252,11 @@ function HeroSection({ stats, statsLoading, theme }) {
                             component="span"
                             sx={{
                                 display: 'inline-block',
+                                maxWidth: '100%',
+                                px: '0.08em',
+                                pb: '0.08em',
+                                mx: '-0.08em',
+                                overflow: 'visible',
                                 background: 'linear-gradient(135deg, #2563eb 0%, #0d9488 50%, #7c3aed 100%)',
                                 backgroundClip: 'text',
                                 WebkitBackgroundClip: 'text',
@@ -1393,7 +1264,7 @@ function HeroSection({ stats, statsLoading, theme }) {
                                 WebkitTextFillColor: 'transparent',
                             }}
                         >
-                            TraitCircuit
+                            {siteName}
                         </Box>
                     </Typography>
 
@@ -1426,14 +1297,14 @@ function HeroSection({ stats, statsLoading, theme }) {
                         }}
                     >
                         {[
-                            { label: 'Genes', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.genes ? stats.genes.toLocaleString() : '...'), color: '#0f766e', href: '/genes', icon: (
-                                <Box component="img" src={variantsIcon} alt="Genes" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
+                            { label: 'Traits', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.traits ? stats.traits.toLocaleString() : '...'), color: '#2563eb', href: '/trait', icon: (
+                                <Box component="img" src={traitsIcon} alt="Traits" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
                             )},
                             { label: 'Programs', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.programs ? stats.programs.toLocaleString() : '...'), color: '#7c3aed', href: '/programs', icon: (
                                 <Box component="img" src={programsIcon} alt="Programs" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
                             )},
-                            { label: 'Traits', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.traits ? stats.traits.toLocaleString() : '...'), color: '#2563eb', href: '/trait', icon: (
-                                <Box component="img" src={traitsIcon} alt="Traits" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
+                            { label: 'Genes', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.genes ? stats.genes.toLocaleString() : '...'), color: '#0f766e', href: '/genes', icon: (
+                                <Box component="img" src={variantsIcon} alt="Genes" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
                             )},
                             { label: 'Associations', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.associations ? stats.associations.toLocaleString() : '...'), color: '#ea580c', href: '/programs', icon: (
                                 <Box component="img" src={associationsIcon} alt="Associations" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
@@ -1555,8 +1426,6 @@ function Home() {
         <Box sx={{ width: '100%', minHeight: '100%', color: '#1f2933', bgcolor: '#f5f7fb', mx: 'auto' }}>
             <HeroSection stats={homeStats} statsLoading={homeStatsLoading} theme={theme} />
 
-            <ProgramCentricIntro />
-
             <FigureGateway items={traitFigureCards} />
 
             <ReleaseLogSection
@@ -1575,7 +1444,7 @@ function Home() {
                 action={(
                     <Button
                         component={RouterLink}
-                        to={`/about#${RELEASE_LOG_ANCHOR}`}
+                        to={`/help#${RELEASE_LOG_ANCHOR}`}
                         size="small"
                         variant="outlined"
                         endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
@@ -1584,6 +1453,49 @@ function Home() {
                     </Button>
                 )}
             />
+
+            <Box
+                component="footer"
+                sx={{
+                    maxWidth: APP_SHELL_MAX_WIDTH,
+                    mx: 'auto',
+                    px: { xs: 2, sm: 3, lg: 4, xl: 5 },
+                    pb: { xs: 4, md: 5.5 },
+                }}
+            >
+                <Box
+                    sx={panelSx(theme, {
+                        px: { xs: 2, sm: 2.5 },
+                        py: { xs: 1.6, sm: 1.9 },
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1,
+                        textAlign: 'center',
+                        backgroundColor: alpha('#ffffff', 0.82),
+                    })}
+                >
+                    <Typography sx={{ fontSize: '0.84rem', fontWeight: 650, color: '#475569' }}>
+                        Contact
+                    </Typography>
+                    <Typography
+                        component="a"
+                        href="mailto:caochen@njmu.edu.cn"
+                        sx={{
+                            fontSize: '0.88rem',
+                            fontWeight: 700,
+                            color: '#2563eb',
+                            textDecoration: 'none',
+                            '&:hover': {
+                                textDecoration: 'underline',
+                            },
+                        }}
+                    >
+                        caochen@njmu.edu.cn
+                    </Typography>
+                </Box>
+            </Box>
         </Box>
     );
 }

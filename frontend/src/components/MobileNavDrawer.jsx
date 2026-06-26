@@ -171,7 +171,7 @@ export default function MobileNavDrawer({ links }) {
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1, py: 0.6 }}>
                     <Box>
                         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                            TraitCircuit
+                            TraitProgram
                         </Typography>
                         <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                             Program-centric human genetics

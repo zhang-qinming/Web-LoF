@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TraitProgram icon">
+  <circle cx="32" cy="32" r="28" fill="#ecfdf5" stroke="#0f766e" stroke-width="5"/>
+  <circle cx="45" cy="22" r="6" fill="#0f766e"/>
+  <path d="M18 47V38M27 47V27M36 47V35" fill="none" stroke="#0284c7" stroke-width="5.4" stroke-linecap="round"/>
+</svg>

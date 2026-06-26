@@ -7,11 +7,6 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import Slider from '@mui/material/Slider';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -19,6 +14,7 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
+import Download from '@mui/icons-material/Download';
 import Insights from '@mui/icons-material/Insights';
 import Refresh from '@mui/icons-material/Refresh';
 import RestartAlt from '@mui/icons-material/RestartAlt';
@@ -27,11 +23,13 @@ import Timeline from '@mui/icons-material/Timeline';
 import useSWR from 'swr';
 import { getBurdenVolcano, getPosteriorVolcano } from '../api/gwas';
 import BurdenVolcanoTable from './BurdenVolcanoTable';
+import ExportPlotDialog from './ExportPlotDialog';
+import FigureLoadingPanel from './FigureLoadingPanel';
 import FloatingLegend from './FloatingLegend';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
 import { parseNullableNumber } from '../utils/numbers';
-import { scrollElementNearViewportCenter } from '../utils/scroll';
+import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
@@ -40,15 +38,11 @@ import {
     buildPlotHoverTone,
     buildPlotHoverToneNeutral,
     chartLayoutTokens,
-    controlFieldSx,
     metricChipTone,
-    plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
     RESPONSIVE_TALL_PLOT_HEIGHT,
-    sectionTitleSx,
     statusToggleSx,
     summaryChipSx,
-    toolbarSx,
 } from '../themeUtils';
 
 const VOLCANO_STYLE = {
@@ -77,8 +71,6 @@ const VOLCANO_CONFIGS = {
         effectLabel: 'Beta',
         effectAxisLabel: 'Effect size (beta)',
         title: 'Burden Volcano',
-        fullTitle: 'All Gene Burden Effects',
-        hitsTitle: 'Gene Burden Hit Overview',
         fullDescription: 'Full gene-level LoF burden effects for this trait. Click a point to focus its table row.',
         hitsDescription: 'Significant LoF burden hits for this trait. Switch to Full TSV for all genes when available.',
         emptyMessage: 'No burden volcano rows are currently available for this trait.',
@@ -93,8 +85,6 @@ const VOLCANO_CONFIGS = {
         effectLabel: 'LoF effect',
         effectAxisLabel: 'GeneBayes LoF effect (post_mean)',
         title: 'Posterior Volcano',
-        fullTitle: 'All GeneBayes LoF Effects',
-        hitsTitle: 'GeneBayes LoF Hit Overview',
         fullDescription: 'Full gene-level GeneBayes LoF effects for this trait. Click a point to focus its table row.',
         hitsDescription: 'Significant GeneBayes LoF hits for this trait. Switch to Full TSV for all genes when available.',
         emptyMessage: 'No posterior volcano rows are currently available for this trait.',
@@ -174,8 +164,6 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         effectLabel,
         effectAxisLabel,
         title,
-        fullTitle,
-        hitsTitle,
         emptyMessage,
         guideText,
         exportPrefix,
@@ -327,7 +315,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             items.push({
                 key: 'background',
                 label: VOLCANO_STYLE.background.label,
-                note: 'Below significance threshold (P ≥ 0.05).',
+                note: 'Below significance threshold (P >= 0.05).',
                 color: VOLCANO_STYLE.background.color,
                 count: counts.nonSignificant,
             });
@@ -638,7 +626,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         const timeoutId = window.setTimeout(() => {
             scrollElementNearViewportCenter(tableSectionRef.current, { viewportOffset: 0.08 });
             const el = tableRowRefs.current[highlight.rowKey];
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (el) scrollElementIntoNearestView(el);
         }, 180);
 
         return () => window.clearTimeout(timeoutId);
@@ -719,141 +707,166 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const hasVisiblePoints = plotData.some((trace) => Array.isArray(trace.x) && trace.x.length > 0);
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-            <Box
-                sx={toolbarSx(theme, {
-                    display: 'grid',
-                    gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) auto' },
-                    alignItems: 'start',
-                    gap: 1.5,
-                })}
-            >
-                <Box sx={{ minWidth: 0, maxWidth: { lg: '62ch' } }}>
-                    <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.35 }}>
-                        {title}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+            {/* CARD 1: Filters & Options */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <Box sx={{ px: 2.5, py: 1.5, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                        Volcano Analysis Controls
                     </Typography>
-                    <Typography sx={sectionTitleSx(theme, { fontSize: '1.02rem', lineHeight: 1.25 })}>
-                        {variantLabel === 'full' ? fullTitle : hitsTitle}
-                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                        <Button 
+                            variant="text" 
+                            size="small"
+                            startIcon={<RestartAlt />} 
+                            onClick={resetControls} 
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, fontSize: '0.78rem' }}
+                        >
+                            Reset
+                        </Button>
+                        <Button 
+                            variant="text" 
+                            size="small"
+                            startIcon={<Download />} 
+                            onClick={downloadCSV} 
+                            disabled={!rows.length} 
+                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, fontSize: '0.78rem' }}
+                        >
+                            CSV
+                        </Button>
+                    </Stack>
                 </Box>
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3.5, alignItems: 'center' }}>
+                        {/* Locus data selection */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Data Type:
+                            </Typography>
+                            <ToggleButtonGroup
+                                exclusive
+                                size="small"
+                                value={variantControlValue}
+                                onChange={handleVariantChange}
+                                sx={statusToggleSx(theme)}
+                            >
+                                <ToggleButton value="hits">Hits TSV</ToggleButton>
+                                <ToggleButton value="full" disabled={Boolean(payload) && !availableVariants.full}>Full TSV</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
 
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 1,
-                        minWidth: 0,
-                        justifyContent: { xs: 'flex-start', lg: 'flex-end' },
-                    }}
-                >
-                    <Chip icon={<Timeline />} label={`${filteredRows.length.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                    <Chip icon={<Insights />} label={`${counts.significant.toLocaleString()} highlighted`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
-                    <Chip icon={<Science />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.positive.color, 0.1), color: VOLCANO_STYLE.positive.strong, border: `1px solid ${alpha(VOLCANO_STYLE.positive.strong, 0.2)}` })} />
-                    <Chip icon={<Science />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.negative.color, 0.1), color: VOLCANO_STYLE.negative.strong, border: `1px solid ${alpha(VOLCANO_STYLE.negative.strong, 0.2)}` })} />
-                    <UpdatingStatus active={isRefreshing} />
-                </Box>
+                        {/* Effect mode */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Effect Sign:
+                            </Typography>
+                            <ToggleButtonGroup
+                                exclusive
+                                size="small"
+                                value={effectMode}
+                                onChange={(_, value) => { if (value) setEffectMode(value); }}
+                                sx={statusToggleSx(theme)}
+                            >
+                                <ToggleButton value={EFFECT_MODES.ALL}>All</ToggleButton>
+                                <ToggleButton value={EFFECT_MODES.POSITIVE}>Positive</ToggleButton>
+                                <ToggleButton value={EFFECT_MODES.NEGATIVE}>Negative</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
 
-                <Box
-                    sx={{
-                        gridColumn: '1 / -1',
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 1,
-                        minWidth: 0,
-                    }}
-                >
-                    <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={variantControlValue}
-                        onChange={handleVariantChange}
-                        sx={statusToggleSx(theme)}
-                    >
-                        <ToggleButton value="hits">Hits TSV</ToggleButton>
-                        <ToggleButton value="full" disabled={Boolean(payload) && !availableVariants.full}>Full TSV</ToggleButton>
-                    </ToggleButtonGroup>
+                        {/* Significance filter */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Significance:
+                            </Typography>
+                            <ToggleButtonGroup
+                                exclusive
+                                size="small"
+                                value={significantOnly ? 'significant' : 'all'}
+                                onChange={(_, value) => {
+                                    if (!value) return;
+                                    setSignificantOnly(value === 'significant');
+                                }}
+                                sx={statusToggleSx(theme)}
+                            >
+                                <ToggleButton value="all">All genes</ToggleButton>
+                                <ToggleButton value="significant">Sig only</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
 
-                    <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={effectMode}
-                        onChange={(_, value) => { if (value) setEffectMode(value); }}
-                        sx={statusToggleSx(theme)}
-                    >
-                        <ToggleButton value={EFFECT_MODES.ALL}>All</ToggleButton>
-                        <ToggleButton value={EFFECT_MODES.POSITIVE}>Positive</ToggleButton>
-                        <ToggleButton value={EFFECT_MODES.NEGATIVE}>Negative</ToggleButton>
-                    </ToggleButtonGroup>
-
-                    <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={significantOnly ? 'significant' : 'all'}
-                        onChange={(_, value) => {
-                            if (!value) return;
-                            setSignificantOnly(value === 'significant');
-                        }}
-                        sx={statusToggleSx(theme)}
-                    >
-                        <ToggleButton value="all">All genes</ToggleButton>
-                        <ToggleButton value="significant">Sig only</ToggleButton>
-                    </ToggleButtonGroup>
-                </Box>
-            </Box>
-
-            <Box sx={toolbarSx(theme)}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 220 }}>
-                    <Typography
-                        variant="caption"
-                        sx={{
-                            color: theme.palette.text.secondary,
-                            fontSize: '0.72rem',
-                            textTransform: 'none',
-                            letterSpacing: 0.8,
-                            fontWeight: 500,
-                        }}
-                    >
-                        Size
-                    </Typography>
-                    <Slider
-                        value={Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
-                        min={4}
-                        max={18}
-                        step={1}
-                        onChange={(_, value) => setPointSizeDraft(Number(value))}
-                        onChangeCommitted={(_, value) => commitPointSize(Number(value))}
-                        sx={{
-                            width: 120,
-                            color: theme.palette.text.secondary,
-                            '& .MuiSlider-thumb': { width: 14, height: 14 },
-                            '& .MuiSlider-rail': { opacity: 0.25 },
-                        }}
-                    />
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.72rem', minWidth: 26 }}>
-                        {Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
-                    </Typography>
-                </Box>
-
-                <Button variant="text" startIcon={<RestartAlt />} onClick={resetControls} sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 38 }}>
-                    Reset
-                </Button>
-
-                <Typography sx={{ width: '100%', fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
-                    {guideText}
-                </Typography>
-            </Box>
-
-            <Card elevation={0} sx={plotFrameSx(theme)}>
-                <CardContent sx={{ p: 0, position: 'relative' }}>
-                    {isLoading && (
-                        <Box sx={{ minHeight: VOLCANO_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    Loading {title.toLowerCase()} data...
+                        {/* Point size slider */}
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0 }}>
+                                Point Size:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 150 }}>
+                                <Slider
+                                    value={Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
+                                    min={4}
+                                    max={18}
+                                    step={1}
+                                    onChange={(_, value) => setPointSizeDraft(Number(value))}
+                                    onChangeCommitted={(_, value) => commitPointSize(Number(value))}
+                                    sx={{
+                                        width: 100,
+                                        color: theme.palette.text.secondary,
+                                        '& .MuiSlider-thumb': { width: 14, height: 14 },
+                                        '& .MuiSlider-rail': { opacity: 0.25 },
+                                    }}
+                                />
+                                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.72rem', minWidth: 20 }}>
+                                    {Number(pointSizeDraft) || DEFAULT_POINT_SIZE}
                                 </Typography>
                             </Box>
-                        </Box>
+                        </Stack>
+                    </Box>
+
+                    {guideText && (
+                        <Typography sx={{ mt: 2, fontSize: '0.74rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
+                            {guideText}
+                        </Typography>
+                    )}
+
+                </CardContent>
+            </Card>
+
+            {/* CARD 2: Interactive Plot */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <Box sx={{ px: 2.5, py: 1.2, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                    <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" alignItems="center">
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            {title} Plot
+                        </Typography>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', mr: 0.5, fontSize: '0.74rem' }}>
+                                Summary Stats:
+                            </Typography>
+                            <Chip icon={<Timeline sx={{ fontSize: '14px !important' }} />} label={`${filteredRows.length.toLocaleString()} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                            <Chip icon={<Insights sx={{ fontSize: '14px !important' }} />} label={`${counts.significant.toLocaleString()} highlighted`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
+                            <Chip icon={<Science sx={{ fontSize: '14px !important' }} />} label={`${counts.positive.toLocaleString()} positive`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.positive.color, 0.1), color: VOLCANO_STYLE.positive.strong, border: `1px solid ${alpha(VOLCANO_STYLE.positive.strong, 0.2)}` })} />
+                            <Chip icon={<Science sx={{ fontSize: '14px !important' }} />} label={`${counts.negative.toLocaleString()} negative`} size="small" sx={summaryChipSx(theme, { backgroundColor: alpha(VOLCANO_STYLE.negative.color, 0.1), color: VOLCANO_STYLE.negative.strong, border: `1px solid ${alpha(VOLCANO_STYLE.negative.strong, 0.2)}` })} />
+                        </Stack>
+                    </Stack>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <UpdatingStatus active={isRefreshing} />
+                        {!isLoading && hasVisiblePoints && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Download />}
+                                onClick={() => setExportOpen(true)}
+                                sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                                Export Image
+                            </Button>
+                        )}
+                    </Box>
+                </Box>
+                <CardContent sx={{ p: 0, position: 'relative' }}>
+                    {isLoading && (
+                        <FigureLoadingPanel
+                            minHeight={VOLCANO_PLOT_HEIGHT}
+                            message={`Loading ${title.toLowerCase()} data...`}
+                        />
                     )}
 
                     {!isLoading && rows.length === 0 && (
@@ -873,7 +886,10 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                     )}
 
                     {!isLoading && hasVisiblePoints && !afterFirstPaint && (
-                        <Box sx={{ minHeight: VOLCANO_PLOT_HEIGHT }} />
+                        <FigureLoadingPanel
+                            minHeight={VOLCANO_PLOT_HEIGHT}
+                            message={`Rendering ${title.toLowerCase()} plot...`}
+                        />
                     )}
 
                     {!isLoading && hasVisiblePoints && afterFirstPaint && (
@@ -936,29 +952,17 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 />
             )}
 
-            <Dialog open={exportOpen} onClose={() => setExportOpen(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: 700, color: theme.palette.text.primary, fontFamily: theme.typography.fontFamily }}>Export Plot</DialogTitle>
-                <DialogContent sx={{ pt: 1 }}>
-                    <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-                        <TextField label="Width" type="number" size="small" value={exportWidth} onChange={(event) => setExportWidth(event.target.value)} sx={controlFieldSx(theme)} />
-                        <TextField label="Height" type="number" size="small" value={exportHeight} onChange={(event) => setExportHeight(event.target.value)} sx={controlFieldSx(theme)} />
-                    </Stack>
-                    <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={exportFmt}
-                        onChange={(_, value) => { if (value) setExportFmt(value); }}
-                        sx={statusToggleSx(theme, { '& .MuiToggleButton-root': { textTransform: 'none', px: 2.5 } })}
-                    >
-                        <ToggleButton value="svg">SVG</ToggleButton>
-                        <ToggleButton value="png">PNG</ToggleButton>
-                    </ToggleButtonGroup>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setExportOpen(false)} sx={{ textTransform: 'none', color: theme.palette.text.secondary }}>Cancel</Button>
-                    <Button variant="contained" onClick={() => { handleExport(); setExportOpen(false); }} sx={{ textTransform: 'none' }}>Export</Button>
-                </DialogActions>
-            </Dialog>
+            <ExportPlotDialog
+                open={exportOpen}
+                onClose={() => setExportOpen(false)}
+                width={exportWidth}
+                onWidthChange={setExportWidth}
+                height={exportHeight}
+                onHeightChange={setExportHeight}
+                format={exportFmt}
+                onFormatChange={setExportFmt}
+                onExport={handleExport}
+            />
         </Box>
     );
 }

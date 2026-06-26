@@ -14,6 +14,7 @@ import { fetcher } from '../api/gwas';
 import TraitMetaCard from '../components/TraitMetaCard';
 import { DATA_PAGE_MAX_WIDTH, sectionTitleSx } from '../themeUtils';
 import { PageFrame, StatePanel } from '../components/PageScaffold';
+import FigureLoadingPanel from '../components/FigureLoadingPanel';
 import { stableSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 
@@ -126,12 +127,9 @@ function TraitFigureFallback() {
 
 function TraitFigureDeferredPlaceholder() {
     return (
-        <Box
-            aria-hidden="true"
-            sx={{
-                minHeight: 400,
-                width: '100%',
-            }}
+        <FigureLoadingPanel
+            minHeight={400}
+            message="Preparing figure..."
         />
     );
 }
@@ -296,7 +294,6 @@ export default function Trait() {
                             { id: 'sample_size', label: 'Sample Size', numeric: true, width: 132, minWidth: 132, whiteSpace: 'nowrap', headerWrap: true },
                             { id: 'mesh_term', label: 'MeSH term', width: 170, minWidth: 170, headerWrap: true },
                             { id: 'year', label: 'Year', numeric: true, width: 84, minWidth: 84, whiteSpace: 'nowrap' },
-                            { id: 'n_variants', label: 'Variants', numeric: true, width: 138, minWidth: 138, whiteSpace: 'nowrap' },
                         ]}
                         defaultSortBy="trait_name"
                         defaultOrder="ASC"
@@ -311,6 +308,7 @@ export default function Trait() {
             width: '100%',
             maxWidth: DATA_PAGE_MAX_WIDTH,
             minWidth: 0,
+            overflowAnchor: 'none',
             mx: 'auto',
             px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
             py: { xs: 2, md: 3, xl: 3.5 },
@@ -354,7 +352,7 @@ export default function Trait() {
                 <Tab label="Burden Volcano" onMouseEnter={() => warmTraitTab(3)} onFocus={() => warmTraitTab(3)} />
                 <Tab label="Posterior Volcano" onMouseEnter={() => warmTraitTab(4)} onFocus={() => warmTraitTab(4)} />
                 <Tab label="Gene Evidence" onMouseEnter={() => warmTraitTab(5)} onFocus={() => warmTraitTab(5)} />
-                <Tab label="Gene QQ" onMouseEnter={() => warmTraitTab(6)} onFocus={() => warmTraitTab(6)} />
+                <Tab label="QQ Plot" onMouseEnter={() => warmTraitTab(6)} onFocus={() => warmTraitTab(6)} />
                 <Tab label="Cross-trait Heatmap" onMouseEnter={() => warmTraitTab(7)} onFocus={() => warmTraitTab(7)} />
                 <Tab label="Trait Correlation" onMouseEnter={() => warmTraitTab(8)} onFocus={() => warmTraitTab(8)} />
             </Tabs>
@@ -383,7 +381,7 @@ export default function Trait() {
             <Box
                 id="trait-figure-panel"
                 ref={figurePanelRef}
-                sx={{ minHeight: 400, scrollMarginTop: { xs: 7, md: 8 }, position: 'relative' }}
+                sx={{ minHeight: 400, scrollMarginTop: { xs: 7, md: 8 }, position: 'relative', overflowAnchor: 'none' }}
             >
                 {hasMountedManhattan && (
                     <Box

@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Collapse from '@mui/material/Collapse';
+import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
@@ -9,8 +12,11 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableRow from '@mui/material/TableRow';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import OpenInNew from '@mui/icons-material/OpenInNew';
 import Refresh from '@mui/icons-material/Refresh';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -22,6 +28,19 @@ import { panelSx } from '../themeUtils';
 import { StatePanel } from './PageScaffold';
 
 const EMPTY_VALUE = '--';
+const TRAIT_INFO_OPEN_STORAGE_KEY = 'gwas.traitInformation.open';
+
+function readInitialOpenState() {
+    if (typeof window === 'undefined') return true;
+    try {
+        const stored = window.localStorage.getItem(TRAIT_INFO_OPEN_STORAGE_KEY);
+        if (stored === 'false') return false;
+        if (stored === 'true') return true;
+    } catch {
+        return true;
+    }
+    return true;
+}
 
 function formatCount(value) {
     return value != null && value !== '' ? Number(value).toLocaleString() : EMPTY_VALUE;
@@ -72,11 +91,6 @@ function buildMeshUrl(meshId, meshTerm) {
     if (meshId) return `https://meshb.nlm.nih.gov/record/ui?ui=${encodeURIComponent(meshId)}`;
     if (meshTerm) return `https://meshb.nlm.nih.gov/search?searchInField=termDescriptor&sort=&size=20&searchType=exactMatch&searchMethod=FullWord&q=${encodeURIComponent(meshTerm)}`;
     return '';
-}
-
-function buildLdscSourceFile(info, fallbackId) {
-    const id = String(info.heritability_trait_id || info.heritability_lof_id || info.file_id || fallbackId || '').trim();
-    return id ? `${id}_k562_atac.results` : '';
 }
 
 function MetaSkeleton({ theme }) {
@@ -153,7 +167,7 @@ function Value({ row, color, linkColor }) {
     );
 }
 
-function TraitInfoTable({ title, rows, theme, action }) {
+function TraitInfoTable({ title, rows, theme, hideTitle = false }) {
     const primary = title === 'Trait information';
     const rowPairs = [];
     for (let index = 0; index < rows.length; index += 2) {
@@ -182,27 +196,21 @@ function TraitInfoTable({ title, rows, theme, action }) {
 
     return (
         <Box sx={{ mt: primary ? 0 : { xs: 2.5, md: 3 } }}>
-            <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1.2}
-                alignItems={{ xs: 'flex-start', sm: 'center' }}
-                justifyContent="space-between"
-                sx={{ mb: 1.4 }}
-            >
+            {!hideTitle && (
                 <Typography
-                    component={primary ? 'h1' : 'h2'}
+                    component="h2"
                     sx={{
                         color: '#1f2933',
                         fontSize: primary ? { xs: '1.85rem', md: '2.25rem' } : { xs: '1.28rem', md: '1.5rem' },
                         fontWeight: 760,
                         lineHeight: 1.15,
                         letterSpacing: 0,
+                        mb: 1.4,
                     }}
                 >
                     {title}
                 </Typography>
-                {action}
-            </Stack>
+            )}
             <TableContainer sx={{ border: `1px solid ${theme.custom.border.soft}`, borderRadius: 0, overflowX: 'auto' }}>
                 <Table size="small" sx={{ minWidth: 900, tableLayout: 'fixed' }}>
                     <colgroup>
@@ -247,8 +255,21 @@ function TraitInfoTable({ title, rows, theme, action }) {
 
 export default function TraitMetaCard({ fileId }) {
     const theme = useTheme();
+    const [open, setOpen] = useState(readInitialOpenState);
     const { data, error, mutate } = useSWR(fileId ? `/api/meta/${fileId}` : null, fetcher, stableSWRConfig);
     const info = (data && !data.error) ? data : null;
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(TRAIT_INFO_OPEN_STORAGE_KEY, open ? 'true' : 'false');
+        } catch {
+            // Storage can be unavailable in restricted browser modes; keep the in-memory state.
+        }
+    }, [open]);
+
+    const toggleOpen = () => {
+        setOpen((value) => !value);
+    };
 
     if (error) {
         return (
@@ -293,12 +314,6 @@ export default function TraitMetaCard({ fileId }) {
             href: info.mesh_id ? meshUrl : '',
             mono: true,
         },
-        { label: 'Trait Type', value: info.mesh_term || EMPTY_VALUE },
-        {
-            label: 'More Information',
-            value: info.mesh_term || info.mesh_id || EMPTY_VALUE,
-            href: meshUrl,
-        },
     ];
 
     const studyRows = [
@@ -318,8 +333,6 @@ export default function TraitMetaCard({ fileId }) {
         { label: 'Population', value: info.population || EMPTY_VALUE, strong: true },
         { label: 'Sample size', value: formatCount(info.sample_size), mono: true, emphasis: true },
         { label: 'Case / control', value: formatCases(info), mono: true },
-        { label: 'Variants', value: formatCount(info.n_variants), mono: true, emphasis: true },
-        { label: 'Significant loci', value: formatCount(info.n_sig), mono: true, emphasis: true },
         { label: 'QC score', value: formatCount(info.qc_score), mono: true },
     ];
 
@@ -333,14 +346,11 @@ export default function TraitMetaCard({ fileId }) {
         info.enrichment_p,
         info.coefficient_z_score,
     ].some((value) => value != null && value !== '');
-    const ldscSourceFile = hasLdscData ? buildLdscSourceFile(info, fileIdentifier) : '';
-
     const burdenRows = [
         { label: 'Burden phenotype', value: info.burden_phenotype_id || EMPTY_VALUE, mono: true, strong: true },
     ];
 
     const ldscRows = [
-        { label: 'LDSC file', value: ldscSourceFile || EMPTY_VALUE, mono: true },
         { label: 'LDSC row', value: hasLdscData ? (info.heritability_source_row || 'L2_0') : EMPTY_VALUE, mono: true, strong: true },
         { label: 'Enrichment', value: formatMetric(info.enrichment), mono: true, emphasis: true },
         { label: 'Enrichment p-value', value: formatPValue(info.enrichment_p), mono: true, emphasis: true },
@@ -393,6 +403,7 @@ export default function TraitMetaCard({ fileId }) {
                     borderColor: theme.custom.border.soft,
                     boxShadow: '0 8px 22px rgba(15, 23, 42, 0.045)',
                 }),
+                overflowAnchor: 'none',
                 '@keyframes traitMetaReveal': {
                     from: { opacity: 0, transform: 'translateY(8px)' },
                     to: { opacity: 1, transform: 'translateY(0)' },
@@ -400,6 +411,68 @@ export default function TraitMetaCard({ fileId }) {
                 animation: 'traitMetaReveal 420ms cubic-bezier(0.22, 1, 0.36, 1) both',
             }}
         >
+            <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1.2}
+                alignItems={{ xs: 'stretch', sm: 'center' }}
+                justifyContent="space-between"
+                sx={{
+                    mb: open ? 1.4 : 0,
+                    pb: open ? 1.4 : 0,
+                    borderBottom: open ? `1px solid ${theme.custom.border.soft}` : 'none',
+                    transition: `border-color ${theme.custom.motion.swift}, margin-bottom ${theme.custom.motion.swift}, padding-bottom ${theme.custom.motion.swift}`,
+                }}
+            >
+                <Button
+                    onClick={toggleOpen}
+                    endIcon={open ? <ExpandLess /> : <ExpandMore />}
+                    aria-expanded={open}
+                    aria-controls="trait-meta-collapse"
+                    sx={{
+                        justifyContent: 'flex-start',
+                        px: 0,
+                        py: 0.25,
+                        color: '#1f2933',
+                        fontSize: { xs: '1.85rem', md: '2.25rem' },
+                        fontWeight: 760,
+                        lineHeight: 1.15,
+                        '&:hover': {
+                            bgcolor: 'transparent',
+                            color: '#1f6fc9',
+                        },
+                        '& .MuiButton-endIcon svg': {
+                            fontSize: { xs: 24, md: 28 },
+                        },
+                    }}
+                >
+                    Trait information
+                </Button>
+                <Stack direction="row" spacing={0.8} alignItems="center" justifyContent={{ xs: 'space-between', sm: 'flex-end' }}>
+                    {exportButton}
+                    <Tooltip title={open ? 'Collapse trait information' : 'Expand trait information'} arrow>
+                        <IconButton
+                            size="small"
+                            onClick={toggleOpen}
+                            aria-label={open ? 'Collapse trait information' : 'Expand trait information'}
+                            aria-expanded={open}
+                            aria-controls="trait-meta-collapse"
+                            sx={{
+                                border: `1px solid ${theme.custom.border.soft}`,
+                                borderRadius: 1,
+                                color: theme.palette.text.secondary,
+                                bgcolor: '#ffffff',
+                                '&:hover': {
+                                    color: '#1f6fc9',
+                                    bgcolor: alpha('#1f6fc9', 0.06),
+                                },
+                            }}
+                        >
+                            {open ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                        </IconButton>
+                    </Tooltip>
+                </Stack>
+            </Stack>
+            <Collapse in={open} timeout="auto" unmountOnExit id="trait-meta-collapse">
             <Box
                 sx={{
                     display: 'grid',
@@ -413,11 +486,12 @@ export default function TraitMetaCard({ fileId }) {
                     },
                 }}
             >
-                <TraitInfoTable title="Trait information" rows={traitRows} theme={theme} action={exportButton} />
+                <TraitInfoTable title="Trait information" rows={traitRows} theme={theme} hideTitle />
                 <TraitInfoTable title="Study information" rows={studyRows} theme={theme} />
                 <TraitInfoTable title="Burden information" rows={burdenRows} theme={theme} />
                 <TraitInfoTable title="LDSC information" rows={ldscRows} theme={theme} />
             </Box>
+            </Collapse>
         </Paper>
     );
 }

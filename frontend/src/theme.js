@@ -133,6 +133,10 @@ const theme = createTheme({
                 'html, body, #root': {
                     minHeight: '100%',
                 },
+                html: {
+                    overflowY: 'scroll',
+                    scrollbarGutter: 'stable',
+                },
                 body: {
                     margin: 0,
                     background: 'linear-gradient(180deg, #f6f9fd 0%, #eef4fb 100%) fixed',
@@ -233,6 +237,21 @@ const theme = createTheme({
         MuiTextField: {
             defaultProps: {
                 variant: 'outlined',
+            },
+        },
+        MuiPopover: {
+            defaultProps: {
+                disableScrollLock: true,
+            },
+        },
+        MuiMenu: {
+            defaultProps: {
+                disableScrollLock: true,
+            },
+        },
+        MuiModal: {
+            defaultProps: {
+                disableScrollLock: true,
             },
         },
         MuiOutlinedInput: {
@@ -338,6 +357,9 @@ const theme = createTheme({
             },
         },
         MuiDialog: {
+            defaultProps: {
+                disableScrollLock: true,
+            },
             styleOverrides: {
                 paper: {
                     borderRadius: 6,

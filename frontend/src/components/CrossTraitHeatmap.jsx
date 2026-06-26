@@ -6,15 +6,19 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
+import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Slider from '@mui/material/Slider';
 import { alpha, useTheme } from '@mui/material/styles';
+import Download from '@mui/icons-material/Download';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import RestartAlt from '@mui/icons-material/RestartAlt';
 import Hub from '@mui/icons-material/Hub';
 import Search from '@mui/icons-material/Search';
 import Timeline from '@mui/icons-material/Timeline';
+import { downloadBlob } from '../utils/download';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
@@ -22,6 +26,7 @@ import {
     getCrossTraitStatus,
     getCrossTraitTargets,
 } from '../api/gwas';
+import FigureLoadingPanel from './FigureLoadingPanel';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
@@ -30,16 +35,31 @@ import {
     buildPlotHoverTone,
     chartLayoutTokens,
     metricChipTone,
-    plotFrameSx,
     RESPONSIVE_EMPTY_PLOT_HEIGHT,
     RESPONSIVE_PLOT_MAX_HEIGHT,
     RESPONSIVE_PLOT_HEIGHT,
-    sectionTitleSx,
     summaryChipSx,
-    toolbarSx,
+    tableToolbarActionButtonSx,
+    tableToolbarGroupSx,
 } from '../themeUtils';
 import { StatePanel, UpdatingStatus } from './PageScaffold';
 import CrossTraitHeatmapTable from './CrossTraitHeatmapTable';
+
+function escapeCsvValue(value) {
+    const text = value == null ? '' : String(value);
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function buildMatrixCsv(payload) {
+    const targets = payload?.targets || [];
+    const header = ['Gene', 'ENSG', ...targets.map((target) => target.trait_name || target.file_id)];
+    const rows = (payload?.genes || []).map((gene, rowIndex) => [
+        gene.gene || '',
+        gene.ensg || '',
+        ...targets.map((_, colIndex) => payload?.matrix?.[rowIndex]?.[colIndex] ?? ''),
+    ]);
+    return `${[header, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n')}\n`;
+}
 
 const DEFAULT_TOP_GENES = 25;
 const MIN_TOP_GENES = 10;
@@ -100,13 +120,6 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     const theme = useTheme();
     const navigate = useNavigate();
     const chartTokens = chartLayoutTokens(theme);
-    const toolbarPanelSx = useMemo(() => ({
-        px: 1,
-        py: 0.7,
-        borderRadius: 2,
-        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-        backgroundColor: alpha(theme.palette.background.paper, 0.82),
-    }), [theme.palette.background.paper, theme.palette.divider]);
     const currentTrait = useMemo(() => normalizeTraitOption({
         file_id: fileId,
         gwas_id: gwasId,
@@ -271,10 +284,13 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         );
         const cellCount = (matrixPayload.targets.length || 0) * (matrixPayload.genes.length || 0);
         const compactHover = cellCount > 2500;
+        const showTargetTraitLabels = matrixPayload.targets.length > 1;
         return [{
             type: 'heatmap',
             z: matrixPayload.matrix,
-            x: matrixPayload.targets.map((target) => truncateLabel(target.trait_name, 24)),
+            x: matrixPayload.targets.map((target) => (
+                showTargetTraitLabels ? truncateLabel(target.trait_name, 24) : 'Target trait'
+            )),
             y: matrixPayload.genes.map((_, index) => index),
             customdata: compactHover
                 ? matrixPayload.matrix.map((row, rowIndex) => row.map((_, colIndex) => [
@@ -310,7 +326,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             }),
             showscale: true,
             colorbar: {
-                title: { text: 'Gene LoF effect (post_mean)', side: 'top', font: { size: 11 } },
+                title: { text: 'post_mean', side: 'top', font: { size: 11 } },
                 orientation: 'h',
                 x: 0.99,
                 xanchor: 'right',
@@ -411,6 +427,14 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
         setReadyPlotKey(plotRenderKey);
     }, [plotRenderKey]);
 
+    const downloadCSV = useCallback(() => {
+        if (!matrixPayload) return;
+        downloadBlob(
+            new Blob([buildMatrixCsv(matrixPayload)], { type: 'text/csv;charset=utf-8;' }),
+            `${fileId || 'trait'}-cross-trait-gene-effects.csv`,
+        );
+    }, [fileId, matrixPayload]);
+
     const shouldRenderTable = useIdleRenderGate(
         !matrixBusy && afterFirstPaint && plotReady && Boolean(matrixPayload?.targets?.length && matrixPayload?.genes?.length),
         `${matrixKey || 'cross-trait-empty'}:${matrixCellCount}`,
@@ -419,9 +443,11 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
 
     if (statusLoading) {
         return (
-            <Box sx={{ minHeight: RESPONSIVE_EMPTY_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CircularProgress size={46} />
-            </Box>
+            <FigureLoadingPanel
+                minHeight={RESPONSIVE_EMPTY_PLOT_HEIGHT}
+                message="Checking cross-trait heatmap availability..."
+                size={46}
+            />
         );
     }
 
@@ -437,145 +463,160 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-            <Box sx={toolbarSx(theme, { alignItems: 'stretch', px: 1.25, py: 0.85, gap: 0.75 })}>
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                            xs: '1fr',
-                            lg: 'minmax(260px, 1.1fr) minmax(240px, 280px) minmax(260px, 320px)',
-                        },
-                        gap: 0.75,
-                        alignItems: 'stretch',
-                        width: '100%',
-                    }}
-                >
-                    <Box sx={{ ...toolbarPanelSx, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 0.55 }}>
-                        <Box>
-                            <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.15 }}>
-                                Cross-trait Heatmap
-                            </Typography>
-                            <Typography sx={sectionTitleSx(theme, { fontSize: '0.96rem', lineHeight: 1.2 })}>
-                                Shared gene effects across selected traits
-                            </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.45 }}>
-                            <Chip icon={<Timeline />} label={`${matrixPayload?.summary?.topGenes || topGeneCount} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                            <Chip icon={<Hub />} label={`${selectedTargets.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
-                            <Chip icon={<Search />} label={`${matrixPayload?.summary?.missingCells?.toLocaleString?.() || 0} missing`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
-                            <UpdatingStatus active={statusRefreshing || targetsRefreshing || matrixRefreshing} />
-                        </Box>
-                    </Box>
-
-                    <Box sx={toolbarPanelSx}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary, mb: 0.4 }}>
-                            Top related traits
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, overflowAnchor: 'none' }}>
+            {/* CARD 1: Filters & Options */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden', overflowAnchor: 'none' }}>
+                <Box sx={{ px: 2.5, py: 1.5, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            Cross-trait Heatmap Controls
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                            <Slider
-                                size="small"
-                                value={targetTraitCountDraftValue}
-                                min={MIN_TARGET_LIMIT}
-                                max={relatedTraitSliderMax}
-                                step={1}
-                                marks={relatedTraitCountMarks}
-                                onChange={(_, value) => setTargetTraitCountDraft(Array.isArray(value) ? value[0] : value)}
-                                onChangeCommitted={(_, value) => commitTargetTraitCount(Array.isArray(value) ? value[0] : value)}
-                                sx={{ flex: 1, mt: 0.35, mb: 0 }}
-                            />
-                            <TextField
-                                size="small"
-                                value={targetTraitCountDraftValue}
-                                onChange={(event) => setTargetTraitCountDraft(event.target.value)}
-                                slotProps={{
-                                    htmlInput: {
-                                        min: MIN_TARGET_LIMIT,
-                                        max: relatedTraitSliderMax,
-                                        step: 1,
-                                        inputMode: 'numeric',
-                                    },
-                                }}
+                        <Tooltip title="Color legend shows GeneBayes LoF posterior mean effect (post_mean): blue is negative, coral is positive." arrow>
+                            <Box
+                                component="span"
+                                tabIndex={0}
+                                aria-label="Cross-trait heatmap color legend details"
                                 sx={{
-                                    width: 72,
-                                    '& .MuiInputBase-input': {
-                                        textAlign: 'center',
-                                        fontWeight: 700,
+                                    display: 'inline-flex',
+                                    color: theme.palette.text.secondary,
+                                    opacity: 0.78,
+                                    cursor: 'help',
+                                    '&:focus-visible': {
+                                        outline: `2px solid ${alpha(theme.palette.primary.main, 0.45)}`,
+                                        outlineOffset: 2,
+                                        borderRadius: 1,
                                     },
                                 }}
-                            />
-                        </Box>
-                    </Box>
-
-                    <Box sx={toolbarPanelSx}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.75, mb: 0.4 }}>
-                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'none', color: theme.palette.text.secondary }}>
-                                Gene rows
-                            </Typography>
-                            <Button
-                                variant="text"
-                                size="small"
-                                startIcon={<RestartAlt />}
-                                onClick={() => {
-                                    setTargetTraitCount(DEFAULT_TARGET_LIMIT);
-                                    setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT));
-                                    setTopGeneCount(DEFAULT_TOP_GENES);
-                                    setAppliedTargets([]);
-                                    setAppliedTopGeneCount(DEFAULT_TOP_GENES);
-                                    setRenderVersion(0);
-                                }}
-                                sx={{ textTransform: 'none', color: theme.palette.text.secondary, fontWeight: 600, minHeight: 28, py: 0, px: 0.5 }}
                             >
-                                Reset
-                            </Button>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                            <Slider
-                                size="small"
-                                value={topGeneCountDraftValue}
-                                min={MIN_TOP_GENES}
-                                max={MAX_TOP_GENES}
-                                step={5}
-                                marks={[
-                                    { value: MIN_TOP_GENES, label: String(MIN_TOP_GENES) },
-                                    { value: 50, label: '50' },
-                                    { value: MAX_TOP_GENES, label: String(MAX_TOP_GENES) },
-                                ]}
-                                onChange={(_, value) => setTopGeneCountDraft(Array.isArray(value) ? value[0] : value)}
-                                onChangeCommitted={(_, value) => commitTopGeneCountDraft(Array.isArray(value) ? value[0] : value)}
-                                sx={{ flex: 1, mt: 0.35, mb: 0 }}
-                            />
-                            <TextField
-                                size="small"
-                                value={topGeneCountDraftValue}
-                                onChange={(event) => {
-                                    const raw = Number.parseInt(event.target.value, 10);
-                                    if (Number.isNaN(raw)) {
-                                        setTopGeneCountDraft(MIN_TOP_GENES);
-                                        return;
-                                    }
-                                    setTopGeneCountDraft(Math.min(MAX_TOP_GENES, Math.max(MIN_TOP_GENES, raw)));
-                                }}
-                                slotProps={{
-                                    htmlInput: {
-                                        min: MIN_TOP_GENES,
-                                        max: MAX_TOP_GENES,
-                                        step: 5,
-                                        inputMode: 'numeric',
-                                    },
-                                }}
-                                sx={{
-                                    width: 72,
-                                    '& .MuiInputBase-input': {
-                                        textAlign: 'center',
-                                        fontWeight: 700,
-                                    },
-                                }}
-                            />
-                        </Box>
+                                <InfoOutlined sx={{ fontSize: 14 }} />
+                            </Box>
+                        </Tooltip>
+                    </Box>
+                    <Box sx={tableToolbarGroupSx(theme)}>
+                        <Button
+                            size="small"
+                            startIcon={<RestartAlt />}
+                            onClick={() => {
+                                setTargetTraitCount(DEFAULT_TARGET_LIMIT);
+                                setSelectedTargets(prependPinnedTrait(recommended, currentTrait).slice(0, DEFAULT_TARGET_LIMIT));
+                                setTopGeneCount(DEFAULT_TOP_GENES);
+                                setAppliedTargets([]);
+                                setAppliedTopGeneCount(DEFAULT_TOP_GENES);
+                                setRenderVersion(0);
+                            }}
+                            sx={tableToolbarActionButtonSx(theme, 'neutral')}
+                        >
+                            Reset
+                        </Button>
+                        <Button 
+                            size="small"
+                            startIcon={<Download />} 
+                            onClick={downloadCSV} 
+                            disabled={!matrixPayload?.genes?.length} 
+                            sx={tableToolbarActionButtonSx(theme)}
+                        >
+                            Export CSV
+                        </Button>
                     </Box>
                 </Box>
-            </Box>
+                <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                        {/* Top Related Traits Slider */}
+                        <Stack direction="row" spacing={2} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0, whiteSpace: 'nowrap' }}>
+                                Related Traits:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 240 }}>
+                                <Slider
+                                    size="small"
+                                    value={targetTraitCountDraftValue}
+                                    min={MIN_TARGET_LIMIT}
+                                    max={relatedTraitSliderMax}
+                                    step={1}
+                                    marks={relatedTraitCountMarks}
+                                    onChange={(_, value) => setTargetTraitCountDraft(Array.isArray(value) ? value[0] : value)}
+                                    onChangeCommitted={(_, value) => commitTargetTraitCount(Array.isArray(value) ? value[0] : value)}
+                                    sx={{ flex: 1, '& .MuiSlider-thumb': { width: 13, height: 13 } }}
+                                />
+                                <TextField
+                                    size="small"
+                                    value={targetTraitCountDraftValue}
+                                    onChange={(event) => setTargetTraitCountDraft(event.target.value)}
+                                    slotProps={{
+                                        htmlInput: {
+                                            min: MIN_TARGET_LIMIT,
+                                            max: relatedTraitSliderMax,
+                                            step: 1,
+                                            inputMode: 'numeric',
+                                        },
+                                    }}
+                                    sx={{
+                                        width: 58,
+                                        '& .MuiInputBase-input': {
+                                            textAlign: 'center',
+                                            fontWeight: 700,
+                                            py: 0.5,
+                                        },
+                                    }}
+                                />
+                            </Box>
+                        </Stack>
+
+                        {/* Gene Rows Slider */}
+                        <Stack direction="row" spacing={2} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 650, color: 'text.secondary', fontSize: '0.76rem', textTransform: 'none', letterSpacing: 0, whiteSpace: 'nowrap' }}>
+                                Gene Rows:
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 240 }}>
+                                <Slider
+                                    size="small"
+                                    value={topGeneCountDraftValue}
+                                    min={MIN_TOP_GENES}
+                                    max={MAX_TOP_GENES}
+                                    step={5}
+                                    marks={[
+                                        { value: MIN_TOP_GENES, label: String(MIN_TOP_GENES) },
+                                        { value: 50, label: '50' },
+                                        { value: MAX_TOP_GENES, label: String(MAX_TOP_GENES) },
+                                    ]}
+                                    onChange={(_, value) => setTopGeneCountDraft(Array.isArray(value) ? value[0] : value)}
+                                    onChangeCommitted={(_, value) => commitTopGeneCountDraft(Array.isArray(value) ? value[0] : value)}
+                                    sx={{ flex: 1, '& .MuiSlider-thumb': { width: 13, height: 13 } }}
+                                />
+                                <TextField
+                                    size="small"
+                                    value={topGeneCountDraftValue}
+                                    onChange={(event) => {
+                                        const raw = Number.parseInt(event.target.value, 10);
+                                        if (Number.isNaN(raw)) {
+                                            setTopGeneCountDraft(MIN_TOP_GENES);
+                                            return;
+                                        }
+                                        setTopGeneCountDraft(Math.min(MAX_TOP_GENES, Math.max(MIN_TOP_GENES, raw)));
+                                    }}
+                                    slotProps={{
+                                        htmlInput: {
+                                            min: MIN_TOP_GENES,
+                                            max: MAX_TOP_GENES,
+                                            step: 5,
+                                            inputMode: 'numeric',
+                                        },
+                                    }}
+                                    sx={{
+                                        width: 58,
+                                        '& .MuiInputBase-input': {
+                                            textAlign: 'center',
+                                            fontWeight: 700,
+                                            py: 0.5,
+                                        },
+                                    }}
+                                />
+                            </Box>
+                        </Stack>
+                    </Box>
+
+                </CardContent>
+            </Card>
 
             {!selectedTargets.length && (
                 <Alert severity="info">
@@ -589,17 +630,30 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                 </Alert>
             )}
 
-            <Card elevation={0} sx={plotFrameSx(theme)}>
+            {/* CARD 2: Heatmap Frame */}
+            <Card variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden', overflowAnchor: 'none' }}>
+                <Box sx={{ px: 2.5, py: 1.2, bgcolor: theme.custom?.surface?.subtle || 'grey.50', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                    <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" alignItems="center">
+                        <Typography sx={{ fontWeight: 680, fontSize: '0.9rem', color: 'text.primary', letterSpacing: '0.02em' }}>
+                            Cross-trait Heatmap Matrix
+                        </Typography>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', mr: 0.5, fontSize: '0.74rem' }}>
+                                Summary Stats:
+                            </Typography>
+                            <Chip icon={<Timeline sx={{ fontSize: '14px !important' }} />} label={`${matrixPayload?.summary?.topGenes || topGeneCount} genes`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                            <Chip icon={<Hub sx={{ fontSize: '14px !important' }} />} label={`${selectedTargets.length.toLocaleString()} traits`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                            <Chip icon={<Search sx={{ fontSize: '14px !important' }} />} label={`${matrixPayload?.summary?.missingCells?.toLocaleString?.() || 0} missing`} size="small" sx={summaryChipSx(theme, metricChipTone(theme, 'warning'))} />
+                        </Stack>
+                    </Stack>
+                    <UpdatingStatus active={statusRefreshing || targetsRefreshing || matrixRefreshing} />
+                </Box>
                 <CardContent sx={{ p: 0, position: 'relative' }}>
                     {matrixBusy && (
-                        <Box sx={{ minHeight: RESPONSIVE_PLOT_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    {matrixLoading ? 'Loading cross-trait heatmap...' : 'Updating cross-trait heatmap...'}
-                                </Typography>
-                            </Box>
-                        </Box>
+                        <FigureLoadingPanel
+                            minHeight={RESPONSIVE_PLOT_HEIGHT}
+                            message={matrixLoading ? 'Loading cross-trait heatmap...' : 'Updating cross-trait heatmap...'}
+                        />
                     )}
 
                     {!matrixBusy && hasRenderedMatrix && plotData.length === 0 && (
@@ -619,25 +673,17 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     )}
 
                     {!matrixBusy && plotData.length > 0 && !afterFirstPaint && (
-                        <Box sx={{ minHeight: plotHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    Rendering cross-trait heatmap...
-                                </Typography>
-                            </Box>
-                        </Box>
+                        <FigureLoadingPanel
+                            minHeight={plotHeight}
+                            message="Rendering cross-trait heatmap..."
+                        />
                     )}
 
                     {!matrixBusy && plotData.length > 0 && afterFirstPaint && !plotReady && (
-                        <Box sx={{ minHeight: plotHeight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <CircularProgress size={52} />
-                                <Typography variant="body2" sx={{ mt: 1.5, color: theme.palette.text.secondary }}>
-                                    Rendering cross-trait heatmap...
-                                </Typography>
-                            </Box>
-                        </Box>
+                        <FigureLoadingPanel
+                            minHeight={plotHeight}
+                            message="Rendering cross-trait heatmap..."
+                        />
                     )}
 
                     {!matrixBusy && plotData.length > 0 && afterFirstPaint && (
