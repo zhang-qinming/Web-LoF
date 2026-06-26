@@ -16,8 +16,11 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import Download from '@mui/icons-material/Download';
+import Hub from '@mui/icons-material/Hub';
+import Insights from '@mui/icons-material/Insights';
 import Refresh from '@mui/icons-material/Refresh';
 import RestartAlt from '@mui/icons-material/RestartAlt';
+import Science from '@mui/icons-material/Science';
 import Timeline from '@mui/icons-material/Timeline';
 import useSWR from 'swr';
 import { getCrossTraitTargets, getDataFileText } from '../api/gwas';
@@ -536,12 +539,7 @@ function buildEnvelope(rows, resolveColor) {
 export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = [] }) {
     const theme = useTheme();
     const chartTokens = useMemo(() => chartLayoutTokens(theme), [theme]);
-    const compactMetricChipSx = useCallback((tone) => summaryChipSx(theme, {
-        ...tone,
-        height: 22,
-        fontSize: '0.68rem',
-        '& .MuiChip-label': { px: 0.85 },
-    }), [theme]);
+
     const plotRef = useRef(null);
     const plotElRef = useRef(null);
     const tableRowRefs = useRef({});
@@ -1489,10 +1487,42 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                                 size="small"
                                 sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))}
                             />
-                            <Chip label={`${activeTraits.length.toLocaleString()} traits`} size="small" sx={compactMetricChipSx(metricChipTone(theme, 'primary'))} />
-                            <Chip label={`${counts.fdr.toLocaleString()} FDR`} size="small" sx={compactMetricChipSx({ backgroundColor: alpha(chartTokens.threshold, 0.08), color: chartTokens.threshold, border: `1px solid ${alpha(chartTokens.threshold, 0.22)}` })} />
-                            <Chip label={`${counts.positive.toLocaleString()} +`} size="small" sx={compactMetricChipSx({ backgroundColor: alpha(TAIL_META.positive.color, 0.08), color: TAIL_META.positive.color, border: `1px solid ${alpha(TAIL_META.positive.color, 0.2)}` })} />
-                            <Chip label={`${counts.negative.toLocaleString()} -`} size="small" sx={compactMetricChipSx({ backgroundColor: alpha(TAIL_META.negative.color, 0.08), color: TAIL_META.negative.color, border: `1px solid ${alpha(TAIL_META.negative.color, 0.2)}` })} />
+                            <Chip
+                                icon={<Hub sx={{ fontSize: '14px !important' }} />}
+                                label={activeTraits.length === 1 ? '1 trait' : `${activeTraits.length.toLocaleString()} traits`}
+                                size="small"
+                                sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))}
+                            />
+                            <Chip
+                                icon={<Insights sx={{ fontSize: '14px !important' }} />}
+                                label={`${counts.fdr.toLocaleString()} FDR significant`}
+                                size="small"
+                                sx={summaryChipSx(theme, {
+                                    backgroundColor: alpha(chartTokens.threshold, 0.08),
+                                    color: chartTokens.threshold,
+                                    border: `1px solid ${alpha(chartTokens.threshold, 0.22)}`,
+                                })}
+                            />
+                            <Chip
+                                icon={<Science sx={{ fontSize: '14px !important' }} />}
+                                label={`${counts.positive.toLocaleString()} positive`}
+                                size="small"
+                                sx={summaryChipSx(theme, {
+                                    backgroundColor: alpha(TAIL_META.positive.color, 0.08),
+                                    color: TAIL_META.positive.color,
+                                    border: `1px solid ${alpha(TAIL_META.positive.color, 0.2)}`,
+                                })}
+                            />
+                            <Chip
+                                icon={<Science sx={{ fontSize: '14px !important' }} />}
+                                label={`${counts.negative.toLocaleString()} negative`}
+                                size="small"
+                                sx={summaryChipSx(theme, {
+                                    backgroundColor: alpha(TAIL_META.negative.color, 0.08),
+                                    color: TAIL_META.negative.color,
+                                    border: `1px solid ${alpha(TAIL_META.negative.color, 0.2)}`,
+                                })}
+                            />
                         </Stack>
                     </Stack>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

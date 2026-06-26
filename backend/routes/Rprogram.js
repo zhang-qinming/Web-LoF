@@ -9,6 +9,7 @@ const { normalizeSafeBaseName, normalizeSafeBaseNameList } = require('../lib/req
 const { parseTsvStream } = require('../lib/tsv');
 const { findVariantFile } = require('../lib/variantFiles');
 const { trySendPrecomputedJson } = require('../lib/precomputedJson');
+const { normalizeGraphRows } = require('../lib/traitProgramGraphSchema');
 
 const router = express.Router();
 
@@ -386,15 +387,16 @@ function sortProgramsForRole(programs, role) {
 }
 
 function buildGraphPayload(fileId, programRows, geneRows) {
+    const normalized = normalizeGraphRows(programRows, geneRows);
     const programMap = new Map();
 
-    for (const row of programRows) {
+    for (const row of normalized.programRows) {
         const node = buildProgramNode(row);
         if (!node.program) continue;
         programMap.set(node.program, node);
     }
 
-    for (const row of geneRows) {
+    for (const row of normalized.geneRows) {
         const gene = buildGeneNode(row);
         if (!gene) continue;
 
@@ -444,7 +446,9 @@ function buildGraphPayload(fileId, programRows, geneRows) {
         'program',
     );
     const traitId = normalizeText(
-        programs.find((program) => program.traitId)?.traitId || programRows[0]?.trait_id || geneRows[0]?.trait_id,
+        programs.find((program) => program.traitId)?.traitId
+            || normalized.programRows[0]?.trait_id
+            || normalized.geneRows[0]?.trait_id,
         fileId,
     );
 

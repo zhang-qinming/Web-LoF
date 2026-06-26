@@ -6,6 +6,7 @@ const readline = require('readline');
 const { once } = require('events');
 const mysql = require('mysql2/promise');
 const { config } = require('../lib/config');
+const { normalizeGraphRows } = require('../lib/traitProgramGraphSchema');
 const { REFRESH_GENE_SUMMARY_SQL, refreshGeneSummary } = require('./lib/geneSummary');
 
 const BATCH_SIZE = 1000;
@@ -330,12 +331,13 @@ async function collectRecords(rootDir, { source = 'auto', apiBase = null } = {})
         }
 
         try {
-            const programRows = sourceMode === 'api'
+            const rawProgramRows = sourceMode === 'api'
                 ? await parseTsvFromApi(apiBase, pair.programPath)
                 : await parseTsvFile(pair.programPath || path.join(rootDir, pair.programFile));
-            const geneRows = sourceMode === 'api'
+            const rawGeneRows = sourceMode === 'api'
                 ? await parseTsvFromApi(apiBase, pair.genePath)
                 : await parseTsvFile(pair.genePath || path.join(rootDir, pair.geneFile));
+            const { programRows, geneRows } = normalizeGraphRows(rawProgramRows, rawGeneRows);
             const programRecords = programRows
                 .map((row) => programRowToRecord(row, pair.fileId, pair.programFile))
                 .filter(Boolean);

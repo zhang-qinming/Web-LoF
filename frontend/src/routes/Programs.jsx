@@ -375,38 +375,61 @@ function programTableColumnHeaderSx(theme, tone, align) {
 function ProgramSummaryChips({ summary }) {
     const theme = useTheme();
     const items = [
-        { label: 'traits', value: summary?.totalTraits, tone: 'primary' },
-        { label: 'program enriched', value: summary?.selectedByProgram, tone: 'warning' },
-        { label: 'regulator enriched', value: summary?.selectedByRegulator, tone: 'primary' },
-        { label: 'both enriched', value: summary?.bothSelected, tone: 'success' },
+        { label: 'Traits', value: summary?.totalTraits, tone: 'primary' },
+        { label: 'Program Enriched', value: summary?.selectedByProgram, tone: 'warning' },
+        { label: 'Regulator Enriched', value: summary?.selectedByRegulator, tone: 'primary' },
+        { label: 'Both Enriched', value: summary?.bothSelected, tone: 'success' },
     ];
 
     return (
-        <Stack
-            direction="row"
+        <Box
             sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                    xs: 'repeat(2, minmax(0, 1fr))',
+                    sm: 'repeat(4, minmax(104px, 1fr))',
+                    md: 'repeat(4, minmax(104px, 1fr))',
+                    lg: 'repeat(4, minmax(116px, 1fr))',
+                },
+                gap: { xs: 0.75, md: 0.9 },
+                width: '100%',
                 minWidth: 0,
-                flexWrap: 'wrap',
-                justifyContent: { xs: 'flex-start', md: 'flex-end' },
-                gap: 0.55,
             }}
         >
-            {items.map((item) => (
-                <Chip
-                    key={item.label}
-                    label={`${(Number(item.value) || 0).toLocaleString()} ${item.label}`}
-                    size="small"
-                    sx={summaryChipSx(theme, {
-                        ...metricChipTone(theme, item.tone),
-                        height: 22,
-                        fontWeight: 700,
-                        '& .MuiChip-label': {
-                            whiteSpace: 'nowrap',
-                        },
-                    })}
-                />
-            ))}
-        </Stack>
+            {items.map((item) => {
+                const colors = metricChipTone(theme, item.tone);
+                return (
+                    <Box
+                        key={item.label}
+                        sx={{
+                            px: { xs: 1, md: 1.15 },
+                            py: { xs: 0.85, md: 0.95 },
+                            minHeight: { xs: 58, md: 64 },
+                            borderRadius: 1.2,
+                            border: colors.border,
+                            bgcolor: colors.backgroundColor,
+                            color: colors.color,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            transition: 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s cubic-bezier(0.2, 0, 0, 1)',
+                            '&:hover': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: `0 6px 14px ${alpha(colors.color, 0.08)}`,
+                                borderColor: alpha(colors.color, 0.32),
+                            },
+                        }}
+                    >
+                        <Typography sx={{ fontSize: { xs: '1rem', md: '1.1rem' }, lineHeight: 1.08, fontWeight: 760, fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1' }}>
+                            {(Number(item.value) || 0).toLocaleString()}
+                        </Typography>
+                        <Typography sx={{ mt: 0.35, fontSize: '0.66rem', fontWeight: 650, letterSpacing: '0.04em', textTransform: 'none', color: alpha(colors.color, 0.82) }}>
+                            {item.label}
+                        </Typography>
+                    </Box>
+                );
+            })}
+        </Box>
     );
 }
 
@@ -1289,6 +1312,9 @@ export default function Programs() {
                                 minWidth: 0,
                                 width: 'auto',
                                 flex: { xs: '1 1 auto', md: '0 1 auto' },
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1.5,
                             }}
                         >
                             <ProgramSwitcher
@@ -1297,11 +1323,18 @@ export default function Programs() {
                                 onSelect={handleProgramSelect}
                                 onPreload={preloadProgram}
                             />
-                        </Box>
-                        <Stack direction="row" spacing={0.8} alignItems="center" sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-                            <ProgramSummaryChips summary={detailSummary} />
                             <UpdatingStatus active={traitRefreshing || geneRefreshing} />
-                        </Stack>
+                        </Box>
+                        <Box
+                            sx={{
+                                minWidth: 0,
+                                flex: { xs: '1 1 auto', md: '1 1 0%' },
+                                maxWidth: { md: 560 },
+                                width: '100%',
+                            }}
+                        >
+                            <ProgramSummaryChips summary={detailSummary} />
+                        </Box>
                     </Stack>
                 </Paper>
 

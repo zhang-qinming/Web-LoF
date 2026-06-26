@@ -95,7 +95,7 @@ DATASETS = {
         "input_dir": Path(
             os.environ.get(
                 "TRAIT_PROGRAM_GENE_PANEL_DIR",
-                DATA_ROOT / "trait_program_gene_panel" / "tables",
+                DATA_ROOT / "trait_program_gene_model_5program_3regulator" / "tables",
             )
         ),
         "suffixes": {".tsv"},
