@@ -21,6 +21,8 @@ import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOpt
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { useIdleRenderGate } from '../utils/renderScheduling';
+import { compareValues } from '../utils/sort';
+import { formatScientificNumber } from '../utils/numbers';
 import ExportPlotDialog from './ExportPlotDialog';
 import FigureLoadingPanel from './FigureLoadingPanel';
 import GeneRegulationTable from './GeneRegulationTable';
@@ -183,7 +185,7 @@ export default function GeneRegulation({ programId }) {
             automargin: true,
         };
         const baseYaxis = {
-            title: { text: '-log10(P-value)', font: { size: 13, color: chartTokens.axisColor, family: theme.typography.fontFamily } },
+            title: { text: '-log10(p-value)', font: { size: 13, color: chartTokens.axisColor, family: theme.typography.fontFamily } },
             showline: true,
             linecolor: chartTokens.axisSoft,
             ticks: 'outside',
@@ -268,7 +270,7 @@ export default function GeneRegulation({ programId }) {
                 if (!grouped[category]) grouped[category] = { x: [], y: [], text: [], customdata: [] };
                 grouped[category].x.push(row.es);
                 grouped[category].y.push(row.negLogP);
-                grouped[category].text.push(`<b>${row.gene}</b><br>Effect size: ${row.es?.toFixed(4)}<br>P value: ${row.p?.toExponential(2)}`);
+                grouped[category].text.push(`<b>${row.gene}</b><br>Effect size: ${row.es?.toFixed(4)}<br>p-value: ${formatScientificNumber(row.p, 2)}`);
                 grouped[category].customdata.push([row.gene]);
             });
 
@@ -393,20 +395,14 @@ export default function GeneRegulation({ programId }) {
     const tablePaperRef = useRef(null);
     const tableRowRefs = useRef({});
 
-    const collator = useMemo(() => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), []);
-
     const sortedRows = useMemo(() => {
-        const dir = sortDir === 'asc' ? 1 : -1;
         return [...rows].sort((a, b) => {
             if (sortBy === 'gene') {
-                return collator.compare(a.gene || '', b.gene || '') * dir;
+                return compareValues(a.gene, b.gene, 'text', sortDir);
             }
-            const va = a[sortBy] ?? -Infinity;
-            const vb = b[sortBy] ?? -Infinity;
-            if (va === vb) return 0;
-            return va > vb ? dir : -dir;
+            return compareValues(a[sortBy], b[sortBy], 'number', sortDir);
         });
-    }, [rows, sortBy, sortDir, collator]);
+    }, [rows, sortBy, sortDir]);
 
     const shouldPaginateTable = sortedRows.length > 10;
     const totalPages = shouldPaginateTable ? Math.max(1, Math.ceil(sortedRows.length / rowsPerPage)) : 1;
@@ -459,7 +455,7 @@ export default function GeneRegulation({ programId }) {
     }, [sortBy]);
 
     const downloadCSV = useCallback(() => {
-        const hdr = 'Gene,Effect Size (lm_es),P-value (lm_p),-log10(P)';
+        const hdr = 'Gene,Effect Size (lm_es),p-value (lm_p),-log10(p-value)';
         const body = rows.map(r => [r.gene, r.es, r.p, r.negLogP].join(',')).join('\n');
         const blob = new Blob([hdr + '\n' + body], { type: 'text/csv;charset=utf-8' });
         const baseName = (data?.fileName || `program${programId}.txt`).replace(/\.txt$/, '');
@@ -505,7 +501,7 @@ export default function GeneRegulation({ programId }) {
                                         Volcano plot
                                     </Typography>
                                     <Typography sx={{ mt: 0.35, fontSize: '0.73rem', lineHeight: 1.45, color: theme.palette.text.secondary }}>
-                                        Colors encode signal class: gray points are background, light orange and light blue are significant positive or negative hits, and darker orange and darker blue mark the top 100 strongest signals by P-value.
+                                        Colors encode signal class: gray points are background, light orange and light blue are significant positive or negative hits, and darker orange and darker blue mark the top 100 strongest signals by p-value.
                                     </Typography>
                                 </Box>
                                 <UpdatingStatus active={isRefreshing} />

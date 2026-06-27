@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useNavigate } from 'react-router-dom';
@@ -21,16 +20,23 @@ import {
     effectSignFromGene,
     formatNumber,
     GRAPH_LAYOUTS,
-    GRAPH_VIEW_MODES,
     positionModules,
     programColor,
     programSelectionLabel,
     SIDE_META,
     splitTraitTextLines,
+    SVG_WIDTH,
     traitNodeHeight,
     traitTextFontSize,
     useGraphTransform,
 } from './traitProgramGraph/shared';
+
+const GENE_LIMIT_OPTIONS = [
+    { label: '5', value: 5 },
+    { label: '10', value: 10 },
+    { label: '20', value: 20 },
+    { label: 'All', value: Number.POSITIVE_INFINITY },
+];
 
 function normalizeGeneQueryValue(value) {
     const text = String(value || '').trim();
@@ -64,11 +70,14 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
     const [selectedProgram, setSelectedProgram] = useState(null);
     const [selectedGene, setSelectedGene] = useState(null);
     const [expandedPrograms, setExpandedPrograms] = useState(() => new Set());
-    const [graphViewMode, setGraphViewMode] = useState(GRAPH_VIEW_MODES.compact);
+    const [geneLimit, setGeneLimit] = useState(5);
+    const [expandedAllGeneModuleKey, setExpandedAllGeneModuleKey] = useState(null);
 
     const {
         transform,
         isDragging,
+        isTransformAnimating,
+        transformAnimationMs,
         onPointerDown,
         onPointerMove,
         onPointerUp,
@@ -76,25 +85,96 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         zoomIn,
         zoomOut,
         reset,
+        animateToTransform,
+        focusBounds,
         shouldSuppressClick,
     } = useGraphTransform();
 
-    const graphLayout = GRAPH_LAYOUTS[graphViewMode] || GRAPH_LAYOUTS.compact;
-    const isFullGraph = graphViewMode === GRAPH_VIEW_MODES.full;
+    const isAllGeneMode = geneLimit === Number.POSITIVE_INFINITY;
+    const expandedAllGeneSide = isAllGeneMode ? expandedAllGeneModuleKey?.split(':')[0] : null;
+    const graphLayout = useMemo(() => {
+        if (!isAllGeneMode) return geneLimit >= 10 ? GRAPH_LAYOUTS.full : GRAPH_LAYOUTS.compact;
+
+        const layout = {
+            ...GRAPH_LAYOUTS.compact,
+            mode: GRAPH_LAYOUTS.full.mode,
+            defaultMaxGenes: 5,
+            leftProgramX: 56,
+            traitCenterX: 700,
+            rightProgramX: 900,
+            rightRegulatorX: 1250,
+            allGeneLabelCount: 5,
+            allGeneOverviewProgramW: GRAPH_LAYOUTS.full.leftProgramW,
+            allGeneOverviewRightProgramW: GRAPH_LAYOUTS.full.rightProgramW,
+            allGeneOverviewRegulatorW: GRAPH_LAYOUTS.full.rightRegulatorW,
+            allGeneProgramFocusCenterX: SVG_WIDTH * 0.36,
+            allGeneRegulatorFocusCenterX: SVG_WIDTH * 0.62,
+            allGeneProgramModuleH: 126,
+            allGeneRegulatorGroupH: 92,
+            allGeneExpandedPanelGap: 12,
+            allGeneExpandedMinH: 360,
+            allGeneDetailHeaderH: 52,
+            allGeneDetailGroupHeaderH: 22,
+            allGeneDetailRowH: 21,
+            allGeneDetailCellMinW: 86,
+            allGeneDetailCellGap: 7,
+            allGeneDetailGroupGap: 10,
+            allGeneDetailPaddingX: 12,
+            allGeneDetailPaddingY: 10,
+            allGeneDetailMaxColumns: 9,
+            allGeneExpandedProgramPanelW: 820,
+            allGeneExpandedRegulatorPanelW: 900,
+            moduleGap: GRAPH_LAYOUTS.compact.moduleGap,
+            regulatorGroupGap: 12,
+            graphTopPadding: 64,
+            graphBottomPadding: 34,
+            minContentHeight: 400,
+            minSvgHeight: GRAPH_LAYOUTS.compact.minSvgHeight,
+            showSectionNotes: false,
+        };
+
+        if (expandedAllGeneSide === 'regulator') {
+            return {
+                ...layout,
+                traitCenterX: 600,
+                rightProgramX: 790,
+                rightRegulatorX: 1190,
+                allGeneRegulatorFocusCenterX: SVG_WIDTH * 0.62,
+            };
+        }
+
+        if (expandedAllGeneSide === 'program') {
+            return {
+                ...layout,
+                traitCenterX: 1030,
+                rightProgramX: 1200,
+                rightProgramW: 220,
+                rightRegulatorX: 1445,
+                allGeneOverviewRightProgramW: 220,
+                allGeneOverviewRegulatorW: 220,
+                allGeneProgramFocusCenterX: SVG_WIDTH * 0.36,
+            };
+        }
+
+        return layout;
+    }, [expandedAllGeneSide, geneLimit, isAllGeneMode]);
+    const maxGenesPerProgram = geneLimit;
 
     const filters = useMemo(() => ({
         gammaThreshold: 0,
-        maxGenesPerProgram: graphLayout.defaultMaxGenes,
+        maxGenesPerProgram,
         discordantOnly: false,
         gammaSign: 'all',
         sideFilter: 'both',
-    }), [graphLayout.defaultMaxGenes]);
+        allGeneExpandedKey: isAllGeneMode ? expandedAllGeneModuleKey : null,
+    }), [expandedAllGeneModuleKey, isAllGeneMode, maxGenesPerProgram]);
 
     useEffect(() => {
         setSelectedProgram(null);
         setSelectedGene(null);
         setExpandedPrograms(new Set());
-        setGraphViewMode(GRAPH_VIEW_MODES.compact);
+        setExpandedAllGeneModuleKey(null);
+        setGeneLimit(5);
         reset();
     }, [fileId, reset]);
 
@@ -114,7 +194,20 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         const contentHeight = Math.max(leftBlueprint.contentHeight, rightBlueprint.contentHeight, graphLayout.minContentHeight);
         return Math.max(graphLayout.minSvgHeight, Math.ceil(contentHeight + graphLayout.graphTopPadding + graphLayout.graphBottomPadding));
     }, [graphLayout, leftBlueprint.contentHeight, rightBlueprint.contentHeight]);
-    const traitCenterY = useMemo(() => Math.round(svgHeight / 2), [svgHeight]);
+    const allGeneViewportHeight = useMemo(() => {
+        if (!isAllGeneMode) return svgHeight;
+
+        const viewportFilters = {
+            ...filters,
+            allGeneExpandedKey: null,
+        };
+        const leftViewportBlueprint = buildModuleBlueprints(leftPrograms, 'program', viewportFilters, expandedPrograms, graphLayout);
+        const rightViewportBlueprint = buildModuleBlueprints(rightPrograms, 'regulator', viewportFilters, expandedPrograms, graphLayout);
+        const contentHeight = Math.max(leftViewportBlueprint.contentHeight, rightViewportBlueprint.contentHeight, graphLayout.minContentHeight);
+        return Math.max(graphLayout.minSvgHeight, Math.ceil(contentHeight + graphLayout.graphTopPadding + graphLayout.graphBottomPadding));
+    }, [expandedPrograms, filters, graphLayout, isAllGeneMode, leftPrograms, rightPrograms, svgHeight]);
+    const svgViewportHeight = isAllGeneMode ? allGeneViewportHeight : svgHeight;
+    const traitCenterY = useMemo(() => Math.round(svgViewportHeight / 2), [svgViewportHeight]);
 
     const leftLayout = useMemo(
         () => positionModules(leftBlueprint.modules, 'program', traitCenterY, graphLayout),
@@ -170,6 +263,60 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         if (!stillVisible) setSelectedGene(null);
     }, [allModules, selectedGeneKey, visibleSides]);
 
+    useEffect(() => {
+        if (!expandedAllGeneModuleKey) return;
+        if (!isAllGeneMode) {
+            setExpandedAllGeneModuleKey(null);
+            return;
+        }
+
+        const stillVisible = allModules.some((module) => module.allGeneModuleKey === expandedAllGeneModuleKey);
+        if (!stillVisible) {
+            setExpandedAllGeneModuleKey(null);
+        }
+    }, [allModules, expandedAllGeneModuleKey, isAllGeneMode]);
+
+    useEffect(() => {
+        if (!expandedAllGeneModuleKey || !isAllGeneMode) return;
+
+        const module = allModules.find((item) => item.allGeneModuleKey === expandedAllGeneModuleKey && item.allGeneExpanded);
+        if (!module) return;
+
+        const panelWidth = module.allGeneDetailPanelWidth || (
+            module.side === 'regulator' ? graphLayout.rightRegulatorW : graphLayout.leftProgramW
+        );
+        const x = module.side === 'regulator' ? graphLayout.rightProgramX : module.xProgram;
+        const bounds = {
+            x: Math.max(0, x - 26),
+            y: Math.max(0, module.yTop - 32),
+            width: Math.min(SVG_WIDTH - x, panelWidth) + 52,
+            height: module.height + 64,
+        };
+        const tallFocus = bounds.height > svgViewportHeight * 0.74;
+        const paddingX = module.side === 'regulator'
+            ? (tallFocus ? 76 : 116)
+            : (tallFocus ? 82 : 104);
+        const paddingY = tallFocus ? 30 : 54;
+        const fitScale = Math.min(
+            SVG_WIDTH / Math.max(1, bounds.width + (paddingX * 2)),
+            svgViewportHeight / Math.max(1, bounds.height + (paddingY * 2)),
+        );
+        const preferredScale = module.side === 'regulator' ? 1.28 : 1.38;
+        const targetScale = Math.min(preferredScale, Math.max(tallFocus ? 1.04 : 1.12, fitScale * 1.08));
+
+        focusBounds(bounds, { width: SVG_WIDTH, height: svgViewportHeight }, {
+            scale: targetScale,
+            minScale: tallFocus ? 1.02 : 1.1,
+            maxScale: module.side === 'regulator' ? 1.42 : 1.52,
+            centerX: module.side === 'regulator'
+                ? (graphLayout.allGeneRegulatorFocusCenterX ?? SVG_WIDTH / 2)
+                : (graphLayout.allGeneProgramFocusCenterX ?? SVG_WIDTH / 2),
+            paddingX,
+            paddingY,
+            durationMs: 620,
+        });
+    }, [allModules, expandedAllGeneModuleKey, focusBounds, graphLayout, isAllGeneMode, svgViewportHeight]);
+
     const toggleExpanded = useCallback((program, side) => {
         setExpandedPrograms((current) => {
             const next = new Set(current);
@@ -199,12 +346,34 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
         setSelectedGene(null);
     }, []);
 
-    const toggleGraphViewMode = useCallback(() => {
-        setGraphViewMode((current) => (
-            current === GRAPH_VIEW_MODES.full ? GRAPH_VIEW_MODES.compact : GRAPH_VIEW_MODES.full
-        ));
+    const collapseAllGeneFocus = useCallback((options = {}) => {
+        setExpandedAllGeneModuleKey(null);
+        animateToTransform({ x: 0, y: 0, scale: 1 }, { durationMs: options.durationMs ?? 360 });
+    }, [animateToTransform]);
+
+    const handleGeneLimitChange = useCallback((nextLimit) => {
+        setExpandedAllGeneModuleKey(null);
+        setGeneLimit(nextLimit);
         reset();
     }, [reset]);
+
+    const handleToggleAllGeneModule = useCallback((moduleKey) => {
+        if (!moduleKey) return;
+
+        const collapsing = expandedAllGeneModuleKey === moduleKey;
+        setSelectedGene(null);
+        setSelectedProgram(null);
+        setExpandedAllGeneModuleKey(collapsing ? null : moduleKey);
+
+        if (collapsing) {
+            collapseAllGeneFocus({ durationMs: 360 });
+        }
+    }, [collapseAllGeneFocus, expandedAllGeneModuleKey]);
+
+    const handleClearAllGeneFocus = useCallback(() => {
+        if (!expandedAllGeneModuleKey) return;
+        collapseAllGeneFocus({ durationMs: 360 });
+    }, [collapseAllGeneFocus, expandedAllGeneModuleKey]);
 
     const openProgram = useCallback((program) => {
         if (!program) return;
@@ -238,11 +407,11 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
     }
 
     if (error && !graph) {
-        return <Alert severity="error">Failed to load trait program graph.</Alert>;
+        return <Alert severity="error">Failed to load gene association map.</Alert>;
     }
 
     if (!graph?.programs?.length) {
-        return <Alert severity="info">No trait program graph data available.</Alert>;
+        return <Alert severity="info">No gene association map data available.</Alert>;
     }
 
     if (!afterFirstPaint) {
@@ -256,10 +425,16 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 clearSelection={clearSelection}
                 exportFileName={fileId}
                 graphLayout={graphLayout}
-                isFullGraph={isFullGraph}
+                geneLimit={geneLimit}
+                geneLimitOptions={GENE_LIMIT_OPTIONS}
                 isDragging={isDragging}
+                isTransformAnimating={isTransformAnimating}
+                transformAnimationMs={transformAnimationMs}
                 leftLayout={leftLayout}
-                onGraphViewModeToggle={toggleGraphViewMode}
+                expandedAllGeneModuleKey={expandedAllGeneModuleKey}
+                onGeneLimitChange={handleGeneLimitChange}
+                onClearAllGeneFocus={handleClearAllGeneFocus}
+                onToggleAllGeneModule={handleToggleAllGeneModule}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
@@ -276,6 +451,7 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 selectedProgram={selectedProgram}
                 shouldSuppressClick={shouldSuppressClick}
                 svgHeight={svgHeight}
+                svgViewportHeight={svgViewportHeight}
                 svgRef={svgRef}
                 traitCenterY={traitCenterY}
                 traitDisplayLines={traitDisplayLines}
@@ -287,34 +463,27 @@ export default function TraitProgramGraph({ fileId, traitLabel }) {
                 zoomOut={zoomOut}
             />
 
-            <Box sx={{ width: '100%' }}>
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: 'rgba(15,23,42,0.10)' }}>
-                    <Typography sx={{ fontWeight: 700, color: '#0f172a', mb: 0.5 }}>
-                        Module summary
-                    </Typography>
-                    <TraitProgramGraphSummary
-                        title="Visible modules"
-                        modules={summaryModules}
-                        side="program"
-                        selectedProgram={selectedProgram}
-                        selectedGeneKey={selectedGeneKey}
-                        onSelectProgram={handleSelectProgram}
-                        onSelectGene={handleSelectGene}
-                        onClearSelection={clearSelection}
-                        onToggleExpanded={toggleExpanded}
-                        onOpenProgram={openProgram}
-                        onOpenGene={openGene}
-                        sideMeta={SIDE_META.program}
-                        sideMetaMap={SIDE_META}
-                        programColor={programColor}
-                        programSelectionLabel={programSelectionLabel}
-                        effectColors={EFFECT_COLORS}
-                        effectSignFromGene={effectSignFromGene}
-                        edgeColorFromScore={edgeColorFromScore}
-                        formatNumber={formatNumber}
-                    />
-                </Paper>
-            </Box>
+            <TraitProgramGraphSummary
+                title="Gene association summary"
+                modules={summaryModules}
+                side="program"
+                selectedProgram={selectedProgram}
+                selectedGeneKey={selectedGeneKey}
+                onSelectProgram={handleSelectProgram}
+                onSelectGene={handleSelectGene}
+                onClearSelection={clearSelection}
+                onToggleExpanded={toggleExpanded}
+                onOpenProgram={openProgram}
+                onOpenGene={openGene}
+                sideMeta={SIDE_META.program}
+                sideMetaMap={SIDE_META}
+                programColor={programColor}
+                programSelectionLabel={programSelectionLabel}
+                effectColors={EFFECT_COLORS}
+                effectSignFromGene={effectSignFromGene}
+                edgeColorFromScore={edgeColorFromScore}
+                formatNumber={formatNumber}
+            />
         </Stack>
     );
 }

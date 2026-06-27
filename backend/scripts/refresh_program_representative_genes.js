@@ -30,45 +30,32 @@ async function fetchRepresentativeGenes(connection) {
                 ROW_NUMBER() OVER (
                     PARTITION BY ranked.program
                     ORDER BY
-                        ranked.score DESC,
-                        ranked.rank_within_side ASC,
-                        ranked.total_traits DESC,
+                        ranked.rank_value IS NULL ASC,
+                        ranked.rank_value ASC,
+                        ranked.score_abs DESC,
                         ranked.gene_label ASC
                 ) AS row_num
             FROM (
                 SELECT
-                    gpte.program,
+                    pgre.program,
                     COALESCE(
-                        NULLIF(MAX(gi.symbol), ''),
-                        NULLIF(MAX(gi.perturb_symbol), ''),
-                        NULLIF(MAX(gpte.gene_symbol), ''),
-                        NULLIF(MAX(gpte.ensg_id), '')
+                        NULLIF(gi_ensg.symbol, ''),
+                        NULLIF(gi_symbol.symbol, ''),
+                        NULLIF(gi_ensg.perturb_symbol, ''),
+                        NULLIF(gi_symbol.perturb_symbol, ''),
+                        NULLIF(pgre.gene_symbol, ''),
+                        NULLIF(pgre.ensg_id, '')
                     ) AS gene_label,
-                    MAX(GREATEST(
-                        ABS(COALESCE(gpte.membership_score, 0)),
-                        ABS(COALESCE(gpte.abs_gamma, 0)),
-                        ABS(COALESCE(gpte.post_mean, 0))
-                    )) AS score,
-                    MIN(gpte.rank_within_side) AS rank_within_side,
-                    COUNT(DISTINCT gpte.trait_id) AS total_traits
-                 FROM trait_program_edge tpe
-                 INNER JOIN gene_program_trait_edge gpte
-                    ON gpte.program = tpe.program
-                    AND gpte.trait_id = tpe.trait_id
-                 INNER JOIN gene_info_hg37_matched gi
-                    ON gi.ensembl = gpte.ensg_id
-                 WHERE (tpe.program_sig = 1 OR tpe.selected_by_program = 1)
-                    AND gpte.role = 'program'
-                    AND gpte.rank_within_side IS NOT NULL
-                    AND GREATEST(
-                        ABS(COALESCE(gpte.membership_score, 0)),
-                        ABS(COALESCE(gpte.abs_gamma, 0)),
-                        ABS(COALESCE(gpte.post_mean, 0))
-                    ) > 0
-                    AND COALESCE(NULLIF(gpte.ensg_id, ''), NULLIF(gpte.gene_symbol, '')) IS NOT NULL
-                 GROUP BY
-                    gpte.program,
-                    COALESCE(NULLIF(gpte.ensg_id, ''), NULLIF(gpte.gene_symbol, ''))
+                    ABS(COALESCE(pgre.score, 0)) AS score_abs,
+                    pgre.rank_value
+                 FROM program_gene_role_edge pgre
+                 LEFT JOIN gene_info_hg37_matched gi_ensg
+                    ON BINARY gi_ensg.ensembl = BINARY pgre.ensg_id
+                 LEFT JOIN gene_info_hg37_matched gi_symbol
+                    ON BINARY gi_symbol.perturb_symbol = BINARY pgre.gene_symbol
+                 WHERE pgre.role = 'program_gene'
+                    AND COALESCE(NULLIF(pgre.ensg_id, ''), NULLIF(pgre.gene_symbol, '')) IS NOT NULL
+                    AND ABS(COALESCE(pgre.score, 0)) > 0
             ) ranked
          ) top_ranked
          WHERE row_num <= ?

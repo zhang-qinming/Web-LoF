@@ -36,8 +36,8 @@ const COLUMN_SPECS = [
     { key: 'snp', label: 'SNP', align: 'center', width: 114, tone: 'locus' },
     { key: 'normalizedChr', label: 'CHR', align: 'center', width: 52, tone: 'locus' },
     { key: 'bp', label: 'BP', align: 'center', width: 94, tone: 'locus' },
-    { key: 'p', label: 'P-value', align: 'center', width: 94, tone: 'locus' },
-    { key: 'logp', label: '-log10(P)', align: 'center', width: 82, tone: 'locus' },
+    { key: 'p', label: 'p-value', align: 'center', width: 94, tone: 'locus' },
+    { key: 'logp', label: '-log10(p-value)', align: 'center', width: 82, tone: 'locus' },
     { key: 'nearestGene', label: 'Gene', align: 'center', width: 112, tone: 'annotation' },
     { key: 'distanceToGene', label: 'distance_to_gene', align: 'center', width: 104, tone: 'annotation' },
     { key: 'program', label: 'Program', align: 'center', width: 136, tone: 'program' },
@@ -107,20 +107,20 @@ function buildSearchIndex(row) {
 }
 
 function renderCellContent({ column, row, programColorMap, formatDistance, formatP, getProgramRoute, navigate }) {
-    if (column.key === 'snp') return row.snp || '\u2014';
+    if (column.key === 'snp') return row.snp || '-';
     if (column.key === 'normalizedChr') return row.normalizedChr;
-    if (column.key === 'bp') return row.bp?.toLocaleString() || '\u2014';
+    if (column.key === 'bp') return row.bp?.toLocaleString() || '-';
     if (column.key === 'p') return formatP(row.p);
     if (column.key === 'logp') return row.logp.toFixed(2);
-    if (column.key === 'nearestGene') return row.nearestGene || '\u2014';
+    if (column.key === 'nearestGene') return row.nearestGene || '-';
     if (column.key === 'distanceToGene') return formatDistance(row.distanceToGene);
-    if (column.key === 'geneset') return row.geneset || row.primaryGeneset || '\u2014';
+    if (column.key === 'geneset') return row.geneset || row.primaryGeneset || '-';
 
     if (column.key === 'program') {
         const programs = Array.isArray(row.programs) && row.programs.length
             ? row.programs
             : [row.primaryProgram || row.program].filter(Boolean);
-        if (!programs.length) return '\u2014';
+        if (!programs.length) return '-';
 
         const pointColor = programs[0] ? (programColorMap.get(programs[0]) || '#2563eb') : '#94a3b8';
 
@@ -245,7 +245,7 @@ export default function TraitHitManhattanTable({
                     endIcon={tableOpen ? <ExpandLess /> : <ExpandMore />}
                     sx={{ textTransform: 'none', color: theme.palette.text.primary, fontWeight: 600, fontSize: '0.8rem', px: 0.3 }}
                 >
-                    Data Table
+                    Data table
                     {!tableOpen && (
                         <Chip
                             label={processedRows.length.toLocaleString()}

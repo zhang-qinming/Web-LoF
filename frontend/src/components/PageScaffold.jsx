@@ -72,18 +72,21 @@ export function PageFrame({
     );
 }
 
-export function UpdatingStatus({ active, label = 'Updating', sx }) {
+export function UpdatingStatus({ active, label = 'Updating', sx, reserveSpace = false }) {
     const theme = useTheme();
-    if (!active) return null;
+    if (!active && !reserveSpace) return null;
 
     return (
         <Box
             component="span"
+            aria-hidden={!active}
             sx={{
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: 0.55,
                 height: 22,
+                minWidth: 72,
                 px: 0.75,
                 borderRadius: 1,
                 color: theme.palette.text.secondary,
@@ -93,6 +96,9 @@ export function UpdatingStatus({ active, label = 'Updating', sx }) {
                 fontWeight: 680,
                 lineHeight: 1,
                 whiteSpace: 'nowrap',
+                visibility: active ? 'visible' : 'hidden',
+                opacity: active ? 1 : 0,
+                pointerEvents: active ? 'auto' : 'none',
                 ...sx,
             }}
         >

@@ -158,6 +158,7 @@ function parseTsvText(text) {
 function pairFromFileNames(names, toPath = (name) => name) {
     const programFiles = new Map();
     const geneFiles = new Map();
+    const fallbackGeneFiles = new Map();
 
     names.forEach((name) => {
         const baseName = path.basename(name);
@@ -167,9 +168,19 @@ function pairFromFileNames(names, toPath = (name) => name) {
             return;
         }
 
+        const concordantGeneMatch = baseName.match(/^(.+)_concordant_long\.tsv$/i);
+        if (concordantGeneMatch) {
+            geneFiles.set(concordantGeneMatch[1], { name: baseName, sourcePath: toPath(name) });
+            return;
+        }
+
         const geneMatch = baseName.match(/^(.+)_long\.tsv$/i);
-        if (geneMatch) geneFiles.set(geneMatch[1], { name: baseName, sourcePath: toPath(name) });
+        if (geneMatch) fallbackGeneFiles.set(geneMatch[1], { name: baseName, sourcePath: toPath(name) });
     });
+
+    for (const [fileId, file] of fallbackGeneFiles.entries()) {
+        if (!geneFiles.has(fileId)) geneFiles.set(fileId, file);
+    }
 
     const allIds = [...new Set([...programFiles.keys(), ...geneFiles.keys()])].sort();
     return allIds.map((fileId) => ({
@@ -193,6 +204,15 @@ function normalizeApiBase(apiBase) {
     return String(apiBase || '').trim().replace(/\/+$/g, '');
 }
 
+function panelDirToDataRelativePath(rootDir) {
+    const dataRoot = path.resolve(config.paths.dataDir);
+    const panelRoot = path.resolve(rootDir || config.paths.traitProgramGenePanelDir);
+    const relative = path.relative(dataRoot, panelRoot).replace(/\\/g, '/');
+    return relative && !relative.startsWith('..') && !path.isAbsolute(relative)
+        ? relative
+        : path.posix.join('trait_program_gene_model_5program_3regulator', 'tables');
+}
+
 async function fetchJson(url) {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${url}`);
@@ -205,10 +225,10 @@ async function fetchText(url) {
     return res.text();
 }
 
-async function listPanelFilePairsFromApi(apiBase) {
+async function listPanelFilePairsFromApi(apiBase, rootDir) {
     const base = normalizeApiBase(apiBase);
     const params = new URLSearchParams({
-        dir: 'trait_program_gene_panel/tables',
+        dir: panelDirToDataRelativePath(rootDir),
         search: '.tsv',
     });
     const payload = await fetchJson(`${base}/api/data/file-paths?${params.toString()}`);
@@ -315,7 +335,7 @@ async function collectRecords(rootDir, { source = 'auto', apiBase = null } = {})
     }
 
     if (!pairs.length && source !== 'local') {
-        pairs = await listPanelFilePairsFromApi(apiBase);
+        pairs = await listPanelFilePairsFromApi(apiBase, rootDir);
         sourceMode = 'api';
     }
 
@@ -413,8 +433,6 @@ async function emitImportSql(records, stream = process.stdout) {
     await writeStream(stream, 'SET autocommit = 0;\n');
     await writeStream(stream, 'START TRANSACTION;\n');
     await writeStream(stream, 'DELETE FROM `gene_program_trait_edge`;\n');
-    await writeStream(stream, 'DELETE FROM `trait_program_edge`;\n');
-    await writeInsertSql(stream, 'trait_program_edge', PROGRAM_COLUMNS, records.programRecords);
     await writeInsertSql(stream, 'gene_program_trait_edge', GENE_COLUMNS, records.geneRecords);
     await writeStream(stream, REFRESH_GENE_SUMMARY_SQL.trimStart());
     await writeStream(stream, 'COMMIT;\n');
@@ -445,8 +463,6 @@ async function importRecords(records) {
     try {
         await connection.beginTransaction();
         await connection.query('DELETE FROM gene_program_trait_edge');
-        await connection.query('DELETE FROM trait_program_edge');
-        await insertRows(connection, 'trait_program_edge', PROGRAM_COLUMNS, records.programRecords);
         await insertRows(connection, 'gene_program_trait_edge', GENE_COLUMNS, records.geneRecords);
         await refreshGeneSummary(connection);
         await connection.commit();

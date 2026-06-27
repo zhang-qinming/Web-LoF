@@ -362,19 +362,134 @@ export function sectionPanelHeaderSx(theme, overrides = {}) {
     };
 }
 
+export function mainTableToolbarSx(theme, overrides = {}) {
+    return {
+        px: { xs: 1.5, md: 2 },
+        py: { xs: 1.1, md: 1.15 },
+        borderBottom: `1px solid ${theme.custom.border.soft}`,
+        display: 'grid',
+        gridTemplateColumns: {
+            xs: 'minmax(0, 1fr)',
+            lg: 'minmax(240px, 280px) minmax(320px, 420px) minmax(360px, 1fr)',
+        },
+        alignItems: 'center',
+        gap: { xs: 0.7, lg: 1.1 },
+        minWidth: 0,
+        '@media (min-width: 2200px)': {
+            gridTemplateColumns: 'minmax(300px, 420px) minmax(360px, 420px) minmax(420px, 1fr)',
+        },
+        ...overrides,
+    };
+}
+
+export function mainTableToolbarTitleSlotSx(theme, overrides = {}) {
+    return {
+        minWidth: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        gap: 0.65,
+        flexWrap: 'wrap',
+        maxWidth: { lg: 280 },
+        '@media (min-width: 2200px)': {
+            maxWidth: 420,
+        },
+        ...overrides,
+    };
+}
+
+export function mainTableToolbarSearchSlotSx(theme, overrides = {}) {
+    return {
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: { xs: 'flex-start', lg: 'center' },
+        gap: 0.55,
+        flexWrap: { xs: 'wrap', lg: 'nowrap' },
+        minWidth: 0,
+        ...overrides,
+    };
+}
+
+export function mainTableToolbarActionsSx(theme, overrides = {}) {
+    return {
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        justifySelf: 'stretch',
+        gap: 0.85,
+        flexWrap: { xs: 'wrap', lg: 'nowrap' },
+        whiteSpace: { lg: 'nowrap' },
+        minWidth: 0,
+        '& > .MuiButton-root:last-of-type': {
+            marginLeft: { xs: 0, lg: 'auto' },
+        },
+        ...overrides,
+    };
+}
+
+export function mainTableSearchFieldSx(theme, accent = theme.palette.primary.main, overrides = {}) {
+    return {
+        width: '100%',
+        maxWidth: { lg: 360 },
+        flex: { xs: '1 1 100%', lg: '0 0 360px' },
+        flexShrink: { xs: 1, lg: 0 },
+        '@media (min-width: 2200px)': {
+            maxWidth: 420,
+            flexBasis: 420,
+        },
+        '& .MuiOutlinedInput-root': {
+            height: 36,
+            bgcolor: theme.palette.background.paper,
+            borderRadius: 1,
+            borderColor: alpha(accent, 0.16),
+        },
+        '& .MuiOutlinedInput-input': {
+            py: 0.55,
+            fontSize: '0.8rem',
+        },
+        ...overrides,
+    };
+}
+
+export function mainTableActionButtonSx(theme, accent = theme.palette.primary.main, overrides = {}) {
+    return {
+        textTransform: 'none',
+        fontSize: '0.76rem',
+        fontWeight: 700,
+        color: accent,
+        border: `1px solid ${alpha(accent, 0.18)}`,
+        bgcolor: theme.palette.background.paper,
+        minWidth: 136,
+        height: 36,
+        px: 1.35,
+        py: 0.45,
+        flexShrink: 0,
+        boxShadow: 'none',
+        '&:hover': {
+            bgcolor: alpha(accent, 0.055),
+            borderColor: alpha(accent, 0.28),
+            boxShadow: 'none',
+        },
+        ...overrides,
+    };
+}
+
 export function tableToolbarGroupSx(theme, overrides = {}) {
     return {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'flex-end',
         gap: 0.75,
-        flexWrap: 'wrap',
+        flexWrap: { xs: 'wrap', sm: 'nowrap' },
         px: 0.7,
         py: 0.6,
         borderRadius: 1.5,
         border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
         background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.custom.surface.subtle, 0.92)} 100%)`,
         boxShadow: `inset 0 1px 0 rgba(255,255,255,0.84), 0 8px 18px ${alpha('#0f172a', 0.05)}`,
+        transition: `border-color ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}`,
         ...overrides,
     };
 }

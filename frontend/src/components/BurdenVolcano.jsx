@@ -28,12 +28,13 @@ import FigureLoadingPanel from './FigureLoadingPanel';
 import FloatingLegend from './FloatingLegend';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
-import { parseNullableNumber } from '../utils/numbers';
+import { formatScientificNumber, parseNullableNumber } from '../utils/numbers';
 import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { useDebouncedControlValue, useIdleRenderGate } from '../utils/renderScheduling';
+import { compareValues } from '../utils/sort';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneNeutral,
@@ -74,7 +75,7 @@ const VOLCANO_CONFIGS = {
         fullDescription: 'Full gene-level LoF burden effects for this trait. Click a point to focus its table row.',
         hitsDescription: 'Significant LoF burden hits for this trait. Switch to Full TSV for all genes when available.',
         emptyMessage: 'No burden volcano rows are currently available for this trait.',
-        guideText: 'Y-axis uses -log10(P). Horizontal guide marks nominal significance. Positive beta shifts right; negative beta shifts left.',
+        guideText: 'Y-axis uses -log10(p-value). Horizontal guide marks nominal significance. Positive beta shifts right; negative beta shifts left.',
         exportPrefix: 'burden_volcano',
         plotSuffix: 'burden-volcano',
         includePosteriorColumns: false,
@@ -88,7 +89,7 @@ const VOLCANO_CONFIGS = {
         fullDescription: 'Full gene-level GeneBayes LoF effects for this trait. Click a point to focus its table row.',
         hitsDescription: 'Significant GeneBayes LoF hits for this trait. Switch to Full TSV for all genes when available.',
         emptyMessage: 'No posterior volcano rows are currently available for this trait.',
-        guideText: 'Y-axis uses -log10(P). Horizontal guide marks nominal significance. Positive LoF effect shifts right; negative LoF effect shifts left.',
+        guideText: 'Y-axis uses -log10(p-value). Horizontal guide marks nominal significance. Positive LoF effect shifts right; negative LoF effect shifts left.',
         exportPrefix: 'posterior_volcano',
         plotSuffix: 'posterior-volcano',
         includePosteriorColumns: true,
@@ -315,7 +316,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             items.push({
                 key: 'background',
                 label: VOLCANO_STYLE.background.label,
-                note: 'Below significance threshold (P >= 0.05).',
+                note: 'Below significance threshold (p-value >= 0.05).',
                 color: VOLCANO_STYLE.background.color,
                 count: counts.nonSignificant,
             });
@@ -363,15 +364,15 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 `<b>${row.gene || row.ensg || 'Gene'}</b>`,
             ];
             if (row.gene && row.ensg) lines.push(row.ensg);
-            lines.push(`${effectLabel} ${Number.isFinite(row.effect) ? row.effect.toFixed(4) : 'NA'}`);
+            lines.push(`${effectLabel} ${Number.isFinite(row.effect) ? row.effect.toFixed(4) : '-'}`);
             if (includePosteriorColumns && Number.isFinite(row.posteriorSd)) {
                 lines.push(`Posterior SD ${row.posteriorSd.toFixed(4)}`);
             }
             if (includePosteriorColumns && Number.isFinite(row.lower95) && Number.isFinite(row.upper95)) {
                 lines.push(`95% CI [${row.lower95.toFixed(4)}, ${row.upper95.toFixed(4)}]`);
             }
-            if (Number.isFinite(row.p)) lines.push(`P ${row.p.toExponential(2)}`);
-            if (Number.isFinite(row.fdr)) lines.push(`FDR ${row.fdr.toExponential(2)}`);
+            if (Number.isFinite(row.p)) lines.push(`p-value ${formatScientificNumber(row.p, 2)}`);
+            if (Number.isFinite(row.fdr)) lines.push(`FDR ${formatScientificNumber(row.fdr, 2)}`);
             if (row.primaryProgram) lines.push(`Program: ${row.primaryProgram}`);
             if (row.primaryGeneset) lines.push(`Geneset: ${row.primaryGeneset}`);
             return lines.join('<br>');
@@ -504,7 +505,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
             range: xAxisRange,
         },
         yaxis: {
-            title: { text: '-log<sub>10</sub>(P)', font: { size: 14, color: chartTokens.axisColor, family: theme.typography.fontFamily } },
+            title: { text: '-log<sub>10</sub>(p-value)', font: { size: 14, color: chartTokens.axisColor, family: theme.typography.fontFamily } },
             zeroline: false,
             showgrid: true,
             gridwidth: 0.5,
@@ -545,7 +546,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                 xanchor: 'right',
                 yanchor: 'bottom',
                 showarrow: false,
-                text: '<b>FDR/P guide</b>',
+                text: '<b>FDR/p-value guide</b>',
                 font: { size: 11, color: chartTokens.threshold, family: theme.typography.fontFamily },
             },
         ],
@@ -582,20 +583,14 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
         setSortDir(['gene', 'ensg', 'primaryProgram', 'primaryGeneset'].includes(column) ? 'asc' : 'desc');
     }, [sortBy]);
 
-    const collator = useMemo(() => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), []);
-
     const sortedRows = useMemo(() => {
-        const dir = sortDir === 'asc' ? 1 : -1;
         return [...filteredRows].sort((a, b) => {
             if (['gene', 'ensg', 'primaryProgram', 'primaryGeneset'].includes(sortBy)) {
-                return collator.compare(String(a[sortBy] || ''), String(b[sortBy] || '')) * dir;
+                return compareValues(a[sortBy], b[sortBy], 'text', sortDir);
             }
-            const av = a[sortBy] ?? -Infinity;
-            const bv = b[sortBy] ?? -Infinity;
-            if (av === bv) return 0;
-            return av > bv ? dir : -dir;
+            return compareValues(a[sortBy], b[sortBy], 'number', sortDir);
         });
-    }, [collator, filteredRows, sortBy, sortDir]);
+    }, [filteredRows, sortBy, sortDir]);
 
     const pagedRows = useMemo(() => {
         const start = tablePage * tableRowsPerPage;
@@ -662,7 +657,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
     const downloadCSV = useCallback(() => {
         const cols = ['Gene', 'ENSG', effectLabel];
         if (includePosteriorColumns) cols.push('Posterior SD', 'Lower 95', 'Upper 95');
-        cols.push('P', '-log10(P)', 'FDR', 'Program', 'Geneset');
+        cols.push('p-value', '-log10(p-value)', 'FDR', 'Program', 'Geneset');
         const header = cols.join(',');
         const body = rows.map((row) => [
             row.gene || '',
@@ -856,7 +851,7 @@ export default function BurdenVolcano({ fileId, gwasId, traitLabel, volcanoType 
                                 onClick={() => setExportOpen(true)}
                                 sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
                             >
-                                Export Image
+                                Export image
                             </Button>
                         )}
                     </Box>

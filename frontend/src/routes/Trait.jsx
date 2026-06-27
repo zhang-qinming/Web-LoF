@@ -347,7 +347,7 @@ export default function Trait() {
                     },
                 }}>
                 <Tab label="Program Scatter" disabled={!hasProgramScatter} onMouseEnter={() => warmTraitTab(0)} onFocus={() => warmTraitTab(0)} />
-                <Tab label="Trait Program Graph" disabled={!hasProgramGraph} onMouseEnter={() => warmTraitTab(1)} onFocus={() => warmTraitTab(1)} />
+                <Tab label="Gene Association Map" disabled={!hasProgramGraph} onMouseEnter={() => warmTraitTab(1)} onFocus={() => warmTraitTab(1)} />
                 <Tab label="Manhattan" onMouseEnter={() => warmTraitTab(2)} onFocus={() => warmTraitTab(2)} />
                 <Tab label="Burden Volcano" onMouseEnter={() => warmTraitTab(3)} onFocus={() => warmTraitTab(3)} />
                 <Tab label="Posterior Volcano" onMouseEnter={() => warmTraitTab(4)} onFocus={() => warmTraitTab(4)} />
@@ -430,8 +430,8 @@ export default function Trait() {
                         {displayedTab === 1 && !hasProgramGraph && availabilityReady && (
                             <StatePanel
                                 icon={Timeline}
-                                title="No Trait Program Graph data"
-                                message="This trait does not have graph-linked program and regulator data available."
+                                title="No Gene Association Map data"
+                                message="This trait does not have gene-linked program and regulator context data available."
                                 minHeight={360}
                             />
                         )}

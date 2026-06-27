@@ -1,6 +1,6 @@
 const express = require('express');
 const programModel = require('../models/Mprogram');
-const geneProgramModel = require('../models/MgeneProgram');
+const semanticRelationsModel = require('../models/MsemanticRelations');
 const { createFileStore } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const { asyncRoute, throwIfAborted } = require('../lib/http');
@@ -85,7 +85,7 @@ async function listAvailableTraitProgramGraphFiles() {
             continue;
         }
 
-        const geneMatch = entry.name.match(/^(.+)_long\.tsv$/i);
+        const geneMatch = entry.name.match(/^(.+)_(?:concordant_)?long\.tsv$/i);
         if (geneMatch) {
             geneFiles.add(geneMatch[1]);
         }
@@ -94,6 +94,13 @@ async function listAvailableTraitProgramGraphFiles() {
     return [...programFiles]
         .filter((fileId) => geneFiles.has(fileId))
         .sort((a, b) => a.localeCompare(b));
+}
+
+async function parseTraitProgramGeneRows(fileId, { signal = null } = {}) {
+    return (
+        await parseTsvFromStore(traitProgramGenePanelStore, `${fileId}_long.tsv`, { signal })
+        || await parseTsvFromStore(traitProgramGenePanelStore, `${fileId}_concordant_long.tsv`, { signal })
+    );
 }
 
 function getFreshListCache(cache) {
@@ -510,7 +517,15 @@ router.get('/api/programs/:programId/traits', asyncRoute(async (req, res) => {
     const safeProgramId = normalizeSafeBaseName(req.params.programId);
     if (!safeProgramId) return res.status(400).json({ error: 'Invalid programId' });
 
-    const data = await geneProgramModel.getProgramTraits(safeProgramId);
+    const data = await semanticRelationsModel.getProgramScatterTraits(safeProgramId);
+    res.json(data);
+}));
+
+router.get('/api/programs/:programId/scatter-traits', asyncRoute(async (req, res) => {
+    const safeProgramId = normalizeSafeBaseName(req.params.programId);
+    if (!safeProgramId) return res.status(400).json({ error: 'Invalid programId' });
+
+    const data = await semanticRelationsModel.getProgramScatterTraits(safeProgramId);
     res.json(data);
 }));
 
@@ -518,7 +533,15 @@ router.get('/api/programs/:programId/genes', asyncRoute(async (req, res) => {
     const safeProgramId = normalizeSafeBaseName(req.params.programId);
     if (!safeProgramId) return res.status(400).json({ error: 'Invalid programId' });
 
-    const data = await geneProgramModel.getProgramGenes(safeProgramId);
+    const data = await semanticRelationsModel.getProgramGeneRoles(safeProgramId);
+    res.json(data);
+}));
+
+router.get('/api/programs/:programId/gene-roles', asyncRoute(async (req, res) => {
+    const safeProgramId = normalizeSafeBaseName(req.params.programId);
+    if (!safeProgramId) return res.status(400).json({ error: 'Invalid programId' });
+
+    const data = await semanticRelationsModel.getProgramGeneRoles(safeProgramId);
     res.json(data);
 }));
 
@@ -528,7 +551,7 @@ router.get('/api/programs/:fileId/graph', asyncRoute(async (req, res) => {
     if (!safeFileId) return res.status(400).json({ error: 'Invalid fileId' });
 
     const programRows = await parseTsvFromStore(traitProgramGenePanelStore, `${safeFileId}_programs.tsv`, { signal });
-    const geneRows = await parseTsvFromStore(traitProgramGenePanelStore, `${safeFileId}_long.tsv`, { signal });
+    const geneRows = await parseTraitProgramGeneRows(safeFileId, { signal });
 
     if (!programRows || !geneRows) {
         return res.status(404).json({ error: 'Graph data not found' });

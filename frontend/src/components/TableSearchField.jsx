@@ -87,8 +87,16 @@ export default function TableSearchField({
                         <Search sx={{ fontSize: 17, color: error ? theme.palette.error.main : theme.palette.text.secondary }} />
                     </InputAdornment>
                 ),
-                endAdornment: hasValue ? (
-                    <InputAdornment position="end">
+                endAdornment: (
+                    <InputAdornment
+                        position="end"
+                        sx={{
+                            minWidth: 28,
+                            justifyContent: 'flex-end',
+                            visibility: hasValue ? 'visible' : 'hidden',
+                            pointerEvents: hasValue ? 'auto' : 'none',
+                        }}
+                    >
                         <Tooltip title="Clear search" arrow>
                             <IconButton
                                 size="small"
@@ -108,15 +116,21 @@ export default function TableSearchField({
                             </IconButton>
                         </Tooltip>
                     </InputAdornment>
-                ) : null,
+                ),
             }}
             inputProps={{
                 'aria-label': label,
             }}
             sx={{
                 width,
-                minWidth: { xs: 0, sm: 230 },
-                flexShrink: 0,
+                minWidth: 0,
+                maxWidth: '100%',
+                flex: {
+                    xs: '1 1 100%',
+                    sm: '0 0 auto',
+                },
+                flexShrink: { xs: 1, sm: 0 },
+                transition: `width ${theme.custom.motion.swift}, max-width ${theme.custom.motion.swift}`,
                 '& .MuiInputLabel-root': {
                     fontSize: '0.7rem',
                     fontWeight: 680,

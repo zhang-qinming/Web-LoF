@@ -10,8 +10,8 @@
   <line x1="126" y1="302" x2="594" y2="146" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="6 5"/>
   <path d="M126 314 C238 268 286 250 360 224 C434 198 486 176 594 134 L594 160 C486 188 434 210 360 236 C286 262 238 286 126 326 Z" fill="#DBEAFE" fill-opacity="0.22"/>
 
-  <text x="360" y="356" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Expected signed -log10(P)</text>
-  <text transform="rotate(-90 74 224)" x="74" y="224" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Observed signed -log10(P)</text>
+  <text x="360" y="356" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Expected signed -log10(p-value)</text>
+  <text transform="rotate(-90 74 224)" x="74" y="224" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">Observed signed -log10(p-value)</text>
 
   <text x="360" y="240" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">0</text>
   <text x="180" y="240" text-anchor="middle" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">-4</text>

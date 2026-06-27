@@ -305,7 +305,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
                     `<b>${gene.gene || gene.ensg}</b>`,
                     `Source: ${matrixPayload.sourceTrait?.trait_name || traitLabel || fileId}`,
                     `Target: ${target.trait_name}`,
-                    `LoF effect (post_mean): ${value == null ? 'NA' : Number(value).toFixed(4)}`,
+                    `LoF effect (post_mean): ${value == null ? '-' : Number(value).toFixed(4)}`,
                 ].join('<br>');
             })),
             hovertemplate: compactHover
@@ -326,7 +326,7 @@ export default function CrossTraitHeatmap({ fileId, gwasId, traitLabel }) {
             }),
             showscale: true,
             colorbar: {
-                title: { text: 'post_mean', side: 'top', font: { size: 11 } },
+                title: { text: 'Posterior mean', side: 'top', font: { size: 11 } },
                 orientation: 'h',
                 x: 0.99,
                 xanchor: 'right',

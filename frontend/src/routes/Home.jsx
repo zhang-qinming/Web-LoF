@@ -31,6 +31,7 @@ import ReleaseLogSection from '../components/ReleaseLogSection';
 import { RELEASE_LOG_ANCHOR } from '../components/releaseLogData';
 import { getHomeStats } from '../api/gwas';
 import { createTtlCache } from '../utils/cache';
+import { triggerDataPackageDownload } from '../utils/download';
 import { detailSummarySWRConfig } from '../utils/swrOptions';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { APP_SHELL_MAX_WIDTH, captionSx, panelSx, summaryChipSx } from '../themeUtils';
@@ -62,6 +63,7 @@ const FEATURED_TRAIT = {
     fileId: 'GCST90083727',
     name: 'ICD10 E11.9: Type 2 diabetes mellitus without complications',
 };
+const FEATURED_TRAIT_ALIAS = 'Type 2 diabetes mellitus';
 const FEATURED_PROGRAM = {
     id: 'P1',
     name: 'ATP dependent activity',
@@ -78,18 +80,18 @@ const compactNumberFormatter = new Intl.NumberFormat('en-US', {
 });
 
 const quickSearchSeeds = [
-    { label: `Trait ${FEATURED_TRAIT.fileId}`, query: FEATURED_TRAIT.fileId },
     { label: FEATURED_TRAIT.name, query: FEATURED_TRAIT.name },
-    { label: `Program ${FEATURED_PROGRAM.id}: ${FEATURED_PROGRAM.name}`, query: FEATURED_PROGRAM.id },
-    { label: FEATURED_PROGRAM.name, query: FEATURED_PROGRAM.name },
-    { label: `Gene ${FEATURED_GENES[0].symbol}: ${FEATURED_GENES[0].name}`, query: FEATURED_GENES[0].symbol },
-    { label: `Gene ${FEATURED_GENES[1].symbol}: ${FEATURED_GENES[1].name}`, query: FEATURED_GENES[1].symbol },
+    { label: FEATURED_TRAIT_ALIAS, query: FEATURED_TRAIT_ALIAS },
+    { label: FEATURED_TRAIT.fileId, query: FEATURED_TRAIT.fileId },
+    { label: `Program: ${FEATURED_PROGRAM.name}`, query: FEATURED_PROGRAM.name },
+    { label: FEATURED_GENES[0].symbol, query: FEATURED_GENES[0].symbol },
+    { label: FEATURED_GENES[1].symbol, query: FEATURED_GENES[1].symbol },
 ];
 
 const searchPlaceholderExamples = [
-    `Search genes: ${FEATURED_GENES[0].symbol} (${FEATURED_GENES[0].name}) or ${FEATURED_GENES[1].symbol} (${FEATURED_GENES[1].name})`,
-    `Search programs: ${FEATURED_PROGRAM.id} (${FEATURED_PROGRAM.name})`,
-    `Search traits: ${FEATURED_TRAIT.fileId} or ${FEATURED_TRAIT.name}`,
+    `${FEATURED_GENES[0].symbol} or ${FEATURED_GENES[1].symbol}`,
+    FEATURED_PROGRAM.name,
+    FEATURED_TRAIT.name,
 ];
 
 const loadingBarSx = {
@@ -129,8 +131,8 @@ const traitFigureCards = [
         color: '#0284c7',
     },
     {
-        title: 'Trait Program Graph',
-        description: 'Used to map trait, program, and gene-level evidence into an interpretable network for mechanistic hypothesis generation.',
+        title: 'Gene Association Map',
+        description: 'Used to map trait-linked gene evidence with program and regulator context for mechanistic hypothesis generation.',
         image: homeFigureTraitProgramNetwork,
         to: traitTabPath('trait-program-graph'),
         color: '#0f766e',
@@ -502,8 +504,8 @@ function SearchResultsPanel({
                                 <EntityResultItem
                                     key={`program-${item.program || item.id}`}
                                     icon={<Hub sx={{ fontSize: 18, color: '#7c3aed' }} />}
-                                    title={item.program || item.label || 'Program'}
-                                    secondary={[item.annotation, item.goTerm].filter(Boolean).join(' | ')}
+                                    title={item.goTerm || item.annotation || item.program || item.label || 'Program'}
+                                    secondary={[item.program, item.annotation].filter(Boolean).join(' | ')}
                                     chipLabel={item.goOntology || 'program'}
                                     chipSx={summaryChipSx(theme, { bgcolor: alpha(theme.palette.secondary.main, 0.08) })}
                                     to={buildProgramHref(item)}
@@ -1202,6 +1204,22 @@ function HeroBackground() {
 
 /* ─── Redesigned hero section ─── */
 function HeroSection({ stats, statsLoading, theme }) {
+    const [downloadError, setDownloadError] = useState('');
+    const [downloadingPackageId, setDownloadingPackageId] = useState('');
+
+    const handleMetricDownload = async (metric) => {
+        if (!metric.downloadPackageId || downloadingPackageId) return;
+        setDownloadError('');
+        setDownloadingPackageId(metric.downloadPackageId);
+        try {
+            await triggerDataPackageDownload(metric.downloadPackageId);
+        } catch (err) {
+            setDownloadError(getRequestErrorMessage(err, 'Download failed'));
+        } finally {
+            setDownloadingPackageId('');
+        }
+    };
+
     return (
         <Box
             component="section"
@@ -1306,14 +1324,17 @@ function HeroSection({ stats, statsLoading, theme }) {
                             { label: 'Genes', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.genes ? stats.genes.toLocaleString() : '...'), color: '#0f766e', href: '/genes', icon: (
                                 <Box component="img" src={variantsIcon} alt="Genes" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
                             )},
-                            { label: 'Associations', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.associations ? stats.associations.toLocaleString() : '...'), color: '#ea580c', href: '/programs', icon: (
+                            { label: 'Associations', value: statsLoading ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} /> : (stats?.associations ? stats.associations.toLocaleString() : '...'), color: '#ea580c', downloadPackageId: 'trait-associations', icon: (
                                 <Box component="img" src={associationsIcon} alt="Associations" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
                             )},
                         ].map((metric) => (
                             <Box
-                                component={RouterLink}
+                                component={metric.href ? RouterLink : 'button'}
                                 to={metric.href}
+                                type={metric.href ? undefined : 'button'}
                                 key={metric.label}
+                                disabled={metric.downloadPackageId ? Boolean(downloadingPackageId) : undefined}
+                                onClick={metric.downloadPackageId ? () => { void handleMetricDownload(metric); } : undefined}
                                 sx={{
                                     textDecoration: 'none',
                                     display: 'flex',
@@ -1324,13 +1345,19 @@ function HeroSection({ stats, statsLoading, theme }) {
                                     borderRadius: 3,
                                     bgcolor: 'rgba(255,255,255,0.6)',
                                     border: '1px solid rgba(255,255,255,0.9)',
+                                    cursor: metric.href || metric.downloadPackageId ? 'pointer' : 'default',
                                     boxShadow: '0 8px 32px rgba(15,23,42,0.03)',
                                     backdropFilter: 'blur(12px)',
                                     transition: 'background-color 220ms ease, box-shadow 220ms ease, transform 220ms ease',
+                                    font: 'inherit',
                                     '&:hover': {
                                         bgcolor: 'rgba(255,255,255,0.85)',
                                         boxShadow: '0 12px 48px rgba(15,23,42,0.06)',
                                         transform: 'translateY(-2px)',
+                                    },
+                                    '&:disabled': {
+                                        cursor: 'wait',
+                                        opacity: 0.72,
                                     },
                                 }}
                             >
@@ -1349,11 +1376,21 @@ function HeroSection({ stats, statsLoading, theme }) {
                                     {metric.value}
                                 </Typography>
                                 <Typography sx={{ mt: 0.8, fontSize: '0.85rem', fontWeight: 600, color: '#64748b', letterSpacing: '0.03em' }}>
-                                    {metric.label}
+                                    {downloadingPackageId === metric.downloadPackageId ? 'Preparing download' : metric.label}
                                 </Typography>
                             </Box>
                         ))}
                     </Box>
+
+                    {downloadError && (
+                        <Alert
+                            severity="error"
+                            onClose={() => setDownloadError('')}
+                            sx={{ mt: 2, mx: 'auto', maxWidth: 620, borderRadius: 2, textAlign: 'left' }}
+                        >
+                            {downloadError}
+                        </Alert>
+                    )}
 
                     {/* CTA buttons */}
                     <Stack

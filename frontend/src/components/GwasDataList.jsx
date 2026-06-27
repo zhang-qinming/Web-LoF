@@ -34,6 +34,12 @@ import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
 import Search from '@mui/icons-material/Search';
 import {
+    mainTableActionButtonSx,
+    mainTableSearchFieldSx,
+    mainTableToolbarActionsSx,
+    mainTableToolbarSearchSlotSx,
+    mainTableToolbarSx,
+    mainTableToolbarTitleSlotSx,
     panelSx,
     sectionTitleSx,
     stickyTableContainerSx,
@@ -43,16 +49,18 @@ import {
     tableSkeletonCellSx,
 } from '../themeUtils';
 
-function PaginationControl({ totalPages, page, onChange }) {
-    if (totalPages <= 1) return null;
+function PaginationControl({ totalPages, page, onChange, disabled = false }) {
+    const pageCount = Math.max(Number(totalPages) || 1, 1);
+    const currentPage = Math.min(Math.max(Number(page) || 1, 1), pageCount);
 
     return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: 0 }}>
             <Pagination
-                count={totalPages}
-                page={page}
+                count={pageCount}
+                page={currentPage}
                 onChange={onChange}
                 color="primary"
+                disabled={disabled}
                 shape="rounded"
                 size="small"
                 siblingCount={0}
@@ -72,15 +80,16 @@ function PaginationControl({ totalPages, page, onChange }) {
     );
 }
 
-function JumpToPageControl({ totalPages, page, onChange }) {
+function JumpToPageControl({ totalPages, page, onChange, disabled = false }) {
+    const pageCount = Math.max(Number(totalPages) || 1, 1);
     const [inputPage, setInputPage] = useState(page);
     const pageNumber = Number(inputPage);
-
-    const isValid = inputPage !== '' && Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= totalPages;
+    const canPage = !disabled && pageCount > 1;
+    const isValid = inputPage !== '' && Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= pageCount;
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (isValid) {
+        if (canPage && isValid) {
             onChange(null, pageNumber);
             return;
         }
@@ -95,8 +104,6 @@ function JumpToPageControl({ totalPages, page, onChange }) {
         setInputPage(page);
     }, [page]);
 
-    if (totalPages <= 1) return null;
-
     return (
         <Box component="form" onSubmit={handleSubmit} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.45, flexShrink: 0, minHeight: 32 }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}>
@@ -105,13 +112,14 @@ function JumpToPageControl({ totalPages, page, onChange }) {
             <TextField
                 size="small"
                 value={inputPage}
+                disabled={!canPage}
                 onChange={(e) => setInputPage(e.target.value)}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') handleSubmit(e);
                 }}
                 onBlur={handleBlur}
                 type="number"
-                inputProps={{ min: 1, max: totalPages, step: 1 }}
+                inputProps={{ min: 1, max: pageCount, step: 1 }}
                 sx={{
                     '& .MuiOutlinedInput-root': {
                         height: 32,
@@ -129,31 +137,31 @@ function JumpToPageControl({ totalPages, page, onChange }) {
                 }}
             />
             <Typography variant="caption" color="text.secondary" sx={{ mx: 0.15, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                / {totalPages.toLocaleString()}
+                / {pageCount.toLocaleString()}
             </Typography>
-            <Button type="submit" size="small" variant="outlined" disabled={!isValid} sx={{ minWidth: 38, height: 32, px: 0.9, py: 0.35, textTransform: 'none', fontSize: '0.72rem', fontWeight: 680 }}>
+            <Button type="submit" size="small" variant="outlined" disabled={!canPage || !isValid} sx={{ minWidth: 38, height: 32, px: 0.9, py: 0.35, textTransform: 'none', fontSize: '0.72rem', fontWeight: 680 }}>
                 Go
             </Button>
         </Box>
     );
 }
 
-function HeaderPageControl({ totalPages, page, onChange }) {
+function HeaderPageControl({ totalPages, page, onChange, disabled = false }) {
+    const pageCount = Math.max(Number(totalPages) || 1, 1);
     const [inputPage, setInputPage] = useState(page);
     const pageNumber = Number(inputPage);
+    const canPage = !disabled && pageCount > 1;
     const isValid = inputPage !== ''
         && Number.isInteger(pageNumber)
         && pageNumber >= 1
-        && pageNumber <= totalPages;
+        && pageNumber <= pageCount;
 
     useEffect(() => {
         setInputPage(page);
     }, [page]);
 
-    if (totalPages <= 1) return null;
-
     const commitPage = () => {
-        if (isValid) {
+        if (canPage && isValid) {
             onChange(pageNumber);
             return;
         }
@@ -182,7 +190,7 @@ function HeaderPageControl({ totalPages, page, onChange }) {
             <IconButton
                 size="small"
                 aria-label="Previous page"
-                disabled={page <= 1}
+                disabled={!canPage || page <= 1}
                 onClick={() => onChange(page - 1)}
                 sx={{ width: 31, height: 30, borderRadius: 0 }}
             >
@@ -195,6 +203,7 @@ function HeaderPageControl({ totalPages, page, onChange }) {
                 <TextField
                     size="small"
                     value={inputPage}
+                    disabled={!canPage}
                     onChange={(event) => setInputPage(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') {
@@ -227,19 +236,46 @@ function HeaderPageControl({ totalPages, page, onChange }) {
                     }}
                 />
                 <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 650, whiteSpace: 'nowrap' }}>
-                    / {totalPages.toLocaleString()}
+                    / {pageCount.toLocaleString()}
                 </Typography>
             </Box>
             <IconButton
                 size="small"
                 aria-label="Next page"
-                disabled={page >= totalPages}
+                disabled={!canPage || page >= pageCount}
                 onClick={() => onChange(page + 1)}
                 sx={{ width: 31, height: 30, borderRadius: 0 }}
             >
                 <KeyboardArrowRight fontSize="small" />
             </IconButton>
         </Box>
+    );
+}
+
+function RowsPerPageControl({ value, onChange, disabled = false }) {
+    const theme = useTheme();
+
+    return (
+        <FormControl size="small" sx={{ minWidth: 94, flexShrink: 0 }}>
+            <Select
+                value={value}
+                onChange={onChange}
+                disabled={disabled}
+                inputProps={{ 'aria-label': 'Rows per page' }}
+                renderValue={(selectedValue) => `${selectedValue} / page`}
+                sx={{
+                    height: 32,
+                    bgcolor: theme.palette.background.paper,
+                    fontSize: '0.78rem',
+                    fontWeight: 650,
+                    '& .MuiSelect-select': { py: 0.45, display: 'flex', alignItems: 'center' },
+                }}
+            >
+                {[25, 50, 100, 200].map((option) => (
+                    <MenuItem key={option} value={option} dense>{option}</MenuItem>
+                ))}
+            </Select>
+        </FormControl>
     );
 }
 
@@ -525,17 +561,6 @@ function QuietTableRowsPlaceholder({ columns, rows = 10 }) {
     );
 }
 
-const TRAIT_PLACEHOLDERS = [
-    'e.g. GCST90081631',
-    'e.g. PA00638 (Self-reported illness)',
-    'e.g. Hypertension',
-    'e.g. Diabetes',
-    'e.g. PA00450 (Type 2 diabetes)',
-    'e.g. Alzheimer\'s disease',
-    'e.g. GCST90014269 (Coronary artery disease)',
-    'e.g. Body mass index'
-];
-
 export default function GwasDataList({
     title = 'GWAS Data',
     columns = [],
@@ -543,15 +568,7 @@ export default function GwasDataList({
     defaultOrder = 'ASC',
 }) {
     const theme = useTheme();
-    const [placeholderIndex, setPlaceholderIndex] = useState(0);
-    const searchPlaceholder = TRAIT_PLACEHOLDERS[placeholderIndex % TRAIT_PLACEHOLDERS.length];
-
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setPlaceholderIndex((index) => (index + 1) % TRAIT_PLACEHOLDERS.length);
-        }, 3600);
-        return () => clearInterval(timer);
-    }, []);
+    const searchPlaceholder = 'Search trait ID, name, MeSH term';
     const [searchParams, setSearchParams] = useSearchParams();
     const rootRef = useRef(null);
     const availableSortColumns = useMemo(() => new Set(columns.map((column) => column.id)), [columns]);
@@ -712,38 +729,16 @@ export default function GwasDataList({
             >
                 {title && (
                     <Box
-                        sx={{
-                            px: { xs: 1.5, md: 2 },
-                            py: { xs: 1.1, md: 1.15 },
-                            borderBottom: `1px solid ${theme.custom.border.soft}`,
-                            display: 'grid',
-                            gridTemplateColumns: {
-                                xs: '1fr',
-                                lg: 'max-content minmax(180px, 1fr) max-content',
-                            },
-                            alignItems: 'center',
-                            gap: { xs: 0.7, lg: 1.1 },
-                            minWidth: 0,
-                        }}
+                        sx={mainTableToolbarSx(theme)}
                     >
                         <Box
-                            sx={{
-                                minWidth: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'flex-start',
-                                gap: 0.55,
-                                maxWidth: { lg: 280 },
-                                '@media (min-width: 2200px)': {
-                                    maxWidth: 420,
-                                },
-                            }}
+                            sx={mainTableToolbarTitleSlotSx(theme, { gap: 0.55 })}
                         >
                             <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b5f', lineHeight: 1.15 })}>
                                 {title}
                             </Typography>
                         </Box>
-                        <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'center' }, gap: 0.55, flexWrap: 'wrap', minWidth: 0 }}>
+                        <Box sx={mainTableToolbarSearchSlotSx(theme)}>
                             <TextField
                                 size="small"
                                 value={search}
@@ -752,31 +747,23 @@ export default function GwasDataList({
                                     setPage(1);
                                 }}
                                 placeholder={searchPlaceholder}
-                                sx={{
-                                    width: '100%',
-                                    maxWidth: { lg: 320 },
-                                    '@media (min-width: 2200px)': {
-                                        maxWidth: 420,
-                                    },
-                                    '& .MuiOutlinedInput-root': {
-                                        height: 36,
-                                        bgcolor: theme.palette.background.paper,
-                                        borderRadius: 1,
-                                        borderColor: alpha('#245089', 0.16),
-                                    },
-                                    '& .MuiInputBase-input': {
-                                        py: 0.55,
-                                        fontSize: '0.8rem',
-                                    },
-                                }}
+                                sx={mainTableSearchFieldSx(theme, '#245089')}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
                                             <Search fontSize="small" sx={{ color: theme.palette.text.secondary }} />
                                         </InputAdornment>
                                     ),
-                                    endAdornment: search ? (
-                                        <InputAdornment position="end">
+                                    endAdornment: (
+                                        <InputAdornment
+                                            position="end"
+                                            sx={{
+                                                minWidth: 32,
+                                                justifyContent: 'flex-end',
+                                                visibility: search ? 'visible' : 'hidden',
+                                                pointerEvents: search ? 'auto' : 'none',
+                                            }}
+                                        >
                                             <IconButton
                                                 size="small"
                                                 aria-label="Clear trait search"
@@ -789,60 +776,37 @@ export default function GwasDataList({
                                                 <Clear fontSize="small" />
                                             </IconButton>
                                         </InputAdornment>
-                                    ) : null,
+                                    ),
                                 }}
                             />
                         </Box>
-                        <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: { xs: 'flex-start', lg: 'flex-end' }, justifySelf: { xs: 'start', lg: 'end' }, gap: 0.85, minWidth: 0, flexWrap: { xs: 'wrap', lg: 'nowrap' }, whiteSpace: { lg: 'nowrap' } }}>
-                            {shouldPaginate && <HeaderPageControl totalPages={totalPages} page={page} onChange={setPage} />}
-                            {shouldPaginate && (
-                                <FormControl size="small" sx={{ minWidth: 94 }}>
-                                    <Select
-                                        value={limit}
-                                        onChange={handleChangeLimit}
-                                        inputProps={{ 'aria-label': 'Rows per page' }}
-                                        renderValue={(value) => `${value} / page`}
-                                        sx={{
-                                            height: 32,
-                                            bgcolor: theme.palette.background.paper,
-                                            fontSize: '0.78rem',
-                                            fontWeight: 650,
-                                            '& .MuiSelect-select': { py: 0.45, display: 'flex', alignItems: 'center' },
-                                        }}
-                                    >
-                                        {[25, 50, 100, 200].map((v) => (
-                                            <MenuItem key={v} value={v} dense>{v}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            )}
-                            <UpdatingStatus active={isRefreshing} />
+                        <Box sx={mainTableToolbarActionsSx(theme)}>
+                            <Box
+                                sx={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 0.65,
+                                    px: 0.55,
+                                    py: 0.35,
+                                    border: `1px solid ${alpha('#245089', 0.1)}`,
+                                    borderRadius: 1,
+                                    bgcolor: alpha('#245089', 0.025),
+                                    flexShrink: 0,
+                                    opacity: shouldPaginate ? 1 : 0.58,
+                                }}
+                            >
+                                <HeaderPageControl totalPages={totalPages} page={page} onChange={setPage} disabled={!shouldPaginate} />
+                                <RowsPerPageControl value={limit} onChange={handleChangeLimit} disabled={!shouldPaginate} />
+                            </Box>
+                            <UpdatingStatus active={isRefreshing} reserveSpace />
                             <Button
                                 size="small"
                                 startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
                                 onClick={handleDownloadTsv}
                                 disabled={!totalCount || downloading}
-                                sx={{
-                                    textTransform: 'none',
-                                    fontSize: '0.76rem',
-                                    fontWeight: 700,
-                                    color: '#173b5f',
-                                    border: `1px solid ${alpha('#173b5f', 0.16)}`,
-                                    bgcolor: theme.palette.background.paper,
-                                    minWidth: 136,
-                                    height: 36,
-                                    px: 1.35,
-                                    py: 0.45,
-                                    flexShrink: 0,
-                                    boxShadow: 'none',
-                                    '&:hover': {
-                                        bgcolor: alpha('#173b5f', 0.05),
-                                        borderColor: alpha('#173b5f', 0.26),
-                                        boxShadow: 'none',
-                                    },
-                                }}
+                                sx={mainTableActionButtonSx(theme, '#173b5f')}
                             >
-                                {downloading ? 'Preparing' : 'Download Table'}
+                                {downloading ? 'Preparing' : 'Download TSV'}
                             </Button>
                         </Box>
                     </Box>
@@ -866,7 +830,7 @@ export default function GwasDataList({
                                 stickyHeader
                                 sx={stickyTableSx(theme, {
                                     width: '100%',
-                                    tableLayout: 'auto',
+                                    tableLayout: 'fixed',
                                 })}
                             >
                                 <colgroup>
@@ -961,31 +925,28 @@ export default function GwasDataList({
 
                     </Box>
 
-                    {visibleRows.length > 0 && (
-                        <Box
-                            sx={{
-                                px: { xs: 1.5, md: 2 },
-                                py: 1.35,
-                                display: 'grid',
-                                gridTemplateColumns: shouldPaginate ? { xs: '1fr', md: 'minmax(0, 1fr) auto' } : '1fr',
-                                alignItems: 'center',
-                                gap: 1.5,
-                                background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.custom.surface.subtle})`,
-                                borderTop: `1px solid ${theme.custom.border.soft}`,
-                            }}
-                        >
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                                {totalCount === 0 ? 'No items' : `${Math.min(((page - 1) * limit) + 1, totalCount).toLocaleString()}-${Math.min(page * limit, totalCount).toLocaleString()} / ${totalCount.toLocaleString()} records`}
-                            </Typography>
+                    <Box
+                        sx={{
+                            px: { xs: 1.5, md: 2 },
+                            py: 1.35,
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+                            alignItems: 'center',
+                            gap: 1.5,
+                            background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.custom.surface.subtle})`,
+                            borderTop: `1px solid ${theme.custom.border.soft}`,
+                        }}
+                    >
+                        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
+                            {totalCount === 0 ? 'No records' : `${Math.min(((page - 1) * limit) + 1, totalCount).toLocaleString()}-${Math.min(page * limit, totalCount).toLocaleString()} / ${totalCount.toLocaleString()} records`}
+                        </Typography>
 
-                            {shouldPaginate && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flexWrap: 'wrap' }}>
-                                    <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
-                                    <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} />
-                                </Box>
-                            )}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flexWrap: 'wrap', opacity: shouldPaginate ? 1 : 0.58 }}>
+                            <RowsPerPageControl value={limit} onChange={handleChangeLimit} disabled={!shouldPaginate} />
+                            <PaginationControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} disabled={!shouldPaginate} />
+                            <JumpToPageControl totalPages={totalPages} page={page} onChange={(e, value) => setPage(value)} disabled={!shouldPaginate} />
                         </Box>
-                    )}
+                    </Box>
             </Paper>
         </Box>
     );

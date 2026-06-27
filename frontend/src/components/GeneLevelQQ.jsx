@@ -26,12 +26,13 @@ import useSWR from 'swr';
 import { getCrossTraitTargets, getDataFileText } from '../api/gwas';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
-import { parseNullableNumber } from '../utils/numbers';
+import { formatScientificNumber, parseNullableNumber } from '../utils/numbers';
 import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { useIdleRenderGate } from '../utils/renderScheduling';
+import { compareValues } from '../utils/sort';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -298,11 +299,11 @@ async function loadGeneLevelQQPayload({ appliedTraits, availableTraits, candidat
 }
 
 function formatNumber(value, digits = 3) {
-    return Number.isFinite(value) ? value.toFixed(digits) : 'NA';
+    return Number.isFinite(value) ? value.toFixed(digits) : '-';
 }
 
 function formatPValue(value) {
-    return Number.isFinite(value) ? value.toExponential(2) : 'NA';
+    return formatScientificNumber(value, 2, '-');
 }
 
 function buildHoverText(row) {
@@ -321,7 +322,7 @@ function buildHoverText(row) {
     }
     if ([row.p, row.fdr, row.beta].some(Number.isFinite)) {
         lines.push('');
-        if (Number.isFinite(row.p)) lines.push(`P_withShet: ${formatPValue(row.p)}`);
+        if (Number.isFinite(row.p)) lines.push(`p-value: ${formatPValue(row.p)}`);
         if (Number.isFinite(row.fdr)) lines.push(`FDR: ${formatPValue(row.fdr)}`);
         if (Number.isFinite(row.beta)) lines.push(`beta_withShet: ${formatNumber(row.beta, 4)}`);
     }
@@ -1089,14 +1090,14 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
             showlegend: false,
             xaxis: {
                 ...axisStyle,
-                title: { text: 'Expected signed -log10(P)', font: { size: 12.5, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 10 },
+                title: { text: 'Expected signed -log10(p-value)', font: { size: 12.5, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 10 },
                 range: axisRange,
                 fixedrange: false,
                 automargin: true,
             },
             yaxis: {
                 ...axisStyle,
-                title: { text: 'Observed signed -log10(P)', font: { size: 12.5, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 10 },
+                title: { text: 'Observed signed -log10(p-value)', font: { size: 12.5, color: theme.palette.text.primary, family: theme.typography.fontFamily }, standoff: 10 },
                 range: axisRange,
                 fixedrange: false,
                 automargin: true,
@@ -1120,18 +1121,13 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
     }), []);
 
     const sortedRows = useMemo(() => {
-        const dir = sortDir === 'asc' ? 1 : -1;
-        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
         return [...filteredRows].sort((a, b) => {
             if (['gene', 'tailSide'].includes(sortBy)) {
                 const left = sortBy === 'gene' ? (a.geneLabel || a.gene || a.ensg || '') : (a[sortBy] || '');
                 const right = sortBy === 'gene' ? (b.geneLabel || b.gene || b.ensg || '') : (b[sortBy] || '');
-                return collator.compare(String(left), String(right)) * dir;
+                return compareValues(left, right, 'text', sortDir);
             }
-            const av = a[sortBy] ?? -Infinity;
-            const bv = b[sortBy] ?? -Infinity;
-            if (av === bv) return 0;
-            return av > bv ? dir : -dir;
+            return compareValues(a[sortBy], b[sortBy], 'number', sortDir);
         });
     }, [filteredRows, sortBy, sortDir]);
 
@@ -1535,7 +1531,7 @@ export default function GeneLevelQQ({ fileId, gwasId, traitLabel, lookupIds = []
                                 onClick={() => setExportOpen(true)}
                                 sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
                             >
-                                Export Image
+                                Export image
                             </Button>
                         )}
                     </Box>

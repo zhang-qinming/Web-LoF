@@ -24,7 +24,7 @@ export default function ExportPlotDialog({
     format,
     onFormatChange,
     onExport,
-    title = 'Export Image',
+    title = 'Export image',
 }) {
     const theme = useTheme();
     const fieldSx = controlFieldSx(theme, {

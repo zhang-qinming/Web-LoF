@@ -106,7 +106,21 @@ export const GRAPH_LAYOUTS = {
     },
     full: {
         mode: GRAPH_VIEW_MODES.full,
-        defaultMaxGenes: 8,
+        defaultMaxGenes: 5,
+        allGeneLabelCount: 5,
+        allGeneProgramModuleH: 128,
+        allGeneRegulatorGroupH: 92,
+        allGeneExpandedPanelGap: 12,
+        allGeneExpandedMinH: 430,
+        allGeneDetailHeaderH: 58,
+        allGeneDetailGroupHeaderH: 24,
+        allGeneDetailRowH: 24,
+        allGeneDetailCellMinW: 112,
+        allGeneDetailCellGap: 8,
+        allGeneDetailGroupGap: 12,
+        allGeneDetailPaddingX: 14,
+        allGeneDetailPaddingY: 12,
+        allGeneDetailMaxColumns: 6,
         traitCenterX: 560,
         traitNodeW: 232,
         traitNodeMinH: 128,
@@ -133,8 +147,8 @@ export const GRAPH_LAYOUTS = {
         geneBottomPadding: 0,
         oneSidedDividerRatio: 0.5,
         geneBoxStyle: 'legacy',
-        moduleGap: 42,
-        regulatorGroupGap: 18,
+        moduleGap: 54,
+        regulatorGroupGap: 22,
         regulatorEdgeTargetSpacing: 14,
         graphTopPadding: 168,
         graphBottomPadding: 96,
@@ -187,9 +201,9 @@ export const INLINE_LEGEND_GROUPS = [
     {
         label: 'Selected by',
         items: [
-            { label: 'program', color: PROGRAM_COLORS.program_enriched },
-            { label: 'regulator', color: PROGRAM_COLORS.regulator_enriched },
-            { label: 'both', color: PROGRAM_COLORS.both_enriched },
+            { label: 'Program', color: PROGRAM_COLORS.program_enriched },
+            { label: 'Regulator', color: PROGRAM_COLORS.regulator_enriched },
+            { label: 'Both', color: PROGRAM_COLORS.both_enriched },
         ],
     },
     {
@@ -210,11 +224,11 @@ export function toFiniteNumber(value, fallback = null) {
 }
 
 export function sanitizeFileNamePart(value) {
-    return String(value || 'trait-program-gene').replace(/[\\/:*?"<>|]+/g, '_');
+    return String(value || 'trait-gene-association-map').replace(/[\\/:*?"<>|]+/g, '_');
 }
 
 export function formatNumber(value, digits = 3) {
-    return Number.isFinite(value) ? value.toFixed(digits) : 'NA';
+    return Number.isFinite(value) ? value.toFixed(digits) : '-';
 }
 
 export function formatProgramTooltip(program) {
@@ -234,15 +248,15 @@ export function formatProgramTooltip(program) {
 export function formatGeneTooltip(gene) {
     return [
         `Gene: ${gene.gene}`,
-        `ENSG: ${gene.ensg || 'NA'}`,
-        `LoF effect (post_mean): ${formatNumber(gene.postMean, 4)}`,
-        `Abs LoF effect (abs_gamma): ${formatNumber(gene.absGamma, 4)}`,
-        `Membership / regulator beta score: ${formatNumber(gene.membershipScore, 4)}`,
-        `Program-trait sign: ${gene.programTraitSign || 'NA'}`,
-        `Regulator-program sign: ${gene.regulatorProgramSign || 'NA'}`,
-        `Predicted sign: ${gene.predictedSign || 'NA'}`,
-        `Display bucket: ${gene.displayBucket || 'NA'}`,
-        `Display column: ${gene.displayColumn || 'NA'}`,
+        `ENSG: ${gene.ensg || '-'}`,
+        `post_mean: ${formatNumber(gene.postMean, 4)}`,
+        `abs_gamma: ${formatNumber(gene.absGamma, 4)}`,
+        `membership_score: ${formatNumber(gene.membershipScore, 4)}`,
+        `Program-trait sign: ${gene.programTraitSign || '-'}`,
+        `Regulator-program sign: ${gene.regulatorProgramSign || '-'}`,
+        `Predicted sign: ${gene.predictedSign || '-'}`,
+        `Display bucket: ${gene.displayBucket || '-'}`,
+        `Display column: ${gene.displayColumn || '-'}`,
         `Concordant direction: ${gene.isConcordant ? 'yes' : 'no'}`,
         `Discordant direction: ${gene.isDiscordant ? 'yes' : 'no'}`,
     ].join('\n');
@@ -352,6 +366,69 @@ export function splitGenesByEffect(genes) {
         left: sortGenesWithinColumn(columns.left),
         right: sortGenesWithinColumn(columns.right),
     };
+}
+
+export function sortGenesForDetail(genes) {
+    return [...(genes || [])].sort((a, b) => {
+        const aRank = Number.isFinite(Number(a.rankWithinSide)) ? Number(a.rankWithinSide) : Number.MAX_SAFE_INTEGER;
+        const bRank = Number.isFinite(Number(b.rankWithinSide)) ? Number(b.rankWithinSide) : Number.MAX_SAFE_INTEGER;
+        if (aRank !== bRank) return aRank - bRank;
+
+        const effectDelta = Math.abs(Number(b.absGamma) || 0) - Math.abs(Number(a.absGamma) || 0);
+        if (effectDelta !== 0) return effectDelta;
+
+        const membershipDelta = Math.abs(Number(b.membershipScore) || 0) - Math.abs(Number(a.membershipScore) || 0);
+        if (membershipDelta !== 0) return membershipDelta;
+
+        return displayGeneLabel(a).localeCompare(displayGeneLabel(b), undefined, { numeric: true, sensitivity: 'base' });
+    });
+}
+
+export function allGeneDetailGroups(genes) {
+    const groups = [
+        { key: 'positive', label: 'Effect +', color: EFFECT_COLORS.positive, genes: [] },
+        { key: 'negative', label: 'Effect -', color: EFFECT_COLORS.negative, genes: [] },
+        { key: 'neutral', label: 'Neutral', color: EFFECT_COLORS.neutral, genes: [] },
+    ];
+    const byKey = new Map(groups.map((group) => [group.key, group]));
+
+    sortGenesForDetail(genes).forEach((gene) => {
+        const sign = effectSignFromGene(gene);
+        (byKey.get(sign) || byKey.get('neutral')).genes.push(gene);
+    });
+
+    return groups.filter((group) => group.genes.length > 0);
+}
+
+export function allGeneDetailColumnCount(width, layout = DEFAULT_GRAPH_LAYOUT) {
+    const paddingX = layout.allGeneDetailPaddingX ?? 14;
+    const gap = layout.allGeneDetailCellGap ?? 8;
+    const minCellW = layout.allGeneDetailCellMinW ?? 112;
+    const maxColumns = layout.allGeneDetailMaxColumns ?? 6;
+    const usableWidth = Math.max(minCellW, width - (paddingX * 2));
+    const columns = Math.floor((usableWidth + gap) / (minCellW + gap));
+    return clamp(columns, 2, maxColumns);
+}
+
+export function allGeneDetailPanelHeight(genes, width, layout = DEFAULT_GRAPH_LAYOUT) {
+    const paddingY = layout.allGeneDetailPaddingY ?? 12;
+    const headerH = layout.allGeneDetailHeaderH ?? 58;
+    const groupHeaderH = layout.allGeneDetailGroupHeaderH ?? 24;
+    const rowH = layout.allGeneDetailRowH ?? 24;
+    const groupGap = layout.allGeneDetailGroupGap ?? 12;
+    const columns = allGeneDetailColumnCount(width, layout);
+    const groups = allGeneDetailGroups(genes);
+    const groupsHeight = groups.reduce((sum, group, index) => (
+        sum
+        + groupHeaderH
+        + (Math.ceil(group.genes.length / columns) * rowH)
+        + (index > 0 ? groupGap : 0)
+    ), 0);
+
+    return Math.ceil(Math.max(
+        layout.allGeneExpandedMinH ?? 430,
+        paddingY + headerH + groupsHeight + paddingY,
+    ));
 }
 
 function regulatorSignFromGene(gene) {
@@ -622,10 +699,18 @@ export function exportPng(svgElement, fileName) {
 export function useGraphTransform() {
     const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
     const [isDragging, setIsDragging] = useState(false);
+    const [isTransformAnimating, setIsTransformAnimating] = useState(false);
+    const [transformAnimationMs, setTransformAnimationMs] = useState(0);
     const dragRef = useRef(null);
     const frameRef = useRef(null);
+    const animationTimeoutRef = useRef(null);
     const pendingTransformRef = useRef(null);
+    const transformRef = useRef(transform);
     const suppressClickUntilRef = useRef(0);
+
+    useEffect(() => {
+        transformRef.current = transform;
+    }, [transform]);
 
     const commitPendingTransform = useCallback(() => {
         frameRef.current = null;
@@ -644,9 +729,76 @@ export function useGraphTransform() {
         frameRef.current = requestAnimationFrame(commitPendingTransform);
     }, [commitPendingTransform]);
 
+    const cancelTransformAnimation = useCallback(() => {
+        if (animationTimeoutRef.current !== null) clearTimeout(animationTimeoutRef.current);
+        animationTimeoutRef.current = null;
+        setIsTransformAnimating(false);
+        setTransformAnimationMs(0);
+    }, []);
+
     useEffect(() => () => {
         if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+        if (animationTimeoutRef.current !== null) clearTimeout(animationTimeoutRef.current);
     }, []);
+
+    const animateToTransform = useCallback((nextTransform, options = {}) => {
+        cancelTransformAnimation();
+        if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+        pendingTransformRef.current = null;
+
+        const duration = options.durationMs ?? 520;
+        const start = transformRef.current;
+        const target = {
+            x: Number.isFinite(nextTransform.x) ? nextTransform.x : start.x,
+            y: Number.isFinite(nextTransform.y) ? nextTransform.y : start.y,
+            scale: Number.isFinite(nextTransform.scale) ? clamp(nextTransform.scale, 0.5, 2.2) : start.scale,
+        };
+
+        if (duration <= 0) {
+            transformRef.current = target;
+            setTransform(target);
+            return;
+        }
+
+        setIsTransformAnimating(true);
+        setTransformAnimationMs(duration);
+        transformRef.current = target;
+        setTransform(target);
+        animationTimeoutRef.current = setTimeout(() => {
+            animationTimeoutRef.current = null;
+            setIsTransformAnimating(false);
+            setTransformAnimationMs(0);
+        }, duration + 80);
+    }, [cancelTransformAnimation]);
+
+    const focusBounds = useCallback((bounds, viewBox, options = {}) => {
+        if (!bounds || !viewBox) return;
+
+        const viewWidth = Math.max(1, viewBox.width || SVG_WIDTH);
+        const viewHeight = Math.max(1, viewBox.height || DEFAULT_GRAPH_LAYOUT.minSvgHeight);
+        const paddingX = options.paddingX ?? 120;
+        const paddingY = options.paddingY ?? 96;
+        const fitScale = Math.min(
+            viewWidth / Math.max(1, bounds.width + (paddingX * 2)),
+            viewHeight / Math.max(1, bounds.height + (paddingY * 2)),
+        );
+        const targetScale = clamp(
+            options.scale ?? fitScale * (options.zoomBoost ?? 1.08),
+            options.minScale ?? 1.18,
+            options.maxScale ?? 1.72,
+        );
+        const targetCenterX = bounds.x + (bounds.width / 2);
+        const targetCenterY = bounds.y + (bounds.height / 2);
+        const viewCenterX = options.centerX ?? viewWidth / 2;
+        const viewCenterY = options.centerY ?? viewHeight / 2;
+
+        animateToTransform({
+            x: viewCenterX - (targetCenterX * targetScale),
+            y: viewCenterY - (targetCenterY * targetScale),
+            scale: targetScale,
+        }, { durationMs: options.durationMs ?? 560 });
+    }, [animateToTransform]);
 
     const trySetPointerCapture = useCallback((target, pointerId) => {
         try {
@@ -671,6 +823,7 @@ export function useGraphTransform() {
             || event.target.closest?.('[data-graph-clickable="true"]')
         ) return;
 
+        cancelTransformAnimation();
         dragRef.current = {
             id: event.pointerId,
             x: event.clientX,
@@ -681,7 +834,7 @@ export function useGraphTransform() {
         };
         setIsDragging(true);
         trySetPointerCapture(event.currentTarget, event.pointerId);
-    }, [transform.x, transform.y, trySetPointerCapture]);
+    }, [cancelTransformAnimation, transform.x, transform.y, trySetPointerCapture]);
 
     const onPointerMove = useCallback((event) => {
         const dragState = dragRef.current;
@@ -716,34 +869,42 @@ export function useGraphTransform() {
 
     const onWheel = useCallback((event) => {
         if (!event.ctrlKey && !event.metaKey) return;
+        cancelTransformAnimation();
         const factor = event.deltaY < 0 ? 1.08 : 0.92;
         setTransform((current) => ({
             ...current,
             scale: clamp(current.scale * factor, 0.5, 2.2),
         }));
-    }, []);
+    }, [cancelTransformAnimation]);
 
     const zoomIn = useCallback(() => {
+        cancelTransformAnimation();
         setTransform((current) => ({ ...current, scale: clamp(current.scale * 1.12, 0.5, 2.2) }));
-    }, []);
+    }, [cancelTransformAnimation]);
 
     const zoomOut = useCallback(() => {
+        cancelTransformAnimation();
         setTransform((current) => ({ ...current, scale: clamp(current.scale * 0.9, 0.5, 2.2) }));
-    }, []);
+    }, [cancelTransformAnimation]);
 
     const reset = useCallback(() => {
+        cancelTransformAnimation();
         if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
         pendingTransformRef.current = null;
-        setTransform({ x: 0, y: 0, scale: 1 });
+        const resetTransform = { x: 0, y: 0, scale: 1 };
+        transformRef.current = resetTransform;
+        setTransform(resetTransform);
         suppressClickUntilRef.current = 0;
-    }, []);
+    }, [cancelTransformAnimation]);
 
     const shouldSuppressClick = useCallback(() => Date.now() < suppressClickUntilRef.current, []);
 
     return {
         transform,
         isDragging,
+        isTransformAnimating,
+        transformAnimationMs,
         onPointerDown,
         onPointerMove,
         onPointerUp,
@@ -751,6 +912,8 @@ export function useGraphTransform() {
         zoomIn,
         zoomOut,
         reset,
+        animateToTransform,
+        focusBounds,
         shouldSuppressClick,
     };
 }
@@ -767,6 +930,8 @@ export function buildModuleBlueprints(programs, side, filters, expandedPrograms,
     const allowedSign = filters.gammaSign;
     const threshold = filters.gammaThreshold;
     const maxGenes = filters.maxGenesPerProgram;
+    const allGeneOverview = maxGenes === Number.POSITIVE_INFINITY && layout.mode === GRAPH_VIEW_MODES.full;
+    const allGeneExpandedKey = filters.allGeneExpandedKey || null;
 
     const modules = programs.map((program) => {
         const genes = [...program.genes[side]];
@@ -780,13 +945,22 @@ export function buildModuleBlueprints(programs, side, filters, expandedPrograms,
         });
 
         const expanded = expandedPrograms.has(`${program.program}:${side}`);
-        const visibleGenes = expanded ? filteredGenes : filteredGenes.slice(0, maxGenes);
+        const allGeneModuleKey = `${side}:${program.program}`;
+        const allGeneExpanded = allGeneOverview && allGeneExpandedKey === allGeneModuleKey;
+        const plotGenes = allGeneOverview ? filteredGenes : expanded ? filteredGenes : filteredGenes.slice(0, maxGenes);
+        const visibleGenes = allGeneOverview
+            ? plotGenes
+            : expanded ? filteredGenes : filteredGenes.slice(0, maxGenes);
         const geneColumns = splitGenesByEffect(visibleGenes);
-        const regulatorGroups = side === 'regulator' ? groupRegulatorGenesByBucket(visibleGenes, layout) : null;
+        const regulatorGroups = side === 'regulator'
+            ? groupRegulatorGenesByBucket(allGeneOverview ? filteredGenes : visibleGenes, layout)
+            : null;
         const titleRows = programDisplayLines(program, 19).length || 1;
         const regulatorGroupHeights = regulatorGroups
             ? regulatorGroups.reduce((acc, group) => {
-                acc[group.key] = regulatorGeneBoxHeight(group.genes, layout);
+                acc[group.key] = allGeneOverview
+                    ? (layout.allGeneRegulatorGroupH || 92)
+                    : regulatorGeneBoxHeight(group.genes, layout);
                 return acc;
             }, {})
             : null;
@@ -797,8 +971,22 @@ export function buildModuleBlueprints(programs, side, filters, expandedPrograms,
             : regulatorGroups
                 ? Math.max(...regulatorGroups.map((group) => regulatorGroupHeights[group.key] || 0), 0)
                 : 0;
+        const allGeneDetailPanelWidth = side === 'regulator'
+            ? (layout.allGeneExpandedRegulatorPanelW || layout.rightRegulatorW)
+            : (layout.allGeneExpandedProgramPanelW || layout.leftProgramW);
+        const allGeneDetailHeight = allGeneExpanded
+            ? allGeneDetailPanelHeight(filteredGenes, allGeneDetailPanelWidth, layout)
+            : 0;
         const height = program.collapsed
             ? 74
+            : allGeneOverview
+                ? allGeneExpanded
+                    ? side === 'regulator'
+                        ? layout.rightProgramH + (layout.allGeneExpandedPanelGap || 12) + allGeneDetailHeight
+                        : allGeneDetailHeight
+                    : side === 'regulator'
+                        ? Math.max(layout.rightProgramH + 34, regulatorGroupsHeight)
+                        : (layout.allGeneProgramModuleH || 128)
             : side === 'regulator'
                 ? Math.max(layout.rightProgramH + (layout.mode === GRAPH_VIEW_MODES.full ? 34 : 24), regulatorGroupsHeight)
                 : geneBoxHeight(geneColumns, titleRows, layout);
@@ -807,7 +995,14 @@ export function buildModuleBlueprints(programs, side, filters, expandedPrograms,
             ...program,
             side,
             expanded,
+            allGeneOverview,
+            allGeneExpanded,
+            allGeneModuleKey,
+            allGeneDetailHeight,
+            allGeneDetailPanelWidth,
             height,
+            allGenes: filteredGenes,
+            plotGenes,
             totalFilteredGenes: filteredGenes.length,
             filteredGeneKeys: filteredGenes.map((gene) => gene.highlightKey),
             visibleGenes,

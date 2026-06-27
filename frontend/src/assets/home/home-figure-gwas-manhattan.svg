@@ -8,7 +8,7 @@
   <line x1="92" y1="326" x2="92" y2="126" stroke="#CBD5E1" stroke-width="1.5"/>
   <line x1="92" y1="196" x2="636" y2="196" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="6 5"/>
   <text x="364" y="370" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="12">chromosome</text>
-  <text transform="rotate(-90 60 236)" x="60" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">-log10(P)</text>
+  <text transform="rotate(-90 60 236)" x="60" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="12">-log10(p-value)</text>
 
   <text x="82" y="330" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">0</text>
   <text x="82" y="268" text-anchor="end" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="9">4</text>

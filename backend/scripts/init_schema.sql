@@ -97,38 +97,6 @@ CREATE TABLE IF NOT EXISTS program_info (
     marker_coexpression       TEXT         DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS trait_program_edge (
-    id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    edge_key              VARCHAR(255) NOT NULL,
-    file_id               VARCHAR(100) NOT NULL,
-    trait_id              VARCHAR(100) NOT NULL,
-    program               VARCHAR(100) NOT NULL,
-    program_label         VARCHAR(300) DEFAULT NULL,
-    program_annotation    VARCHAR(500) DEFAULT NULL,
-    program_trait_sign    VARCHAR(50)  DEFAULT NULL,
-    color                 VARCHAR(50)  DEFAULT NULL,
-    program_score         DOUBLE       DEFAULT NULL,
-    regulator_score       DOUBLE       DEFAULT NULL,
-    program_sig           BOOLEAN      DEFAULT FALSE,
-    regulator_sig         BOOLEAN      DEFAULT FALSE,
-    selected_by_program   BOOLEAN      DEFAULT FALSE,
-    selected_by_regulator BOOLEAN      DEFAULT FALSE,
-    loading_gene_count    INT          DEFAULT 0,
-    regulator_gene_count  INT          DEFAULT 0,
-    loading_visible_count INT          DEFAULT 0,
-    regulator_visible_count INT        DEFAULT 0,
-    has_overlap           BOOLEAN      DEFAULT TRUE,
-    empty_reason          VARCHAR(500) DEFAULT NULL,
-    source_file           VARCHAR(255) DEFAULT NULL,
-    imported_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_trait_program_edge_key (edge_key),
-    INDEX idx_tpe_program (program),
-    INDEX idx_tpe_trait (trait_id),
-    INDEX idx_tpe_file (file_id),
-    INDEX idx_tpe_program_trait (program, trait_id),
-    INDEX idx_tpe_trait_program (trait_id, program)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS gene_info_hg37_matched (
     id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     perturb_symbol      VARCHAR(100) NOT NULL,
@@ -196,6 +164,54 @@ CREATE TABLE IF NOT EXISTS gene_program_trait_edge (
     INDEX idx_gpte_ensg_program (ensg_id, program),
     INDEX idx_gpte_program_trait (program, trait_id),
     INDEX idx_gpte_trait_program (trait_id, program)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS program_gene_role_edge (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    edge_key        VARCHAR(360) NOT NULL,
+    program         VARCHAR(100) NOT NULL,
+    gene_symbol     VARCHAR(100) DEFAULT NULL,
+    ensg_id         VARCHAR(30)  DEFAULT NULL,
+    role            ENUM('program_gene','regulator') NOT NULL,
+    score           DOUBLE       DEFAULT NULL,
+    rank_value      INT          DEFAULT NULL,
+    direction       VARCHAR(50)  DEFAULT NULL,
+    source_dataset  VARCHAR(100) NOT NULL,
+    source_file     VARCHAR(255) DEFAULT NULL,
+    imported_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_program_gene_role_edge_key (edge_key),
+    INDEX idx_pgre_program (program),
+    INDEX idx_pgre_gene (gene_symbol),
+    INDEX idx_pgre_ensg (ensg_id),
+    INDEX idx_pgre_role (role),
+    INDEX idx_pgre_program_role (program, role, rank_value),
+    INDEX idx_pgre_gene_program (gene_symbol, program),
+    INDEX idx_pgre_ensg_program (ensg_id, program)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS program_trait_scatter_edge (
+    id               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    edge_key         VARCHAR(360) NOT NULL,
+    file_id          VARCHAR(100) NOT NULL,
+    trait_id         VARCHAR(100) NOT NULL,
+    program          VARCHAR(100) NOT NULL,
+    program_score    DOUBLE       DEFAULT NULL,
+    regulator_score  DOUBLE       DEFAULT NULL,
+    program_p        DOUBLE       DEFAULT NULL,
+    regulator_p      DOUBLE       DEFAULT NULL,
+    program_rank     INT          DEFAULT NULL,
+    regulator_rank   INT          DEFAULT NULL,
+    program_gamma    DOUBLE       DEFAULT NULL,
+    regulator_beta   DOUBLE       DEFAULT NULL,
+    enrichment_class VARCHAR(50)  DEFAULT NULL,
+    source_file      VARCHAR(255) DEFAULT NULL,
+    imported_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_program_trait_scatter_edge_key (edge_key),
+    INDEX idx_ptse_program (program),
+    INDEX idx_ptse_trait (trait_id),
+    INDEX idx_ptse_file (file_id),
+    INDEX idx_ptse_program_trait (program, trait_id),
+    INDEX idx_ptse_trait_program (trait_id, program)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS gene_summary (

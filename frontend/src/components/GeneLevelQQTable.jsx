@@ -17,6 +17,7 @@ import Download from '@mui/icons-material/Download';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import TableSearchField from './TableSearchField';
+import { formatScientificNumber } from '../utils/numbers';
 import {
     groupedTableColumnHeaderCellSx,
     highlightedRowSx,
@@ -39,7 +40,7 @@ const COLUMN_SPECS = [
     { key: 'expected', label: 'Expected', align: 'center', tone: 'qq', width: 104 },
     { key: 'observed', label: 'Observed', align: 'center', tone: 'qq', width: 104 },
     { key: 'deviation', label: 'Obs - Exp', align: 'center', tone: 'qq', width: 104 },
-    { key: 'p', label: 'P', align: 'center', tone: 'stat', width: 106 },
+    { key: 'p', label: 'p-value', align: 'center', tone: 'stat', width: 106 },
     { key: 'fdr', label: 'FDR', align: 'center', tone: 'stat', width: 106 },
     { key: 'beta', label: 'Beta', align: 'center', tone: 'stat', width: 96 },
     { key: 'qqRank', label: 'Rank', align: 'center', tone: 'stat', width: 82 },
@@ -95,7 +96,7 @@ function formatNumber(value, digits = 3) {
 }
 
 function formatPValue(value) {
-    return Number.isFinite(value) ? value.toExponential(2) : '-';
+    return formatScientificNumber(value, 2, '-');
 }
 
 function renderCellContent(column, row) {
@@ -172,7 +173,7 @@ export default function GeneLevelQQTable({
                     endIcon={tableOpen ? <ExpandLess /> : <ExpandMore />}
                     sx={{ textTransform: 'none', color: theme.palette.text.primary, fontWeight: 600, fontSize: '0.8rem', px: 0.3 }}
                 >
-                    QQ Plot table
+                    QQ plot table
                     {!tableOpen && (
                         <Chip
                             label={sortedRows.length.toLocaleString()}

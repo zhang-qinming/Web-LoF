@@ -17,6 +17,7 @@ import Download from '@mui/icons-material/Download';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import TableSearchField from './TableSearchField';
+import { formatScientificNumber } from '../utils/numbers';
 import {
     groupedTableColumnHeaderCellSx,
     highlightedRowSx,
@@ -36,9 +37,9 @@ const COLUMN_SPECS = [
     { key: 'gene', label: 'Gene', align: 'center', tone: 'gene', width: 118 },
     { key: 'ensg', label: 'ENSG', align: 'center', tone: 'gene', width: 148 },
     { key: 'postMean', label: 'LoF effect', align: 'center', tone: 'posterior', width: 108 },
-    { key: 'signedLogP', label: 'signed -log10(P)', align: 'center', tone: 'regulation', width: 128 },
+    { key: 'signedLogP', label: 'signed -log10(p-value)', align: 'center', tone: 'regulation', width: 128 },
     { key: 'beta', label: 'Reg beta', align: 'center', tone: 'regulation', width: 92 },
-    { key: 'p', label: 'P', align: 'center', tone: 'regulation', width: 104 },
+    { key: 'p', label: 'p-value', align: 'center', tone: 'regulation', width: 104 },
     { key: 'fdr', label: 'FDR', align: 'center', tone: 'regulation', width: 104 },
     { key: 'evidenceClassLabel', label: 'Evidence', align: 'center', tone: 'evidence', width: 180 },
     { key: 'combinedScore', label: 'Score', align: 'center', tone: 'evidence', width: 94 },
@@ -95,7 +96,7 @@ function formatNumber(value, digits = 3) {
 }
 
 function formatPValue(value) {
-    return Number.isFinite(value) ? value.toExponential(2) : '-';
+    return formatScientificNumber(value, 2, '-');
 }
 
 function formatLabelReason(value) {

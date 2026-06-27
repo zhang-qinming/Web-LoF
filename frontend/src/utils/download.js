@@ -103,6 +103,33 @@ export function triggerBatchDataDownload(paths, filename = 'data-selection.zip')
     submitDownloadForm(buildApiUrl('/data/download-batch'), { paths, filename });
 }
 
+export async function prepareAndTriggerDownload(path, payload = {}) {
+    const response = await fetch(buildApiUrl(path), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        let message = 'Download failed';
+        try {
+            const data = await response.json();
+            if (data?.error) message = data.error;
+        } catch {
+            message = response.statusText || message;
+        }
+        throw new Error(message);
+    }
+
+    const data = await response.json();
+    if (!data?.url) throw new Error('Download URL was not returned');
+    triggerNativeDownload(data.url);
+    return data;
+}
+
+export function triggerTraitDataDownload(traitIds, filename = 'trait-data.zip') {
+    return prepareAndTriggerDownload('/data/traits/download/prepare', { traitIds, filename });
+}
+
 export async function downloadDataPaths(paths, options = {}) {
     const { filename = 'data-selection.zip', zipThreshold = 1 } = options;
     const uniquePaths = [...new Set((paths || []).filter(Boolean))];

@@ -16,6 +16,7 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
@@ -60,10 +61,16 @@ import {
 } from '../themeUtils';
 import { StatePanel, UpdatingStatus } from './PageScaffold';
 import { downloadBlob } from '../utils/download';
+import { compareValues, nextSortDirection } from '../utils/sort';
 
 const DEFAULT_TRAIT_LIMIT = 12;
 const MIN_TRAIT_LIMIT = 2;
 const MAX_TRAIT_LIMIT = 100;
+const CORRELATION_TABLE_COLUMNS = [
+    { key: 'trait', label: 'Trait', align: 'left', tone: 'neutral', type: 'text', defaultDirection: 'asc' },
+    { key: 'correlation', label: 'Correlation', align: 'right', tone: 'primary', type: 'number', defaultDirection: 'desc' },
+    { key: 'sharedGenes', label: 'Shared genes', align: 'right', tone: 'success', type: 'number', defaultDirection: 'desc' },
+];
 
 function truncateLabel(value, maxLength = 28) {
     const text = String(value || '').trim();
@@ -111,7 +118,7 @@ function traitListKey(items = []) {
 }
 
 function formatCorrelation(value) {
-    if (!Number.isFinite(value)) return 'NA';
+    if (!Number.isFinite(value)) return '-';
     return `${value > 0 ? '+' : ''}${value.toFixed(4)}`;
 }
 
@@ -158,6 +165,8 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
     const [appliedTraits, setAppliedTraits] = useState([]);
     const [appliedMethod, setAppliedMethod] = useState('spearman');
     const [renderVersion, setRenderVersion] = useState(0);
+    const [summarySortBy, setSummarySortBy] = useState('absCorrelation');
+    const [summarySortDir, setSummarySortDir] = useState('desc');
     const appliedTraitIds = useMemo(
         () => appliedTraits.map((item) => item.file_id).filter(Boolean),
         [appliedTraits],
@@ -277,18 +286,32 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
         status?.available,
     ]);
 
-    const sourceCorrelationRows = useMemo(() => {
+    const rawSourceCorrelationRows = useMemo(() => {
         const traits = payload?.traits || [];
         return traits.slice(1).map((trait, index) => ({
             trait,
             correlation: payload?.matrix?.[0]?.[index + 1] ?? null,
             sharedGenes: payload?.sharedGeneCounts?.[0]?.[index + 1] ?? 0,
-        })).sort((a, b) => {
-            if (a.correlation == null) return 1;
-            if (b.correlation == null) return -1;
-            return Math.abs(b.correlation) - Math.abs(a.correlation);
-        });
+        }));
     }, [payload]);
+    const sourceCorrelationRows = useMemo(() => {
+        const rows = [...rawSourceCorrelationRows];
+        return rows.sort((a, b) => {
+            let result = 0;
+            if (summarySortBy === 'trait') {
+                result = compareValues(a.trait.trait_name || a.trait.file_id, b.trait.trait_name || b.trait.file_id, 'text', summarySortDir);
+            } else if (summarySortBy === 'correlation') {
+                result = compareValues(a.correlation, b.correlation, 'number', summarySortDir);
+            } else if (summarySortBy === 'sharedGenes') {
+                result = compareValues(a.sharedGenes, b.sharedGenes, 'number', summarySortDir);
+            } else {
+                result = compareValues(Math.abs(a.correlation ?? 0), Math.abs(b.correlation ?? 0), 'number', summarySortDir);
+            }
+
+            return result
+                || compareValues(a.trait.trait_name || a.trait.file_id, b.trait.trait_name || b.trait.file_id, 'text', 'asc');
+        });
+    }, [rawSourceCorrelationRows, summarySortBy, summarySortDir]);
 
     const strongestSourceCorrelation = sourceCorrelationRows.find((row) => row.correlation != null);
     const displayedMethod = hasRenderedCorrelation ? (payload?.summary?.method || appliedMethod) : method;
@@ -421,6 +444,11 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
         `${correlationKey || 'trait-correlation-empty'}:${sourceCorrelationRows.length}`,
         { delay: sourceCorrelationRows.length > 80 ? 450 : 180, timeout: 1600 },
     );
+
+    const handleSummarySort = useCallback((column) => {
+        setSummarySortDir((current) => nextSortDirection(summarySortBy, column.key, current, column.defaultDirection));
+        setSummarySortBy(column.key);
+    }, [summarySortBy]);
 
     if (statusLoading) {
         return (
@@ -726,9 +754,26 @@ export default function TraitCorrelation({ fileId, gwasId, traitLabel }) {
                         <Table stickyHeader size="small" sx={stickyTableSx(theme, { minWidth: 720 })}>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell align="left" sx={stickyTableHeaderCellSx(theme, tableTone(theme, 'neutral'), 'left')}>Trait</TableCell>
-                                    <TableCell align="right" sx={stickyTableHeaderCellSx(theme, tableTone(theme, 'primary'), 'right')}>Correlation</TableCell>
-                                    <TableCell align="right" sx={stickyTableHeaderCellSx(theme, tableTone(theme, 'success'), 'right')}>Shared genes</TableCell>
+                                    {CORRELATION_TABLE_COLUMNS.map((column) => (
+                                        <TableCell
+                                            key={column.key}
+                                            align={column.align}
+                                            sx={stickyTableHeaderCellSx(theme, tableTone(theme, column.tone), column.align)}
+                                        >
+                                            <TableSortLabel
+                                                active={summarySortBy === column.key}
+                                                direction={summarySortBy === column.key ? summarySortDir : column.defaultDirection}
+                                                onClick={() => handleSummarySort(column)}
+                                                sx={{
+                                                    justifyContent: column.align === 'right' ? 'flex-end' : 'flex-start',
+                                                    width: '100%',
+                                                    fontSize: 'inherit',
+                                                }}
+                                            >
+                                                {column.label}
+                                            </TableSortLabel>
+                                        </TableCell>
+                                    ))}
                                 </TableRow>
                             </TableHead>
                             <TableBody>

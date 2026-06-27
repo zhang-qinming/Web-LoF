@@ -40,6 +40,8 @@ import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { useIdleRenderGate } from '../utils/renderScheduling';
+import { compareValues } from '../utils/sort';
+import { formatScientificNumber } from '../utils/numbers';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneArray,
@@ -118,13 +120,13 @@ function normalizeChromosome(value) {
 }
 
 function formatDistance(distance) {
-    if (distance == null) return '—';
+    if (distance == null) return '-';
     if (distance === 0) return '0 bp';
     return `${Math.abs(distance).toLocaleString()} bp`;
 }
 
 function formatP(value) {
-    return Number.isFinite(value) ? value.toExponential(2) : '—';
+    return formatScientificNumber(value, 2, '-');
 }
 
 function clamp(value, min, max) {
@@ -158,8 +160,8 @@ function buildCategoryColorMap(rows, field) {
 function buildPointHoverText(row) {
     const lines = [
         `<b>${row.snp || 'Variant'}</b>`,
-        `CHR ${row.normalizedChr}:${Number.isFinite(row.bp) ? row.bp.toLocaleString() : 'NA'}`,
-        `P ${formatP(row.p)} | -log10(P) ${row.logp.toFixed(2)}`,
+        `CHR ${row.normalizedChr}:${Number.isFinite(row.bp) ? row.bp.toLocaleString() : '-'}`,
+        `p-value ${formatP(row.p)} | -log10(p-value) ${row.logp.toFixed(2)}`,
     ];
     if (row.nearestGene) lines.push(`Nearest gene: ${row.nearestGene}`);
     if (row.distanceToGene != null) lines.push(`distance_to_gene: ${formatDistance(row.distanceToGene)}`);
@@ -655,7 +657,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
             linecolor: chartTokens.axisSoft,
         },
         yaxis: {
-            title: { text: '-log<sub>10</sub>(P)', font: { color: chartTokens.axisColor, size: 14, family: theme.typography.fontFamily } },
+            title: { text: '-log<sub>10</sub>(p-value)', font: { color: chartTokens.axisColor, size: 14, family: theme.typography.fontFamily } },
             showgrid: true,
             gridcolor: chartTokens.gridColor,
             gridwidth: 0.5,
@@ -750,7 +752,6 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
         setSortDir(['snp', 'nearestGene', 'normalizedChr', 'program', 'geneset', 'primaryProgram', 'primaryGeneset'].includes(column) ? 'asc' : 'desc');
     };
 
-    const collator = useMemo(() => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), []);
     const tableDataKey = `${serializeCacheKey(manhattanKey)}:${processedRows.length}`;
     const tableDataReady = useIdleRenderGate(
         dataReady && processedRows.length > 0,
@@ -763,17 +764,13 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
 
     const sortedRows = useMemo(() => {
         if (!tableDataReady) return EMPTY_MANHATTAN_ROWS;
-        const dir = sortDir === 'asc' ? 1 : -1;
         return [...processedRows].sort((a, b) => {
             if (['snp', 'nearestGene', 'normalizedChr', 'program', 'geneset', 'primaryProgram', 'primaryGeneset'].includes(sortBy)) {
-                return collator.compare(String(a[sortBy] || ''), String(b[sortBy] || '')) * dir;
+                return compareValues(a[sortBy], b[sortBy], 'text', sortDir);
             }
-            const av = a[sortBy] ?? -Infinity;
-            const bv = b[sortBy] ?? -Infinity;
-            if (av === bv) return 0;
-            return av > bv ? dir : -dir;
+            return compareValues(a[sortBy], b[sortBy], 'number', sortDir);
         });
-    }, [collator, processedRows, sortBy, sortDir, tableDataReady]);
+    }, [processedRows, sortBy, sortDir, tableDataReady]);
 
     const pagedRows = useMemo(() => {
         const start = tablePage * tableRowsPerPage;
@@ -841,7 +838,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
     }, [exportBaseName, exportFmt, exportHeight, exportWidth, variantLabel]);
 
     const downloadCSV = useCallback(() => {
-        const cols = ['SNP', 'CHR', 'BP', 'P', '-log10(P)', 'Gene', 'distance_to_gene', 'Program', 'Geneset', 'Primary Program', 'Primary Geneset'];
+        const cols = ['SNP', 'CHR', 'BP', 'p-value', '-log10(p-value)', 'Gene', 'distance_to_gene', 'Program', 'Geneset', 'Primary Program', 'Primary Geneset'];
         const header = cols.join(',');
         const body = processedRows.map((row) => [
             row.snp || '', row.normalizedChr, row.bp || '', formatP(row.p), row.logp?.toFixed(4) || '',
@@ -1056,7 +1053,7 @@ export default function TraitHitManhattan({ fileId, gwasId }) {
                                 onClick={() => setExportOpen(true)}
                                 sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
                             >
-                                Export Image
+                                Export image
                             </Button>
                         )}
                     </Box>

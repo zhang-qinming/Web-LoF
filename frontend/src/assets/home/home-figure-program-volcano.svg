@@ -12,7 +12,7 @@
   <line x1="430" y1="318" x2="430" y2="118" stroke="#E9D5FF" stroke-width="1.2" stroke-dasharray="5 7"/>
 
   <text x="362" y="356" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">Effect size (lm_es)</text>
-  <text transform="rotate(-90 76 236)" x="76" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">-log10(P-value)</text>
+  <text transform="rotate(-90 76 236)" x="76" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">-log10(p-value)</text>
   <text x="112" y="256" fill="#7C3AED" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700">P &lt; 0.05</text>
 
   <g fill="#C3CCD8" fill-opacity="0.44">

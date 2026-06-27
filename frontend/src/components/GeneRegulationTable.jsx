@@ -19,6 +19,7 @@ import { useTheme } from '@mui/material/styles';
 import Download from '@mui/icons-material/Download';
 import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
+import { formatScientificNumber } from '../utils/numbers';
 import {
     highlightedRowSx,
     plotFrameSx,
@@ -32,9 +33,9 @@ import {
 
 const COLUMNS = [
     { key: 'gene', label: 'Gene', align: 'center', width: 150, tone: 'gene' },
-    { key: 'es', label: 'Effect Size (lm_es)', align: 'center', width: 160, tone: 'other' },
-    { key: 'p', label: 'P-value (lm_p)', align: 'center', width: 150, tone: 'other' },
-    { key: 'negLogP', label: '-log10(P)', align: 'center', width: 132, tone: 'other' },
+    { key: 'es', label: 'Effect size (lm_es)', align: 'center', width: 160, tone: 'other' },
+    { key: 'p', label: 'p-value (lm_p)', align: 'center', width: 150, tone: 'other' },
+    { key: 'negLogP', label: '-log10(p-value)', align: 'center', width: 132, tone: 'other' },
 ];
 
 function justifyForAlign(align = 'left') {
@@ -54,7 +55,7 @@ const sortLabelSx = {
 function formatCell(row, key) {
     if (key === 'gene') return row.gene || '-';
     if (key === 'es') return row.es?.toFixed(6) ?? '-';
-    if (key === 'p') return row.p?.toExponential(3) ?? '-';
+    if (key === 'p') return formatScientificNumber(row.p, 3, '-');
     if (key === 'negLogP') return row.negLogP?.toFixed(4) ?? '-';
     return '-';
 }
@@ -127,7 +128,7 @@ export default function GeneRegulationTable({
                 })}
             >
                 <Typography sx={{ color: theme.palette.text.primary, fontWeight: 700, fontSize: '0.82rem' }}>
-                    Gene Data
+                    Gene data
                 </Typography>
                 <Box sx={{ flex: 1 }} />
                 <Button
@@ -136,7 +137,7 @@ export default function GeneRegulationTable({
                     onClick={downloadCSV}
                     sx={{ textTransform: 'none', fontSize: '0.75rem', color: theme.palette.text.secondary }}
                 >
-                    CSV
+                    Export CSV
                 </Button>
             </Box>
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>

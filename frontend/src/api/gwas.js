@@ -89,6 +89,18 @@ export async function getGeneProgramRecords(geneId, {
     return res.data;
 }
 
+export async function getGeneAssociationTraits(geneId, {
+    page = 1,
+    limit = 50,
+    sortBy = 'abs_gamma',
+    order = 'desc',
+} = {}) {
+    const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/association-traits`, {
+        params: { page, limit, sortBy, order },
+    });
+    return res.data;
+}
+
 export async function getGenePrograms(geneId, {
     page = 1,
     limit = 50,
@@ -101,8 +113,18 @@ export async function getGenePrograms(geneId, {
     return res.data;
 }
 
+export async function getGeneProgramRoles(geneId) {
+    const res = await axios.get(`${API_BASE}/genes/${encodeURIComponent(geneId)}/program-roles`);
+    return res.data;
+}
+
 export async function getProgramTraits(programId) {
     const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/traits`);
+    return res.data;
+}
+
+export async function getProgramScatterTraits(programId) {
+    const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/scatter-traits`);
     return res.data;
 }
 
@@ -118,6 +140,11 @@ export async function getTraitProgramGraph(fileId, { signal } = {}) {
 
 export async function getProgramGenes(programId) {
     const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/genes`);
+    return res.data;
+}
+
+export async function getProgramGeneRoles(programId) {
+    const res = await axios.get(`${API_BASE}/programs/${encodeURIComponent(programId)}/gene-roles`);
     return res.data;
 }
 

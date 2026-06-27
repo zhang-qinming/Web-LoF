@@ -13,6 +13,7 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import Paper from '@mui/material/Paper';
 import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
@@ -33,10 +34,12 @@ import FileDownload from '@mui/icons-material/FileDownload';
 import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBox from '@mui/icons-material/CheckBox';
 import Storage from '@mui/icons-material/Storage';
+import AccountTree from '@mui/icons-material/AccountTree';
 import axios from 'axios';
 import DataBrowseSummary from '../components/DataBrowseSummary';
-import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload, triggerDataPackageDownload } from '../utils/download';
+import { downloadDataPaths, getZipName, triggerBatchDataDownload, triggerDataDownload, triggerDataPackageDownload, triggerTraitDataDownload } from '../utils/download';
 import { createTtlCache } from '../utils/cache';
+import { compareValues, nextSortDirection } from '../utils/sort';
 import {
     controlFieldSx,
     DATA_PAGE_MAX_WIDTH,
@@ -57,6 +60,17 @@ import {
 const API = axios.create({ baseURL: '/api/data' });
 const PER = 40, COL_W = 440, ANIM = 170;
 const GLOBAL_PAGE_SIZE = 50;
+
+const SORT_LABEL_SX = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    width: '100%',
+    fontSize: 'inherit',
+    '& .MuiTableSortLabel-icon': {
+        fontSize: '0.88rem',
+        margin: 0,
+    },
+};
 
 function fmtSize(b) {
     if (b == null) return '';
@@ -257,16 +271,16 @@ const multilineNameSx = {
     lineHeight: 1.28,
 };
 
-function getListCacheKey(dir, page, filter) {
-    return `${dir}::${page}::${filter || ''}`;
+function getListCacheKey(dir, page, filter, sortBy = 'name', sortDir = 'asc') {
+    return `${dir}::${page}::${filter || ''}::${sortBy}::${sortDir}`;
 }
 
 function getFilePathsCacheKey(dir, filter) {
     return `${dir}::${filter || ''}`;
 }
 
-function getGlobalSearchCacheKey(query, page) {
-    return `${query}::${page}`;
+function getGlobalSearchCacheKey(query, page, sortBy = 'relevance', sortDir = 'asc') {
+    return `${query}::${page}::${sortBy}::${sortDir}`;
 }
 
 function getRequestErrorMessage(err, fallback) {
@@ -316,7 +330,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             }
         };
 
-        const cacheKey = getListCacheKey(dir, page, filter);
+        const cacheKey = getListCacheKey(dir, page, filter, sortBy, sortDir);
         const cached = LIST_CACHE.get(cacheKey);
 
         if (cached) {
@@ -334,7 +348,7 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             setLoading(true);
         }
 
-        API.get('/list', { params: { dir, page, limit: PER, search: filter || undefined } })
+        API.get('/list', { params: { dir, page, limit: PER, search: filter || undefined, sortBy, order: sortDir } })
             .then(r => {
                 if (cancelled) return;
                 const d = r.data.data || [];
@@ -361,9 +375,10 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [dir, onFiles, onStats, page, filter]);
+    }, [dir, onFiles, onStats, page, filter, sortBy, sortDir]);
 
     useEffect(() => { setPage(1); }, [filter]);
+    useEffect(() => { setPage(1); }, [sortBy, sortDir]);
     useEffect(() => {
         if (animState === 'exit') return undefined;
         const t = setTimeout(() => { enterSettledRef.current = true; }, ANIM + 20);
@@ -373,12 +388,17 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
     const filtered = useMemo(() => {
         const list = [...items];
         list.sort((a, b) => {
-            const d = sortDir === 'asc' ? 1 : -1;
-            if (sortBy === 'size') return ((a.size || 0) - (b.size || 0)) * d;
-            return a.name.toLowerCase().localeCompare(b.name.toLowerCase()) * d;
+            if (sortBy === 'size') return compareValues(a.size, b.size, 'number', sortDir);
+            if (sortBy === 'type') return compareValues(a.type, b.type, 'text', sortDir) || compareValues(a.name, b.name, 'text', 'asc');
+            return (Number(b.type === 'dir') - Number(a.type === 'dir')) || compareValues(a.name, b.name, 'text', sortDir);
         });
         return list;
     }, [items, sortBy, sortDir]);
+
+    const handleSort = useCallback((key) => {
+        setSortDir((current) => nextSortDirection(sortBy, key, current, key === 'size' ? 'desc' : 'asc'));
+        setSortBy(key);
+    }, [sortBy]);
 
     const files = filtered.filter(f => f.type === 'file');
     const cked = files.filter(f => checked.has(f.path));
@@ -466,7 +486,13 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                 <Chip label={totalCount} size="small" sx={summaryChipSx(theme, { height: 20, fontSize: '0.65rem', ...metricChipTone(theme, 'neutral') })} />
                 <Tooltip title={downloading ? 'Preparing download...' : headerDownloadTitle}>
                     <span>
-                    <IconButton size="small" disabled={downloading} onClick={() => { void handleHeaderDownload(); }} sx={{ color: hasFilter ? theme.palette.primary.main : theme.palette.text.secondary, '&:hover': { color: hasFilter ? theme.palette.primary.dark : theme.palette.warning.dark, bgcolor: hasFilter ? alpha(theme.palette.primary.main, 0.08) : alpha(theme.palette.warning.main, 0.1) } }}>
+                    <IconButton
+                        size="small"
+                        aria-label={headerDownloadTitle}
+                        disabled={downloading}
+                        onClick={() => { void handleHeaderDownload(); }}
+                        sx={{ color: hasFilter ? theme.palette.primary.main : theme.palette.text.secondary, '&:hover': { color: hasFilter ? theme.palette.primary.dark : theme.palette.warning.dark, bgcolor: hasFilter ? alpha(theme.palette.primary.main, 0.08) : alpha(theme.palette.warning.main, 0.1) } }}
+                    >
                         <FileDownload sx={{ fontSize: 16 }} />
                     </IconButton>
                     </span>
@@ -485,16 +511,34 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                     <TableHead>
                         <TableRow>
                             <TableCell sx={{ ...thSx, width: 38, textAlign: 'center', px: 0.3 }}>
-                                <Checkbox size="small" sx={{ p: 0.3 }} checked={allCk} indeterminate={someCk}
+                                <Checkbox
+                                    size="small"
+                                    inputProps={{ 'aria-label': `Select all files in ${columnTitle}` }}
+                                    sx={{ p: 0.3 }}
+                                    checked={allCk}
+                                    indeterminate={someCk}
+                                    disabled={files.length === 0}
                                     onChange={() => toggleDirAll(dir, files.map(f => f.path))} />
                             </TableCell>
-                            <TableCell sx={{ ...thSx, textAlign: 'center', cursor: 'pointer' }}
-                                onClick={() => { if (sortBy === 'name') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy('name'); setSortDir('asc'); } }}>
-                                Name {sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                            <TableCell sx={{ ...thSx, textAlign: 'left' }}>
+                                <TableSortLabel
+                                    active={sortBy === 'name'}
+                                    direction={sortBy === 'name' ? sortDir : 'asc'}
+                                    onClick={() => handleSort('name')}
+                                    sx={{ ...SORT_LABEL_SX, justifyContent: 'flex-start' }}
+                                >
+                                    Name
+                                </TableSortLabel>
                             </TableCell>
-                            <TableCell sx={{ ...thSx, width: 56, textAlign: 'center', cursor: 'pointer' }}
-                                onClick={() => { if (sortBy === 'size') setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy('size'); setSortDir('desc'); } }}>
-                                Size {sortBy === 'size' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                            <TableCell sx={{ ...thSx, width: 76, minWidth: 76, textAlign: 'center', px: 0.6, whiteSpace: 'nowrap' }}>
+                                <TableSortLabel
+                                    active={sortBy === 'size'}
+                                    direction={sortBy === 'size' ? sortDir : 'asc'}
+                                    onClick={() => handleSort('size')}
+                                    sx={{ ...SORT_LABEL_SX, justifyContent: 'center', whiteSpace: 'nowrap' }}
+                                >
+                                    Size
+                                </TableSortLabel>
                             </TableCell>
                             <TableCell sx={{ ...thSx, width: 36, textAlign: 'center', px: 0.6 }}><Download sx={{ fontSize: 15 }} /></TableCell>
                         </TableRow>
@@ -513,36 +557,59 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                         ) : (
                             filtered.map((f, rowIndex) => {
                                 const isFile = f.type === 'file', isCk = checked.has(f.path);
+                                const isHovered = hovered === f.path;
                                 return (
                                     <TableRow key={f.path}
                                         onMouseEnter={() => setHov(f.path)}
                                         sx={{
                                             ...tableRowRevealSx(theme, rowIndex),
                                             '& td': { py: 0.3, px: 1.5 },
-                                            bgcolor: isCk ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
-                                            '&:hover': { bgcolor: isCk ? alpha(theme.palette.primary.main, 0.12) : alpha(theme.palette.primary.main, 0.03) },
-                                            transition: `background-color ${theme.custom.motion.swift}`,
+                                            bgcolor: isCk ? alpha(theme.palette.primary.main, 0.075) : 'transparent',
+                                            transition: `background-color ${theme.custom.motion.swift}, box-shadow ${theme.custom.motion.swift}`,
+                                            '&:hover': {
+                                                bgcolor: isCk ? alpha(theme.palette.primary.main, 0.11) : alpha(theme.palette.primary.main, 0.045),
+                                                boxShadow: `inset 0 0 0 1px ${alpha(theme.palette.primary.main, 0.055)}`,
+                                            },
+                                            '& .dir-row-action': {
+                                                opacity: isCk || isHovered ? 1 : 0.48,
+                                                transform: isHovered ? 'translateY(0)' : 'translateY(1px)',
+                                                transition: `opacity ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}, background-color ${theme.custom.motion.swift}`,
+                                            },
+                                            '&:hover .dir-row-action': {
+                                                opacity: 1,
+                                                transform: 'translateY(0)',
+                                            },
                                         }}>
-                                        <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, textAlign: 'center', px: 0.3 }}>
-                                            {isFile && <Checkbox size="small" sx={{ p: 0.3 }} checked={isCk}
+                                        <TableCell sx={{
+                                            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                                            borderLeft: `3px solid ${isCk ? theme.palette.primary.main : isHovered ? alpha(theme.palette.primary.main, 0.55) : 'transparent'}`,
+                                            textAlign: 'center',
+                                            px: 0.3,
+                                            transition: `border-color ${theme.custom.motion.swift}`,
+                                        }}>
+                                            {isFile && <Checkbox
+                                                size="small"
+                                                inputProps={{ 'aria-label': `Select ${f.name}` }}
+                                                sx={{ p: 0.3 }}
+                                                checked={isCk}
                                                 icon={<CheckBoxOutlineBlank sx={{ fontSize: 17 }} />}
                                                 checkedIcon={<CheckBox sx={{ fontSize: 17 }} />}
                                                 onChange={() => toggleFile(f.path)} />}
                                         </TableCell>
-                                        <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, textAlign: 'center' }}>
+                                        <TableCell sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, textAlign: 'left' }}>
                                             {f.type === 'dir' ? (
                                                 <Box component="button" onClick={() => onEnter(f.path)}
                                                     sx={{
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.7, width: '100%',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 0.7, width: '100%',
                                                         border: 'none', bgcolor: 'transparent', cursor: 'pointer',
                                                         fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', fontSize: '0.79rem', fontWeight: 500,
-                                                        color: theme.palette.primary.main, textAlign: 'center', px: 0, py: 0.2,
+                                                        color: theme.palette.primary.main, textAlign: 'left', px: 0, py: 0.2,
                                                         transition: `color ${theme.custom.motion.swift}, transform ${theme.custom.motion.swift}`,
                                                         '&:hover': { color: theme.palette.primary.dark, transform: 'translateX(2px)' },
                                                         '&:active': { transform: 'translateX(4px) scale(0.98)' },
                                                     }}>
                                                     <Folder sx={{ fontSize: 17, color: theme.palette.primary.light, flexShrink: 0 }} />
-                                                    <Box component="span" title={f.name} sx={{ minWidth: 0, textAlign: 'center', ...multilineNameSx }}>{f.name}</Box>
+                                                    <Box component="span" title={f.name} sx={{ minWidth: 0, textAlign: 'left', ...multilineNameSx }}>{f.name}</Box>
                                                     <ChevronRight sx={{
                                                         fontSize: 16, opacity: 0.3, flexShrink: 0,
                                                         transition: 'opacity .15s, transform .15s',
@@ -550,41 +617,51 @@ const DirColumn = React.memo(function DirColumn({ dir, filter, onEnter, onFiles,
                                                     }} />
                                                 </Box>
                                             ) : (
-                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.7 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 0.7 }}>
                                                     <InsertDriveFile sx={{ fontSize: 15, color: theme.custom.chart.axisSoft, flexShrink: 0 }} />
                                                     <Box component="span" title={f.name}
-                                                        sx={{ minWidth: 0, textAlign: 'center', fontSize: '0.79rem', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', ...multilineNameSx }}>
+                                                        sx={{ minWidth: 0, textAlign: 'left', fontSize: '0.79rem', fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum" 1', ...multilineNameSx }}>
                                                         {f.name}
                                                     </Box>
                                                 </Box>
                                             )}
                                         </TableCell>
-                                        <TableCell align="center" sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`, fontSize: '0.72rem', color: theme.palette.text.secondary }}>
+                                        <TableCell align="center" sx={{
+                                            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                                            width: 76,
+                                            minWidth: 76,
+                                            px: 0.6,
+                                            fontSize: '0.72rem',
+                                            color: theme.palette.text.secondary,
+                                            whiteSpace: 'nowrap',
+                                            fontVariantNumeric: 'tabular-nums',
+                                            fontFeatureSettings: '"tnum" 1',
+                                        }}>
                                             {isFile ? fmtSize(f.size) : ''}
                                         </TableCell>
                                         <TableCell align="center" sx={{ borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}` }}>
                                             {isFile ? (
                                                 <Tooltip title="Download">
-                                                    <IconButton size="small" onClick={() => {
+                                                    <IconButton className="dir-row-action" size="small" aria-label={`Download ${f.name}`} onClick={() => {
                                                         setDownloading(true);
                                                         setError('');
                                                         triggerDataDownload(f.path)
                                                             .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
                                                             .finally(() => setDownloading(false));
                                                     }}
-                                                        sx={{ opacity: (hovered === f.path || isCk) ? 0.95 : 0.24, transition: `opacity ${theme.custom.motion.swift}`, '&:hover': { opacity: 1, bgcolor: alpha(theme.palette.primary.main, 0.08) } }}>
+                                                        sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) } }}>
                                                         <Download sx={{ fontSize: 16, color: theme.palette.primary.main }} />
                                                     </IconButton>
                                                 </Tooltip>
                                             ) : !filter ? (
                                                 <Tooltip title="Download as ZIP">
-                                                    <IconButton size="small" component="span" onClick={() => {
+                                                    <IconButton className="dir-row-action" size="small" component="span" aria-label={`Download ${f.name} as ZIP`} onClick={() => {
                                                         setDownloading(true);
                                                         setError('');
                                                         Promise.resolve(triggerBatchDataDownload([f.path], getZipName(f.path)))
                                                             .catch((err) => setError(getRequestErrorMessage(err, 'Download failed')))
                                                             .finally(() => setDownloading(false));
-                                                    }} sx={{ opacity: hovered === f.path ? 0.92 : 0.34, transition: `opacity ${theme.custom.motion.swift}`, '&:hover': { opacity: 1, bgcolor: alpha(theme.palette.warning.main, 0.1) } }}>
+                                                    }} sx={{ '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.1) } }}>
                                                         <FileDownload sx={{ fontSize: 16, color: theme.palette.warning.main }} />
                                                     </IconButton>
                                                 </Tooltip>
@@ -721,7 +798,7 @@ function buildColumnsFromDir(dir) {
     return cols;
 }
 
-function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll, onOpenDirectory }) {
+function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll, onOpenDirectory, embedded = false }) {
     const theme = useTheme();
     const neutralTone = tableTone(theme, 'neutral');
     const loadingBarSx = {
@@ -739,7 +816,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
         px: 1.5,
     };
     const trimmedQuery = query.trim();
-    const canSearch = trimmedQuery.length >= 2;
+    const canSearch = trimmedQuery.length > 0;
     const [results, setResults] = useState([]);
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
@@ -748,10 +825,15 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
     const [downloading, setDownloading] = useState(false);
     const [error, setError] = useState('');
     const [hovered, setHovered] = useState(null);
+    const [sortBy, setSortBy] = useState('relevance');
+    const [sortDir, setSortDir] = useState('asc');
 
     useEffect(() => {
         setPage(1);
     }, [trimmedQuery]);
+    useEffect(() => {
+        setPage(1);
+    }, [sortBy, sortDir]);
 
     useEffect(() => {
         let cancelled = false;
@@ -764,7 +846,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
             return () => { cancelled = true; };
         }
 
-        const cacheKey = getGlobalSearchCacheKey(trimmedQuery, page);
+        const cacheKey = getGlobalSearchCacheKey(trimmedQuery, page, sortBy, sortDir);
         const cached = GLOBAL_SEARCH_CACHE.get(cacheKey);
 
         if (cached) {
@@ -779,7 +861,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
 
         setLoading(true);
         setError('');
-        API.get('/search', { params: { q: trimmedQuery, page, limit: GLOBAL_PAGE_SIZE } })
+        API.get('/search', { params: { q: trimmedQuery, page, limit: GLOBAL_PAGE_SIZE, sortBy, order: sortDir } })
             .then(({ data }) => {
                 if (cancelled) return;
                 const nextResults = data.results || [];
@@ -808,7 +890,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
             });
 
         return () => { cancelled = true; };
-    }, [canSearch, page, trimmedQuery]);
+    }, [canSearch, page, sortBy, sortDir, trimmedQuery]);
 
     useEffect(() => {
         if (page > totalPages) setPage(totalPages);
@@ -850,6 +932,10 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
         if (!allFilePaths.length) return;
         togglePaths(allFilePaths);
     };
+    const handleSort = (key) => {
+        setSortDir((current) => nextSortDirection(sortBy, key, current, key === 'size' ? 'desc' : 'asc'));
+        setSortBy(key);
+    };
 
     const handleDownloadChecked = async () => {
         const selectedPaths = fileResults.filter((item) => checked.has(item.path)).map((item) => item.path);
@@ -881,18 +967,12 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
     };
 
     return (
-        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
-                <Box>
-                    <Typography variant="subtitle1" sx={sectionTitleSx(theme, { mb: 0.3, fontSize: '1rem' })}>
-                        Global Search Results
-                    </Typography>
-
-                    <Box sx={{ display: 'flex', gap: 0.7, flexWrap: 'wrap', mt: 1 }}>
-                        <Chip size="small" label={`${totalCount.toLocaleString()} matches`} sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
-                        <Chip size="small" label={`${fileResults.length} page files`} sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
-                        <Chip size="small" label={`${results.length - fileResults.length} page folders`} sx={summaryChipSx(theme, metricChipTone(theme, 'subtle'))} />
-                    </Box>
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 1.2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', gap: 0.7, flexWrap: 'wrap' }}>
+                    <Chip size="small" label={`${totalCount.toLocaleString()} matches`} sx={summaryChipSx(theme, metricChipTone(theme, 'neutral'))} />
+                    <Chip size="small" label={`${fileResults.length} files`} sx={summaryChipSx(theme, metricChipTone(theme, 'primary'))} />
+                    <Chip size="small" label={`${results.length - fileResults.length} folders`} sx={summaryChipSx(theme, metricChipTone(theme, 'subtle'))} />
                 </Box>
 
                 {fileResults.length > 0 && (
@@ -936,12 +1016,19 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                 </Alert>
             )}
 
-            <Paper elevation={0} sx={plotFrameSx(theme, { borderRadius: 3, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 })}>
+            <Paper elevation={0} sx={plotFrameSx(theme, {
+                borderRadius: embedded ? 1.5 : 3,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                boxShadow: embedded ? 'none' : undefined,
+            })}>
                 {(loading || downloading) && <LinearProgress sx={loadingBarSx} />}
                 {!canSearch ? (
                     <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                         <Typography variant="body2" color="text.secondary">
-                            Enter at least 2 characters to search all files and folders.
+                            Type a search term to search files and folders.
                         </Typography>
                     </Box>
                 ) : (
@@ -949,7 +1036,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                         {loading && (
                             <Box sx={{ px: 2, py: 1, bgcolor: theme.custom.surface.raised, borderBottom: `1px solid ${theme.custom.border.soft}` }}>
                                 <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700 }}>
-                                    {visibleResults.length > 0 ? 'Updating cached results.' : 'Searching server files. The first global search may build the index and take longer.'}
+                                    {visibleResults.length > 0 ? 'Updating cached results.' : 'Searching server files. The first search may build the index and take longer.'}
                                 </Typography>
                             </Box>
                         )}
@@ -966,9 +1053,36 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                 onChange={handleToggleAllVisible}
                                             />
                                         </TableCell>
-                                        <TableCell sx={{ ...thSx, width: 360, textAlign: 'center' }}>Name</TableCell>
-                                        <TableCell sx={{ ...thSx, width: { xs: 220, sm: 'auto' }, textAlign: 'center' }}>Path</TableCell>
-                                        <TableCell sx={{ ...thSx, width: 84, textAlign: 'center' }}>Size</TableCell>
+                                        <TableCell sx={{ ...thSx, width: 360, textAlign: 'center' }}>
+                                            <TableSortLabel
+                                                active={sortBy === 'name'}
+                                                direction={sortBy === 'name' ? sortDir : 'asc'}
+                                                onClick={() => handleSort('name')}
+                                                sx={{ ...SORT_LABEL_SX, justifyContent: 'center' }}
+                                            >
+                                                Name
+                                            </TableSortLabel>
+                                        </TableCell>
+                                        <TableCell sx={{ ...thSx, width: { xs: 220, sm: 'auto' }, textAlign: 'center' }}>
+                                            <TableSortLabel
+                                                active={sortBy === 'path'}
+                                                direction={sortBy === 'path' ? sortDir : 'asc'}
+                                                onClick={() => handleSort('path')}
+                                                sx={{ ...SORT_LABEL_SX, justifyContent: 'center' }}
+                                            >
+                                                Path
+                                            </TableSortLabel>
+                                        </TableCell>
+                                        <TableCell sx={{ ...thSx, width: 84, textAlign: 'center' }}>
+                                            <TableSortLabel
+                                                active={sortBy === 'size'}
+                                                direction={sortBy === 'size' ? sortDir : 'asc'}
+                                                onClick={() => handleSort('size')}
+                                                sx={{ ...SORT_LABEL_SX, justifyContent: 'center' }}
+                                            >
+                                                Size
+                                            </TableSortLabel>
+                                        </TableCell>
                                         <TableCell sx={{ ...thSx, width: 84, textAlign: 'center' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -1068,7 +1182,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.3 }}>
                                                             {isFile && (
                                                                 <Tooltip title="Download">
-                                                                    <IconButton size="small" onClick={() => {
+                                                                    <IconButton size="small" aria-label={`Download ${item.name}`} onClick={() => {
                                                                         setDownloading(true);
                                                                         setError('');
                                                                         triggerDataDownload(item.path)
@@ -1081,7 +1195,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                             )}
                                                             {!isFile && (
                                                                 <Tooltip title="Download folder as ZIP">
-                                                                    <IconButton size="small" onClick={() => {
+                                                                    <IconButton size="small" aria-label={`Download ${item.name} as ZIP`} onClick={() => {
                                                                         setDownloading(true);
                                                                         setError('');
                                                                         Promise.resolve(triggerBatchDataDownload([item.path], getZipName(item.path)))
@@ -1093,7 +1207,12 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                                                 </Tooltip>
                                                             )}
                                                             <Tooltip title={item.type === 'dir' ? 'Open folder' : 'Open containing folder'}>
-                                                                <IconButton size="small" onClick={() => onOpenDirectory(openDir)} sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) } }}>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    aria-label={item.type === 'dir' ? `Open ${item.name}` : `Open containing folder for ${item.name}`}
+                                                                    onClick={() => onOpenDirectory(openDir)}
+                                                                    sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) } }}
+                                                                >
                                                                     <FolderOpen sx={{ fontSize: 16, color: theme.palette.primary.main }} />
                                                                 </IconButton>
                                                             </Tooltip>
@@ -1145,7 +1264,7 @@ function GlobalSearchResults({ query, checked, toggleFile, togglePaths, clearAll
                                     <Search sx={{ fontSize: 16, color: theme.custom.chart.axisSoft, flexShrink: 0 }} />
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, fontWeight: 700 }}>
-                                            Hover matches for details
+                                            Hover results for details
                                         </Typography>
 
                                     </Box>
@@ -1329,7 +1448,6 @@ function FullDataBrowser({ onBackToDownloads } = {}) {
 
     const showIntro = !onBackToDownloads && (isGlobalSearch || (columns.length === 1 && exitingCols.length === 0));
     const compactBrowseLayout = !isGlobalSearch && columns.length === 1 && exitingCols.length === 0;
-
     return (
         <SelectionCtx.Provider value={ctxVal}>
             <Box sx={{
@@ -1365,51 +1483,78 @@ function FullDataBrowser({ onBackToDownloads } = {}) {
 
                 {/* toolbar */}
                 <Box sx={toolbarSx(theme, {
-                    flexDirection: compactBrowseLayout && !onBackToDownloads ? 'column' : { xs: 'column', sm: 'row' },
-                    alignItems: compactBrowseLayout && !onBackToDownloads ? 'stretch' : { xs: 'stretch', sm: 'center' },
+                    display: 'grid',
+                    gridTemplateColumns: {
+                        xs: '1fr',
+                        md: onBackToDownloads
+                            ? 'minmax(260px, 360px) auto minmax(0, 1fr) auto'
+                            : 'minmax(260px, 420px) auto minmax(0, 1fr)',
+                    },
+                    alignItems: 'center',
+                    gap: { xs: 0.9, md: 1.1 },
                     mb: onBackToDownloads ? 1.25 : 2,
                     flexShrink: 0,
-                    flexWrap: compactBrowseLayout && !onBackToDownloads ? 'nowrap' : 'wrap',
                     borderRadius: onBackToDownloads ? 2 : undefined,
                     bgcolor: onBackToDownloads ? alpha(theme.palette.background.paper, 0.94) : undefined,
                     boxShadow: onBackToDownloads ? '0 10px 22px rgba(15, 23, 42, 0.045)' : undefined,
+                    py: { xs: 1, md: 0.95 },
                 })}>
-                    <TextField placeholder={isGlobalSearch ? 'e.g. GCST90081631' : 'e.g. GCST90081631'} size="small"
+                    <TextField
+                        placeholder={isGlobalSearch ? 'Search files and folders' : 'Filter this folder'}
+                        size="small"
                         value={filter} onChange={e => setFilter(e.target.value)}
-                        sx={controlFieldSx(theme, { width: { xs: '100%', sm: isGlobalSearch ? 440 : 320 } })}
+                        error={false}
+                        sx={controlFieldSx(theme, { width: '100%' })}
                         InputProps={{
                             startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 18, color: theme.custom.chart.axisSoft }} /></InputAdornment>,
-                            endAdornment: (
+                            endAdornment: filter ? (
                                 <InputAdornment position="end" sx={{ ml: 0.4 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.35 }}>
-                                        {filter && (
-                                            <IconButton size="small" onClick={() => setFilter('')} sx={{ p: 0.3 }}>
-                                                <Close sx={{ fontSize: 16 }} />
-                                            </IconButton>
-                                        )}
-                                        <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: theme.custom.border.soft, mx: 0.25 }} />
-                                        <Checkbox
-                                            size="small"
-                                            checked={isGlobalSearch}
-                                            onChange={handleGlobalSearchToggle}
-                                            sx={{ p: 0.35, color: theme.custom.chart.axisSoft, '&.Mui-checked': { color: theme.palette.primary.main } }}
-                                        />
-                                        <Typography variant="caption" sx={{ color: isGlobalSearch ? theme.palette.primary.main : theme.palette.text.secondary, fontWeight: 700, pr: 0.2 }}>
-                                            Global
-                                        </Typography>
-                                    </Box>
+                                    <IconButton size="small" aria-label="Clear filter" onClick={() => setFilter('')} sx={{ p: 0.3 }}>
+                                        <Close sx={{ fontSize: 16 }} />
+                                    </IconButton>
                                 </InputAdornment>
-                            ),
+                            ) : null,
                         }}
                     />
 
+                    <Box
+                        component="label"
+                        sx={{
+                            minHeight: 34,
+                            px: 0.8,
+                            py: 0.35,
+                            borderRadius: 1,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: { xs: 'flex-start', md: 'center' },
+                            gap: 0.35,
+                            cursor: 'pointer',
+                            bgcolor: isGlobalSearch ? alpha(theme.palette.primary.main, 0.08) : theme.custom.surface.base,
+                            border: `1px solid ${isGlobalSearch ? alpha(theme.palette.primary.main, 0.2) : theme.custom.border.soft}`,
+                            color: isGlobalSearch ? theme.palette.primary.main : theme.palette.text.secondary,
+                            fontWeight: 750,
+                        }}
+                    >
+                        <Checkbox
+                            size="small"
+                            inputProps={{ 'aria-label': 'Search globally' }}
+                            checked={isGlobalSearch}
+                            onChange={handleGlobalSearchToggle}
+                            sx={{ p: 0.25, color: 'inherit', '&.Mui-checked': { color: theme.palette.primary.main } }}
+                        />
+                        <Typography variant="caption" sx={{ color: 'inherit', fontWeight: 750 }}>
+                            Global
+                        </Typography>
+                    </Box>
+
                     {!isGlobalSearch && (
                         <Box sx={{
-                            display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, flexWrap: 'wrap',
+                            display: 'flex', alignItems: 'center', gap: 1, minWidth: 0,
+                            gridColumn: { xs: '1 / -1', md: 'auto' },
                         }}>
                             {/* breadcrumb */}
                             <Box sx={{
-                                display: 'flex', alignItems: 'center', gap: 0.3, overflowX: 'auto', flex: 1, py: 0.5,
+                                display: 'flex', alignItems: 'center', gap: 0.3, overflowX: 'auto', flex: 1, py: 0.25,
                                 '&::-webkit-scrollbar': { height: 3 }, '&::-webkit-scrollbar-thumb': { background: alpha(theme.palette.primary.main, 0.14), borderRadius: 2 },
                             }}>
                                 {columns.map((c, i) => (
@@ -1455,8 +1600,8 @@ function FullDataBrowser({ onBackToDownloads } = {}) {
                             size="small"
                             onClick={onBackToDownloads}
                             sx={{
-                                ml: { sm: 'auto' },
-                                alignSelf: { xs: 'stretch', sm: 'center' },
+                                justifySelf: { xs: 'stretch', md: 'end' },
+                                alignSelf: 'center',
                                 minHeight: 34,
                                 px: 1.45,
                                 textTransform: 'none',
@@ -1532,6 +1677,7 @@ function FullDataBrowser({ onBackToDownloads } = {}) {
 }
 const FOLDER_DOWNLOAD_PAGE_SIZE = 50;
 const DOWNLOAD_START_FEEDBACK_MS = 900;
+const TRAIT_DOWNLOAD_PAGE_SIZE = 20;
 
 function formatArchiveUpdated(value) {
     if (!value) return '';
@@ -1555,15 +1701,406 @@ const resourceIconSx = (color) => ({
     flexShrink: 0,
 });
 
+function formatTraitTypeLabel(type) {
+    const labels = {
+        associations: 'Associations',
+        'cross-trait': 'Cross-trait',
+        manhattan: 'Manhattan',
+        'program-scatter': 'Program',
+        'trait-program-gene': 'Graph',
+    };
+    return labels[type] || String(type || '').replace(/[-_]+/g, ' ');
+}
+
+function TraitTypeChips({ types = [], theme, justifyContent = 'flex-start' }) {
+    const visibleTypes = types.slice(0, 4);
+    if (!visibleTypes.length) {
+        return (
+            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', textAlign: justifyContent === 'center' ? 'center' : 'left', display: 'block' }}>
+                Manifest only
+            </Typography>
+        );
+    }
+
+    return (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent }}>
+            {visibleTypes.map((type) => (
+                <Chip
+                    key={type}
+                    label={formatTraitTypeLabel(type)}
+                    size="small"
+                    sx={{
+                        height: 20,
+                        borderRadius: 1,
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        bgcolor: alpha(theme.palette.info.main, 0.08),
+                        color: theme.palette.info.dark,
+                    }}
+                />
+            ))}
+            {types.length > visibleTypes.length && (
+                <Chip
+                    label={`+${types.length - visibleTypes.length}`}
+                    size="small"
+                    sx={{
+                        height: 20,
+                        borderRadius: 1,
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        bgcolor: alpha(theme.palette.text.secondary, 0.08),
+                        color: theme.palette.text.secondary,
+                    }}
+                />
+            )}
+        </Box>
+    );
+}
+
+function TraitDownloadPanel({ theme, query: externalQuery, embedded = false }) {
+    const isControlledQuery = externalQuery != null;
+    const [localQuery, setLocalQuery] = useState('');
+    const [page, setPage] = useState(1);
+    const [payload, setPayload] = useState({ data: [], totalPages: 1, totalCount: 0, maxDownloadTraits: 20 });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [selected, setSelected] = useState(() => new Set());
+    const [downloadKey, setDownloadKey] = useState(null);
+    const [sortBy, setSortBy] = useState('trait_name');
+    const [sortDir, setSortDir] = useState('asc');
+    const resetTimerRef = useRef(null);
+    const query = isControlledQuery ? externalQuery : localQuery;
+    const trimmedQuery = query.trim();
+    const canSearch = trimmedQuery.length >= 2;
+    const rows = useMemo(() => payload.data || [], [payload.data]);
+    const selectedIds = [...selected];
+    const maxDownloadTraits = payload.maxDownloadTraits || 20;
+
+    useEffect(() => {
+        clearTimeout(resetTimerRef.current);
+        return () => clearTimeout(resetTimerRef.current);
+    }, []);
+
+    useEffect(() => {
+        setPage(1);
+    }, [trimmedQuery]);
+    useEffect(() => {
+        setPage(1);
+    }, [sortBy, sortDir]);
+
+    useEffect(() => {
+        if (!canSearch) {
+            setPayload({ data: [], totalPages: 1, totalCount: 0, maxDownloadTraits });
+            setSelected(new Set());
+            setError('');
+            setLoading(false);
+            return undefined;
+        }
+
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            setLoading(true);
+            setError('');
+            API.get('/traits/search', {
+                params: { q: trimmedQuery, page, limit: TRAIT_DOWNLOAD_PAGE_SIZE, sortBy, order: sortDir },
+            })
+                .then((response) => {
+                    if (cancelled) return;
+                    setPayload({
+                        data: response.data?.data || [],
+                        totalPages: response.data?.totalPages || 1,
+                        totalCount: response.data?.totalCount || 0,
+                        maxDownloadTraits: response.data?.maxDownloadTraits || 20,
+                    });
+                })
+                .catch((err) => {
+                    if (!cancelled) setError(getRequestErrorMessage(err, 'Trait search failed'));
+                })
+                .finally(() => {
+                    if (!cancelled) setLoading(false);
+                });
+        }, 250);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [canSearch, maxDownloadTraits, page, sortBy, sortDir, trimmedQuery]);
+
+    const toggleRow = useCallback((fileId) => {
+        setSelected((current) => {
+            const next = new Set(current);
+            if (next.has(fileId)) next.delete(fileId);
+            else if (next.size < maxDownloadTraits) next.add(fileId);
+            return next;
+        });
+    }, [maxDownloadTraits]);
+
+    const togglePage = useCallback(() => {
+        const downloadableIds = rows
+            .filter((row) => row.file_id && row.download?.hasDownloadableData)
+            .map((row) => row.file_id);
+        setSelected((current) => {
+            const next = new Set(current);
+            const allSelected = downloadableIds.length > 0 && downloadableIds.every((id) => next.has(id));
+            if (allSelected) {
+                downloadableIds.forEach((id) => next.delete(id));
+                return next;
+            }
+            downloadableIds.forEach((id) => {
+                if (next.size < maxDownloadTraits) next.add(id);
+            });
+            return next;
+        });
+    }, [maxDownloadTraits, rows]);
+
+    const handleSort = useCallback((key) => {
+        setSortDir((current) => nextSortDirection(sortBy, key, current, ['sample_size', 'n_sig', 'n_variants', 'year'].includes(key) ? 'desc' : 'asc'));
+        setSortBy(key);
+    }, [sortBy]);
+
+    const handleDownload = useCallback(async (traitIds, key, filename) => {
+        clearTimeout(resetTimerRef.current);
+        setDownloadKey(key);
+        setError('');
+        try {
+            await triggerTraitDataDownload(traitIds, filename);
+            resetTimerRef.current = setTimeout(() => {
+                setDownloadKey((current) => current === key ? null : current);
+            }, DOWNLOAD_START_FEEDBACK_MS);
+        } catch (err) {
+            setError(getRequestErrorMessage(err, 'Download failed'));
+            setDownloadKey(null);
+        }
+    }, []);
+
+    const allPageDownloadable = rows
+        .filter((row) => row.file_id && row.download?.hasDownloadableData)
+        .map((row) => row.file_id);
+    const pageAllSelected = allPageDownloadable.length > 0 && allPageDownloadable.every((id) => selected.has(id));
+    const pageSomeSelected = allPageDownloadable.some((id) => selected.has(id)) && !pageAllSelected;
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: embedded ? 1.2 : 2 }}>
+            <Paper
+                elevation={0}
+                sx={{
+                    p: embedded ? 1.5 : 2,
+                    borderRadius: 1.5,
+                    border: `1px solid ${theme.palette.divider}`,
+                    bgcolor: 'background.paper',
+                }}
+            >
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: { xs: 'stretch', md: 'center' }, flexDirection: { xs: 'column', md: 'row' } }}>
+                    {isControlledQuery ? (
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography sx={{ fontWeight: 800, fontSize: '0.9rem', color: 'text.primary' }}>
+                                Trait data packages
+                            </Typography>
+                            <Typography sx={{ color: 'text.secondary', fontSize: '0.72rem', mt: 0.2 }}>
+                                Matching trait-level source bundles for "{trimmedQuery}"
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <TextField
+                            value={localQuery}
+                            onChange={(event) => {
+                                setLocalQuery(event.target.value);
+                                setPage(1);
+                            }}
+                            placeholder="Search trait name, file ID, or GWAS ID"
+                            size="small"
+                            sx={controlFieldSx(theme, {
+                                width: { xs: '100%', md: 440 },
+                                flex: { xs: '1 1 100%', md: '0 0 440px' },
+                                flexShrink: { xs: 1, md: 0 },
+                            })}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search sx={{ fontSize: 18, color: theme.custom.chart.axisSoft }} />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                    )}
+                    <Button
+                        variant="contained"
+                        disabled={selectedIds.length === 0 || Boolean(downloadKey)}
+                        onClick={() => {
+                            void handleDownload(selectedIds, 'selected', `trait-data-${selectedIds.length}-traits.zip`);
+                        }}
+                        sx={{ textTransform: 'none', borderRadius: 1, boxShadow: 'none', fontSize: '0.78rem', fontWeight: 700, minWidth: 184, flexShrink: 0 }}
+                    >
+                        <FileDownload sx={{ fontSize: 14, mr: 0.5 }} />
+                        {downloadKey === 'selected' ? 'Preparing...' : `Download selected${selectedIds.length ? ` (${selectedIds.length})` : ''}`}
+                    </Button>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 650 }}>
+                        Max {maxDownloadTraits} traits per package
+                    </Typography>
+                </Box>
+            </Paper>
+
+            {loading && <LinearProgress sx={{ height: 3, borderRadius: 999 }} />}
+            {error && <Alert severity="error" sx={{ borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
+
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 1.5, border: `1px solid ${theme.palette.divider}`, overflow: 'hidden' }}>
+                <Table size="small" sx={{ tableLayout: 'fixed' }}>
+                    <TableHead>
+                        <TableRow sx={{ bgcolor: alpha(theme.palette.info.main, 0.045) }}>
+                            <TableCell padding="checkbox" align="center" sx={{ width: 42, textAlign: 'center' }}>
+                                <Checkbox
+                                    size="small"
+                                    indeterminate={pageSomeSelected}
+                                    checked={pageAllSelected}
+                                    onChange={togglePage}
+                                    disabled={allPageDownloadable.length === 0}
+                                />
+                            </TableCell>
+                            <TableCell align="left" sx={{ fontWeight: 800, width: '32%', textAlign: 'left' }}>
+                                <TableSortLabel
+                                    active={sortBy === 'trait_name'}
+                                    direction={sortBy === 'trait_name' ? sortDir : 'asc'}
+                                    onClick={() => handleSort('trait_name')}
+                                    sx={{ ...SORT_LABEL_SX, justifyContent: 'flex-start' }}
+                                >
+                                    Trait
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 800, width: '18%', textAlign: 'center' }}>
+                                <TableSortLabel
+                                    active={sortBy === 'file_id'}
+                                    direction={sortBy === 'file_id' ? sortDir : 'asc'}
+                                    onClick={() => handleSort('file_id')}
+                                    sx={{ ...SORT_LABEL_SX, justifyContent: 'center' }}
+                                >
+                                    IDs
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 800, width: '14%', textAlign: 'center' }}>
+                                <TableSortLabel
+                                    active={sortBy === 'population'}
+                                    direction={sortBy === 'population' ? sortDir : 'asc'}
+                                    onClick={() => handleSort('population')}
+                                    sx={{ ...SORT_LABEL_SX, justifyContent: 'center' }}
+                                >
+                                    Study
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 800, width: '24%', textAlign: 'center' }}>Available data</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 800, width: 128 }}>Download</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {!canSearch && (
+                            <TableRow>
+                                <TableCell colSpan={6} sx={{ py: 5, textAlign: 'center', color: 'text.secondary', fontWeight: 650 }}>
+                                    Enter at least 2 characters to search trait data packages.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {canSearch && !loading && rows.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={6} sx={{ py: 5, textAlign: 'center', color: 'text.secondary', fontWeight: 650 }}>
+                                    No traits match this search.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {rows.map((row) => {
+                            const fileId = row.file_id || '';
+                            const isChecked = selected.has(fileId);
+                            const isDownloadable = Boolean(row.download?.hasDownloadableData);
+                            const isDownloading = downloadKey === fileId;
+                            return (
+                                <TableRow key={fileId || row.gwas_id} hover>
+                                    <TableCell padding="checkbox" align="center" sx={{ textAlign: 'center' }}>
+                                        <Checkbox
+                                            size="small"
+                                            checked={isChecked}
+                                            disabled={!isDownloadable}
+                                            onChange={() => toggleRow(fileId)}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="left" sx={{ minWidth: 0, textAlign: 'left' }}>
+                                        <Typography sx={{ fontWeight: 760, fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                                            {row.trait_name || fileId}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.68rem', textAlign: 'left', display: 'block' }}>
+                                            {row.download?.fileCount || 0} source files / {row.download?.associationCount || 0} associations
+                                        </Typography>
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ textAlign: 'center' }}>
+                                        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center' }} noWrap>{fileId || '-'}</Typography>
+                                        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: 'text.secondary', textAlign: 'center' }} noWrap>{row.gwas_id || '-'}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ textAlign: 'center' }}>
+                                        <Typography sx={{ fontSize: '0.76rem', fontWeight: 700, textAlign: 'center' }} noWrap>{row.population || '-'}</Typography>
+                                        <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', textAlign: 'center' }} noWrap>{row.year || '-'}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ textAlign: 'center' }}>
+                                        <TraitTypeChips types={row.download?.availableTypes || []} theme={theme} justifyContent="center" />
+                                        {!isDownloadable && (
+                                            <Typography variant="caption" sx={{ display: 'block', mt: 0.4, color: 'text.secondary', fontSize: '0.66rem', textAlign: 'center' }}>
+                                                No source files or associations found.
+                                            </Typography>
+                                        )}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            disabled={!isDownloadable || Boolean(downloadKey)}
+                                            onClick={() => {
+                                                void handleDownload([fileId], fileId, `trait-data-${fileId}.zip`);
+                                            }}
+                                            sx={{ textTransform: 'none', borderRadius: 1, fontSize: '0.72rem', fontWeight: 700 }}
+                                        >
+                                            <Download sx={{ fontSize: 13, mr: 0.4 }} />
+                                            {isDownloading ? 'Preparing...' : 'Download'}
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+
+            {payload.totalPages > 1 && (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 650 }}>
+                        {payload.totalCount.toLocaleString()} matching traits
+                    </Typography>
+                    <Pagination count={payload.totalPages} page={page} onChange={(_, value) => setPage(value)} size="small" />
+                </Box>
+            )}
+        </Box>
+    );
+}
+
+function HubTraitSearchPanel({ query }) {
+    const theme = useTheme();
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) return null;
+
+    return (
+        <Box sx={{ mb: 2.5, display: 'flex', flexDirection: 'column', gap: 1.2 }}>
+            <TraitDownloadPanel theme={theme} query={trimmedQuery} embedded />
+        </Box>
+    );
+}
+
 export default function DataBrowser() {
     const theme = useTheme();
     const [searchParams, setSearchParams] = useSearchParams();
     const initialBrowserView = searchParams.get('view') === 'browser'
-        || searchParams.get('mode') === 'global'
         || Boolean(searchParams.get('dir'))
-        || Boolean(searchParams.get('q'));
+        || (Boolean(searchParams.get('q')) && searchParams.get('mode') !== 'global');
+    const initialHubTab = 0;
     const [showFullBrowser, setShowFullBrowser] = useState(() => initialBrowserView);
-    const [tabValue, setTabValue] = useState(0);
+    const [tabValue, setTabValue] = useState(initialHubTab);
+    const [hubSearchQuery, setHubSearchQuery] = useState('');
     const [page, setPage] = useState(1);
     const [payload, setPayload] = useState({ data: [], totalPages: 1 });
     const [loading, setLoading] = useState(true);
@@ -1634,11 +2171,17 @@ export default function DataBrowser() {
         setPackageRefreshKey((value) => value + 1);
     }, [setSearchParams]);
 
-    const downloadFolder = useCallback(async (folderPath) => {
+    const downloadFolder = useCallback(async (folder) => {
+        const folderPath = folder?.path || '';
+        const downloadMode = folder?.download?.mode || 'archive';
         clearTimeout(folderDownloadResetTimerRef.current);
         setDownloadState({ path: folderPath, error: '' });
         try {
-            await triggerDataDownload(folderPath);
+            if (downloadMode === 'dynamic') {
+                triggerBatchDataDownload([folderPath], getZipName(folderPath, 'data'));
+            } else {
+                await triggerDataDownload(folderPath);
+            }
             folderDownloadResetTimerRef.current = setTimeout(() => {
                 setDownloadState((current) => current.path === folderPath ? { path: null, error: '' } : current);
             }, DOWNLOAD_START_FEEDBACK_MS);
@@ -1667,6 +2210,8 @@ export default function DataBrowser() {
     }
 
     const hasFolders = payload.data.length > 0;
+    const trimmedHubSearchQuery = hubSearchQuery.trim();
+    const hasHubSearchQuery = trimmedHubSearchQuery.length > 0;
 
     return (
         <Box sx={{
@@ -1676,28 +2221,107 @@ export default function DataBrowser() {
             px: { xs: 1.5, sm: 2, md: 3, xl: 4 },
             py: { xs: 2, md: 3 },
         }}>
-            {/* Header Title Area with Background */}
-            <Paper 
+            <Paper
                 elevation={0}
-                sx={{ 
+                sx={{
                     mb: 3,
-                    p: { xs: 2, sm: 2.5 },
-                    borderRadius: 2,
+                    p: { xs: 1.5, md: 1.8 },
+                    borderRadius: 1.5,
                     border: `1px solid ${theme.palette.divider}`,
-                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.03)} 0%, ${alpha(theme.palette.secondary.main, 0.01)} 100%)`,
+                    bgcolor: theme.palette.background.paper,
                 }}
             >
-                <Typography 
-                    variant="h5" 
-                    sx={{ 
-                        fontWeight: 800, 
-                        color: 'text.primary', 
-                        letterSpacing: '-0.02em',
-                        fontSize: '1.25rem'
-                    }}
-                >
-                    Data Download Hub
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', gap: 1.5, flexDirection: { xs: 'column', sm: 'row' } }}>
+                    <Typography variant="h5" sx={{ fontWeight: 760, color: 'text.primary', fontSize: { xs: '1.08rem', md: '1.18rem' }, lineHeight: 1.1 }}>
+                        Data Download Hub
+                    </Typography>
+                    <Button
+                        variant="outlined"
+                        onClick={showDataBrowser}
+                        sx={{
+                            alignSelf: { xs: 'flex-start', sm: 'center' },
+                            textTransform: 'none',
+                            borderColor: theme.palette.divider,
+                            color: theme.palette.text.primary,
+                            fontWeight: 600,
+                            px: 1.6,
+                            py: 0.45,
+                            borderRadius: 1,
+                            fontSize: '0.76rem',
+                            '&:hover': {
+                                borderColor: theme.palette.primary.main,
+                                bgcolor: alpha(theme.palette.primary.main, 0.04),
+                            },
+                        }}
+                    >
+                        <FolderOpen sx={{ fontSize: 14, mr: 0.6 }} />
+                        Explore File Browser
+                    </Button>
+                </Box>
+                <Box sx={{ mt: 1.25 }}>
+                    <TextField
+                        value={hubSearchQuery}
+                        onChange={(event) => setHubSearchQuery(event.target.value)}
+                        placeholder="Search trait name, file ID, or GWAS ID"
+                        size="small"
+                        fullWidth
+                        error={false}
+                        helperText=" "
+                        sx={controlFieldSx(theme)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search sx={{ fontSize: 18, color: 'text.secondary' }} />
+                                </InputAdornment>
+                            ),
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Box sx={{ width: 26, display: 'inline-flex', justifyContent: 'center', visibility: hubSearchQuery ? 'visible' : 'hidden', pointerEvents: hubSearchQuery ? 'auto' : 'none' }}>
+                                        <Tooltip title="Clear search">
+                                            <IconButton size="small" aria-label="Clear search" onClick={() => setHubSearchQuery('')} sx={{ p: 0.35 }}>
+                                                <Close sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                </Box>
+                {!hasHubSearchQuery && (
+                <Box sx={{ mt: 0.25 }}>
+                    <Tabs
+                        value={tabValue}
+                        onChange={(_, val) => setTabValue(val)}
+                        aria-label="download categories"
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        sx={{
+                            minHeight: 0,
+                            '& .MuiTab-root': {
+                                minHeight: 34,
+                                px: 1.25,
+                                mr: 0.5,
+                                textTransform: 'none',
+                                fontSize: '0.79rem',
+                                fontWeight: 650,
+                                color: theme.palette.text.secondary,
+                                alignItems: 'center',
+                                minWidth: 0,
+                            },
+                            '& .MuiTab-root.Mui-selected': {
+                                color: theme.palette.text.primary,
+                            },
+                            '& .MuiTabs-indicator': {
+                                height: 2,
+                            },
+                        }}
+                    >
+                        <Tab label="Folder Archives" />
+                        <Tab label="Database Tables" />
+                    </Tabs>
+                </Box>
+                )}
             </Paper>
 
             {loading && <LinearProgress sx={{ mb: 3, borderRadius: 999, height: 4 }} />}
@@ -1705,108 +2329,10 @@ export default function DataBrowser() {
             {downloadState.error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setDownloadState({ path: null, error: '' })}>{downloadState.error}</Alert>}
             {packageError && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setPackageError('')}>{packageError}</Alert>}
 
-            {/* Switcher & File Browser Button */}
-            <Box sx={{ 
-                mb: 3, 
-                display: 'flex', 
-                flexDirection: { xs: 'column', sm: 'row' },
-                alignItems: { xs: 'stretch', sm: 'center' },
-                justifyContent: 'space-between',
-                gap: 2,
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                pb: 0.5
-            }}>
-                <Tabs 
-                    value={tabValue} 
-                    onChange={(_, val) => setTabValue(val)} 
-                    aria-label="download categories"
-                    sx={{
-                        minHeight: 0,
-                        '& .MuiTab-root': {
-                            minHeight: 36,
-                            fontSize: '0.82rem',
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            color: theme.palette.text.secondary,
-                            px: 2,
-                            '&.Mui-selected': {
-                                color: theme.palette.primary.main,
-                            },
-                        },
-                        '& .MuiTabs-indicator': {
-                            height: 2.5,
-                            borderRadius: '3px 3px 0 0',
-                            bgcolor: theme.palette.primary.main,
-                        }
-                    }}
-                >
-                    <Tab 
-                        label={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                                <Folder sx={{ fontSize: 14 }} />
-                                <span>Folder Archives</span>
-                                <Chip 
-                                    label={payload.data.length} 
-                                    size="small" 
-                                    sx={{ 
-                                        height: 16, 
-                                        fontSize: '0.65rem', 
-                                        fontWeight: 700, 
-                                        bgcolor: tabValue === 0 ? alpha(theme.palette.primary.main, 0.08) : theme.palette.action.hover,
-                                        color: tabValue === 0 ? theme.palette.primary.main : theme.palette.text.secondary,
-                                        border: 'none',
-                                    }} 
-                                />
-                            </Box>
-                        } 
-                    />
-                    <Tab 
-                        label={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                                <Storage sx={{ fontSize: 14 }} />
-                                <span>Database Tables</span>
-                                <Chip 
-                                    label={packagePayload.data.length} 
-                                    size="small" 
-                                    sx={{ 
-                                        height: 16, 
-                                        fontSize: '0.65rem', 
-                                        fontWeight: 700, 
-                                        bgcolor: tabValue === 1 ? alpha(theme.palette.secondary.main, 0.08) : theme.palette.action.hover,
-                                        color: tabValue === 1 ? theme.palette.secondary.main : theme.palette.text.secondary,
-                                        border: 'none',
-                                    }} 
-                                />
-                            </Box>
-                        } 
-                    />
-                </Tabs>
-
-                <Button 
-                    variant="outlined" 
-                    onClick={showDataBrowser} 
-                    sx={{ 
-                        textTransform: 'none', 
-                        borderColor: theme.palette.divider,
-                        color: theme.palette.text.primary,
-                        fontWeight: 600,
-                        px: 1.8,
-                        py: 0.5,
-                        borderRadius: 1,
-                        fontSize: '0.78rem',
-                        '&:hover': { 
-                            borderColor: theme.palette.primary.main,
-                            bgcolor: alpha(theme.palette.primary.main, 0.04),
-                        },
-                    }}
-                >
-                    <FolderOpen sx={{ fontSize: 14, mr: 0.6 }} />
-                    Explore File Browser
-                </Button>
-            </Box>
+            {hasHubSearchQuery && <HubTraitSearchPanel query={hubSearchQuery} />}
 
             {/* Folder Archives Content Panel */}
-            {tabValue === 0 && (
+            {!hasHubSearchQuery && tabValue === 0 && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
                     <Box sx={{
@@ -1821,7 +2347,7 @@ export default function DataBrowser() {
                             </Paper>
                         )}
                         {payload.data.map((folder) => {
-                            const archiveReady = Boolean(folder.archive?.exists);
+                            const downloadReady = Boolean(folder.download?.available);
                             const isDownloading = downloadState.path === folder.path;
                             return (
                                 <Paper
@@ -1852,21 +2378,21 @@ export default function DataBrowser() {
                                             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                 {folder.name}
                                             </Typography>
-                                            {archiveReady && folder.archive?.size && (
+                                            {folder.archive?.exists && folder.archive?.size ? (
                                                 <Tooltip title={getArchiveTooltip(folder.archive)} arrow>
                                                     <Typography variant="caption" sx={{ color: 'text.secondary', display: 'inline-block', mt: 0.3, fontSize: '0.72rem', cursor: 'help' }}>
                                                         {fmtSize(folder.archive.size)}
                                                     </Typography>
                                                 </Tooltip>
-                                            )}
+                                            ) : null}
                                         </Box>
                                     </Box>
 
                                     <Button
                                         size="small"
                                         variant="contained"
-                                        disabled={isDownloading || !archiveReady}
-                                        onClick={() => { void downloadFolder(folder.path); }}
+                                        disabled={isDownloading || !downloadReady}
+                                        onClick={() => { void downloadFolder(folder); }}
                                         sx={{
                                             textTransform: 'none',
                                             boxShadow: 'none',
@@ -1904,7 +2430,7 @@ export default function DataBrowser() {
             )}
 
             {/* Database Tables Content Panel */}
-            {tabValue === 1 && (
+            {!hasHubSearchQuery && tabValue === 1 && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
                     {packageLoading && <LinearProgress sx={{ height: 3, borderRadius: 999, mb: 1 }} />}
@@ -1922,6 +2448,7 @@ export default function DataBrowser() {
                         )}
                         {packagePayload.data.map((item) => {
                             const archiveReady = Boolean(item.archive?.exists);
+                            const downloadReady = Boolean(item.download?.available || archiveReady);
                             const isDownloading = packageDownloadId === item.id;
                             return (
                                 <Paper
@@ -1976,7 +2503,7 @@ export default function DataBrowser() {
                                         size="small"
                                         variant="contained"
                                         color="secondary"
-                                        disabled={isDownloading || !archiveReady}
+                                        disabled={isDownloading || !downloadReady}
                                         onClick={() => { void downloadPackage(item.id); }}
                                         sx={{
                                             textTransform: 'none',
@@ -2008,6 +2535,7 @@ export default function DataBrowser() {
                     </Box>
                 </Box>
             )}
+
         </Box>
     );
 }

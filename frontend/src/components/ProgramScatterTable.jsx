@@ -16,6 +16,7 @@ import { useTheme } from '@mui/material/styles';
 import Download from '@mui/icons-material/Download';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import { formatScientificNumber } from '../utils/numbers';
 import {
     groupedTableColumnHeaderCellSx,
     highlightedRowSx,
@@ -31,15 +32,15 @@ import {
 
 const COLUMN_SPECS = [
     { key: 'program', label: 'Program', align: 'center', tone: 'program', width: 118 },
-    { key: 'color', label: 'Enrichment Class', align: 'center', tone: 'info', width: 150 },
-    { key: 'progScore', label: 'Program Burden Score', align: 'center', tone: 'program', width: 156 },
-    { key: 'rankProg', label: 'Program Rank', align: 'center', tone: 'program', width: 112 },
-    { key: 'progP', label: 'Program P-value', align: 'center', tone: 'program', width: 128 },
-    { key: 'progGamma', label: 'Program Mean Gamma', align: 'center', tone: 'program', width: 154 },
-    { key: 'regScore', label: 'Regulator-Burden Score', align: 'center', tone: 'regulator', width: 180 },
-    { key: 'rankReg', label: 'Regulator Rank', align: 'center', tone: 'regulator', width: 124 },
-    { key: 'regP', label: 'Regulator P-value', align: 'center', tone: 'regulator', width: 144 },
-    { key: 'regBeta', label: 'Regulator Beta', align: 'center', tone: 'regulator', width: 130 },
+    { key: 'color', label: 'Enrichment class', align: 'center', tone: 'info', width: 150 },
+    { key: 'progScore', label: 'Program burden score', align: 'center', tone: 'program', width: 156 },
+    { key: 'rankProg', label: 'Program rank', align: 'center', tone: 'program', width: 112 },
+    { key: 'progP', label: 'Program p-value', align: 'center', tone: 'program', width: 128 },
+    { key: 'progGamma', label: 'Program mean gamma', align: 'center', tone: 'program', width: 154 },
+    { key: 'regScore', label: 'Regulator-burden score', align: 'center', tone: 'regulator', width: 180 },
+    { key: 'rankReg', label: 'Regulator rank', align: 'center', tone: 'regulator', width: 124 },
+    { key: 'regP', label: 'Regulator p-value', align: 'center', tone: 'regulator', width: 144 },
+    { key: 'regBeta', label: 'Regulator beta', align: 'center', tone: 'regulator', width: 130 },
 ];function justifyForAlign(align = 'left') {
     if (align === 'right') return 'flex-end';
     if (align === 'center') return 'center';
@@ -100,21 +101,21 @@ function renderCell(column, row, helpers) {
             </TableCell>
         );
     case 'progScore':
-        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progScore?.toFixed(3) ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progScore?.toFixed(3) ?? '-'}</TableCell>;
     case 'rankProg':
-        return <TableCell key={column.key} align="center" sx={{ ...tdSx('center', undefined, isTopProg ? 700 : 400, TABLE_TONES.program.rankCell), color: isTopProg ? TABLE_TONES.program.headerColor : '#888' }}>{row.rankProg ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={{ ...tdSx('center', undefined, isTopProg ? 700 : 400, TABLE_TONES.program.rankCell), color: isTopProg ? TABLE_TONES.program.headerColor : '#888' }}>{row.rankProg ?? '-'}</TableCell>;
     case 'progP':
-        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellSoft)}>{row.progP != null ? row.progP.toExponential(2) : '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellSoft)}>{formatScientificNumber(row.progP, 2, '-')}</TableCell>;
     case 'progGamma':
-        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progGamma?.toFixed(4) ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.program.cellStrong)}>{row.progGamma?.toFixed(4) ?? '-'}</TableCell>;
     case 'regScore':
-        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regScore?.toFixed(3) ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regScore?.toFixed(3) ?? '-'}</TableCell>;
     case 'rankReg':
-        return <TableCell key={column.key} align="center" sx={{ ...tdSx('center', undefined, isTopReg ? 700 : 400, TABLE_TONES.regulator.rankCell), color: isTopReg ? TABLE_TONES.regulator.headerColor : '#888' }}>{row.rankReg ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={{ ...tdSx('center', undefined, isTopReg ? 700 : 400, TABLE_TONES.regulator.rankCell), color: isTopReg ? TABLE_TONES.regulator.headerColor : '#888' }}>{row.rankReg ?? '-'}</TableCell>;
     case 'regP':
-        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellSoft)}>{row.regP != null ? row.regP.toExponential(2) : '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellSoft)}>{formatScientificNumber(row.regP, 2, '-')}</TableCell>;
     case 'regBeta':
-        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regBeta?.toFixed(4) ?? '—'}</TableCell>;
+        return <TableCell key={column.key} align="center" sx={tdSx('center', 'monospace', 400, TABLE_TONES.regulator.cellStrong)}>{row.regBeta?.toFixed(4) ?? '-'}</TableCell>;
     default:
         return null;
     }
@@ -176,7 +177,7 @@ export default function ProgramScatterTable({
                     endIcon={tableOpen ? <ExpandLess /> : <ExpandMore />}
                     sx={{ textTransform: 'none', color: theme.palette.text.primary, fontWeight: 500, fontSize: '0.82rem' }}
                 >
-                    Data Table <Chip label={rows.length} size="small" sx={summaryChipSx(theme, { ml: 1, height: 20, fontSize: '0.7rem', ...metricChipTone(theme, 'neutral') })} />
+                    Data table <Chip label={rows.length} size="small" sx={summaryChipSx(theme, { ml: 1, height: 20, fontSize: '0.7rem', ...metricChipTone(theme, 'neutral') })} />
                 </Button>
                 <Box sx={{ flex: 1 }} />
                 <Button
@@ -185,7 +186,7 @@ export default function ProgramScatterTable({
                     onClick={downloadCSV}
                     sx={{ textTransform: 'none', fontSize: '0.75rem', color: theme.palette.text.secondary }}
                 >
-                    CSV
+                    Export CSV
                 </Button>
             </Box>
             <Collapse in={tableOpen}>

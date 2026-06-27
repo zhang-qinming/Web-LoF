@@ -8,6 +8,8 @@
     "dev": "nodemon app.js",
     "refresh:gene-summary": "node scripts/refresh_gene_summary.js",
     "refresh:program-representative-genes": "node scripts/refresh_program_representative_genes.js",
+    "import:program-gene-roles": "node scripts/import_program_gene_roles.js",
+    "import:program-trait-scatter": "node scripts/import_program_trait_scatter_index.js",
     "prepare:data-archives": "node scripts/prepare_data_archives.js",
     "prepare:data-archives:hpc": "bash scripts/prepare_data_archives_hpc.sh",
     "precompute:chart-json": "python3 scripts/precompute_chart_json.py"

@@ -104,13 +104,24 @@ async function getTsvIndex(store, options) {
     if (cached?.entries?.length && now - cached.mtime < options.ttlMs) {
         return cached.entries;
     }
+    if (cached?.promise) return cached.promise;
 
-    const exists = await store.exists(store.rootPath);
-    if (!exists) return [];
+    const promise = (async () => {
+        const exists = await store.exists(store.rootPath);
+        if (!exists) return [];
 
-    const entries = await collectTsvEntries(store, store.rootPath, '', 0, options, []);
-    INDEX_CACHE.set(store, { mtime: now, entries });
-    return entries;
+        const entries = await collectTsvEntries(store, store.rootPath, '', 0, options, []);
+        INDEX_CACHE.set(store, { mtime: Date.now(), entries });
+        return entries;
+    })();
+
+    INDEX_CACHE.set(store, { ...(cached || {}), promise });
+    try {
+        return await promise;
+    } catch (err) {
+        INDEX_CACHE.delete(store);
+        throw err;
+    }
 }
 
 function sortCandidates(candidates, fileIds) {

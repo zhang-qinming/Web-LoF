@@ -1,5 +1,6 @@
 const express = require('express');
 const geneProgramModel = require('../models/MgeneProgram');
+const semanticRelationsModel = require('../models/MsemanticRelations');
 const { asyncRoute } = require('../lib/http');
 const { normalizeIdentifier, parsePositiveInt } = require('../lib/request');
 
@@ -44,6 +45,14 @@ router.get('/api/genes/:geneId/programs', asyncRoute(async (req, res) => {
     res.json(result);
 }));
 
+router.get('/api/genes/:geneId/program-roles', asyncRoute(async (req, res) => {
+    const geneId = normalizeIdentifier(req.params.geneId, 120);
+    if (!geneId) return res.status(400).json({ error: 'Invalid geneId' });
+
+    const result = await semanticRelationsModel.getGeneProgramRoles(geneId);
+    res.json(result);
+}));
+
 router.get('/api/genes/:geneId/overview', asyncRoute(async (req, res) => {
     const geneId = normalizeIdentifier(req.params.geneId, 120);
     if (!geneId) return res.status(400).json({ error: 'Invalid geneId' });
@@ -61,6 +70,18 @@ router.get('/api/genes/:geneId/records', asyncRoute(async (req, res) => {
     const sortBy = normalizeIdentifier(req.query.sortBy || 'absGamma', 50) || 'absGamma';
     const order = String(req.query.order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     const result = await geneProgramModel.getGeneProgramRecords(geneId, { page, limit, sortBy, order });
+    res.json(result);
+}));
+
+router.get('/api/genes/:geneId/association-traits', asyncRoute(async (req, res) => {
+    const geneId = normalizeIdentifier(req.params.geneId, 120);
+    if (!geneId) return res.status(400).json({ error: 'Invalid geneId' });
+
+    const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
+    const limit = parsePositiveInt(req.query.limit, 50, 250);
+    const sortBy = normalizeIdentifier(req.query.sortBy || 'abs_gamma', 50) || 'abs_gamma';
+    const order = String(req.query.order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const result = await semanticRelationsModel.getGeneAssociationTraits(geneId, { page, limit, sortBy, order });
     res.json(result);
 }));
 

@@ -23,11 +23,12 @@ import { alpha, useTheme } from '@mui/material/styles';
 import useSWR from 'swr';
 import { fetcher } from '../api/gwas';
 import { downloadBlob } from '../utils/download';
+import { formatScientificNumber, normalizeScientificNotation } from '../utils/numbers';
 import { stableSWRConfig } from '../utils/swrOptions';
 import { panelSx } from '../themeUtils';
 import { StatePanel } from './PageScaffold';
 
-const EMPTY_VALUE = '--';
+const EMPTY_VALUE = '-';
 const TRAIT_INFO_OPEN_STORAGE_KEY = 'gwas.traitInformation.open';
 
 function readInitialOpenState() {
@@ -62,8 +63,8 @@ function formatMetric(value, digits = 4) {
 function formatPValue(value) {
     if (value == null || value === '') return EMPTY_VALUE;
     const number = Number(value);
-    if (!Number.isFinite(number)) return String(value);
-    return number < 0.0001 ? number.toExponential(3) : number.toFixed(4);
+    if (!Number.isFinite(number)) return normalizeScientificNotation(value);
+    return number < 0.0001 ? formatScientificNumber(number, 3) : number.toFixed(4);
 }
 
 function escapeCsvValue(value) {

@@ -322,8 +322,8 @@ const releaseEntryDrafts = [
         en: {
             date: 'May 26, 2026',
             label: 'Graph',
-            title: 'Trait-program graph refinement began',
-            summary: 'Before the larger gene release, the trait-program graph received a focused refinement pass so it could support more navigation and interpretation tasks.',
+            title: 'Trait-gene association map refinement began',
+            summary: 'Before the larger gene release, the gene association map received a focused refinement pass so it could support more navigation and interpretation tasks.',
             highlights: [
                 'Graph behavior was refined as its own task rather than being bundled into a larger feature release.',
                 'This separated graph iteration from the gene workflow and clarified the component’s role in navigation.',
@@ -351,10 +351,10 @@ const releaseEntryDrafts = [
             date: 'May 27, 2026',
             label: 'Genes',
             title: 'Gene evidence and trait-program links were expanded',
-            summary: 'Gene-level evidence views were added alongside a stronger trait-program graph, connecting variant signals to more interpretable biological context.',
+            summary: 'Gene-level evidence views were added alongside a stronger gene association map, connecting variant signals to more interpretable biological context.',
             highlights: [
                 'Gene regulation, program scatter, data-browse summaries, and broader route support expanded the application.',
-                'The trait-program graph was refined after its first rollout rather than remaining a static add-on.',
+                'The gene association map was refined after its first rollout rather than remaining a static add-on.',
                 'Navigation between genes, programs, variants, and traits became more coherent for biological interpretation.',
             ],
             note: 'This release brings gene evidence, graph navigation, and trait-program context into one integrated workflow.',

@@ -20,13 +20,14 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
-import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
+import Clear from '@mui/icons-material/Clear';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
@@ -37,7 +38,7 @@ import ScienceOutlined from '@mui/icons-material/ScienceOutlined';
 import SearchOutlined from '@mui/icons-material/SearchOutlined';
 import TableChartOutlined from '@mui/icons-material/TableChartOutlined';
 import useSWR from 'swr';
-import { getGeneOverview, getGeneProgramRecords, getGenes, searchGenes } from '../api/gwas';
+import { getGeneAssociationTraits, getGeneOverview, getGeneProgramRoles, getGenes, searchGenes } from '../api/gwas';
 import { PageFrame, StatePanel, UpdatingStatus } from '../components/PageScaffold';
 import TableSearchField from '../components/TableSearchField';
 import { downloadBlob } from '../utils/download';
@@ -48,6 +49,12 @@ import {
     captionSx,
     DATA_PAGE_MAX_WIDTH,
     groupedTableColumnHeaderCellSx,
+    mainTableActionButtonSx,
+    mainTableSearchFieldSx,
+    mainTableToolbarActionsSx,
+    mainTableToolbarSearchSlotSx,
+    mainTableToolbarSx,
+    mainTableToolbarTitleSlotSx,
     metricChipTone,
     panelSx,
     sectionPanelHeaderSx,
@@ -71,12 +78,6 @@ function formatSigned(value, digits = 3) {
     return `${value > 0 ? '+' : ''}${value.toFixed(digits)}`;
 }
 
-function roleTone(theme, role) {
-    if (role === 'program') return metricChipTone(theme, 'warning');
-    if (role === 'regulator') return metricChipTone(theme, 'accent');
-    return metricChipTone(theme, 'neutral');
-}
-
 function useDebouncedValue(value, delayMs = 280) {
     const [debouncedValue, setDebouncedValue] = React.useState(value);
 
@@ -91,16 +92,18 @@ function useDebouncedValue(value, delayMs = 280) {
     return debouncedValue;
 }
 
-function GenePaginationControl({ totalPages, page, onChange, size = 'small' }) {
-    if (totalPages <= 1) return null;
+function GenePaginationControl({ totalPages, page, onChange, size = 'small', disabled = false }) {
+    const pageCount = Math.max(Number(totalPages) || 1, 1);
+    const currentPage = Math.min(Math.max(Number(page) || 0, 0), pageCount - 1);
 
     return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: 0 }}>
             <Pagination
-                count={totalPages}
-                page={page + 1}
+                count={pageCount}
+                page={currentPage + 1}
                 onChange={(event, value) => onChange(event, value - 1)}
                 color="primary"
+                disabled={disabled}
                 shape="rounded"
                 size={size}
                 siblingCount={0}
@@ -120,7 +123,7 @@ function GenePaginationControl({ totalPages, page, onChange, size = 'small' }) {
     );
 }
 
-function GeneRowsControl({ rowsPerPage, onChange, showLabel = true }) {
+function GeneRowsControl({ rowsPerPage, onChange, showLabel = true, options = [25, 50, 100, 200], disabled = false }) {
     const theme = useTheme();
 
     return (
@@ -134,6 +137,7 @@ function GeneRowsControl({ rowsPerPage, onChange, showLabel = true }) {
                 <Select
                     value={rowsPerPage}
                     onChange={(event) => onChange(Number(event.target.value))}
+                    disabled={disabled}
                     inputProps={{ 'aria-label': 'Rows per page' }}
                     renderValue={showLabel ? undefined : (value) => `${value} / page`}
                     sx={{
@@ -144,7 +148,7 @@ function GeneRowsControl({ rowsPerPage, onChange, showLabel = true }) {
                         '& .MuiSelect-select': { py: 0.45, display: 'flex', alignItems: 'center' },
                     }}
                 >
-                    {[25, 50, 100, 200].map((value) => (
+                    {options.map((value) => (
                         <MenuItem key={value} value={value} dense>{value}</MenuItem>
                     ))}
                 </Select>
@@ -153,22 +157,22 @@ function GeneRowsControl({ rowsPerPage, onChange, showLabel = true }) {
     );
 }
 
-function GeneHeaderPageControl({ totalPages, page, onChange }) {
+function GeneHeaderPageControl({ totalPages, page, onChange, disabled = false }) {
+    const pageCount = Math.max(Number(totalPages) || 1, 1);
     const [inputPage, setInputPage] = React.useState(page + 1);
     const pageNumber = Number(inputPage);
+    const canPage = !disabled && pageCount > 1;
     const isValid = inputPage !== ''
         && Number.isInteger(pageNumber)
         && pageNumber >= 1
-        && pageNumber <= totalPages;
+        && pageNumber <= pageCount;
 
     React.useEffect(() => {
         setInputPage(page + 1);
     }, [page]);
 
-    if (totalPages <= 1) return null;
-
     const commitPage = () => {
-        if (isValid) {
+        if (canPage && isValid) {
             onChange(null, pageNumber - 1);
             return;
         }
@@ -197,7 +201,7 @@ function GeneHeaderPageControl({ totalPages, page, onChange }) {
             <IconButton
                 size="small"
                 aria-label="Previous page"
-                disabled={page <= 0}
+                disabled={!canPage || page <= 0}
                 onClick={() => onChange(null, page - 1)}
                 sx={{ width: 31, height: 30, borderRadius: 0 }}
             >
@@ -210,6 +214,7 @@ function GeneHeaderPageControl({ totalPages, page, onChange }) {
                 <TextField
                     size="small"
                     value={inputPage}
+                    disabled={!canPage}
                     onChange={(event) => setInputPage(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') {
@@ -242,13 +247,13 @@ function GeneHeaderPageControl({ totalPages, page, onChange }) {
                     }}
                 />
                 <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 650, whiteSpace: 'nowrap' }}>
-                    / {totalPages.toLocaleString()}
+                    / {pageCount.toLocaleString()}
                 </Typography>
             </Box>
             <IconButton
                 size="small"
                 aria-label="Next page"
-                disabled={page >= totalPages - 1}
+                disabled={!canPage || page >= pageCount - 1}
                 onClick={() => onChange(null, page + 1)}
                 sx={{ width: 31, height: 30, borderRadius: 0 }}
             >
@@ -258,12 +263,13 @@ function GeneHeaderPageControl({ totalPages, page, onChange }) {
     );
 }
 
-function GenePageJumpControl({ totalPages, page, onChange }) {
+function GenePageJumpControl({ totalPages, page, onChange, disabled = false }) {
     const theme = useTheme();
+    const pageCount = Math.max(Number(totalPages) || 1, 1);
     const [inputPage, setInputPage] = React.useState(page + 1);
     const pageNumber = Number(inputPage);
-    const canPage = totalPages > 1;
-    const isValid = inputPage !== '' && Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= totalPages;
+    const canPage = !disabled && pageCount > 1;
+    const isValid = inputPage !== '' && Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= pageCount;
 
     React.useEffect(() => {
         setInputPage(page + 1);
@@ -293,7 +299,7 @@ function GenePageJumpControl({ totalPages, page, onChange }) {
                 onBlur={() => {
                     if (!isValid) setInputPage(page + 1);
                 }}
-                inputProps={{ min: 1, max: totalPages }}
+                inputProps={{ min: 1, max: pageCount }}
                 sx={{
                     width: 58,
                     '& .MuiOutlinedInput-root': { bgcolor: theme.palette.background.paper, height: 32 },
@@ -307,7 +313,7 @@ function GenePageJumpControl({ totalPages, page, onChange }) {
                 }}
             />
             <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                / {totalPages.toLocaleString()}
+                / {pageCount.toLocaleString()}
             </Typography>
             <Button
                 type="submit"
@@ -355,13 +361,11 @@ function GenePagerTools({
                     {rangeLabel}
                 </Typography>
             )}
-            {shouldPaginate && (
-                <Stack direction="row" spacing={0.9} alignItems="center" sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', lg: 'flex-end' }, minWidth: 0 }}>
-                    <GeneRowsControl rowsPerPage={rowsPerPage} onChange={onRowsPerPageChange} />
-                    <GenePaginationControl totalPages={pageCount} page={currentPage} onChange={onPageChange} />
-                    <GenePageJumpControl totalPages={pageCount} page={currentPage} onChange={onPageChange} />
-                </Stack>
-            )}
+            <Stack direction="row" spacing={0.9} alignItems="center" sx={{ flexWrap: 'wrap', justifyContent: { xs: 'flex-start', lg: 'flex-end' }, minWidth: 0, opacity: shouldPaginate ? 1 : 0.58 }}>
+                <GeneRowsControl rowsPerPage={rowsPerPage} onChange={onRowsPerPageChange} showLabel={false} disabled={!shouldPaginate} />
+                <GenePaginationControl totalPages={pageCount} page={currentPage} onChange={onPageChange} disabled={!shouldPaginate} />
+                <GenePageJumpControl totalPages={pageCount} page={currentPage} onChange={onPageChange} disabled={!shouldPaginate} />
+            </Stack>
         </Box>
     );
 }
@@ -398,37 +402,74 @@ function QuietDeferredPanel({ minHeight = 260 }) {
 }
 
 const GENE_TABLE_COLUMNS = [
-    { key: 'geneSymbol', label: 'Gene Symbol', align: 'center', width: 138 },
-    { key: 'geneDescription', label: 'Gene Description', align: 'left', width: 320 },
+    { key: 'geneSymbol', label: 'Gene symbol', align: 'center', width: 138 },
+    { key: 'geneDescription', label: 'Gene description', align: 'left', width: 320 },
     { key: 'ensgId', label: 'Ensembl ID', align: 'center', width: 170 },
     { key: 'location', label: 'Location', align: 'center', width: 190 },
-    { key: 'geneType', label: 'Gene Type', align: 'center', width: 150 },
-    { key: 'totalPrograms', label: 'Associated Programs', align: 'center', width: 156, headerWrap: true },
-    { key: 'totalTraits', label: 'Associated Traits', align: 'center', width: 156, headerWrap: true },
+    { key: 'geneType', label: 'Gene type', align: 'center', width: 150 },
+    { key: 'totalPrograms', label: 'Associated programs', align: 'center', width: 156, headerWrap: true },
+    { key: 'totalTraits', label: 'Associated traits', align: 'center', width: 156, headerWrap: true },
 ];
 const GENE_PROGRAM_COLUMNS = [
-    { key: 'program', label: 'Program', align: 'center', width: 84, tone: 'program' },
-    { key: 'programAnnotation', label: 'Function Annotation', align: 'left', width: 292, tone: 'neutral' },
-    { key: 'programGoLabel', label: 'GO Term', align: 'left', width: 244, tone: 'neutral' },
-    { key: 'geneDirection', label: 'Gene Role / Direction', align: 'center', width: 170, tone: 'gene' },
-    { key: 'totalTraits', label: 'Associated Traits', align: 'center', width: 122, tone: 'trait' },
-    { key: 'programGeneCountSort', label: 'Gene Count', align: 'center', width: 128, tone: 'gene' },
+    { key: 'program', label: 'program', align: 'center', width: 84, tone: 'program' },
+    { key: 'loading_gene_score', label: 'score', align: 'center', width: 110, tone: 'neutral' },
+    { key: 'loading_gene_rank', label: 'rank', align: 'center', width: 88, tone: 'neutral' },
+    { key: 'loading_gene_direction', label: 'direction', align: 'center', width: 112, tone: 'neutral' },
+    { key: 'regulator_score', label: 'score', align: 'center', width: 110, tone: 'neutral' },
+    { key: 'regulator_rank', label: 'rank', align: 'center', width: 88, tone: 'neutral' },
+    { key: 'regulator_direction', label: 'direction', align: 'center', width: 112, tone: 'neutral' },
 ];
 const GENE_TRAIT_COLUMNS = [
-    { key: 'traitName', label: 'Trait', align: 'left', width: 272, tone: 'trait' },
-    { key: 'program', label: 'Program', align: 'center', width: 82, tone: 'program' },
-    { key: 'programAnnotation', label: 'Function Annotation', align: 'left', width: 228, tone: 'neutral' },
-    { key: 'role', label: 'Role', align: 'center', width: 92, tone: 'gene' },
-    { key: 'direction', label: 'Direction', align: 'center', width: 112, tone: 'gene' },
-    { key: 'postMean', label: 'LoF Effect', align: 'center', width: 98, tone: 'neutral' },
-    { key: 'membershipScore', label: 'Beta', align: 'center', width: 100, tone: 'neutral' },
-    { key: 'concordance', label: 'Concordance', align: 'center', width: 132, tone: 'neutral' },
+    { key: 'trait', label: 'trait', align: 'left', width: 272, tone: 'trait' },
+    { key: 'program', label: 'program', align: 'center', width: 82, tone: 'program' },
+    { key: 'role', label: 'role', align: 'center', width: 92, tone: 'gene' },
+    { key: 'post_mean', label: 'post_mean', align: 'center', width: 106, tone: 'neutral' },
+    { key: 'abs_gamma', label: 'abs_gamma', align: 'center', width: 118, tone: 'neutral' },
+    { key: 'membership_score', label: 'membership_score', align: 'center', width: 138, tone: 'neutral' },
+    { key: 'direction', label: 'direction', align: 'center', width: 112, tone: 'gene' },
+    { key: 'concordance', label: 'concordance', align: 'center', width: 132, tone: 'neutral' },
 ];
+
+const GENE_PROGRAM_COLUMN_DESCRIPTIONS = {
+    program: 'Program connected with the selected gene.',
+    loading_gene: 'cNMF_all.gene_spectra_score membership evidence for loading genes.',
+    regulator: 'cNMF_regulation/K562GW perturb effect evidence for regulators.',
+    loading_gene_score: 'Membership score for role=program_gene.',
+    loading_gene_rank: 'Rank within the program among program_gene membership rows.',
+    loading_gene_direction: 'Direction inferred from the program_gene score sign.',
+    regulator_score: 'Perturb/regulation score for role=regulator.',
+    regulator_rank: 'Rank within the program among regulator rows.',
+    regulator_direction: 'Direction inferred from the regulator score sign.',
+};
+
+const GENE_TRAIT_COLUMN_DESCRIPTIONS = {
+    trait: 'Trait associated with this gene in the Trait-Gene Association Map.',
+    program: 'Program context for the gene-trait association.',
+    role: 'Association role in the Trait-Gene Association Map.',
+    post_mean: 'Posterior mean LoF effect estimate from the source association map.',
+    abs_gamma: 'Absolute gamma/effect magnitude used for prioritization in the source association map.',
+    membership_score: 'Gene-program membership or regulator score carried by the source association map.',
+    direction: 'Predicted direction/sign assembled from source sign fields.',
+    concordance: 'Whether trait and program/regulator directions are concordant or discordant.',
+};
 const EMPTY_GENE_ROWS = [];
 const EMPTY_RECORDS = [];
-const GO_TERM_PATTERN = /GO:\d{7}/i;
 const TABLE_PAGINATION_THRESHOLD = 50;
 const DEFAULT_ROWS_PER_PAGE = 25;
+const RELATION_ROWS_PER_PAGE = 10;
+const RELATION_PAGINATION_THRESHOLD = 10;
+const relationIndexSWRConfig = {
+    ...detailSummarySWRConfig,
+    refreshInterval: (latestData) => (latestData?.unavailable ? 5000 : 0),
+    revalidateIfStale: true,
+    revalidateOnFocus: true,
+};
+const associationTraitsSWRConfig = {
+    ...stableListSWRConfig,
+    refreshInterval: (latestData) => (latestData?.unavailable ? 5000 : 0),
+    revalidateIfStale: true,
+    revalidateOnFocus: true,
+};
 
 function justifyForAlign(align = 'left') {
     if (align === 'right') return 'flex-end';
@@ -453,13 +494,6 @@ function matchesGeneIndexRow(gene, query) {
     ].some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
 }
 
-function geneProgramRoleLabel(role) {
-    const value = String(role || '').trim().toLowerCase();
-    if (!value) return '';
-    if (value === 'program' || value === 'loading') return 'program';
-    if (value === 'regulator') return 'regulator';
-    return value;
-}
 const GENE_TABLE_TITLE_HEADER_HEIGHT = 54;
 
 const geneSortLabelSx = {
@@ -580,6 +614,57 @@ function EmbeddedTableTitleRow({ title, caption, colSpan, onDownload, action = n
     );
 }
 
+function GeneRelationPagerFooter({
+    totalCount,
+    page,
+    rowsPerPage,
+    onPageChange,
+    onRowsPerPageChange,
+    itemLabel = 'rows',
+}) {
+    const theme = useTheme();
+    const safeTotalCount = Math.max(Number(totalCount) || 0, 0);
+    const safeRowsPerPage = Math.max(Number(rowsPerPage) || RELATION_ROWS_PER_PAGE, 1);
+    const pageCount = Math.max(1, Math.ceil(safeTotalCount / safeRowsPerPage));
+    const currentPage = Math.min(Math.max(Number(page) || 0, 0), pageCount - 1);
+    const start = safeTotalCount ? currentPage * safeRowsPerPage : 0;
+    const end = safeTotalCount ? Math.min(start + safeRowsPerPage, safeTotalCount) : 0;
+    const canPaginate = safeTotalCount > RELATION_PAGINATION_THRESHOLD;
+    const rangeLabel = safeTotalCount === 0
+        ? `No ${itemLabel}`
+        : `${(start + 1).toLocaleString()}-${end.toLocaleString()} / ${safeTotalCount.toLocaleString()} ${itemLabel}`;
+
+    return (
+        <Box
+            sx={{
+                px: { xs: 1.25, md: 1.6 },
+                py: 1.15,
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+                alignItems: 'center',
+                gap: 1,
+                borderTop: `1px solid ${theme.custom.border.soft}`,
+                background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.024)}, ${theme.custom.surface.subtle})`,
+            }}
+        >
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                {rangeLabel}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 0.9, flexWrap: 'wrap', minWidth: 0, opacity: canPaginate ? 1 : 0.58 }}>
+                <GeneRowsControl
+                    rowsPerPage={safeRowsPerPage}
+                    onChange={onRowsPerPageChange}
+                    showLabel={false}
+                    options={[10, 25, 50, 100, 250]}
+                    disabled={!canPaginate}
+                />
+                <GenePaginationControl totalPages={pageCount} page={currentPage} onChange={onPageChange} disabled={!canPaginate} />
+                <GenePageJumpControl totalPages={pageCount} page={currentPage} onChange={onPageChange} disabled={!canPaginate} />
+            </Box>
+        </Box>
+    );
+}
+
 function getGeneLocation(gene) {
     if (gene?.location) return normalizeLocationText(gene.location);
     const chromosome = String(gene?.chromosome || '').trim();
@@ -630,16 +715,35 @@ function chromosomeSortRank(value) {
 }
 
 function compareText(a, b) {
-    return String(a || '').localeCompare(String(b || ''), undefined, {
+    const leftBlank = a == null || String(a).trim() === '';
+    const rightBlank = b == null || String(b).trim() === '';
+    if (leftBlank && rightBlank) return 0;
+    if (leftBlank) return 1;
+    if (rightBlank) return -1;
+    return String(a).localeCompare(String(b), undefined, {
         sensitivity: 'base',
         numeric: true,
     });
 }
 
 function compareNullableNumber(a, b) {
-    const left = Number.isFinite(a) ? a : Number.POSITIVE_INFINITY;
-    const right = Number.isFinite(b) ? b : Number.POSITIVE_INFINITY;
+    const parsedLeft = Number(a);
+    const parsedRight = Number(b);
+    const left = Number.isFinite(parsedLeft) ? parsedLeft : Number.POSITIVE_INFINITY;
+    const right = Number.isFinite(parsedRight) ? parsedRight : Number.POSITIVE_INFINITY;
     return left - right;
+}
+
+function compareOptionalRoleNumber(leftValue, rightValue, sortDir) {
+    const left = Number(leftValue);
+    const right = Number(rightValue);
+    const leftMissing = !Number.isFinite(left);
+    const rightMissing = !Number.isFinite(right);
+    if (leftMissing && rightMissing) return 0;
+    if (leftMissing) return 1;
+    if (rightMissing) return -1;
+    const result = left - right;
+    return sortDir === 'desc' ? -result : result;
 }
 
 function compareLocation(a, b) {
@@ -664,8 +768,8 @@ function compareGenes(a, b, sortBy, sortDir) {
     if (sortBy === 'ensgId') result = compareText(a?.ensgId, b?.ensgId);
     if (sortBy === 'location') result = compareLocation(a, b);
     if (sortBy === 'geneType') result = compareText(a?.geneType, b?.geneType);
-    if (sortBy === 'totalPrograms') result = (Number(a?.totalPrograms) || 0) - (Number(b?.totalPrograms) || 0);
-    if (sortBy === 'totalTraits') result = (Number(a?.totalTraits) || 0) - (Number(b?.totalTraits) || 0);
+    if (sortBy === 'totalPrograms') result = compareNullableNumber(a?.totalPrograms, b?.totalPrograms);
+    if (sortBy === 'totalTraits') result = compareNullableNumber(a?.totalTraits, b?.totalTraits);
 
     if (!result) {
         result = compareText(a?.geneSymbol || a?.ensgId || a?.geneLabel, b?.geneSymbol || b?.ensgId || b?.geneLabel);
@@ -711,133 +815,162 @@ function buildNcbiUrl(gene) {
     return searchTerm ? `https://www.ncbi.nlm.nih.gov/gene/?term=${encodeURIComponent(searchTerm)}` : '';
 }
 
-function buildGoUrl(goText) {
-    const text = String(goText || '').trim();
-    if (!text) return '';
-    const match = text.match(GO_TERM_PATTERN);
-    if (match) return `https://www.ebi.ac.uk/QuickGO/term/${match[0].toUpperCase()}`;
-    return `https://amigo.geneontology.org/amigo/search/ontology?q=${encodeURIComponent(text)}`;
-}
-
 function getRecordDirection(row) {
-    return row?.predictedSign || row?.gammaSign || row?.postMeanSign || '-';
+    return row?.direction || row?.predictedSign || row?.gammaSign || row?.postMeanSign || '-';
 }
 
 function getConcordanceLabel(row) {
+    if (row?.concordance) return row.concordance;
     if (row?.isConcordant && row?.isDiscordant) return 'concordant + discordant';
     if (row?.isConcordant) return 'concordant';
     if (row?.isDiscordant) return 'discordant';
     return '-';
 }
 
+function getPostMean(row) {
+    const value = row?.post_mean ?? row?.postMean;
+    return Number.isFinite(value) ? value : null;
+}
+
+function getAbsGamma(row) {
+    const value = row?.abs_gamma ?? row?.absGamma;
+    return Number.isFinite(value) ? value : null;
+}
+
+function getMembershipScore(row) {
+    const value = row?.membership_score ?? row?.membershipScore;
+    return Number.isFinite(value) ? value : null;
+}
+
+function betterRoleRecord(current, candidate) {
+    if (!current) return candidate;
+    const currentRank = Number.isFinite(Number(current.rank)) ? Number(current.rank) : Number.POSITIVE_INFINITY;
+    const candidateRank = Number.isFinite(Number(candidate.rank)) ? Number(candidate.rank) : Number.POSITIVE_INFINITY;
+    if (candidateRank !== currentRank) return candidateRank < currentRank ? candidate : current;
+    const currentScore = Math.abs(Number(current.score) || 0);
+    const candidateScore = Math.abs(Number(candidate.score) || 0);
+    return candidateScore > currentScore ? candidate : current;
+}
+
+function groupGeneProgramRows(rows) {
+    const grouped = new Map();
+    rows.forEach((row) => {
+        const program = row?.program || '';
+        if (!program) return;
+        const existing = grouped.get(program) || {
+            program,
+            roleMap: {},
+        };
+        const role = row.role || '';
+        if (role) existing.roleMap[role] = betterRoleRecord(existing.roleMap[role], row);
+        grouped.set(program, existing);
+    });
+
+    return Array.from(grouped.values()).map((row) => {
+        return {
+            program: row.program,
+            program_gene: row.roleMap.program_gene || null,
+            regulator: row.roleMap.regulator || null,
+        };
+    });
+}
+
+function roleEvidenceValue(row, evidence, field) {
+    const record = row?.[evidence];
+    if (!record) return field === 'direction' ? '-' : null;
+    return record[field];
+}
+
+function relationGroupTone(group) {
+    if (group === 'identity') {
+        return {
+            color: '#365f8c',
+            accent: '#8cb3dc',
+            headerBg: '#f1f7fd',
+            subHeaderBg: '#f7fbff',
+            cellBg: '#fbfdff',
+            cellStrongBg: '#eef6fd',
+            border: '#cbdff3',
+        };
+    }
+    if (group === 'regulator') {
+        return {
+            color: '#3f6b4d',
+            accent: '#8fbc9b',
+            headerBg: '#f1f8f3',
+            subHeaderBg: '#f7fbf8',
+            cellBg: '#fbfdfb',
+            cellStrongBg: '#edf7ef',
+            border: '#cfe5d4',
+        };
+    }
+    return {
+        color: '#6e581f',
+        accent: '#caa65b',
+        headerBg: '#fbf8f1',
+        subHeaderBg: '#fdfaf5',
+        cellBg: '#fffefa',
+        cellStrongBg: '#fbf5e8',
+        border: '#eadab8',
+    };
+}
+
+function relationHeaderSx(theme, baseSx, group, overrides = {}) {
+    const tone = relationGroupTone(group);
+    const boundary = overrides.boundary;
+    const { boundary: unusedBoundary, ...restOverrides } = overrides;
+    const { bgcolor: unusedBaseBgcolor, backgroundColor: unusedBaseBackgroundColor, ...baseWithoutBackground } = baseSx;
+    void unusedBoundary;
+    void unusedBaseBgcolor;
+    void unusedBaseBackgroundColor;
+    const headerBackground = overrides.top === GENE_TABLE_TITLE_HEADER_HEIGHT + 36 ? tone.subHeaderBg : tone.headerBg;
+    return {
+        ...baseWithoutBackground,
+        color: tone.color,
+        bgcolor: headerBackground,
+        backgroundColor: `${headerBackground} !important`,
+        backgroundImage: 'none',
+        borderLeft: boundary ? `1px solid ${tone.border}` : undefined,
+        borderBottom: `1px solid ${tone.border}`,
+        borderTop: `1px solid ${alpha(tone.accent, 0.14)}`,
+        ...restOverrides,
+    };
+}
+
+function relationCellSx(theme, baseSx, group, strong = false, boundary = false) {
+    const tone = relationGroupTone(group);
+    return {
+        ...baseSx,
+        bgcolor: strong ? tone.cellStrongBg : tone.cellBg,
+        backgroundColor: strong ? tone.cellStrongBg : tone.cellBg,
+        backgroundImage: 'none',
+        borderLeft: boundary ? `1px solid ${tone.border}` : undefined,
+    };
+}
+
+function relationIdentityHeaderSx(theme, baseSx, overrides = {}) {
+    return relationHeaderSx(theme, baseSx, 'identity', overrides);
+}
+
 function buildGeneInfoCsv(gene, summary) {
     const rows = [
         ['Field', 'Value'],
-        ['Gene Symbol', gene?.geneSymbol || 'NA'],
-        ['Gene Description', gene?.geneName || gene?.description || 'NA'],
-        ['Ensembl ID', gene?.ensgId || 'NA'],
-        ['Gene Location', getGeneLocation(gene) || 'NA'],
-        ['Gene Type', gene?.geneType || 'NA'],
-        ['NCBI Gene Summary', gene?.description || 'NA'],
-        ['More Information About the Gene', [
+        ['Gene symbol', gene?.geneSymbol || '-'],
+        ['Gene description', gene?.geneName || gene?.description || '-'],
+        ['Ensembl ID', gene?.ensgId || '-'],
+        ['Gene location', getGeneLocation(gene) || '-'],
+        ['Gene type', gene?.geneType || '-'],
+        ['NCBI gene summary', gene?.description || '-'],
+        ['More information about the gene', [
             buildEnsemblUrl(gene?.ensgId),
             buildGeneCardsUrl(gene?.geneSymbol),
             buildNcbiUrl(gene),
-        ].filter(Boolean).join(' | ') || 'NA'],
-        ['Associated Programs', Number(summary?.totalPrograms) || 0],
-        ['Associated Traits', Number(summary?.totalTraits) || 0],
+        ].filter(Boolean).join(' | ') || '-'],
+        ['Associated programs', Number(summary?.totalPrograms) || 0],
+        ['Associated traits', Number(summary?.totalTraits) || 0],
     ];
     const lines = rows.map((row) => row.map((value) => escapeCsvValue(value)).join(','));
     return `${lines.join('\n')}\n`;
-}
-
-function matchesGeneInfoDetailRow(row, query) {
-    const normalizedQuery = String(query || '').trim().toLowerCase();
-    if (!normalizedQuery) return true;
-
-    return [
-        row?.label,
-        row?.value,
-        ...(row?.links || []).flatMap((link) => [link.label, link.href]),
-    ].some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
-}
-
-function buildGeneProgramRows(gene, records) {
-    const map = new Map();
-
-    records.forEach((row) => {
-        if (!row.program) return;
-        if (!map.has(row.program)) {
-            map.set(row.program, {
-                geneLabel: gene?.geneSymbol || row.geneSymbol || gene?.ensgId || row.ensgId || '',
-                geneSymbol: gene?.geneSymbol || row.geneSymbol || '',
-                ensgId: gene?.ensgId || row.ensgId || '',
-                program: row.program,
-                programAnnotation: row.programAnnotation || '',
-                programGoLabel: row.representativeGo || row.top10Pathways || '',
-                goEnrichmentP: row.goEnrichmentP || '',
-                roles: new Set(),
-                signs: new Set(),
-                loadingGeneCount: 0,
-                regulatorGeneCount: 0,
-                traitIds: new Set(),
-                primaryRow: null,
-                topStrength: -1,
-            });
-        }
-
-        const item = map.get(row.program);
-        if (!item.programAnnotation && row.programAnnotation) item.programAnnotation = row.programAnnotation;
-        if (!item.programGoLabel && (row.representativeGo || row.top10Pathways)) {
-            item.programGoLabel = row.representativeGo || row.top10Pathways;
-        }
-        if (!item.goEnrichmentP && row.goEnrichmentP) item.goEnrichmentP = row.goEnrichmentP;
-        if (row.role) item.roles.add(row.role);
-        const direction = getRecordDirection(row);
-        if (direction && direction !== '-') item.signs.add(direction);
-        if (row.traitId) item.traitIds.add(row.traitId);
-        item.loadingGeneCount = Math.max(item.loadingGeneCount, Number(row.loadingGeneCount) || 0);
-        item.regulatorGeneCount = Math.max(item.regulatorGeneCount, Number(row.regulatorGeneCount) || 0);
-
-        const strength = Math.max(
-            Math.abs(Number(row.absGamma) || 0),
-            Math.abs(Number(row.postMean) || 0),
-            Math.abs(Number(row.membershipScore) || 0),
-        );
-        if (strength > item.topStrength) {
-            item.topStrength = strength;
-            item.primaryRow = row;
-        }
-    });
-
-    return [...map.values()].map((item) => {
-        const roleLabel = [...item.roles]
-            .map(geneProgramRoleLabel)
-            .filter(Boolean)
-            .join(' + ') || '-';
-        const signValues = [...item.signs];
-        let signLabel = '-';
-        if (signValues.length === 1) signLabel = signValues[0];
-        if (signValues.length > 1) signLabel = 'mixed';
-        const geneDirection = roleLabel === '-' ? signLabel : (signLabel === '-' ? roleLabel : `${roleLabel} / ${signLabel}`);
-        const programGeneCountSort = (Number(item.loadingGeneCount) || 0) + (Number(item.regulatorGeneCount) || 0);
-
-        return {
-            geneLabel: item.geneLabel || item.geneSymbol || item.ensgId || '-',
-            program: item.program,
-            programAnnotation: item.programAnnotation || '-',
-            programGoLabel: item.programGoLabel || '-',
-            goEnrichmentP: item.goEnrichmentP || '',
-            geneDirection,
-            programGeneCountLabel: programGeneCountSort ? `${programGeneCountSort.toLocaleString()} genes` : '-',
-            programGeneCountSort,
-            totalTraits: item.traitIds.size,
-        };
-    }).sort((a, b) => (
-        b.totalTraits - a.totalTraits
-        || b.programGeneCountSort - a.programGeneCountSort
-        || compareText(a.program, b.program)
-    ));
 }
 
 function matchesGeneProgramRow(row, query) {
@@ -847,25 +980,34 @@ function matchesGeneProgramRow(row, query) {
     return [
         row?.geneLabel,
         row?.program,
-        row?.programAnnotation,
-        row?.programGoLabel,
-        row?.geneDirection,
-        row?.totalTraits,
-        row?.programGeneCountLabel,
-        row?.programGeneCountSort,
+        row?.program_gene?.score,
+        row?.program_gene?.rank,
+        row?.program_gene?.direction,
+        row?.regulator?.score,
+        row?.regulator?.rank,
+        row?.regulator?.direction,
     ].some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
 }
 
 function buildGeneProgramCsv(rows) {
     const lines = [
-        GENE_PROGRAM_COLUMNS.map((column) => escapeCsvValue(column.label)).join(','),
+        [
+            'program',
+            'program_gene_score',
+            'program_gene_rank',
+            'program_gene_direction',
+            'regulator_score',
+            'regulator_rank',
+            'regulator_direction',
+        ].map(escapeCsvValue).join(','),
         ...rows.map((row) => ([
             row.program || '',
-            row.programAnnotation || '',
-            row.programGoLabel || '',
-            row.geneDirection || '',
-            row.totalTraits || '',
-            row.programGeneCountLabel || '',
+            row.program_gene?.score ?? '',
+            row.program_gene?.rank ?? '',
+            row.program_gene?.direction || '',
+            row.regulator?.score ?? '',
+            row.regulator?.rank ?? '',
+            row.regulator?.direction || '',
         ].map((value) => escapeCsvValue(value)).join(','))),
     ];
     return `${lines.join('\n')}\n`;
@@ -873,26 +1015,15 @@ function buildGeneProgramCsv(rows) {
 
 function buildGeneTraitCsv(rows) {
     const lines = [
-        [
-            'Trait',
-            'Trait ID',
-            'Program',
-            'Function Annotation',
-            'Role',
-            'Direction',
-            'LoF Effect',
-            'Beta',
-            'Concordance',
-        ].map((value) => escapeCsvValue(value)).join(','),
+        GENE_TRAIT_COLUMNS.map((column) => escapeCsvValue(column.label)).join(','),
         ...rows.map((row) => ([
-            row.traitName || '',
-            row.traitId || '',
+            row.trait || '',
             row.program || '',
-            row.programAnnotation || '',
             row.role || '',
+            Number.isFinite(getPostMean(row)) ? getPostMean(row) : '',
+            Number.isFinite(getAbsGamma(row)) ? getAbsGamma(row) : '',
+            Number.isFinite(getMembershipScore(row)) ? getMembershipScore(row) : '',
             getRecordDirection(row),
-            Number.isFinite(row.postMean) ? row.postMean : '',
-            Number.isFinite(row.membershipScore) ? row.membershipScore : '',
             getConcordanceLabel(row),
         ].map((value) => escapeCsvValue(value)).join(','))),
     ];
@@ -904,14 +1035,14 @@ function matchesGeneTraitRecord(row, query) {
     if (!normalizedQuery) return true;
 
     return [
-        row?.traitName,
-        row?.traitId,
+        row?.trait,
+        row?.trait_id,
         row?.program,
-        row?.programAnnotation,
         row?.role,
         getRecordDirection(row),
-        row?.postMean,
-        row?.membershipScore,
+        getPostMean(row),
+        getAbsGamma(row),
+        getMembershipScore(row),
         getConcordanceLabel(row),
     ].some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
 }
@@ -920,13 +1051,15 @@ function compareGenePrograms(a, b, sortBy, sortDir) {
     let result = 0;
     if (sortBy === 'geneLabel') result = compareText(a?.geneLabel, b?.geneLabel);
     if (sortBy === 'program') result = compareText(a?.program, b?.program);
-    if (sortBy === 'programAnnotation') result = compareText(a?.programAnnotation, b?.programAnnotation);
-    if (sortBy === 'programGoLabel') result = compareText(a?.programGoLabel, b?.programGoLabel);
-    if (sortBy === 'geneDirection') result = compareText(a?.geneDirection, b?.geneDirection);
-    if (sortBy === 'totalTraits') result = (Number(a?.totalTraits) || 0) - (Number(b?.totalTraits) || 0);
-    if (sortBy === 'programGeneCountSort') result = (Number(a?.programGeneCountSort) || 0) - (Number(b?.programGeneCountSort) || 0);
+    if (sortBy === 'loading_gene_score') result = compareOptionalRoleNumber(a?.program_gene?.score, b?.program_gene?.score, sortDir);
+    if (sortBy === 'loading_gene_rank') result = compareOptionalRoleNumber(a?.program_gene?.rank, b?.program_gene?.rank, sortDir);
+    if (sortBy === 'loading_gene_direction') result = compareText(a?.program_gene?.direction, b?.program_gene?.direction);
+    if (sortBy === 'regulator_score') result = compareOptionalRoleNumber(a?.regulator?.score, b?.regulator?.score, sortDir);
+    if (sortBy === 'regulator_rank') result = compareOptionalRoleNumber(a?.regulator?.rank, b?.regulator?.rank, sortDir);
+    if (sortBy === 'regulator_direction') result = compareText(a?.regulator?.direction, b?.regulator?.direction);
 
     if (!result) result = compareText(a?.program, b?.program);
+    if (['loading_gene_score', 'loading_gene_rank', 'regulator_score', 'regulator_rank'].includes(sortBy)) return result;
     return sortDir === 'desc' ? -result : result;
 }
 
@@ -1123,15 +1256,7 @@ function GeneHomeTable({
     onSelect,
 }) {
     const theme = useTheme();
-    const [placeholderIndex, setPlaceholderIndex] = React.useState(0);
-    const searchPlaceholder = GENE_PLACEHOLDERS[placeholderIndex % GENE_PLACEHOLDERS.length];
-
-    React.useEffect(() => {
-        const timer = setInterval(() => {
-            setPlaceholderIndex((index) => (index + 1) % GENE_PLACEHOLDERS.length);
-        }, 3600);
-        return () => clearInterval(timer);
-    }, []);
+    const searchPlaceholder = 'Search gene symbol, ENSG ID, location';
     const geneTone = {
         ...tableTone(theme, 'success'),
         headerBg: '#f5faf8',
@@ -1237,33 +1362,10 @@ function GeneHomeTable({
             })}
         >
             <Box
-                sx={{
-                    px: { xs: 1.5, md: 2 },
-                    py: { xs: 1.1, md: 1.15 },
-                    borderBottom: `1px solid ${theme.custom.border.soft}`,
-                    display: 'grid',
-                    gridTemplateColumns: {
-                        xs: '1fr',
-                        lg: 'max-content minmax(180px, 1fr) max-content',
-                    },
-                    alignItems: 'center',
-                    gap: { xs: 0.7, lg: 1.1 },
-                    minWidth: 0,
-                }}
+                sx={mainTableToolbarSx(theme)}
             >
                 <Box
-                    sx={{
-                        minWidth: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        gap: 0.65,
-                        flexWrap: 'wrap',
-                        maxWidth: { lg: 280 },
-                        '@media (min-width: 2200px)': {
-                            maxWidth: 420,
-                        },
-                    }}
+                    sx={mainTableToolbarTitleSlotSx(theme)}
                 >
                     <Typography sx={sectionTitleSx(theme, { fontSize: { xs: '1.08rem', md: '1.22rem' }, color: '#173b35', lineHeight: 1.15 })}>
                         Gene
@@ -1291,92 +1393,71 @@ function GeneHomeTable({
                 </Box>
 
                 <Box
-                    sx={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: { xs: 'flex-start', lg: 'center' },
-                        gap: 0.85,
-                        flexWrap: 'wrap',
-                        minWidth: 0,
-                    }}
+                    sx={mainTableToolbarSearchSlotSx(theme)}
                 >
                     <TextField
                         size="small"
                         value={input}
                         onChange={handleSearchInputChange}
                         placeholder={searchPlaceholder}
-                        sx={{
-                            width: '100%',
-                            maxWidth: { lg: 260 },
-                            '@media (min-width: 2200px)': {
-                                maxWidth: 360,
-                            },
-                            '& .MuiOutlinedInput-root': {
-                                height: 32,
-                                bgcolor: theme.palette.background.paper,
-                                borderRadius: 1,
-                                borderColor: alpha('#2f6a49', 0.16),
-                            },
-                            '& .MuiOutlinedInput-input': {
-                                py: 0.55,
-                                fontSize: '0.8rem',
-                            },
-                        }}
+                        sx={mainTableSearchFieldSx(theme, '#2f6a49')}
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
                                     <SearchOutlined fontSize="small" sx={{ color: '#2f6a49' }} />
                                 </InputAdornment>
                             ),
+                            endAdornment: (
+                                <InputAdornment
+                                    position="end"
+                                    sx={{
+                                        minWidth: 30,
+                                        justifyContent: 'flex-end',
+                                        visibility: searchInput || activeSearch ? 'visible' : 'hidden',
+                                        pointerEvents: searchInput || activeSearch ? 'auto' : 'none',
+                                    }}
+                                >
+                                    <IconButton
+                                        size="small"
+                                        aria-label="Clear gene search"
+                                        onClick={clearTableSearch}
+                                        edge="end"
+                                        sx={{ width: 24, height: 24 }}
+                                    >
+                                        <Clear fontSize="small" />
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
                         }}
                     />
-                    {(searchInput || activeSearch) && (
-                        <Button
-                            size="small"
-                            variant="text"
-                            onClick={clearTableSearch}
-                            sx={{ textTransform: 'none', color: theme.palette.text.secondary, minWidth: 48, height: 32, py: 0.45 }}
-                        >
-                            Clear
-                        </Button>
-                    )}
                 </Box>
                 <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: { xs: 'flex-start', lg: 'flex-end' },
-                        justifySelf: { xs: 'start', lg: 'end' },
-                        gap: 0.85,
-                        flexWrap: { xs: 'wrap', lg: 'nowrap' },
-                        whiteSpace: { lg: 'nowrap' },
-                        minWidth: 0,
-                    }}
+                    sx={mainTableToolbarActionsSx(theme)}
                 >
-                    {shouldPaginate && <GeneHeaderPageControl totalPages={pageCount} page={currentPage} onChange={handlePageChange} />}
-                    {shouldPaginate && <GeneRowsControl rowsPerPage={rowsPerPage} onChange={handleRowsPerPageChange} showLabel={false} />}
-                    <UpdatingStatus active={isRefreshing} />
+                    <Box
+                        sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 0.65,
+                            px: 0.55,
+                            py: 0.35,
+                            border: `1px solid ${alpha('#2f6a49', 0.1)}`,
+                            borderRadius: 1,
+                            bgcolor: alpha('#2f6a49', 0.025),
+                            flexShrink: 0,
+                            opacity: shouldPaginate ? 1 : 0.58,
+                        }}
+                    >
+                        <GeneHeaderPageControl totalPages={pageCount} page={currentPage} onChange={handlePageChange} disabled={!shouldPaginate} />
+                        <GeneRowsControl rowsPerPage={rowsPerPage} onChange={handleRowsPerPageChange} showLabel={false} disabled={!shouldPaginate} />
+                    </Box>
+                    <UpdatingStatus active={isRefreshing} reserveSpace />
                     <Button
                         size="small"
                         startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
                         onClick={handleDownload}
                         disabled={downloading || data?.unavailable}
-                        sx={{
-                            textTransform: 'none',
-                            fontSize: '0.74rem',
-                            color: '#315d57',
-                            border: `1px solid ${alpha('#2f6a49', 0.18)}`,
-                            bgcolor: alpha('#2f6a49', 0.045),
-                            minWidth: 116,
-                            height: 32,
-                            py: 0.38,
-                            flexShrink: 0,
-                            '&:hover': {
-                                bgcolor: alpha('#2f6a49', 0.08),
-                                borderColor: alpha('#2f6a49', 0.28),
-                            },
-                        }}
+                        sx={mainTableActionButtonSx(theme, '#315d57')}
                     >
                         {downloading ? 'Preparing' : 'Download CSV'}
                     </Button>
@@ -1407,7 +1488,7 @@ function GeneHomeTable({
             )}
 
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'hidden' })}>
-                <Table size="small" stickyHeader sx={stickyTableSx(theme, { minWidth: 1280, tableLayout: 'auto' })}>
+                <Table size="small" stickyHeader sx={stickyTableSx(theme, { minWidth: 1280, tableLayout: 'fixed' })}>
                     <colgroup>
                         {GENE_TABLE_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -1472,8 +1553,8 @@ function GeneHomeTable({
                             <TableRow>
                                 <TableCell colSpan={GENE_TABLE_COLUMNS.length} sx={{ py: 4, textAlign: 'center', color: theme.palette.text.secondary }}>
                                     {activeSearch
-                                        ? `No genes match "${activeSearch}" in the imported gene-program-trait index.`
-                                        : 'No genes found in the imported gene-program-trait index.'}
+                                        ? `No genes match "${activeSearch}" in the imported gene relation indexes.`
+                                        : 'No genes found in the imported gene relation indexes.'}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -1523,7 +1604,7 @@ function GeneHomeTable({
                                         }
                                         if (column.key === 'geneDescription') {
                                             content = (
-                                                <Typography sx={{ fontSize: '0.76rem', lineHeight: 1.35, color: theme.palette.text.primary, overflowWrap: 'anywhere' }}>
+                                                <Typography sx={{ fontSize: '0.76rem', lineHeight: 1.35, color: theme.palette.text.primary, overflowWrap: 'anywhere', textAlign: column.align }}>
                                                     {getGeneDescription(gene) || '-'}
                                                 </Typography>
                                             );
@@ -1872,7 +1953,6 @@ function GeneDetailHeader({ gene, query, summary, onSelect }) {
 
 function GeneInfoTable({ gene, summary }) {
     const theme = useTheme();
-    const [searchQuery, setSearchQuery] = React.useState('');
 
     const links = [
         { label: 'Ensembl', href: buildEnsemblUrl(gene?.ensgId) },
@@ -1881,44 +1961,43 @@ function GeneInfoTable({ gene, summary }) {
     ].filter((item) => item.href);
     const rows = [
         {
-            label: 'Gene Symbol',
-            value: gene?.geneSymbol || 'NA',
+            label: 'Gene symbol',
+            value: gene?.geneSymbol || '-',
             tone: 'link',
             align: 'center',
         },
         {
-            label: 'Gene Description',
-            value: gene?.geneName || gene?.description || 'NA',
+            label: 'Gene description',
+            value: gene?.geneName || gene?.description || '-',
         },
         {
             label: 'Ensembl ID',
-            value: gene?.ensgId || 'NA',
+            value: gene?.ensgId || '-',
             mono: true,
             tone: 'link',
             align: 'center',
         },
         {
-            label: 'Gene Location',
-            value: getGeneLocation(gene) || 'NA',
+            label: 'Gene location',
+            value: getGeneLocation(gene) || '-',
             mono: true,
             align: 'center',
         },
         {
-            label: 'Gene Type',
-            value: gene?.geneType || 'NA',
+            label: 'Gene type',
+            value: gene?.geneType || '-',
             align: 'center',
         },
         {
-            label: 'NCBI Gene Summary',
-            value: gene?.description || 'NA',
+            label: 'NCBI gene summary',
+            value: gene?.description || '-',
             wrap: true,
         },
         {
-            label: 'More Information About the Gene',
+            label: 'More information about the gene',
             links,
         },
     ];
-    const visibleRows = rows.filter((row) => matchesGeneInfoDetailRow(row, searchQuery));
 
     const handleDownload = React.useCallback(() => {
         const csv = buildGeneInfoCsv(gene, summary);
@@ -1941,45 +2020,10 @@ function GeneInfoTable({ gene, summary }) {
                             title="Gene information"
                             colSpan={2}
                             onDownload={handleDownload}
-                            toolbar={(
-                                <Box sx={tableToolbarGroupSx(theme, { width: { xs: '100%', sm: 'auto' } })}>
-                                    <TableSearchField
-                                        label="Search"
-                                        value={searchQuery}
-                                        placeholder="Field or value"
-                                        onChange={setSearchQuery}
-                                        onClear={() => setSearchQuery('')}
-                                        width={{ xs: '100%', sm: 250 }}
-                                    />
-                                    <Button
-                                        size="small"
-                                        startIcon={<DownloadOutlined sx={{ fontSize: 16 }} />}
-                                        onClick={handleDownload}
-                                        sx={tableToolbarActionButtonSx(theme)}
-                                    >
-                                        Export CSV
-                                    </Button>
-                                </Box>
-                            )}
                         />
                     </TableHead>
                     <TableBody>
-                        {visibleRows.length === 0 ? (
-                            <TableRow>
-                                <TableCell
-                                    colSpan={2}
-                                    sx={{
-                                        py: 3,
-                                        textAlign: 'center',
-                                        color: theme.palette.text.secondary,
-                                        fontSize: '0.78rem',
-                                        bgcolor: theme.palette.background.paper,
-                                    }}
-                                >
-                                    No matching rows.
-                                </TableCell>
-                            </TableRow>
-                        ) : visibleRows.map((row, index) => (
+                        {rows.map((row, index) => (
                             <TableRow
                                 key={row.label}
                                 hover
@@ -2058,7 +2102,7 @@ function GeneInfoTable({ gene, summary }) {
                                                 </Button>
                                             )) : (
                                                 <Typography sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary }}>
-                                                    NA
+                                                    -
                                                 </Typography>
                                             )}
                                         </Stack>
@@ -2076,28 +2120,42 @@ function GeneInfoTable({ gene, summary }) {
 function GeneProgramTable({ gene, records, programRows }) {
     const theme = useTheme();
     const [searchQuery, setSearchQuery] = React.useState('');
+    const [page, setPage] = React.useState(0);
+    const [rowsPerPage, setRowsPerPage] = React.useState(RELATION_ROWS_PER_PAGE);
     const rows = React.useMemo(
-        () => (programRows?.length ? programRows : buildGeneProgramRows(gene, records)),
-        [gene, records, programRows],
+        () => (programRows?.length ? programRows : []),
+        [programRows],
     );
-    const [sortBy, setSortBy] = React.useState('totalTraits');
+    void records;
+    const [sortBy, setSortBy] = React.useState('loading_gene_score');
     const [sortDir, setSortDir] = React.useState('desc');
 
     const TONES = {
         gene: tableTone(theme, 'success'),
-        program: tableTone(theme, 'success'),
-        trait: tableTone(theme, 'success'),
         neutral: tableTone(theme, 'success'),
     };
 
-    const sortedRows = React.useMemo(
-        () => [...rows].sort((a, b) => compareGenePrograms(a, b, sortBy, sortDir)),
-        [rows, sortBy, sortDir],
+    const groupedRows = React.useMemo(
+        () => groupGeneProgramRows(rows),
+        [rows],
     );
-    const visibleRows = React.useMemo(
+    const sortedRows = React.useMemo(
+        () => [...groupedRows].sort((a, b) => compareGenePrograms(a, b, sortBy, sortDir)),
+        [groupedRows, sortBy, sortDir],
+    );
+    const filteredRows = React.useMemo(
         () => sortedRows.filter((row) => matchesGeneProgramRow(row, searchQuery)),
         [searchQuery, sortedRows],
     );
+    const shouldPaginate = filteredRows.length > RELATION_PAGINATION_THRESHOLD;
+    const pageCount = Math.max(1, Math.ceil(filteredRows.length / rowsPerPage));
+    const currentPage = shouldPaginate ? Math.min(page, pageCount - 1) : 0;
+    const start = shouldPaginate ? currentPage * rowsPerPage : 0;
+    const visibleRows = shouldPaginate ? filteredRows.slice(start, start + rowsPerPage) : filteredRows;
+
+    React.useEffect(() => {
+        setPage(0);
+    }, [searchQuery, sortBy, sortDir]);
 
     const handleSort = React.useCallback((key) => {
         if (sortBy === key) {
@@ -2105,21 +2163,21 @@ function GeneProgramTable({ gene, records, programRows }) {
             return;
         }
         setSortBy(key);
-        setSortDir(key === 'programGeneCountSort' || key === 'totalTraits' ? 'desc' : 'asc');
+        setSortDir(['loading_gene_score', 'regulator_score'].includes(key) ? 'desc' : 'asc');
     }, [sortBy, sortDir]);
 
     const handleDownload = React.useCallback(() => {
-        const csv = buildGeneProgramCsv(visibleRows);
+        const csv = buildGeneProgramCsv(filteredRows);
         const label = gene?.geneSymbol || gene?.ensgId || 'gene';
-        downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `${label}-gene-program.csv`);
-    }, [gene, visibleRows]);
+        downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `${label}-program-roles.csv`);
+    }, [filteredRows, gene]);
 
     if (!rows.length) return null;
 
     return (
         <Paper elevation={0} sx={panelSx(theme, { overflow: 'hidden' })}>
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 1056 })}>
+                <Table stickyHeader size="small" sx={stickyTableSx(theme, { tableLayout: 'fixed', minWidth: 704 })}>
                     <colgroup>
                         {GENE_PROGRAM_COLUMNS.map((column) => (
                             <col key={column.key} style={{ width: column.width }} />
@@ -2127,15 +2185,23 @@ function GeneProgramTable({ gene, records, programRows }) {
                     </colgroup>
                     <TableHead>
                         <EmbeddedTableTitleRow
-                            title="Associated Programs"
+                            title="Associated programs"
                             colSpan={GENE_PROGRAM_COLUMNS.length}
                             onDownload={handleDownload}
                             toolbar={(
-                                <Box sx={tableToolbarGroupSx(theme, { width: { xs: '100%', sm: 'auto' } })}>
+                                <Box sx={tableToolbarGroupSx(theme, {
+                                    width: { xs: '100%', sm: 'auto' },
+                                    px: 0,
+                                    py: 0,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    boxShadow: 'none',
+                                })}
+                                >
                                     <TableSearchField
                                         label="Search"
                                         value={searchQuery}
-                                        placeholder="Program, GO term, direction"
+                                        placeholder="Program, role, score"
                                         onChange={setSearchQuery}
                                         onClear={() => setSearchQuery('')}
                                         width={{ xs: '100%', sm: 280 }}
@@ -2152,23 +2218,71 @@ function GeneProgramTable({ gene, records, programRows }) {
                             )}
                         />
                         <TableRow>
-                            {GENE_PROGRAM_COLUMNS.map((column) => {
-                                const palette = TONES[column.tone];
+                            {GENE_PROGRAM_COLUMNS.slice(0, 1).map((column) => {
                                 return (
                                     <TableCell
                                         key={column.key}
                                         align={column.align}
-                                        sx={embeddedColumnHeaderSx(theme, palette, column.align)}
+                                        rowSpan={2}
+                                        sx={relationIdentityHeaderSx(theme, embeddedColumnHeaderSx(theme, TONES.neutral, column.align))}
                                     >
-                                        <TableSortLabel
-                                            active={sortBy === column.key}
-                                            direction={sortBy === column.key ? sortDir : 'asc'}
-                                            hideSortIcon
-                                            onClick={() => handleSort(column.key)}
-                                            sx={{ ...geneSortLabelSx, justifyContent: justifyForAlign(column.align) }}
-                                        >
-                                            {column.label}
-                                        </TableSortLabel>
+                                        <Tooltip title={GENE_PROGRAM_COLUMN_DESCRIPTIONS[column.key] || column.label} arrow>
+                                            <TableSortLabel
+                                                active={sortBy === column.key}
+                                                direction={sortBy === column.key ? sortDir : 'asc'}
+                                                hideSortIcon
+                                                onClick={() => handleSort(column.key)}
+                                                sx={{ ...geneSortLabelSx, justifyContent: justifyForAlign(column.align) }}
+                                            >
+                                                {column.label}
+                                            </TableSortLabel>
+                                        </Tooltip>
+                                    </TableCell>
+                                );
+                            })}
+                            <TableCell
+                                align="center"
+                                colSpan={3}
+                                sx={relationHeaderSx(theme, embeddedColumnHeaderSx(theme, TONES.neutral, 'center'), 'loading_gene', { boundary: true })}
+                            >
+                                <Tooltip title={GENE_PROGRAM_COLUMN_DESCRIPTIONS.loading_gene} arrow>
+                                    <Box component="span">loading_gene</Box>
+                                </Tooltip>
+                            </TableCell>
+                            <TableCell
+                                align="center"
+                                colSpan={3}
+                                sx={relationHeaderSx(theme, embeddedColumnHeaderSx(theme, TONES.neutral, 'center'), 'regulator', { boundary: true })}
+                            >
+                                <Tooltip title={GENE_PROGRAM_COLUMN_DESCRIPTIONS.regulator} arrow>
+                                    <Box component="span">regulator</Box>
+                                </Tooltip>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow>
+                            {GENE_PROGRAM_COLUMNS.slice(1).map((column) => {
+                                const palette = TONES[column.tone];
+                                const group = column.key.startsWith('regulator') ? 'regulator' : 'loading_gene';
+                                return (
+                                    <TableCell
+                                        key={column.key}
+                                        align={column.align}
+                                        sx={relationHeaderSx(theme, embeddedColumnHeaderSx(theme, palette, column.align), group, {
+                                            boundary: column.key === 'loading_gene_score' || column.key === 'regulator_score',
+                                            top: GENE_TABLE_TITLE_HEADER_HEIGHT + 36,
+                                        })}
+                                    >
+                                        <Tooltip title={GENE_PROGRAM_COLUMN_DESCRIPTIONS[column.key] || column.label} arrow>
+                                            <TableSortLabel
+                                                active={sortBy === column.key}
+                                                direction={sortBy === column.key ? sortDir : 'asc'}
+                                                hideSortIcon
+                                                onClick={() => handleSort(column.key)}
+                                                sx={{ ...geneSortLabelSx, justifyContent: justifyForAlign(column.align) }}
+                                            >
+                                                {column.label}
+                                            </TableSortLabel>
+                                        </Tooltip>
                                     </TableCell>
                                 );
                             })}
@@ -2192,13 +2306,13 @@ function GeneProgramTable({ gene, records, programRows }) {
                             </TableRow>
                         ) : visibleRows.map((row, index) => (
                             <TableRow
-                                key={`${row.program}-${index}`}
+                                key={`${row.program}-${start + index}`}
                                 sx={{
                                     ...tableRowRevealSx(theme, index),
                                     '&:hover td': { bgcolor: alpha(theme.palette.primary.main, 0.035) },
                                 }}
                             >
-                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.program, fontFamily: 'monospace', fontWeight: 500 })}>
+                                <TableCell align="center" sx={relationCellSx(theme, geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace', fontWeight: 500 }), 'identity', true)}>
                                     <Button
                                         component={RouterLink}
                                         to={`/programs/${encodeURIComponent(row.program)}`}
@@ -2217,109 +2331,40 @@ function GeneProgramTable({ gene, records, programRows }) {
                                         {row.program}
                                     </Button>
                                 </TableCell>
-                                <TableCell
-                                    align="left"
-                                    sx={{
-                                        ...geneBodyCellSx({ align: 'left', tone: TONES.neutral, whiteSpace: 'normal' }),
-                                        overflow: 'visible',
-                                        textOverflow: 'clip',
-                                        verticalAlign: 'top',
-                                    }}
-                                >
-                                    {row.programGoLabel !== '-' ? (
-                                        <Button
-                                            component="a"
-                                            href={buildGoUrl(row.programGoLabel)}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            endIcon={<OpenInNew sx={{ fontSize: 11 }} />}
-                                            sx={{
-                                                textTransform: 'none',
-                                                px: 0,
-                                                py: 0,
-                                                justifyContent: 'flex-start',
-                                                minHeight: 0,
-                                                color: theme.palette.text.primary,
-                                                fontSize: '0.69rem',
-                                                lineHeight: 1.3,
-                                                display: 'inline-flex',
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                whiteSpace: 'normal',
-                                            }}
-                                        >
-                                            {row.programAnnotation}
-                                        </Button>
-                                    ) : (
-                                        <Typography
-                                            sx={{
-                                                fontSize: '0.69rem',
-                                                lineHeight: 1.3,
-                                                whiteSpace: 'normal',
-                                                wordBreak: 'break-word',
-                                            }}
-                                        >
-                                            {row.programAnnotation}
-                                        </Typography>
-                                    )}
+                                <TableCell align="center" sx={relationCellSx(theme, geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace', fontWeight: 700 }), 'loading_gene', false, true)}>
+                                    {formatNumber(roleEvidenceValue(row, 'program_gene', 'score'), 4)}
                                 </TableCell>
-                                <TableCell
-                                    align="left"
-                                    sx={{
-                                        ...geneBodyCellSx({ align: 'left', tone: TONES.neutral, whiteSpace: 'normal' }),
-                                        bgcolor: TONES.neutral.cellStrong,
-                                        overflow: 'visible',
-                                        textOverflow: 'clip',
-                                        verticalAlign: 'top',
-                                    }}
-                                >
-                                    {row.programGoLabel !== '-' ? (
-                                        <>
-                                            <Button
-                                                component="a"
-                                                href={buildGoUrl(row.programGoLabel)}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                endIcon={<OpenInNew sx={{ fontSize: 11 }} />}
-                                                sx={{
-                                                    textTransform: 'none',
-                                                    fontWeight: 700,
-                                                    fontSize: '0.69rem',
-                                                    px: 0,
-                                                    py: 0,
-                                                    justifyContent: 'flex-start',
-                                                    minHeight: 0,
-                                                    color: TONES.neutral.headerColor,
-                                                    width: '100%',
-                                                    textAlign: 'left',
-                                                    whiteSpace: 'normal',
-                                                }}
-                                            >
-                                                {row.programGoLabel}
-                                            </Button>
-                                        </>
-                                    ) : (
-                                        <Typography sx={{ fontSize: '0.69rem', color: theme.palette.text.secondary }}>
-                                            —
-                                        </Typography>
-                                    )}
+                                <TableCell align="center" sx={relationCellSx(theme, geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace', fontWeight: 700 }), 'loading_gene', true)}>
+                                    {roleEvidenceValue(row, 'program_gene', 'rank') ?? '-'}
                                 </TableCell>
-                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.gene, fontWeight: 600 })}>
-                                    <Typography sx={{ fontSize: '0.69rem', fontWeight: 700 }}>
-                                        {row.geneDirection}
-                                    </Typography>
+                                <TableCell align="center" sx={relationCellSx(theme, geneBodyCellSx({ align: 'center', tone: TONES.neutral, whiteSpace: 'normal' }), 'loading_gene')}>
+                                    {roleEvidenceValue(row, 'program_gene', 'direction') || '-'}
                                 </TableCell>
-                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.trait, fontFamily: 'monospace', fontWeight: 600 })}>
-                                    {Number(row.totalTraits || 0).toLocaleString()}
+                                <TableCell align="center" sx={relationCellSx(theme, geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace', fontWeight: 700 }), 'regulator', true, true)}>
+                                    {formatNumber(roleEvidenceValue(row, 'regulator', 'score'), 4)}
                                 </TableCell>
-                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.gene, fontFamily: 'monospace', fontWeight: 600 })}>
-                                    {row.programGeneCountLabel}
+                                <TableCell align="center" sx={relationCellSx(theme, geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace', fontWeight: 700 }), 'regulator')}>
+                                    {roleEvidenceValue(row, 'regulator', 'rank') ?? '-'}
+                                </TableCell>
+                                <TableCell align="center" sx={relationCellSx(theme, geneBodyCellSx({ align: 'center', tone: TONES.neutral, whiteSpace: 'normal' }), 'regulator', true)}>
+                                    {roleEvidenceValue(row, 'regulator', 'direction') || '-'}
                                 </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
             </TableContainer>
+            <GeneRelationPagerFooter
+                totalCount={filteredRows.length}
+                page={currentPage}
+                rowsPerPage={rowsPerPage}
+                onPageChange={(event, nextPage) => setPage(nextPage)}
+                onRowsPerPageChange={(nextRowsPerPage) => {
+                    setRowsPerPage(nextRowsPerPage);
+                    setPage(0);
+                }}
+                itemLabel="programs"
+            />
         </Paper>
     );
 }
@@ -2436,7 +2481,7 @@ function GeneProgramTraitTable({
     const handleSort = React.useCallback((key) => {
         const nextDir = sortBy === key
             ? (sortDir === 'asc' ? 'desc' : 'asc')
-            : (['postMean', 'membershipScore', 'concordance'].includes(key) ? 'desc' : 'asc');
+            : (['post_mean', 'abs_gamma', 'membership_score', 'concordance'].includes(key) ? 'desc' : 'asc');
         onSort?.(key, nextDir);
     }, [onSort, sortBy, sortDir]);
 
@@ -2445,12 +2490,12 @@ function GeneProgramTraitTable({
     const handleDownload = React.useCallback(() => {
         const csv = buildGeneTraitCsv(visibleRecords);
         const label = gene?.geneSymbol || gene?.ensgId || 'gene';
-        downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `${label}-gene-program-trait-page.csv`);
+        downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `${label}-association-traits-page.csv`);
     }, [gene, visibleRecords]);
 
     const safeTotalCount = Number(totalCount) || rows.length;
-    const safeRowsPerPage = Number(rowsPerPage) || DEFAULT_ROWS_PER_PAGE;
-    const shouldPaginate = safeTotalCount > TABLE_PAGINATION_THRESHOLD;
+    const safeRowsPerPage = Number(rowsPerPage) || RELATION_ROWS_PER_PAGE;
+    const shouldPaginate = safeTotalCount > RELATION_PAGINATION_THRESHOLD;
     const pageCount = shouldPaginate ? Math.max(1, Math.ceil(safeTotalCount / safeRowsPerPage)) : 1;
     const currentPage = Math.min(Math.max(Number(page) || 0, 0), pageCount - 1);
     const start = safeTotalCount ? currentPage * safeRowsPerPage : 0;
@@ -2468,12 +2513,20 @@ function GeneProgramTraitTable({
                     </colgroup>
                     <TableHead>
                         <EmbeddedTableTitleRow
-                            title="Associated Traits"
+                            title="Associated traits"
                             colSpan={GENE_TRAIT_COLUMNS.length}
                             onDownload={handleDownload}
                             toolbar={(
-                                <Box sx={tableToolbarGroupSx(theme, { width: { xs: '100%', sm: 'auto' } })}>
-                                    <UpdatingStatus active={isRefreshing} />
+                                <Box sx={tableToolbarGroupSx(theme, {
+                                    width: { xs: '100%', sm: 'auto' },
+                                    px: 0,
+                                    py: 0,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    boxShadow: 'none',
+                                })}
+                                >
+                                    <UpdatingStatus active={isRefreshing} reserveSpace />
                                     <TableSearchField
                                         label="Search"
                                         value={searchQuery}
@@ -2502,15 +2555,17 @@ function GeneProgramTraitTable({
                                         align={column.align}
                                         sx={embeddedColumnHeaderSx(theme, palette, column.align)}
                                     >
-                                        <TableSortLabel
-                                            active={sortBy === column.key}
-                                            direction={sortBy === column.key ? sortDir : 'asc'}
-                                            hideSortIcon
-                                            onClick={() => handleSort(column.key)}
-                                            sx={{ ...geneSortLabelSx, justifyContent: justifyForAlign(column.align) }}
-                                        >
-                                            {column.label}
-                                        </TableSortLabel>
+                                        <Tooltip title={GENE_TRAIT_COLUMN_DESCRIPTIONS[column.key] || column.label} arrow>
+                                            <TableSortLabel
+                                                active={sortBy === column.key}
+                                                direction={sortBy === column.key ? sortDir : 'asc'}
+                                                hideSortIcon
+                                                onClick={() => handleSort(column.key)}
+                                                sx={{ ...geneSortLabelSx, justifyContent: justifyForAlign(column.align) }}
+                                            >
+                                                {column.label}
+                                            </TableSortLabel>
+                                        </Tooltip>
                                     </TableCell>
                                 );
                             })}
@@ -2534,7 +2589,7 @@ function GeneProgramTraitTable({
                             </TableRow>
                         ) : visibleRecords.map((row, index) => (
                             <TableRow
-                                key={`${row.traitId}-${row.program}-${row.role}-${row.ensgId || row.geneSymbol}-${start + index}`}
+                                key={`${row.trait_id}-${row.program}-${row.role}-${row.ensg_id || row.gene_symbol}-${start + index}`}
                                 sx={{
                                     ...tableRowRevealSx(theme, index),
                                     '&:hover td': { bgcolor: alpha(theme.palette.primary.main, 0.035) },
@@ -2551,7 +2606,7 @@ function GeneProgramTraitTable({
                                 >
                                     <Button
                                         component={RouterLink}
-                                        to={`/trait/${encodeURIComponent(row.fileId || row.traitId)}`}
+                                        to={`/trait/${encodeURIComponent(row.file_id || row.trait_id)}`}
                                         endIcon={<OpenInNew sx={{ fontSize: 11 }} />}
                                         sx={{
                                             textTransform: 'none',
@@ -2577,7 +2632,7 @@ function GeneProgramTraitTable({
                                                 lineHeight: 1.28,
                                             }}
                                         >
-                                            {row.traitName || row.traitId}
+                                            {row.trait || row.trait_id}
                                         </Box>
                                     </Button>
                                 </TableCell>
@@ -2601,9 +2656,9 @@ function GeneProgramTraitTable({
                                     </Button>
                                 </TableCell>
                                 <TableCell
-                                    align="left"
+                                    align="center"
                                     sx={{
-                                        ...geneBodyCellSx({ align: 'left', tone: TONES.neutral, whiteSpace: 'normal' }),
+                                        ...geneBodyCellSx({ align: 'center', tone: TONES.neutral, whiteSpace: 'normal' }),
                                         overflow: 'visible',
                                         textOverflow: 'clip',
                                         verticalAlign: 'top',
@@ -2617,27 +2672,20 @@ function GeneProgramTraitTable({
                                             whiteSpace: 'normal',
                                             wordBreak: 'break-word',
                                             overflowWrap: 'anywhere',
+                                            textAlign: 'center',
                                         }}
                                     >
-                                        {row.programAnnotation || '—'}
+                                        {row.role || '-'}
                                     </Typography>
                                 </TableCell>
-                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.gene })}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                                        <Chip label={row.role} size="small" sx={{
-                                            ...summaryChipSx(theme, roleTone(theme, row.role)),
-                                            height: 20,
-                                            fontSize: '0.62rem',
-                                        }} />
-                                    </Box>
-                                </TableCell>
+                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace' })}>{formatSigned(getPostMean(row), 4)}</TableCell>
+                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace' })}>{formatNumber(getAbsGamma(row), 4)}</TableCell>
+                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace' })}>{formatNumber(getMembershipScore(row), 4)}</TableCell>
                                 <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.gene, whiteSpace: 'normal' })}>
                                     <Typography sx={{ fontSize: '0.69rem', fontWeight: 700, textAlign: 'center' }}>
                                         {getRecordDirection(row)}
                                     </Typography>
                                 </TableCell>
-                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace' })}>{formatSigned(row.postMean, 4)}</TableCell>
-                                <TableCell align="center" sx={geneBodyCellSx({ align: 'center', tone: TONES.neutral, fontFamily: 'monospace' })}>{formatNumber(row.membershipScore, 4)}</TableCell>
                                 <TableCell align="center" sx={{ ...geneBodyCellSx({ align: 'center', tone: TONES.neutral }), bgcolor: TONES.neutral.cellStrong }}>
                                     {getConcordanceLabel(row)}
                                 </TableCell>
@@ -2646,28 +2694,14 @@ function GeneProgramTraitTable({
                     </TableBody>
                 </Table>
             </TableContainer>
-            {shouldPaginate && (
-                <TablePagination
-                    component="div"
-                    count={safeTotalCount}
-                    page={currentPage}
-                    onPageChange={(event, nextPage) => onPageChange?.(nextPage)}
-                    rowsPerPage={safeRowsPerPage}
-                    labelRowsPerPage="Associations per page"
-                    rowsPerPageOptions={[25, 50, 100, 250]}
-                    onRowsPerPageChange={(event) => {
-                        onRowsPerPageChange?.(Number(event.target.value));
-                    }}
-                    sx={{
-                        borderTop: `1px solid ${theme.custom.border.soft}`,
-                        '& .MuiTablePagination-toolbar': { minHeight: 44 },
-                        '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                            fontSize: '0.74rem',
-                            color: theme.palette.text.secondary,
-                        },
-                    }}
-                />
-            )}
+            <GeneRelationPagerFooter
+                totalCount={safeTotalCount}
+                page={currentPage}
+                rowsPerPage={safeRowsPerPage}
+                onPageChange={(event, nextPage) => onPageChange?.(nextPage)}
+                onRowsPerPageChange={(nextRowsPerPage) => onRowsPerPageChange?.(nextRowsPerPage)}
+                itemLabel="associations"
+            />
         </Paper>
     );
 }
@@ -2677,8 +2711,8 @@ export default function Genes() {
     const queryParam = params.get('query') || '';
     const [input, setInput] = React.useState(queryParam);
     const [traitPage, setTraitPage] = React.useState(0);
-    const [traitRowsPerPage, setTraitRowsPerPage] = React.useState(DEFAULT_ROWS_PER_PAGE);
-    const [traitSortBy, setTraitSortBy] = React.useState('membershipScore');
+    const [traitRowsPerPage, setTraitRowsPerPage] = React.useState(RELATION_ROWS_PER_PAGE);
+    const [traitSortBy, setTraitSortBy] = React.useState('membership_score');
     const [traitSortDir, setTraitSortDir] = React.useState('desc');
     const query = queryParam.trim();
     const debouncedInput = useDebouncedValue(input.trim());
@@ -2692,7 +2726,7 @@ export default function Genes() {
 
     React.useEffect(() => {
         setTraitPage(0);
-        setTraitSortBy('membershipScore');
+        setTraitSortBy('membership_score');
         setTraitSortDir('desc');
     }, [query]);
 
@@ -2712,7 +2746,7 @@ export default function Genes() {
     const runSearch = React.useCallback((value = input) => {
         const next = value.trim();
         setTraitPage(0);
-        setTraitSortBy('membershipScore');
+        setTraitSortBy('membership_score');
         setTraitSortDir('desc');
         if (!next) {
             setParams({});
@@ -2728,20 +2762,32 @@ export default function Genes() {
 
     const overviewUnavailable = Boolean(overview?.unavailable);
     const overviewGene = overview?.gene || (query ? { geneSymbol: query } : null);
-    const programRows = overview?.programs || [];
-    const summary = overview?.summary || {};
+    const programRoleKey = query ? ['gene-program-roles', query] : null;
+    const programRoleResource = useCachedResourceState(
+        useSWR(programRoleKey, ([, q]) => getGeneProgramRoles(q), relationIndexSWRConfig),
+        { cacheKey: programRoleKey, retainPreviousData: false },
+    );
+    const { displayData: programRoleData, isInitialLoading: programRolesLoading } = programRoleResource;
+    const programRows = programRoleData?.programs || programRoleData?.roles || [];
+    const roleSummary = programRoleData?.summary || {};
+    const summary = {
+        ...(overview?.summary || {}),
+        totalPrograms: Number(roleSummary.totalPrograms ?? overview?.summary?.totalPrograms) || 0,
+    };
     const totalOverviewCount = Number(summary.totalRows) || 0;
+    const hasProgramRoles = programRows.length > 0;
+    const hasAssociationRows = totalOverviewCount > 0;
 
-    const recordKey = query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount > 0
-        ? ['gene-records', query, traitPage, traitRowsPerPage, traitSortBy, traitSortDir]
+    const recordKey = query && !overviewLoading && !overviewError && !overviewUnavailable && hasAssociationRows
+        ? ['gene-association-traits', query, traitPage, traitRowsPerPage, traitSortBy, traitSortDir]
         : null;
     const recordResource = useCachedResourceState(
-        useSWR(recordKey, ([, q, pageIndex, limit, sortKey, direction]) => getGeneProgramRecords(q, {
+        useSWR(recordKey, ([, q, pageIndex, limit, sortKey, direction]) => getGeneAssociationTraits(q, {
             page: pageIndex + 1,
             limit,
             sortBy: sortKey,
             order: direction,
-        }), stableListSWRConfig),
+        }), associationTraitsSWRConfig),
         { cacheKey: recordKey, retainPreviousData: true },
     );
     const { displayData: recordData, isInitialLoading: recordsLoading, isRefreshing: recordsRefreshing, isStale: recordsStale, error: recordsError } = recordResource;
@@ -2776,9 +2822,9 @@ export default function Genes() {
             compact
         >
             <Stack spacing={query ? 1.5 : 2}>
-                {(overviewUnavailable || recordData?.unavailable) && (
+                {(overviewUnavailable || recordData?.unavailable || programRoleData?.unavailable) && (
                     <Alert severity="warning" sx={{ borderRadius: 1 }}>
-                        Gene SQL index is not available yet. Run the schema migration and import script before using this page.
+                        Gene relation SQL indexes are not available yet. Run the schema migration and relation import scripts before using this page.
                     </Alert>
                 )}
 
@@ -2795,7 +2841,7 @@ export default function Genes() {
                     <StatePanel severity="error" title="Failed to load gene evidence" message={overviewError.message || 'The gene lookup request failed.'} />
                 )}
 
-                {query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount === 0 && (
+                {query && !overviewLoading && !overviewError && !overviewUnavailable && !programRolesLoading && !hasProgramRoles && !hasAssociationRows && (
                     <>
                         <GeneDetailHeader
                             gene={overviewGene || { geneSymbol: query }}
@@ -2807,13 +2853,13 @@ export default function Genes() {
                         <StatePanel
                             icon={TableChartOutlined}
                             title="No linked records"
-                            message="This gene was not found in the imported gene-program-trait index. Click the gene name above to search another symbol or ENSG identifier."
+                            message="This gene was not found in the imported cNMF program-role or Gene Association Map indexes. Click the gene name above to search another symbol or ENSG identifier."
                             minHeight={300}
                         />
                     </>
                 )}
 
-                {query && !overviewLoading && !overviewError && !overviewUnavailable && totalOverviewCount > 0 && (
+                {query && !overviewLoading && !overviewError && !overviewUnavailable && (hasAssociationRows || hasProgramRoles) && (
                     <>
                         <GeneDetailHeader
                             gene={overviewGene}
@@ -2842,7 +2888,7 @@ export default function Genes() {
                                 <QuietDeferredPanel minHeight={220} />
                             )}
                         </Box>
-                        {recordsError ? (
+                        {!hasAssociationRows ? null : recordsError ? (
                             <StatePanel
                                 severity="error"
                                 title="Failed to load linked traits"

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -7,14 +7,14 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import CloseFullscreen from '@mui/icons-material/CloseFullscreen';
 import Download from '@mui/icons-material/Download';
 import OpenInNew from '@mui/icons-material/OpenInNew';
-import OpenInFull from '@mui/icons-material/OpenInFull';
 import RestartAlt from '@mui/icons-material/RestartAlt';
 import ZoomIn from '@mui/icons-material/ZoomIn';
 import ZoomOut from '@mui/icons-material/ZoomOut';
 import {
+    allGeneDetailColumnCount,
+    allGeneDetailGroups,
     computeEdgeStyle,
     directionFromSign,
     displayGeneLabel,
@@ -141,6 +141,16 @@ function selectedGeneLabel(gene) {
     return gene?.geneLabel || gene?.gene || gene?.ensg || gene?.highlightKey || '';
 }
 
+function splitModulesForFocus(modules, focusActive, isFocused) {
+    if (!focusActive) return { background: modules, focused: [] };
+
+    return modules.reduce((acc, module) => {
+        if (isFocused(module)) acc.focused.push(module);
+        else acc.background.push(module);
+        return acc;
+    }, { background: [], focused: [] });
+}
+
 function ZoomToolbar({ scale, zoomIn, zoomOut, resetView }) {
     const zoomLabel = `${Math.round(scale * 100)}%`;
 
@@ -231,7 +241,7 @@ function SelectionActions({
                 {selectedProgram && (
                     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
                         <Chip
-                            label={selectedProgram}
+                            label={`Context: ${selectedProgram}`}
                             size="small"
                             sx={{
                                 borderRadius: 1,
@@ -248,7 +258,7 @@ function SelectionActions({
                             onClick={() => onOpenProgram?.(selectedProgram)}
                             sx={{ textTransform: 'none', fontWeight: 680, whiteSpace: 'nowrap' }}
                         >
-                            Open program
+                            Open context
                         </Button>
                     </Stack>
                 )}
@@ -292,13 +302,18 @@ function SelectionActions({
 export default function TraitProgramGraphCanvas({
     clearSelection,
     exportFileName,
+    expandedAllGeneModuleKey,
+    geneLimit,
+    geneLimitOptions = [],
     graphLayout,
-    isFullGraph,
     isDragging,
+    isTransformAnimating,
     leftLayout,
     onOpenGene,
     onOpenProgram,
-    onGraphViewModeToggle,
+    onClearAllGeneFocus,
+    onGeneLimitChange,
+    onToggleAllGeneModule,
     onPointerDown,
     onPointerMove,
     onPointerUp,
@@ -313,21 +328,33 @@ export default function TraitProgramGraphCanvas({
     selectedProgram,
     shouldSuppressClick,
     svgHeight,
+    svgViewportHeight,
     svgRef,
     traitCenterY,
     traitDisplayLines,
     traitFontSize,
     traitNodeHeightValue,
     transform,
+    transformAnimationMs = 0,
     visibleSides,
     zoomIn,
     zoomOut,
 }) {
     const graphViewportRef = useRef(null);
     const layout = graphLayout;
-    const exportStem = sanitizeFileNamePart(exportFileName || 'trait-program-gene');
-    const exportSuffix = isFullGraph ? 'full' : 'compact';
-    const renderMaxWidth = isFullGraph ? GRAPH_RENDER_MAX_WIDTH.full : GRAPH_RENDER_MAX_WIDTH.compact;
+    const exportStem = sanitizeFileNamePart(exportFileName || 'trait-gene-association-map');
+    const exportSuffix = geneLimit === Number.POSITIVE_INFINITY ? 'all_overview' : `genes_${geneLimit}`;
+    const renderMaxWidth = graphLayout.mode === 'full' ? GRAPH_RENDER_MAX_WIDTH.full : GRAPH_RENDER_MAX_WIDTH.compact;
+    const displayGeneLimit = geneLimit;
+    const displayGeneLimitLabel = displayGeneLimit === Number.POSITIVE_INFINITY
+        ? (graphLayout.allGeneLabelCount || graphLayout.defaultMaxGenes || 5)
+        : displayGeneLimit;
+    const isAllGeneMode = geneLimit === Number.POSITIVE_INFINITY;
+    const allGeneFocusActive = isAllGeneMode && Boolean(expandedAllGeneModuleKey);
+    const isFocusedAllGeneModule = useCallback(
+        (module) => allGeneFocusActive && module?.allGeneModuleKey === expandedAllGeneModuleKey,
+        [allGeneFocusActive, expandedAllGeneModuleKey],
+    );
 
     useEffect(() => {
         const element = graphViewportRef.current;
@@ -343,6 +370,25 @@ export default function TraitProgramGraphCanvas({
             element.removeEventListener('wheel', handleWheel);
         };
     }, []);
+
+    const handlePlotBlankClick = useCallback((event) => {
+        const target = event.target;
+        const clickedInteractiveElement = target?.closest?.('[data-graph-clickable="true"]');
+        const clickedGraphControl = target?.closest?.('[data-graph-control="true"]');
+
+        if (clickedInteractiveElement || clickedGraphControl || shouldSuppressClick()) return;
+        clearSelection();
+        onClearAllGeneFocus?.();
+    }, [clearSelection, onClearAllGeneFocus, shouldSuppressClick]);
+
+    const handleProgramModuleClick = useCallback((module) => {
+        if (shouldSuppressClick()) return;
+        if (isAllGeneMode && module?.allGeneOverview) {
+            onToggleAllGeneModule?.(module.allGeneModuleKey, module);
+            return;
+        }
+        onSelectProgram(module.program, module.side);
+    }, [isAllGeneMode, onSelectProgram, onToggleAllGeneModule, shouldSuppressClick]);
 
     const renderGeneColumns = useCallback(({
         columns,
@@ -457,6 +503,439 @@ export default function TraitProgramGraphCanvas({
         );
     }, [layout, onOpenGene, onSelectGene, selectedGeneKey, selectedProgram]);
 
+    const renderGeneOverview = useCallback(({
+        genes,
+        x,
+        y,
+        width,
+        height,
+        selectedProgramName,
+        titleRows = 1,
+        forceMuted = false,
+    }) => {
+        const columns = splitGenesByEffect(genes || []);
+        const tightOverview = height <= 104;
+        const headerHeight = tightOverview
+            ? Math.min(42, Math.max(34, layout.geneHeaderH - 8))
+            : titleRows > 1 ? layout.geneHeaderHTall : layout.geneHeaderH;
+        const contentY = y + headerHeight + (tightOverview ? 5 : 8);
+        const contentH = Math.max(tightOverview ? 34 : 56, height - headerHeight - (tightOverview ? 12 : 16));
+        const laneInsetX = tightOverview ? 14 : 18;
+        const laneX = x + laneInsetX;
+        const laneGap = tightOverview ? 6 : 8;
+        const laneW = tightOverview
+            ? Math.max(58, (width - (laneInsetX * 2) - laneGap) / 2)
+            : Math.max(40, width - (laneInsetX * 2));
+        const laneH = tightOverview
+            ? Math.max(30, contentH)
+            : Math.max(28, (contentH - laneGap) / 2);
+        const lanes = [
+            { key: 'left', label: 'Effect +', genes: columns.left, color: EFFECT_COLORS.positive },
+            { key: 'right', label: 'Effect -', genes: columns.right, color: EFFECT_COLORS.negative },
+        ];
+
+        const renderLane = (lane, index) => {
+            const laneY = tightOverview ? contentY : contentY + (index * (laneH + laneGap));
+            const currentLaneX = tightOverview ? laneX + (index * (laneW + laneGap)) : laneX;
+            const plotX = tightOverview ? currentLaneX + 8 : currentLaneX + 78;
+            const plotY = tightOverview ? laneY + 20 : laneY + 6;
+            const plotW = Math.max(tightOverview ? 24 : 24, laneW - (tightOverview ? 16 : 88));
+            const plotH = Math.max(tightOverview ? 10 : 18, laneH - (tightOverview ? 25 : 12));
+            const geneCount = lane.genes.length;
+
+            if (forceMuted) {
+                const segmentCount = Math.min(10, Math.max(1, Math.ceil(Math.sqrt(Math.max(geneCount, 1)))));
+                const segmentGap = tightOverview ? 2 : 3;
+                const segmentW = Math.max(2, (plotW - ((segmentCount - 1) * segmentGap)) / segmentCount);
+                const segmentH = Math.max(4, Math.min(tightOverview ? 9 : 13, plotH * 0.55));
+
+                return (
+                    <g key={lane.key}>
+                        <rect
+                            x={currentLaneX}
+                            y={laneY}
+                            width={laneW}
+                            height={laneH}
+                            rx="6"
+                            fill="rgba(15,23,42,0.018)"
+                            stroke="rgba(15,23,42,0.055)"
+                        />
+                        <text
+                            x={currentLaneX + 8}
+                            y={laneY + (tightOverview ? 13 : 15)}
+                            fontSize={tightOverview ? 10 : 12}
+                            fontWeight="820"
+                            fill="#94a3b8"
+                        >
+                            {lane.label}
+                        </text>
+                        <text
+                            x={tightOverview ? currentLaneX + laneW - 8 : currentLaneX + 9}
+                            y={laneY + (tightOverview ? 13 : 29)}
+                            textAnchor={tightOverview ? 'end' : 'start'}
+                            fontSize={tightOverview ? 10 : 10}
+                            fontWeight="740"
+                            fill="#94a3b8"
+                            fontVariant="tabular-nums"
+                        >
+                            {tightOverview ? geneCount : `${geneCount} genes`}
+                        </text>
+                        <g opacity={geneCount ? 0.48 : 0.18}>
+                            {Array.from({ length: segmentCount }, (_item, segmentIndex) => (
+                                <rect
+                                    key={`${lane.key}:density:${segmentIndex}`}
+                                    x={plotX + (segmentIndex * (segmentW + segmentGap))}
+                                    y={plotY + ((plotH - segmentH) / 2)}
+                                    width={segmentW}
+                                    height={segmentH}
+                                    rx="2"
+                                    fill={lane.color}
+                                    fillOpacity={0.25 + (segmentIndex / Math.max(1, segmentCount - 1)) * 0.28}
+                                    pointerEvents="none"
+                                />
+                            ))}
+                        </g>
+                    </g>
+                );
+            }
+
+            const sortedGenes = [...lane.genes].sort((a, b) => (b.absGamma || 0) - (a.absGamma || 0));
+            const gridCols = Math.max(
+                1,
+                Math.ceil(Math.sqrt(Math.max(sortedGenes.length, 1) * (plotW / Math.max(plotH, 1)))),
+            );
+            const gridRows = Math.max(1, Math.ceil(Math.max(sortedGenes.length, 1) / gridCols));
+            const cell = Math.max(
+                tightOverview ? 1.2 : 1.5,
+                Math.min(tightOverview ? 4.6 : 6, Math.min(plotW / gridCols, plotH / gridRows) - 0.6),
+            );
+            const xStep = plotW / Math.max(gridCols, 1);
+            const yStep = plotH / Math.max(gridRows, 1);
+            const markerOpacity = sortedGenes.length > 140 ? 0.58 : sortedGenes.length > 70 ? 0.68 : 0.82;
+            const markerFill = (gene) => {
+                const abs = Math.min(Math.abs(gene.absGamma || gene.postMean || 0), 6);
+                if (abs > 3) return lane.color;
+                return abs > 1.5 ? `${lane.color}CC` : `${lane.color}99`;
+            };
+
+            return (
+                <g key={lane.key}>
+                    <rect
+                        x={currentLaneX}
+                        y={laneY}
+                        width={laneW}
+                        height={laneH}
+                        rx="6"
+                        fill="rgba(15,23,42,0.035)"
+                        stroke="rgba(15,23,42,0.08)"
+                    />
+                    <text
+                        x={currentLaneX + 8}
+                        y={laneY + (tightOverview ? 13 : 15)}
+                        fontSize={tightOverview ? 10 : 12}
+                        fontWeight="850"
+                        fill={lane.color}
+                    >
+                        {lane.label}
+                    </text>
+                    <text
+                        x={tightOverview ? currentLaneX + laneW - 8 : currentLaneX + 9}
+                        y={laneY + (tightOverview ? 13 : 29)}
+                        textAnchor={tightOverview ? 'end' : 'start'}
+                        fontSize={tightOverview ? 10 : 10}
+                        fontWeight="750"
+                        fill="#64748b"
+                        fontVariant="tabular-nums"
+                    >
+                        {tightOverview ? geneCount : `${geneCount} genes`}
+                    </text>
+                    {sortedGenes.map((gene, geneIndex) => {
+                        const geneMatched = Boolean(selectedGeneKey) && gene.highlightKey === selectedGeneKey;
+                        const geneProgramSelected = selectedProgram === selectedProgramName;
+                        const geneMuted = (Boolean(selectedProgram) && !geneProgramSelected)
+                            || (Boolean(selectedGeneKey) && !geneMatched);
+                        const col = geneIndex % gridCols;
+                        const row = Math.floor(geneIndex / gridCols);
+                        const markerX = plotX + (col * xStep) + ((xStep - cell) / 2);
+                        const markerY = plotY + (row * yStep) + ((yStep - cell) / 2);
+                        return (
+                            <rect
+                                key={`${gene.id}:overview:${lane.key}:${geneIndex}`}
+                                x={markerX}
+                                y={markerY}
+                                width={cell}
+                                height={cell}
+                                rx={cell < 3 ? 0.4 : 1}
+                                fill={geneMuted ? '#cbd5e1' : markerFill(gene)}
+                                fillOpacity={geneMatched ? 1 : geneMuted ? 0.35 : markerOpacity}
+                                stroke={geneMatched ? '#111827' : 'transparent'}
+                                strokeWidth={geneMatched ? Math.max(1, cell * 0.35) : 0}
+                                pointerEvents="none"
+                            />
+                        );
+                    })}
+                </g>
+            );
+        };
+
+        return (
+            <g>
+                {lanes.map(renderLane)}
+            </g>
+        );
+    }, [layout, selectedGeneKey, selectedProgram]);
+
+    const renderAllGeneDetailPanel = useCallback(({
+        module,
+        x,
+        y,
+        width,
+        height,
+        selectedProgramName,
+    }) => {
+        const groups = allGeneDetailGroups(module.allGenes || []);
+        const totalGenes = groups.reduce((sum, group) => sum + group.genes.length, 0);
+        const paddingX = layout.allGeneDetailPaddingX ?? 14;
+        const paddingY = layout.allGeneDetailPaddingY ?? 12;
+        const headerH = layout.allGeneDetailHeaderH ?? 58;
+        const groupHeaderH = layout.allGeneDetailGroupHeaderH ?? 24;
+        const rowH = layout.allGeneDetailRowH ?? 24;
+        const cellGap = layout.allGeneDetailCellGap ?? 8;
+        const groupGap = layout.allGeneDetailGroupGap ?? 12;
+        const columnCount = allGeneDetailColumnCount(width, layout);
+        const contentX = x + paddingX;
+        const contentW = width - (paddingX * 2);
+        const cellW = Math.max(72, (contentW - ((columnCount - 1) * cellGap)) / columnCount);
+        const titleLines = programDisplayLines(module, module.side === 'regulator' ? layout.rightProgramLabelChars : layout.leftProgramLabelChars);
+        const nodeColor = programColor(module);
+        const isProgramSelected = selectedProgram === selectedProgramName;
+        const hasGeneSelection = Boolean(selectedGeneKey);
+        const moduleGeneMatches = hasGeneSelection && module.filteredGeneKeys.includes(selectedGeneKey);
+        const panelMuted = (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
+        const panelOriginX = x + (width / 2);
+        const panelOriginY = y + Math.min(height, 96);
+        let cursorY = y + paddingY + headerH;
+
+        return (
+            <g
+                className="all-gene-expanded-panel"
+                data-graph-clickable="true"
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                    transform: 'scale(1)',
+                    transformOrigin: `${panelOriginX}px ${panelOriginY}px`,
+                    transformBox: 'view-box',
+                    transition: 'transform 360ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease',
+                    animation: 'allGenePanelSettle 360ms cubic-bezier(0.22, 1, 0.36, 1) both',
+                }}
+            >
+                <rect
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    rx="8"
+                    fill="#fff"
+                    stroke={nodeColor}
+                    strokeWidth="2.8"
+                    opacity={panelMuted ? 0.62 : 1}
+                    style={{ transition: 'height 220ms ease, opacity 180ms ease' }}
+                />
+                <rect
+                    x={x}
+                    y={y}
+                    width="14"
+                    height={height}
+                    rx="8"
+                    fill={nodeColor}
+                    fillOpacity={panelMuted ? 0.34 : 0.94}
+                    pointerEvents="none"
+                />
+                <rect
+                    x={x + 14}
+                    y={y + 9}
+                    width={width - 28}
+                    height={headerH - 14}
+                    rx="6"
+                    fill="rgba(15,23,42,0.045)"
+                    pointerEvents="none"
+                />
+                {titleLines.map((line, index) => (
+                    <text
+                        key={`${line}:${index}`}
+                        x={x + 30}
+                        y={y + 27 + (index * 17)}
+                        fontSize={titleLines.length > 1 ? 13 : 15}
+                        fontWeight="850"
+                        fill="#111827"
+                    >
+                        {line}
+                    </text>
+                ))}
+                <text
+                    x={x + width - 28}
+                    y={y + 33}
+                    textAnchor="end"
+                    fontSize="12"
+                    fontWeight="800"
+                    fill="#475467"
+                    fontVariant="tabular-nums"
+                >
+                    {totalGenes} genes
+                </text>
+                <rect
+                    x={x + 14}
+                    y={y + 9}
+                    width={width - 28}
+                    height={headerH - 14}
+                    rx="6"
+                    fill="transparent"
+                    data-graph-clickable="true"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        handleProgramModuleClick(module);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                >
+                    <title>{formatProgramTooltip(module)}</title>
+                </rect>
+                {groups.length === 0 ? (
+                    <text
+                        x={contentX}
+                        y={y + paddingY + headerH + 32}
+                        fontSize="13"
+                        fontWeight="720"
+                        fill="#667085"
+                    >
+                        No overlapping genes
+                    </text>
+                ) : (
+                    <g
+                        opacity="1"
+                        style={{
+                            animation: 'allGeneContentFade 360ms cubic-bezier(0.22, 1, 0.36, 1) both',
+                        }}
+                    >
+                        {groups.map((group, groupIndex) => {
+                    const rows = Math.ceil(group.genes.length / columnCount);
+                    const groupH = groupHeaderH + (rows * rowH);
+                    const groupY = cursorY + (groupIndex > 0 ? groupGap : 0);
+                    cursorY = groupY + groupH;
+
+                    return (
+                        <g key={`${module.program}:${module.side}:${group.key}`}>
+                            <rect
+                                x={contentX}
+                                y={groupY}
+                                width={contentW}
+                                height={groupH}
+                                rx="7"
+                                fill={`${group.color}0D`}
+                                stroke={`${group.color}36`}
+                                strokeWidth="1.2"
+                                pointerEvents="none"
+                            />
+                            <rect
+                                x={contentX}
+                                y={groupY}
+                                width={contentW}
+                                height={groupHeaderH}
+                                rx="7"
+                                fill={`${group.color}18`}
+                                pointerEvents="none"
+                            />
+                            <text
+                                x={contentX + 12}
+                                y={groupY + 16}
+                                fontSize="12"
+                                fontWeight="850"
+                                fill={group.color}
+                            >
+                                {group.label}
+                            </text>
+                            <text
+                                x={contentX + contentW - 12}
+                                y={groupY + 16}
+                                textAnchor="end"
+                                fontSize="11"
+                                fontWeight="780"
+                                fill="#64748b"
+                                fontVariant="tabular-nums"
+                            >
+                                {group.genes.length}
+                            </text>
+                            {group.genes.map((gene, geneIndex) => {
+                                const col = geneIndex % columnCount;
+                                const row = Math.floor(geneIndex / columnCount);
+                                const cellX = contentX + (col * (cellW + cellGap));
+                                const cellY = groupY + groupHeaderH + (row * rowH) + 3;
+                                const geneMatched = Boolean(selectedGeneKey) && gene.highlightKey === selectedGeneKey;
+                                const geneProgramSelected = selectedProgram === selectedProgramName;
+                                const geneMuted = (Boolean(selectedProgram) && !geneProgramSelected) || (Boolean(selectedGeneKey) && !geneMatched);
+                                const color = effectColorFromGene(gene);
+                                const label = displayGeneLabel(gene);
+                                const maxChars = Math.max(8, Math.floor((cellW - 18) / 7.2));
+                                const fittedLabel = label.length > maxChars ? `${label.slice(0, Math.max(1, maxChars - 3))}...` : label;
+
+                                return (
+                                    <g
+                                        key={`${gene.id}:${group.key}:all-expanded:${geneIndex}`}
+                                        data-graph-clickable="true"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            onSelectGene(gene);
+                                        }}
+                                        onDoubleClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            onOpenGene?.(gene);
+                                        }}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <rect
+                                            x={cellX}
+                                            y={cellY}
+                                            width={cellW}
+                                            height={rowH - 6}
+                                            rx="4"
+                                            fill={geneMatched ? `${color}1F` : '#fff'}
+                                            stroke={geneMatched ? '#111827' : `${color}3B`}
+                                            strokeWidth={geneMatched ? 1.8 : 1}
+                                            opacity={geneMuted ? 0.42 : 1}
+                                            style={{ transition: 'opacity 160ms ease, stroke 160ms ease, fill 160ms ease' }}
+                                        />
+                                        <rect
+                                            x={cellX + 5}
+                                            y={cellY + 5}
+                                            width="5"
+                                            height={rowH - 16}
+                                            rx="2"
+                                            fill={color}
+                                            opacity={geneMuted ? 0.48 : 0.95}
+                                            pointerEvents="none"
+                                        />
+                                        <text
+                                            x={cellX + 16}
+                                            y={cellY + ((rowH - 6) / 2)}
+                                            dominantBaseline="middle"
+                                            fontSize="11.5"
+                                            fontWeight={geneMatched ? 880 : 760}
+                                            fill={geneMuted ? '#94a3b8' : color}
+                                        >
+                                            {fittedLabel}
+                                        </text>
+                                    </g>
+                                );
+                            })}
+                        </g>
+                    );
+                        })}
+                    </g>
+                )}
+            </g>
+        );
+    }, [handleProgramModuleClick, layout, onOpenGene, onSelectGene, selectedGeneKey, selectedProgram]);
+
     const renderRegulatorGeneList = useCallback(({ genes, x, y, selectedProgramName }) => {
         const rowStartY = y + layout.geneHeaderH + (layout.geneRowH / 2);
         const textX = x + 28;
@@ -506,13 +985,20 @@ export default function TraitProgramGraphCanvas({
     const renderLeftProgramModule = useCallback((module) => {
         if (!visibleSides.has(module.side)) return null;
 
+        const isCollapsedAllOverview = module.allGeneOverview && !module.allGeneExpanded;
+        const programBoxX = layout.leftProgramX;
+        const programBoxW = isCollapsedAllOverview
+            ? (layout.allGeneOverviewProgramW || layout.leftProgramW)
+            : layout.leftProgramW;
         const score = module.programScore;
         const direction = directionFromSign(module.programTraitSign, score);
         const isProgramSelected = selectedProgram === module.program;
         const hasGeneSelection = Boolean(selectedGeneKey);
         const moduleGeneMatches = hasGeneSelection && module.filteredGeneKeys.includes(selectedGeneKey);
-        const edgeHighlighted = isProgramSelected || moduleGeneMatches;
-        const muted = (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
+        const allGeneFocused = isFocusedAllGeneModule(module);
+        const allGeneMuted = allGeneFocusActive && !allGeneFocused;
+        const edgeHighlighted = isProgramSelected || moduleGeneMatches || allGeneFocused;
+        const muted = allGeneMuted || (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
         const edgeStyle = computeEdgeStyle(score, edgeHighlighted, muted);
         const centerY = module.yCenter;
         const traitLeftX = layout.traitCenterX - (layout.traitNodeW / 2);
@@ -521,10 +1007,103 @@ export default function TraitProgramGraphCanvas({
         const titleLines = programDisplayLines(module, layout.leftProgramLabelChars);
         const nodeColor = programColor(module);
 
+        if (allGeneMuted) {
+            return (
+                <g
+                    key={`${module.program}:program`}
+                    opacity="0.2"
+                    style={{ transition: 'opacity 160ms ease' }}
+                >
+                    <ArrowOrCap
+                        x1={programBoxX + programBoxW}
+                        y1={centerY}
+                        x2={traitLeftX}
+                        y2={traitTargetY}
+                        color={edgeColorFromSign(module.programTraitSign, score)}
+                        direction={direction}
+                        opacity={0.32}
+                        width={2.2}
+                    />
+
+                    <g
+                        data-graph-clickable="true"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            handleProgramModuleClick(module);
+                        }}
+                        onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            onOpenProgram?.(module.program);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        <rect
+                            x={programBoxX}
+                            y={module.yTop}
+                            width={programBoxW}
+                            height={boxHeight}
+                            rx="6"
+                            fill="#fff"
+                            fillOpacity="0.74"
+                            stroke={nodeColor}
+                            strokeOpacity="0.62"
+                            strokeWidth="2.2"
+                        />
+                        <rect
+                            x={programBoxX}
+                            y={module.yTop}
+                            width="10"
+                            height={boxHeight}
+                            rx="6"
+                            fill={nodeColor}
+                            fillOpacity="0.62"
+                            pointerEvents="none"
+                        />
+                        {titleLines.map((line, index) => (
+                            <text
+                                key={line}
+                                x={programBoxX + (programBoxW / 2)}
+                                y={centeredLineY(
+                                    module.yTop,
+                                    Math.min(boxHeight, layout.geneHeaderH),
+                                    titleLines.length,
+                                    Math.max(16, layout.leftProgramTitleStep - 4),
+                                    index,
+                                )}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                fontSize={Math.max(15, layout.leftProgramTitleFontSize - 5)}
+                                fontWeight="780"
+                                fill="#64748b"
+                            >
+                                {line}
+                            </text>
+                        ))}
+                        <text
+                            x={programBoxX + programBoxW - 14}
+                            y={module.yTop + boxHeight - 12}
+                            textAnchor="end"
+                            fontSize="11"
+                            fontWeight="760"
+                            fill="#94a3b8"
+                            fontVariant="tabular-nums"
+                        >
+                            {module.totalFilteredGenes}
+                        </text>
+                        <title>{formatProgramTooltip(module)}</title>
+                    </g>
+                </g>
+            );
+        }
+
         return (
-            <g key={`${module.program}:program`}>
+            <g
+                key={`${module.program}:program`}
+                opacity={allGeneMuted ? 0.22 : 1}
+                style={{ transition: 'opacity 180ms ease' }}
+            >
                 <ArrowOrCap
-                    x1={layout.leftProgramX + layout.leftProgramW}
+                    x1={programBoxX + programBoxW}
                     y1={centerY}
                     x2={traitLeftX}
                     y2={traitTargetY}
@@ -536,7 +1115,10 @@ export default function TraitProgramGraphCanvas({
 
                 <g
                     data-graph-clickable="true"
-                    onClick={() => onSelectProgram(module.program, module.side)}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        handleProgramModuleClick(module);
+                    }}
                     onDoubleClick={(event) => {
                         event.stopPropagation();
                         onOpenProgram?.(module.program);
@@ -544,9 +1126,9 @@ export default function TraitProgramGraphCanvas({
                     style={{ cursor: 'pointer' }}
                 >
                     <rect
-                        x={layout.leftProgramX}
+                        x={programBoxX}
                         y={module.yTop}
-                        width={layout.leftProgramW}
+                        width={programBoxW}
                         height={boxHeight}
                         rx="6"
                         fill={nodeColor}
@@ -555,7 +1137,7 @@ export default function TraitProgramGraphCanvas({
                         strokeWidth={isProgramSelected ? 3.2 : 2.6}
                     />
                     <rect
-                        x={layout.leftProgramX}
+                        x={programBoxX}
                         y={module.yTop}
                         width="12"
                         height={boxHeight}
@@ -567,7 +1149,7 @@ export default function TraitProgramGraphCanvas({
                     {titleLines.map((line, index) => (
                         <text
                             key={line}
-                            x={layout.leftProgramX + (layout.leftProgramW / 2)}
+                            x={programBoxX + (programBoxW / 2)}
                             y={layout.geneBoxStyle === 'legacy'
                                 ? module.yTop + 31 + (index * layout.leftProgramTitleStep)
                                 : centeredLineY(
@@ -588,7 +1170,7 @@ export default function TraitProgramGraphCanvas({
                     ))}
                     {module.collapsed ? (
                         <text
-                            x={layout.leftProgramX + 16}
+                            x={programBoxX + 16}
                             y={layout.geneBoxStyle === 'legacy' ? module.yTop + 58 : module.yTop + (boxHeight / 2)}
                             dominantBaseline={layout.geneBoxStyle === 'legacy' ? undefined : 'middle'}
                             fontSize="18"
@@ -596,11 +1178,29 @@ export default function TraitProgramGraphCanvas({
                         >
                             {module.emptyReason || 'No overlap'}
                         </text>
+                    ) : module.allGeneOverview ? (
+                        module.allGeneExpanded ? renderAllGeneDetailPanel({
+                            module,
+                            x: layout.leftProgramX,
+                            y: module.yTop,
+                            width: module.allGeneDetailPanelWidth || layout.leftProgramW,
+                            height: boxHeight,
+                            selectedProgramName: module.program,
+                        }) : renderGeneOverview({
+                            genes: module.allGenes,
+                            x: programBoxX,
+                            y: module.yTop,
+                            width: programBoxW,
+                            height: boxHeight,
+                            selectedProgramName: module.program,
+                            titleRows: titleLines.length,
+                            forceMuted: muted,
+                        })
                     ) : renderGeneColumns({
                         columns: module.geneColumns,
-                        x: layout.leftProgramX,
+                        x: programBoxX,
                         y: module.yTop,
-                        width: layout.leftProgramW,
+                        width: programBoxW,
                         height: boxHeight,
                         textAnchor: 'start',
                         selectedProgramName: module.program,
@@ -613,8 +1213,12 @@ export default function TraitProgramGraphCanvas({
     }, [
         leftLayout.modules.length,
         layout,
+        handleProgramModuleClick,
+        allGeneFocusActive,
+        isFocusedAllGeneModule,
         onOpenProgram,
-        onSelectProgram,
+        renderAllGeneDetailPanel,
+        renderGeneOverview,
         renderGeneColumns,
         selectedGeneKey,
         selectedProgram,
@@ -627,12 +1231,22 @@ export default function TraitProgramGraphCanvas({
         const isProgramSelected = selectedProgram === module.program;
         const hasGeneSelection = Boolean(selectedGeneKey);
         const moduleGeneMatches = hasGeneSelection && group.genes.some((gene) => gene.highlightKey === selectedGeneKey);
-        const muted = (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
+        const allGeneFocused = isFocusedAllGeneModule(module);
+        const allGeneMuted = allGeneFocusActive && !allGeneFocused;
+        const muted = allGeneMuted || (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
         const groupColor = group.sign === 'negative' ? EFFECT_COLORS.negative : EFFECT_COLORS.positive;
+        const allModeGroupClickProps = module.allGeneOverview ? {
+            'data-graph-clickable': 'true',
+            onClick: (event) => {
+                event.stopPropagation();
+                handleProgramModuleClick(module);
+            },
+            style: { cursor: 'pointer' },
+        } : {};
 
         if (layout.regulatorGroupStyle === 'legacy') {
             return (
-                <g key={`${module.program}:regulator:${group.key}`}>
+                <g key={`${module.program}:regulator:${group.key}`} {...allModeGroupClickProps}>
                     <rect
                         x={x}
                         y={yTop}
@@ -647,7 +1261,16 @@ export default function TraitProgramGraphCanvas({
                     <text x={x + 14} y={yTop + 28} fontSize="24" fontWeight="900" fill={groupColor}>
                         {group.title}
                     </text>
-                    {group.genes.length ? renderGeneColumns({
+                    {group.genes.length && module.allGeneOverview ? renderGeneOverview({
+                        genes: group.genes,
+                        x,
+                        y: yTop,
+                        width,
+                        height,
+                        selectedProgramName: module.program,
+                        forceMuted: muted,
+                    }) : null}
+                    {group.genes.length && !module.allGeneOverview ? renderGeneColumns({
                         columns: splitGenesByEffect(group.genes),
                         x,
                         y: yTop,
@@ -665,7 +1288,7 @@ export default function TraitProgramGraphCanvas({
         const groupHeaderFill = `rgba(${groupRgb},0.16)`;
 
         return (
-            <g key={`${module.program}:regulator:${group.key}`}>
+            <g key={`${module.program}:regulator:${group.key}`} {...allModeGroupClickProps}>
                 <rect
                     x={x}
                     y={yTop}
@@ -716,7 +1339,18 @@ export default function TraitProgramGraphCanvas({
                 >
                     {group.title}
                 </text>
-                {group.genes.length && layout.regulatorGeneLayout === 'single'
+                {group.genes.length && module.allGeneOverview
+                    ? renderGeneOverview({
+                        genes: group.genes,
+                        x,
+                        y: yTop,
+                        width,
+                        height,
+                        selectedProgramName: module.program,
+                        forceMuted: muted,
+                    })
+                    : null}
+                {group.genes.length && !module.allGeneOverview && layout.regulatorGeneLayout === 'single'
                     ? renderRegulatorGeneList({
                         genes: group.genes,
                         x,
@@ -724,7 +1358,7 @@ export default function TraitProgramGraphCanvas({
                         selectedProgramName: module.program,
                     })
                     : null}
-                {group.genes.length && layout.regulatorGeneLayout !== 'single'
+                {group.genes.length && !module.allGeneOverview && layout.regulatorGeneLayout !== 'single'
                     ? renderGeneColumns({
                         columns: splitGenesByEffect(group.genes),
                         x,
@@ -737,35 +1371,288 @@ export default function TraitProgramGraphCanvas({
                     : null}
             </g>
         );
-    }, [layout, renderGeneColumns, renderRegulatorGeneList, selectedGeneKey, selectedProgram]);
+    }, [
+        allGeneFocusActive,
+        handleProgramModuleClick,
+        isFocusedAllGeneModule,
+        layout,
+        renderGeneColumns,
+        renderGeneOverview,
+        renderRegulatorGeneList,
+        selectedGeneKey,
+        selectedProgram,
+    ]);
 
     const renderRightProgramModule = useCallback((module) => {
         if (!visibleSides.has(module.side)) return null;
 
+        const isCollapsedAllOverview = module.allGeneOverview && !module.allGeneExpanded;
+        const programBoxX = layout.rightProgramX;
+        const programBoxW = isCollapsedAllOverview
+            ? (layout.allGeneOverviewRightProgramW || layout.rightProgramW)
+            : layout.rightProgramW;
+        const regulatorBoxW = isCollapsedAllOverview
+            ? (layout.allGeneOverviewRegulatorW || layout.rightRegulatorW)
+            : layout.rightRegulatorW;
         const regulatorScore = module.regulatorScore;
         const isProgramSelected = selectedProgram === module.program;
         const hasGeneSelection = Boolean(selectedGeneKey);
         const moduleGeneMatches = hasGeneSelection && module.filteredGeneKeys.includes(selectedGeneKey);
-        const edgeHighlighted = isProgramSelected || moduleGeneMatches;
-        const muted = (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
+        const allGeneFocused = isFocusedAllGeneModule(module);
+        const allGeneMuted = allGeneFocusActive && !allGeneFocused;
+        const edgeHighlighted = isProgramSelected || moduleGeneMatches || allGeneFocused;
+        const muted = allGeneMuted || (Boolean(selectedProgram) && !isProgramSelected) || (hasGeneSelection && !moduleGeneMatches);
         const programScore = module.programScore;
         const programEdgeStyle = computeEdgeStyle(programScore, edgeHighlighted, muted);
-        const programY = module.yCenter;
+        const programY = module.allGeneExpanded ? module.yTop + (layout.rightProgramH / 2) : module.yCenter;
         const programBoxY = programY - (layout.rightProgramH / 2);
         const traitRightX = layout.traitCenterX + (layout.traitNodeW / 2);
         const traitTargetY = traitCenterY + traitPortY(module.layoutIndex, rightLayout.modules.length, traitNodeHeightValue);
         const programLines = programDisplayLines(module, layout.rightProgramLabelChars);
         const nodeColor = programColor(module);
         const regulatorGroups = module.regulatorGroups || [];
+
+        if (allGeneMuted) {
+            const regulatorGhostH = Math.max(
+                layout.rightProgramH + 20,
+                Math.min(module.height, regulatorGroups.length
+                    ? regulatorGroups.reduce((sum, group, index) => (
+                        sum
+                        + (module.regulatorGroupHeights?.[group.key] || layout.allGeneRegulatorGroupH || 92)
+                        + (index > 0 ? Math.min(layout.regulatorGroupGap, 10) : 0)
+                    ), 0)
+                    : (layout.allGeneRegulatorGroupH || 92)),
+            );
+            const regulatorGhostY = module.yTop + ((module.height - regulatorGhostH) / 2);
+            const regulatorGhostCenterY = regulatorGhostY + (regulatorGhostH / 2);
+
+            return (
+                <g
+                    key={`${module.program}:regulator`}
+                    opacity="0.2"
+                    style={{ transition: 'opacity 160ms ease' }}
+                >
+                    <ArrowOrCap
+                        x1={programBoxX}
+                        y1={programY}
+                        x2={traitRightX}
+                        y2={traitTargetY}
+                        color={edgeColorFromSign(module.programTraitSign, programScore)}
+                        direction={directionFromSign(module.programTraitSign, programScore)}
+                        opacity={0.32}
+                        width={2.2}
+                    />
+                    <line
+                        x1={layout.rightRegulatorX}
+                        y1={regulatorGhostCenterY}
+                        x2={programBoxX + programBoxW}
+                        y2={programY}
+                        stroke={edgeColorFromSign(module.regulatorProgramSign, regulatorScore)}
+                        strokeWidth="2"
+                        strokeOpacity="0.22"
+                        strokeLinecap="round"
+                    />
+                    <g
+                        data-graph-clickable="true"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            handleProgramModuleClick(module);
+                        }}
+                        onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            onOpenProgram?.(module.program);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        <rect
+                            x={programBoxX}
+                            y={programBoxY}
+                            width={programBoxW}
+                            height={layout.rightProgramH}
+                            rx="5"
+                            fill="#fff"
+                            fillOpacity="0.74"
+                            stroke={nodeColor}
+                            strokeOpacity="0.62"
+                            strokeWidth="2.1"
+                        />
+                        <rect
+                            x={programBoxX}
+                            y={programBoxY}
+                            width="10"
+                            height={layout.rightProgramH}
+                            rx="5"
+                            fill={nodeColor}
+                            fillOpacity="0.62"
+                            pointerEvents="none"
+                        />
+                        {programLines.map((line, index) => (
+                            <text
+                                key={line}
+                                x={programBoxX + (programBoxW / 2)}
+                                y={centeredLineY(
+                                    programBoxY,
+                                    layout.rightProgramH,
+                                    programLines.length,
+                                    Math.max(15, layout.rightProgramTitleStep - 4),
+                                    index,
+                                )}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                fontSize={Math.max(14, layout.rightProgramTitleFontSize - 5)}
+                                fontWeight="780"
+                                fill="#64748b"
+                            >
+                                {line}
+                            </text>
+                        ))}
+                        <rect
+                            x={layout.rightRegulatorX}
+                            y={regulatorGhostY}
+                            width={regulatorBoxW}
+                            height={regulatorGhostH}
+                            rx="7"
+                            fill="#fff"
+                            fillOpacity="0.68"
+                            stroke="#94a3b8"
+                            strokeOpacity="0.45"
+                            strokeWidth="1.8"
+                        />
+                        <rect
+                            x={layout.rightRegulatorX}
+                            y={regulatorGhostY}
+                            width="10"
+                            height={regulatorGhostH}
+                            rx="7"
+                            fill={nodeColor}
+                            fillOpacity="0.42"
+                            pointerEvents="none"
+                        />
+                        <text
+                            x={layout.rightRegulatorX + 24}
+                            y={regulatorGhostY + 25}
+                            fontSize="14"
+                            fontWeight="780"
+                            fill="#64748b"
+                        >
+                            regulator context
+                        </text>
+                        <text
+                            x={layout.rightRegulatorX + regulatorBoxW - 14}
+                            y={regulatorGhostY + regulatorGhostH - 14}
+                            textAnchor="end"
+                            fontSize="11"
+                            fontWeight="760"
+                            fill="#94a3b8"
+                            fontVariant="tabular-nums"
+                        >
+                            {module.totalFilteredGenes}
+                        </text>
+                        <title>{formatProgramTooltip(module)}</title>
+                    </g>
+                </g>
+            );
+        }
+
+        if (module.allGeneExpanded) {
+            const panelGap = layout.allGeneExpandedPanelGap || 12;
+            const panelY = programBoxY + layout.rightProgramH + panelGap;
+            const panelWidth = module.allGeneDetailPanelWidth || layout.allGeneExpandedRegulatorPanelW || layout.rightRegulatorW;
+
+            return (
+                <g
+                    key={`${module.program}:regulator`}
+                    opacity={allGeneMuted ? 0.22 : 1}
+                    style={{ transition: 'opacity 180ms ease' }}
+                >
+                    <ArrowOrCap
+                        x1={layout.rightProgramX}
+                        y1={programY}
+                        x2={traitRightX}
+                        y2={traitTargetY}
+                        color={edgeColorFromSign(module.programTraitSign, programScore)}
+                        direction={directionFromSign(module.programTraitSign, programScore)}
+                        opacity={programEdgeStyle.opacity}
+                        width={Math.max(2.8, programEdgeStyle.width * 0.82)}
+                    />
+                    <g
+                        data-graph-clickable="true"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            handleProgramModuleClick(module);
+                        }}
+                        onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            onOpenProgram?.(module.program);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        <rect
+                            x={layout.rightProgramX}
+                            y={programBoxY}
+                            width={layout.rightProgramW}
+                            height={layout.rightProgramH}
+                            rx="5"
+                            fill={nodeColor}
+                            fillOpacity={programFillOpacity(module, muted)}
+                            stroke={allGeneFocused ? '#111827' : nodeColor}
+                            strokeWidth={allGeneFocused ? 3.2 : 2.8}
+                        />
+                        <rect
+                            x={layout.rightProgramX}
+                            y={programBoxY}
+                            width="12"
+                            height={layout.rightProgramH}
+                            rx="5"
+                            fill={nodeColor}
+                            fillOpacity={programStripeOpacity(module, muted)}
+                            pointerEvents="none"
+                        />
+                        {programLines.map((line, index) => (
+                            <text
+                                key={line}
+                                x={layout.rightProgramX + (layout.rightProgramW / 2)}
+                                y={centeredLineY(
+                                    programBoxY,
+                                    layout.rightProgramH,
+                                    programLines.length,
+                                    layout.rightProgramTitleStep,
+                                    index,
+                                )}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                fontSize={layout.rightProgramTitleFontSize}
+                                fontWeight="800"
+                                fill="#111"
+                            >
+                                {line}
+                            </text>
+                        ))}
+                        <title>{formatProgramTooltip(module)}</title>
+                    </g>
+                    {renderAllGeneDetailPanel({
+                        module,
+                        x: layout.rightProgramX,
+                        y: panelY,
+                        width: panelWidth,
+                        height: module.allGeneDetailHeight,
+                        selectedProgramName: module.program,
+                    })}
+                </g>
+            );
+        }
+
         let cursorY = module.yTop;
         const groupGap = regulatorGroups.length > 1 ? layout.regulatorGroupGap : 0;
         const groupWidth = regulatorGroups.length > 1 && layout.regulatorGroupLayout === 'horizontal'
-            ? (layout.rightRegulatorW - ((regulatorGroups.length - 1) * groupGap)) / regulatorGroups.length
-            : layout.rightRegulatorW;
+            ? (regulatorBoxW - ((regulatorGroups.length - 1) * groupGap)) / regulatorGroups.length
+            : regulatorBoxW;
         const groupLayouts = regulatorGroups.map((group, index) => {
             const height = module.regulatorGroupHeights?.[group.key] || regulatorGeneBoxHeight(group.genes, layout);
             if (layout.regulatorGroupLayout === 'vertical') {
-                const width = regulatorGeneBoxWidth(group.genes, layout);
+                const width = isCollapsedAllOverview
+                    ? regulatorBoxW
+                    : regulatorGeneBoxWidth(group.genes, layout);
                 const positioned = {
                     ...group,
                     height,
@@ -789,7 +1676,11 @@ export default function TraitProgramGraphCanvas({
         });
 
         return (
-            <g key={`${module.program}:regulator`}>
+            <g
+                key={`${module.program}:regulator`}
+                opacity={allGeneMuted ? 0.22 : 1}
+                style={{ transition: 'opacity 180ms ease' }}
+            >
                 <ArrowOrCap
                     x1={layout.rightProgramX}
                     y1={programY}
@@ -803,10 +1694,12 @@ export default function TraitProgramGraphCanvas({
                 {groupLayouts.map((group, index) => {
                     const bucketDirection = group.sign === 'negative' ? 'flat' : 'arrow';
                     const bucketColor = group.sign === 'negative' ? EFFECT_COLORS.negative : EFFECT_COLORS.positive;
-                    const bucketMagnitude = Math.max(
-                        ...group.genes.map((gene) => Math.abs(toFiniteNumber(gene.membershipScore, 0))),
-                        Math.abs(toFiniteNumber(regulatorScore, 0)),
-                    );
+                    const bucketMagnitude = allGeneMuted
+                        ? Math.abs(toFiniteNumber(regulatorScore, 0))
+                        : Math.max(
+                            ...group.genes.map((gene) => Math.abs(toFiniteNumber(gene.membershipScore, 0))),
+                            Math.abs(toFiniteNumber(regulatorScore, 0)),
+                        );
                     const bucketEdgeStyle = computeEdgeStyle(bucketMagnitude, edgeHighlighted, muted);
 
                     return (
@@ -814,7 +1707,7 @@ export default function TraitProgramGraphCanvas({
                             key={`${module.program}:${group.key}:edge`}
                             x1={group.x}
                             y1={group.centerY}
-                            x2={layout.rightProgramX + layout.rightProgramW}
+                            x2={programBoxX + programBoxW}
                             y2={programY + ((index - ((groupLayouts.length - 1) / 2)) * layout.regulatorEdgeTargetSpacing)}
                             color={bucketColor}
                             direction={bucketDirection}
@@ -826,7 +1719,10 @@ export default function TraitProgramGraphCanvas({
 
                 <g
                     data-graph-clickable="true"
-                    onClick={() => onSelectProgram(module.program, module.side)}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        handleProgramModuleClick(module);
+                    }}
                     onDoubleClick={(event) => {
                         event.stopPropagation();
                         onOpenProgram?.(module.program);
@@ -834,9 +1730,9 @@ export default function TraitProgramGraphCanvas({
                     style={{ cursor: 'pointer' }}
                 >
                     <rect
-                        x={layout.rightProgramX}
+                        x={programBoxX}
                         y={programBoxY}
-                        width={layout.rightProgramW}
+                        width={programBoxW}
                         height={layout.rightProgramH}
                         rx="5"
                         fill={nodeColor}
@@ -845,7 +1741,7 @@ export default function TraitProgramGraphCanvas({
                         strokeWidth={isProgramSelected ? 3.2 : 2.4}
                     />
                     <rect
-                        x={layout.rightProgramX}
+                        x={programBoxX}
                         y={programBoxY}
                         width="12"
                         height={layout.rightProgramH}
@@ -857,7 +1753,7 @@ export default function TraitProgramGraphCanvas({
                     {programLines.map((line, index) => (
                         <text
                             key={line}
-                            x={layout.rightProgramX + (layout.rightProgramW / 2)}
+                            x={programBoxX + (programBoxW / 2)}
                             y={layout.geneBoxStyle === 'legacy'
                                 ? programBoxY + 30 + (index * layout.rightProgramTitleStep)
                                 : centeredLineY(
@@ -890,9 +1786,12 @@ export default function TraitProgramGraphCanvas({
             </g>
         );
     }, [
-        onSelectProgram,
         onOpenProgram,
+        handleProgramModuleClick,
+        allGeneFocusActive,
+        isFocusedAllGeneModule,
         layout,
+        renderAllGeneDetailPanel,
         renderRegulatorGroup,
         rightLayout.modules.length,
         selectedGeneKey,
@@ -901,6 +1800,15 @@ export default function TraitProgramGraphCanvas({
         traitNodeHeightValue,
         visibleSides,
     ]);
+
+    const leftRenderGroups = useMemo(
+        () => splitModulesForFocus(leftLayout.modules, allGeneFocusActive, isFocusedAllGeneModule),
+        [allGeneFocusActive, isFocusedAllGeneModule, leftLayout.modules],
+    );
+    const rightRenderGroups = useMemo(
+        () => splitModulesForFocus(rightLayout.modules, allGeneFocusActive, isFocusedAllGeneModule),
+        [allGeneFocusActive, isFocusedAllGeneModule, rightLayout.modules],
+    );
 
     return (
         <Paper
@@ -926,31 +1834,58 @@ export default function TraitProgramGraphCanvas({
             >
                 <Box>
                     <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: 23, lineHeight: 1.1 }}>
-                        Trait-Program-Gene graph
+                        Gene Association Map
                     </Typography>
                 </Box>
 
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <Button
-                        size="small"
-                        variant={isFullGraph ? 'contained' : 'outlined'}
-                        startIcon={isFullGraph ? <CloseFullscreen /> : <OpenInFull />}
-                        onClick={onGraphViewModeToggle}
-                        sx={{
-                            textTransform: 'none',
-                            fontWeight: 680,
-                            borderRadius: 1,
-                            px: 1.25,
-                            whiteSpace: 'nowrap',
-                        }}
-                    >
-                        {isFullGraph ? 'Compact view' : 'Full view'}
-                    </Button>
+                    {geneLimitOptions.length > 0 && (
+                        <Box
+                            sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.45,
+                                px: 0.6,
+                                py: 0.35,
+                                border: '1px solid rgba(15,23,42,0.12)',
+                                borderRadius: 1,
+                                bgcolor: '#f8fafc',
+                            }}
+                        >
+                            <Typography sx={{ fontSize: 12, color: '#475467', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                Gene display
+                            </Typography>
+                            {geneLimitOptions.map((option) => {
+                                const selected = option.value === geneLimit;
+                                return (
+                                    <Button
+                                        key={option.label}
+                                        size="small"
+                                        variant={selected ? 'contained' : 'text'}
+                                        onClick={() => onGeneLimitChange?.(option.value)}
+                                        sx={{
+                                            minWidth: option.label === 'All' ? 38 : 30,
+                                            px: 0.65,
+                                            py: 0.2,
+                                            borderRadius: 0.75,
+                                            fontSize: 12,
+                                            lineHeight: 1.3,
+                                            textTransform: 'none',
+                                            fontWeight: 760,
+                                            boxShadow: 'none',
+                                        }}
+                                    >
+                                        {option.label}
+                                    </Button>
+                                );
+                            })}
+                        </Box>
+                    )}
                     <Button
                         size="small"
                         variant="outlined"
                         startIcon={<Download />}
-                        onClick={() => svgRef.current && exportSvg(svgRef.current, `${exportStem}_trait_program_gene_${exportSuffix}.svg`)}
+                        onClick={() => svgRef.current && exportSvg(svgRef.current, `${exportStem}_trait_gene_association_map_${exportSuffix}.svg`)}
                         sx={{
                             textTransform: 'none',
                             fontWeight: 680,
@@ -965,7 +1900,7 @@ export default function TraitProgramGraphCanvas({
                         size="small"
                         variant="outlined"
                         startIcon={<Download />}
-                        onClick={() => svgRef.current && exportPng(svgRef.current, `${exportStem}_trait_program_gene_${exportSuffix}.png`)}
+                        onClick={() => svgRef.current && exportPng(svgRef.current, `${exportStem}_trait_gene_association_map_${exportSuffix}.png`)}
                         sx={{
                             textTransform: 'none',
                             fontWeight: 680,
@@ -982,7 +1917,7 @@ export default function TraitProgramGraphCanvas({
                     sx={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 2,
+                        gap: 1.5,
                         flexWrap: 'wrap',
                         width: '100%',
                         mt: 0.75,
@@ -990,9 +1925,6 @@ export default function TraitProgramGraphCanvas({
                         borderTop: '1px solid rgba(15,23,42,0.06)',
                     }}
                 >
-                    <Typography sx={{ fontWeight: 650, color: '#0f172a', fontSize: 13 }}>
-                        Legend
-                    </Typography>
                     {INLINE_LEGEND_GROUPS.map((group) => (
                         <Box key={group.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                             <Typography sx={{ fontSize: 12.5, color: '#475467', fontWeight: 650 }}>
@@ -1008,6 +1940,26 @@ export default function TraitProgramGraphCanvas({
                             ))}
                         </Box>
                     ))}
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.55 }}>
+                        <Typography sx={{ fontSize: 12.5, color: '#475467', fontWeight: 650 }}>
+                            Parentheses:
+                        </Typography>
+                        <Typography sx={{ fontSize: 12.5, color: '#667085', fontWeight: 600 }}>
+                            discordant gene direction
+                        </Typography>
+                    </Box>
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.55, flexWrap: 'wrap' }}>
+                        <Typography sx={{ fontSize: 12.5, color: '#475467', fontWeight: 650 }}>
+                            Display:
+                        </Typography>
+                        <Typography sx={{ fontSize: 12.5, color: '#667085', fontWeight: 600 }}>
+                            {displayGeneLimit === Number.POSITIVE_INFINITY
+                                ? (expandedAllGeneModuleKey
+                                    ? 'showing all genes for selected association context'
+                                    : 'showing all genes as compact overview')
+                                : `showing top ${displayGeneLimitLabel} genes per association context`}
+                        </Typography>
+                    </Box>
                 </Box>
             </Box>
 
@@ -1029,6 +1981,7 @@ export default function TraitProgramGraphCanvas({
                 onPointerCancel={onPointerUp}
                 onPointerLeave={onPointerUp}
                 onWheel={onWheel}
+                onClickCapture={handlePlotBlankClick}
             >
                 <ZoomToolbar
                     scale={transform.scale}
@@ -1047,7 +2000,7 @@ export default function TraitProgramGraphCanvas({
                 <svg
                     ref={svgRef}
                     width="100%"
-                    viewBox={`0 0 ${SVG_WIDTH} ${svgHeight}`}
+                    viewBox={`0 0 ${SVG_WIDTH} ${svgViewportHeight || svgHeight}`}
                     preserveAspectRatio="xMidYMid meet"
                     style={{
                         display: 'block',
@@ -1058,32 +2011,50 @@ export default function TraitProgramGraphCanvas({
                 >
                     <defs>
                         <style>
-                            {'.trait-program-template text{font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;letter-spacing:0}.trait-program-template .section-title{font-size:26px;font-weight:900;fill:#111}.trait-program-template .section-note{font-size:21px;font-weight:900;fill:#111}'}
+                            {'.trait-program-template text{font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;letter-spacing:0}.trait-program-template .section-title{font-size:26px;font-weight:900;fill:#111}.trait-program-template .section-note{font-size:21px;font-weight:900;fill:#111}@keyframes allGenePanelSettle{from{opacity:.88;transform:scale(.988)}to{opacity:1;transform:scale(1)}}@keyframes allGeneContentFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}'}
                         </style>
                     </defs>
 
-                    <g className="trait-program-template" transform={`translate(${transform.x} ${transform.y}) scale(${transform.scale})`}>
-                        <rect x="0" y="0" width={SVG_WIDTH} height={svgHeight} fill="#fff" />
+                    <g
+                        className="trait-program-template"
+                        style={{
+                            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+                            transformOrigin: '0 0',
+                            transformBox: 'view-box',
+                            transition: isTransformAnimating
+                                ? `transform ${Math.max(120, transformAnimationMs)}ms cubic-bezier(0.22, 1, 0.36, 1)`
+                                : 'none',
+                            willChange: isTransformAnimating || isDragging ? 'transform' : 'auto',
+                        }}
+                    >
+                        <rect
+                            data-graph-background="true"
+                            x="0"
+                            y="0"
+                            width={SVG_WIDTH}
+                            height={svgHeight}
+                            fill="#fff"
+                        />
 
                         <text x="8" y="28" className="section-title">
-                            Programs selected by
+                            Genes linked by
                         </text>
                         <text x="8" y="54" className="section-title">
-                            program burden effects
+                            program burden
                         </text>
                         <text
                             x={layout.rightProgramX}
                             y="28"
                             className="section-title"
                         >
-                            Programs selected by
+                            Genes linked by
                         </text>
                         <text
                             x={layout.rightProgramX}
                             y="54"
                             className="section-title"
                         >
-                            regulator-burden correlations
+                            regulator burden
                         </text>
 
                         <g
@@ -1125,20 +2096,22 @@ export default function TraitProgramGraphCanvas({
                             ))}
                         </g>
 
-                        {leftLayout.modules.map(renderLeftProgramModule)}
-                        {rightLayout.modules.map(renderRightProgramModule)}
+                        {leftRenderGroups.background.map(renderLeftProgramModule)}
+                        {rightRenderGroups.background.map(renderRightProgramModule)}
+                        {leftRenderGroups.focused.map(renderLeftProgramModule)}
+                        {rightRenderGroups.focused.map(renderRightProgramModule)}
 
                         {layout.showSectionNotes && (
                             <>
                                 <SectionNote
                                     x={layout.leftProgramX + layout.leftProgramW + 16}
                                     y={traitCenterY - 310}
-                                    lines={['Directions determined by', 'program burden effects']}
+                                    lines={['Gene direction from', 'program burden effects']}
                                 />
                                 <SectionNote
                                     x={layout.traitCenterX + 76}
                                     y={traitCenterY - 310}
-                                    lines={['Directions determined by', 'program-trait and regulator-program signs']}
+                                    lines={['Gene direction from', 'program-trait and regulator-program signs']}
                                 />
                             </>
                         )}

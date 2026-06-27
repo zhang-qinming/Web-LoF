@@ -1242,19 +1242,11 @@ async function getGeneOverview(geneId) {
                 MAX(pi.top10_pathways) AS top10_pathways,
                 GROUP_CONCAT(DISTINCT gpte.role SEPARATOR ',') AS roles,
                 GROUP_CONCAT(DISTINCT COALESCE(NULLIF(gpte.predicted_sign, ''), NULLIF(gpte.gamma_sign, ''), NULLIF(gpte.post_mean_sign, ''), '-') SEPARATOR ',') AS signs,
-                MAX(COALESCE(pgc.program_gene_count, 0)) AS program_gene_count,
+                COUNT(DISTINCT COALESCE(NULLIF(gpte.ensg_id, ''), NULLIF(gpte.gene_symbol, ''), NULLIF(gpte.gene_label, ''))) AS program_gene_count,
                 COUNT(DISTINCT gpte.trait_id) AS total_traits
              FROM gene_program_trait_edge gpte
              LEFT JOIN program_info pi
                 ON BINARY pi.program = BINARY gpte.program
-             LEFT JOIN (
-                SELECT
-                    program,
-                    COUNT(DISTINCT COALESCE(NULLIF(gene_symbol, ''), NULLIF(ensg_id, ''))) AS program_gene_count
-                FROM gene_program_trait_edge
-                GROUP BY program
-             ) pgc
-                ON BINARY pgc.program = BINARY gpte.program
              ${whereSql}
              GROUP BY gpte.program
              ORDER BY
@@ -1336,17 +1328,17 @@ async function getGeneProgramRecords(geneId, {
             `SELECT
                 gpte.*,
                 ${geneInfoSelect}
-                tpe.program_score,
-                tpe.regulator_score,
-                tpe.color,
-                tpe.program_sig,
-                tpe.regulator_sig,
-                tpe.selected_by_program,
-                tpe.selected_by_regulator,
-                tpe.loading_gene_count,
-                tpe.regulator_gene_count,
-                tpe.loading_visible_count,
-                tpe.regulator_visible_count,
+                NULL AS program_score,
+                NULL AS regulator_score,
+                NULL AS color,
+                0 AS program_sig,
+                0 AS regulator_sig,
+                0 AS selected_by_program,
+                0 AS selected_by_regulator,
+                0 AS loading_gene_count,
+                0 AS regulator_gene_count,
+                0 AS loading_visible_count,
+                0 AS regulator_visible_count,
                 COALESCE(fm_trait.file_id, fm_gwas.file_id, fm_file.file_id, gpte.file_id) AS joined_file_id,
                 COALESCE(fm_trait.gwas_id, fm_gwas.gwas_id, fm_file.gwas_id, '') AS gwas_id,
                 COALESCE(fm_trait.trait_name, fm_gwas.trait_name, fm_file.trait_name, '') AS trait_name,
@@ -1355,9 +1347,6 @@ async function getGeneProgramRecords(geneId, {
                 pi.go_enrichment_p,
                 pi.top10_pathways
              FROM gene_program_trait_edge gpte
-             LEFT JOIN trait_program_edge tpe
-                ON BINARY tpe.trait_id = BINARY gpte.trait_id
-                    AND BINARY tpe.program = BINARY gpte.program
              LEFT JOIN file_metadata fm_trait
                 ON BINARY fm_trait.file_id = BINARY gpte.trait_id
              LEFT JOIN file_metadata fm_gwas
@@ -1445,123 +1434,6 @@ async function getGenePrograms(geneId, options = {}) {
         records: recordPayload.records,
         recordPage: recordPayload.recordPage,
     };
-}
-
-async function getProgramTraits(programId) {
-    const program = normalizeProgramId(programId);
-    if (!program) {
-        return {
-            program: { id: '', annotation: '' },
-            summary: { totalTraits: 0, selectedByProgram: 0, selectedByRegulator: 0, bothSelected: 0, totalGenes: 0 },
-            traits: [],
-        };
-    }
-
-    try {
-        const [rows] = await pool.query(
-            `SELECT
-                tpe.*,
-                COALESCE(fm_trait.file_id, fm_gwas.file_id, fm_file.file_id, tpe.file_id) AS joined_file_id,
-                COALESCE(fm_trait.gwas_id, fm_gwas.gwas_id, fm_file.gwas_id, '') AS gwas_id,
-                COALESCE(fm_trait.trait_name, fm_gwas.trait_name, fm_file.trait_name, '') AS trait_name,
-                pi.curated_annotation
-             FROM trait_program_edge tpe
-             LEFT JOIN file_metadata fm_trait
-                ON BINARY fm_trait.file_id = BINARY tpe.trait_id
-             LEFT JOIN file_metadata fm_gwas
-                ON BINARY fm_gwas.gwas_id = BINARY tpe.trait_id
-             LEFT JOIN file_metadata fm_file
-                ON BINARY fm_file.file_id = BINARY tpe.file_id
-             LEFT JOIN program_info pi
-                ON BINARY pi.program = BINARY tpe.program
-             WHERE tpe.program = ?
-             ORDER BY
-                (tpe.selected_by_program OR tpe.selected_by_regulator) DESC,
-                ABS(COALESCE(tpe.program_score, 0)) + ABS(COALESCE(tpe.regulator_score, 0)) DESC,
-                tpe.trait_id ASC`,
-            [program],
-        );
-        const [geneRows] = rows.length
-            ? await pool.query(
-                `SELECT
-                    trait_id,
-                    gene_label,
-                    score
-                 FROM (
-                    SELECT
-                        ranked.*,
-                        ROW_NUMBER() OVER (PARTITION BY ranked.trait_id ORDER BY ranked.score DESC, ranked.gene_label ASC) AS row_num
-                    FROM (
-                        SELECT
-                            trait_id,
-                            COALESCE(NULLIF(gene_symbol, ''), ensg_id) AS gene_label,
-                            MAX(GREATEST(COALESCE(abs_gamma, 0), ABS(COALESCE(membership_score, 0)))) AS score
-                         FROM gene_program_trait_edge
-                         WHERE program = ?
-                         GROUP BY trait_id, COALESCE(NULLIF(gene_symbol, ''), ensg_id)
-                    ) ranked
-                 ) top_ranked
-                 WHERE row_num <= 8
-                 ORDER BY trait_id ASC, row_num ASC`,
-                [program],
-            )
-            : [[]];
-        const topGenesByTrait = new Map();
-        geneRows.forEach((row) => {
-            if (!row.trait_id || !row.gene_label) return;
-            if (!topGenesByTrait.has(row.trait_id)) topGenesByTrait.set(row.trait_id, []);
-            const genes = topGenesByTrait.get(row.trait_id);
-            if (genes.length < 8) genes.push(row.gene_label);
-        });
-
-        const traits = rows.map((row) => ({
-            traitId: row.trait_id,
-            traitName: row.trait_name || row.trait_id,
-            fileId: row.joined_file_id || row.file_id,
-            gwasId: row.gwas_id || '',
-            program: row.program,
-            programAnnotation: row.program_annotation || row.curated_annotation || '',
-            programLabel: row.program_label || row.program,
-            programScore: row.program_score == null ? null : Number(row.program_score),
-            regulatorScore: row.regulator_score == null ? null : Number(row.regulator_score),
-            color: row.color || 'other',
-            programSig: boolValue(row.program_sig),
-            regulatorSig: boolValue(row.regulator_sig),
-            selectedByProgram: boolValue(row.selected_by_program),
-            selectedByRegulator: boolValue(row.selected_by_regulator),
-            loadingGeneCount: Number(row.loading_gene_count) || 0,
-            regulatorGeneCount: Number(row.regulator_gene_count) || 0,
-            loadingVisibleCount: Number(row.loading_visible_count) || 0,
-            regulatorVisibleCount: Number(row.regulator_visible_count) || 0,
-            totalGenes: (Number(row.loading_visible_count) || Number(row.loading_gene_count) || 0)
-                + (Number(row.regulator_visible_count) || Number(row.regulator_gene_count) || 0),
-            topGenes: topGenesByTrait.get(row.trait_id) || [],
-        }));
-
-        return {
-            program: {
-                id: program,
-                annotation: traits.find((row) => row.programAnnotation)?.programAnnotation || '',
-            },
-            summary: {
-                totalTraits: traits.length,
-                selectedByProgram: traits.filter((row) => row.selectedByProgram).length,
-                selectedByRegulator: traits.filter((row) => row.selectedByRegulator).length,
-                bothSelected: traits.filter((row) => row.selectedByProgram && row.selectedByRegulator).length,
-                totalGenes: traits.reduce((sum, row) => sum + row.totalGenes, 0),
-            },
-            traits,
-        };
-    } catch (err) {
-        if (isMissingIndexTableError(err)) {
-            return emptyUnavailable({
-                program: { id: program, annotation: '' },
-                summary: { totalTraits: 0, selectedByProgram: 0, selectedByRegulator: 0, bothSelected: 0, totalGenes: 0 },
-                traits: [],
-            });
-        }
-        throw err;
-    }
 }
 
 async function getProgramGenes(programId) {
@@ -1684,7 +1556,6 @@ module.exports = {
     getRecommendedGenes,
     getGenePrograms,
     getProgramGenes,
-    getProgramTraits,
     normalizeProgramId,
     searchGenes,
     warmGeneSummaryCache,

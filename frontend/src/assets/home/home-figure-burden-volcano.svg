@@ -8,7 +8,7 @@
   <line x1="360" y1="318" x2="360" y2="118" stroke="#CBD5E1" stroke-width="1.6" stroke-dasharray="7 7"/>
   <line x1="104" y1="276" x2="620" y2="276" stroke="#FDBA74" stroke-width="1.7" stroke-dasharray="8 7"/>
   <text x="360" y="356" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">Effect size (beta)</text>
-  <text transform="rotate(-90 76 236)" x="76" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">-log10(P)</text>
+  <text transform="rotate(-90 76 236)" x="76" y="236" text-anchor="middle" fill="#475569" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13">-log10(p-value)</text>
 
   <g fill="#FED7AA" fill-opacity="0.68">
     <circle cx="352" cy="315" r="2.0"/><circle cx="366" cy="314" r="2.0"/><circle cx="382" cy="316" r="2.0"/>

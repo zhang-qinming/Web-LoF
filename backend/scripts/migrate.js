@@ -42,10 +42,12 @@ async function migrate() {
             );
         }
 
+        await pool.query('DROP TABLE IF EXISTS trait_program_edge');
+
         console.log('Schema migration completed successfully.');
 
         const [tables] = await pool.query(
-            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ('file_id_mapping','file_metadata','trait_ldsc','gwas_meta','lof_meta','program_info','trait_program_edge','gene_info_hg37_matched','gene_program_trait_edge','gene_summary')",
+            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ('file_id_mapping','file_metadata','trait_ldsc','gwas_meta','lof_meta','program_info','program_gene_role_edge','program_trait_scatter_edge','gene_info_hg37_matched','gene_program_trait_edge','gene_summary')",
             [dbName]
         );
         console.log('Created tables:', tables.map((item) => item.TABLE_NAME).join(', '));

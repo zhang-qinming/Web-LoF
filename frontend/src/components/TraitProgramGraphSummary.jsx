@@ -12,11 +12,80 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import OpenInNew from '@mui/icons-material/OpenInNew';
 import { alpha, useTheme } from '@mui/material/styles';
 import { stickyTableContainerSx, stickyTableHeaderCellSx, stickyTableSx, tableRowRevealSx, tableTone } from '../themeUtils';
+import { compareValues, nextSortDirection } from '../utils/sort';
+
+const formatGeneName = (gene) => gene.geneLabel || gene.gene || gene.ensg || 'gene';
+
+const finiteOrMax = (value) => (
+    Number.isFinite(Number(value)) ? Number(value) : Number.MAX_SAFE_INTEGER
+);
+
+const finiteOrZero = (value) => (
+    Number.isFinite(Number(value)) ? Number(value) : 0
+);
+
+const SUMMARY_COLUMNS = [
+    { key: 'gene', label: 'gene', width: 158, description: 'Gene symbol for the association row.', type: 'text', defaultDirection: 'asc' },
+    { key: 'program', label: 'program', width: 178, description: 'Program connected with this gene for the selected trait.', type: 'text', defaultDirection: 'asc' },
+    { key: 'side', label: 'role', width: 104, description: 'Program or regulator evidence role for this association row.', type: 'text', defaultDirection: 'asc' },
+    { key: 'effect', label: 'post_mean_sign', width: 116, description: 'Direction inferred from the post_mean source field.', type: 'text', defaultDirection: 'asc' },
+    { key: 'postMean', label: 'post_mean', width: 116, description: 'Source post_mean value for the gene.', type: 'number', defaultDirection: 'desc' },
+    { key: 'absGamma', label: 'abs_gamma', width: 126, description: 'Source abs_gamma value used as fallback priority when rank is missing.', type: 'number', defaultDirection: 'desc' },
+    { key: 'direction', label: 'concordance', width: 132, description: 'Whether trait and regulator/program signs are concordant or discordant.', type: 'text', defaultDirection: 'asc' },
+    { key: 'scores', label: 'score / membership_score', width: 158, description: 'Context score followed by source membership_score.', type: 'number', defaultDirection: 'desc' },
+];
+
+function compareGenePriority(a, b) {
+    const rankDelta = finiteOrMax(a.gene.rankWithinSide) - finiteOrMax(b.gene.rankWithinSide);
+    if (rankDelta !== 0) return rankDelta;
+
+    const effectDelta = Math.abs(finiteOrZero(b.gene.absGamma)) - Math.abs(finiteOrZero(a.gene.absGamma));
+    if (effectDelta !== 0) return effectDelta;
+
+    const membershipDelta = Math.abs(finiteOrZero(b.gene.membershipScore)) - Math.abs(finiteOrZero(a.gene.membershipScore));
+    if (membershipDelta !== 0) return membershipDelta;
+
+    const geneDelta = formatGeneName(a.gene).localeCompare(formatGeneName(b.gene), undefined, { numeric: true, sensitivity: 'base' });
+    if (geneDelta !== 0) return geneDelta;
+
+    return a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function getDirectionLabel(gene) {
+    if (gene.isDiscordant) return 'discordant';
+    if (gene.isConcordant) return 'concordant';
+    return 'not flagged';
+}
+
+function compareSummaryRows(a, b, sortBy, sortDir) {
+    let result = 0;
+    if (sortBy === 'gene') {
+        result = compareValues(formatGeneName(a.gene), formatGeneName(b.gene), 'text', sortDir);
+    } else if (sortBy === 'program') {
+        result = compareValues(a.module.program, b.module.program, 'text', sortDir);
+    } else if (sortBy === 'side') {
+        result = compareValues(a.rowSide, b.rowSide, 'text', sortDir);
+    } else if (sortBy === 'effect') {
+        result = compareValues(a.sign, b.sign, 'text', sortDir);
+    } else if (sortBy === 'postMean') {
+        result = compareValues(a.gene.postMean, b.gene.postMean, 'number', sortDir);
+    } else if (sortBy === 'absGamma') {
+        result = compareValues(a.gene.absGamma, b.gene.absGamma, 'number', sortDir);
+    } else if (sortBy === 'direction') {
+        result = compareValues(getDirectionLabel(a.gene), getDirectionLabel(b.gene), 'text', sortDir);
+    } else if (sortBy === 'scores') {
+        result = compareValues(a.score, b.score, 'number', sortDir)
+            || compareValues(a.gene.membershipScore, b.gene.membershipScore, 'number', sortDir);
+    }
+
+    return result || compareGenePriority(a, b);
+}
 
 export default function TraitProgramGraphSummary({
     title,
@@ -27,7 +96,6 @@ export default function TraitProgramGraphSummary({
     onSelectProgram,
     onSelectGene,
     onClearSelection,
-    onToggleExpanded,
     sideMeta,
     sideMetaMap,
     programColor,
@@ -40,46 +108,90 @@ export default function TraitProgramGraphSummary({
     onOpenGene,
 }) {
     const theme = useTheme();
-    const [filter, setFilter] = React.useState('all');
     const [tablePage, setTablePage] = React.useState(0);
-    const [rowsPerPage, setRowsPerPage] = React.useState(25);
+    const [rowsPerPage, setRowsPerPage] = React.useState(50);
+    const [showAllGenes, setShowAllGenes] = React.useState(false);
+    const [sortBy, setSortBy] = React.useState('priority');
+    const [sortDir, setSortDir] = React.useState('asc');
     const headerTone = tableTone(theme, 'primary');
-    const programCount = modules.filter((module) => (module.side || side) === 'program').length;
-    const regulatorCount = modules.filter((module) => (module.side || side) === 'regulator').length;
-    const filteredModules = React.useMemo(() => modules.filter((module) => {
-        const rowSide = module.side || side;
-        if (filter === 'program') return rowSide === 'program';
-        if (filter === 'regulator') return rowSide === 'regulator';
-        if (filter === 'selected') return selectedProgram && module.program === selectedProgram;
-        if (filter === 'gene') return selectedGeneKey && module.filteredGeneKeys?.includes(selectedGeneKey);
-        return true;
-    }), [filter, modules, selectedGeneKey, selectedProgram, side]);
-    const shouldPaginate = filteredModules.length > 50;
-    const visibleModules = shouldPaginate
-        ? filteredModules.slice(tablePage * rowsPerPage, (tablePage * rowsPerPage) + rowsPerPage)
-        : filteredModules;
+    const compactCellSx = {
+        py: 0.55,
+        px: 0.9,
+        fontSize: 12,
+        lineHeight: 1.2,
+        whiteSpace: 'nowrap',
+        textAlign: 'center',
+    };
+    const compactNumericCellSx = {
+        ...compactCellSx,
+        fontVariantNumeric: 'tabular-nums',
+    };
+
+    const geneRows = React.useMemo(() => {
+        const rows = modules.flatMap((module) => {
+            const rowSide = module.side || side;
+            const rowMeta = sideMetaMap?.[rowSide] || sideMeta;
+            const scoreField = rowSide === 'program' ? 'programScore' : 'regulatorScore';
+            const plotGenes = module.plotGenes || module.visibleGenes || [];
+            const sourceGenes = showAllGenes ? (module.allGenes || plotGenes) : plotGenes;
+            const seenGenes = new Set();
+
+            return sourceGenes.reduce((moduleRows, gene, geneIndex) => {
+                const geneKey = gene.highlightKey || gene.ensg || gene.gene || `${module.program}:${rowSide}:${geneIndex}`;
+                if (seenGenes.has(geneKey)) return moduleRows;
+                seenGenes.add(geneKey);
+                moduleRows.push({
+                    key: `${module.program}:${rowSide}:${geneKey}`,
+                    module,
+                    rowSide,
+                    rowMeta,
+                    gene,
+                    geneKey,
+                    score: module[scoreField],
+                    selectionColor: programColor(module),
+                    selectionLabel: programSelectionLabel(module),
+                    sign: effectSignFromGene(gene),
+                });
+                return moduleRows;
+            }, []);
+        });
+
+        return rows.sort(compareGenePriority);
+    }, [effectSignFromGene, modules, programColor, programSelectionLabel, showAllGenes, side, sideMeta, sideMetaMap]);
+
+    const hasHiddenGenes = React.useMemo(() => modules.some((module) => {
+        const plotKeys = new Set((module.plotGenes || module.visibleGenes || [])
+            .map((gene) => gene.highlightKey || gene.ensg || gene.gene)
+            .filter(Boolean));
+        return (module.allGenes || []).some((gene) => {
+            const key = gene.highlightKey || gene.ensg || gene.gene;
+            return key && !plotKeys.has(key);
+        });
+    }), [modules]);
+
+    const sortedGeneRows = React.useMemo(() => {
+        if (sortBy === 'priority') return geneRows;
+        return [...geneRows].sort((a, b) => compareSummaryRows(a, b, sortBy, sortDir));
+    }, [geneRows, sortBy, sortDir]);
+
+    const shouldPaginate = sortedGeneRows.length > 80;
+    const visibleRows = shouldPaginate
+        ? sortedGeneRows.slice(tablePage * rowsPerPage, (tablePage * rowsPerPage) + rowsPerPage)
+        : sortedGeneRows;
+
+    const handleSort = React.useCallback((column) => {
+        setSortDir((current) => nextSortDirection(sortBy, column.key, current, column.defaultDirection));
+        setSortBy(column.key);
+    }, [sortBy]);
 
     React.useEffect(() => {
-        if (filter === 'gene' && !selectedGeneKey) setFilter('all');
-        if (filter === 'selected' && !selectedProgram) setFilter('all');
-    }, [filter, selectedGeneKey, selectedProgram]);
-
-    React.useEffect(() => {
-        const maxPage = shouldPaginate ? Math.max(0, Math.ceil(filteredModules.length / rowsPerPage) - 1) : 0;
+        const maxPage = shouldPaginate ? Math.max(0, Math.ceil(sortedGeneRows.length / rowsPerPage) - 1) : 0;
         if (tablePage > maxPage) setTablePage(maxPage);
-    }, [filteredModules.length, rowsPerPage, shouldPaginate, tablePage]);
+    }, [rowsPerPage, shouldPaginate, sortedGeneRows.length, tablePage]);
 
     React.useEffect(() => {
         setTablePage(0);
-    }, [filter, modules.length]);
-
-    const filterOptions = [
-        { key: 'all', label: 'All', disabled: false },
-        { key: 'program', label: 'Program side', disabled: programCount === 0 },
-        { key: 'regulator', label: 'Regulator side', disabled: regulatorCount === 0 },
-        { key: 'selected', label: 'Selected only', disabled: !selectedProgram },
-        { key: 'gene', label: 'Gene focused', disabled: !selectedGeneKey },
-    ];
+    }, [modules.length, showAllGenes, sortBy, sortDir]);
 
     return (
         <Paper variant="outlined" sx={{ borderRadius: 1.5, borderColor: 'rgba(15,23,42,0.10)', overflow: 'hidden' }}>
@@ -100,45 +212,16 @@ export default function TraitProgramGraphSummary({
                     {title}
                 </Typography>
                 <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                    <Chip label={`${modules.length} modules`} size="small" sx={{ height: 22, fontWeight: 650 }} />
-                    {programCount > 0 && (
-                        <Chip
-                            label={`program ${programCount}`}
-                            size="small"
-                            sx={{
-                                height: 22,
-                                fontWeight: 680,
-                                color: (sideMetaMap?.program || sideMeta).accent,
-                                bgcolor: (sideMetaMap?.program || sideMeta).softBg,
-                            }}
-                        />
-                    )}
-                    {regulatorCount > 0 && (
-                        <Chip
-                            label={`regulator ${regulatorCount}`}
-                            size="small"
-                            sx={{
-                                height: 22,
-                                fontWeight: 680,
-                                color: (sideMetaMap?.regulator || sideMeta).accent,
-                                bgcolor: (sideMetaMap?.regulator || sideMeta).softBg,
-                            }}
-                        />
-                    )}
-                </Stack>
-                <Stack direction="row" spacing={0.6} flexWrap="wrap" useFlexGap sx={{ width: '100%' }}>
-                    {filterOptions.map((option) => (
+                    {hasHiddenGenes && (
                         <Button
-                            key={option.key}
                             size="small"
-                            variant={filter === option.key ? 'contained' : 'outlined'}
-                            disabled={option.disabled}
-                            onClick={() => setFilter(option.key)}
+                            variant="outlined"
+                            onClick={() => setShowAllGenes((current) => !current)}
                             sx={{ minHeight: 26, py: 0.15, px: 1, fontSize: 11.5, textTransform: 'none' }}
                         >
-                            {option.label}
+                            {showAllGenes ? 'Show plot genes' : 'Show all genes'}
                         </Button>
-                    ))}
+                    )}
                     {(selectedProgram || selectedGeneKey) && (
                         <Button
                             size="small"
@@ -153,259 +236,216 @@ export default function TraitProgramGraphSummary({
             </Box>
 
             <TableContainer sx={stickyTableContainerSx(theme, { overflowX: 'auto', overflowY: 'visible' })}>
-                <Table size="small" stickyHeader sx={stickyTableSx(theme)}>
+                <Table
+                    size="small"
+                    stickyHeader
+                    sx={stickyTableSx(theme, {
+                        minWidth: 1048,
+                        tableLayout: 'fixed',
+                        '& .MuiTableCell-root': {
+                            borderBottom: '1px solid rgba(226,232,240,0.72)',
+                        },
+                    })}
+                >
+                    <colgroup>
+                        {SUMMARY_COLUMNS.map((column) => (
+                            <col key={column.key} style={{ width: column.width }} />
+                        ))}
+                    </colgroup>
                     <TableHead>
                         <TableRow>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 112 })}>Side</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 132 })}>Program</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, width: 132 })}>Selected by</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Evidence score</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Genes</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>+ / -</TableCell>
-                            <TableCell sx={stickyTableHeaderCellSx(theme, headerTone, 'left', { fontWeight: 650, minWidth: 260 })}>Visible genes</TableCell>
-                            <TableCell align="right" sx={stickyTableHeaderCellSx(theme, headerTone, 'right', { fontWeight: 650 })}>Gene display</TableCell>
+                            {SUMMARY_COLUMNS.map((column) => (
+                                <TableCell
+                                    key={column.key}
+                                    align="center"
+                                    sx={stickyTableHeaderCellSx(theme, headerTone, 'center', { fontWeight: 650 })}
+                                >
+                                    <Tooltip title={column.description} arrow>
+                                        <TableSortLabel
+                                            active={sortBy === column.key}
+                                            direction={sortBy === column.key ? sortDir : column.defaultDirection}
+                                            onClick={() => handleSort(column)}
+                                            sx={{
+                                                justifyContent: 'center',
+                                                width: '100%',
+                                                fontSize: 'inherit',
+                                                cursor: 'pointer',
+                                                '& .MuiTableSortLabel-icon': {
+                                                    fontSize: '0.82rem',
+                                                    margin: 0,
+                                                },
+                                            }}
+                                        >
+                                            {column.label}
+                                        </TableSortLabel>
+                                    </Tooltip>
+                                </TableCell>
+                            ))}
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {visibleModules.map((module, index) => {
-                            const rowSide = module.side || side;
-                            const rowMeta = sideMetaMap?.[rowSide] || sideMeta;
-                            const scoreField = rowSide === 'program' ? 'programScore' : 'regulatorScore';
-                            const totalField = rowSide === 'program' ? 'loadingTotalCount' : 'regulatorTotalCount';
-                            const selected = selectedProgram === module.program;
-                            const geneFocused = Boolean(selectedGeneKey) && module.filteredGeneKeys?.includes(selectedGeneKey);
-                            const selectionColor = programColor(module);
-                            const selectionLabel = programSelectionLabel(module);
-                            const positiveCount = module.visibleGenes?.filter((gene) => effectSignFromGene(gene) === 'positive').length || 0;
-                            const negativeCount = module.visibleGenes?.filter((gene) => effectSignFromGene(gene) === 'negative').length || 0;
-                            const uniqueGenes = [];
-                            const seenGenes = new Set();
-                            (module.visibleGenes || []).forEach((gene) => {
-                                const key = gene.highlightKey || gene.ensg || gene.gene;
-                                if (!key || seenGenes.has(key)) return;
-                                seenGenes.add(key);
-                                uniqueGenes.push(gene);
-                            });
-
+                        {visibleRows.map((row, index) => {
+                            const geneSelected = selectedGeneKey === row.gene.highlightKey;
+                            const contextSelected = selectedProgram === row.module.program;
+                            const effectColor = effectColors[row.sign] || '#475467';
                             return (
                                 <TableRow
-                                    key={`${module.program}:${rowSide}`}
+                                    key={row.key}
                                     hover
-                                    selected={selected}
-                                    onClick={() => onSelectProgram(module.program, rowSide)}
+                                    selected={geneSelected || contextSelected}
+                                    onClick={() => onSelectGene?.(row.gene)}
                                     sx={{
                                         ...tableRowRevealSx(theme, index),
                                         cursor: 'pointer',
-                                        bgcolor: geneFocused && !selected ? alpha(effectColors.positive, 0.06) : undefined,
-                                        '&.Mui-selected': { bgcolor: rowMeta.softBg },
-                                        '&.Mui-selected:hover': { bgcolor: rowMeta.softBg },
-                                        '&:hover': {
-                                            bgcolor: selected
-                                                ? rowMeta.softBg
-                                                : geneFocused
-                                                    ? alpha(effectColors.positive, 0.10)
-                                                    : undefined,
+                                        '&.Mui-selected': {
+                                            bgcolor: geneSelected ? alpha(effectColor, 0.12) : row.rowMeta.softBg,
+                                        },
+                                        '&.Mui-selected:hover': {
+                                            bgcolor: geneSelected ? alpha(effectColor, 0.16) : row.rowMeta.softBg,
                                         },
                                     }}
                                 >
-                                    <TableCell>
-                                        <Chip
-                                            label={rowSide}
-                                            size="small"
-                                            sx={{
-                                                height: 22,
-                                                borderRadius: 1,
-                                                color: rowMeta.accent,
-                                                bgcolor: rowMeta.softBg,
-                                                fontWeight: 700,
-                                                textTransform: 'lowercase',
-                                            }}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Stack spacing={0.35}>
-                                            <Stack direction="row" spacing={0.25} alignItems="center">
-                                                <Tooltip title={`Focus ${module.program} in graph and table`}>
-                                                    <Button
-                                                        size="small"
-                                                        variant="text"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            onSelectProgram(module.program, rowSide);
-                                                        }}
-                                                        sx={{
-                                                            justifyContent: 'flex-start',
-                                                            minWidth: 0,
-                                                            p: 0,
-                                                            color: '#245089',
-                                                            fontWeight: 740,
-                                                            lineHeight: 1,
-                                                            textTransform: 'none',
-                                                        }}
-                                                    >
-                                                        {module.program}
-                                                    </Button>
-                                                </Tooltip>
-                                                <Tooltip title={`Open ${module.program}`}>
-                                                    <IconButton
-                                                        size="small"
-                                                        aria-label={`Open ${module.program}`}
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            onOpenProgram?.(module.program);
-                                                        }}
-                                                        sx={{ width: 24, height: 24, color: '#667085' }}
-                                                    >
-                                                        <OpenInNew sx={{ fontSize: 15 }} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Stack>
-                                            <Typography sx={{ fontSize: 11.5, color: '#667085', lineHeight: 1.2 }}>
-                                                {rowSide === 'program' ? 'program burden' : 'regulator-burden'}
-                                            </Typography>
-                                        </Stack>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box
-                                            sx={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: 0.7,
-                                                minWidth: 0,
-                                                px: 0.75,
-                                                py: 0.35,
-                                                borderRadius: 1,
-                                                bgcolor: `${selectionColor}18`,
-                                                border: `1px solid ${selectionColor}55`,
-                                            }}
-                                        >
-                                            <Box
-                                                sx={{
-                                                    width: 12,
-                                                    height: 12,
-                                                    borderRadius: 0.75,
-                                                    bgcolor: selectionColor,
-                                                    border: '1px solid rgba(15,23,42,0.12)',
-                                                    flexShrink: 0,
-                                                }}
-                                            />
-                                            <Typography
-                                                sx={{
-                                                    fontSize: 12,
-                                                    color: '#475467',
-                                                    fontWeight: 700,
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap',
-                                                }}
-                                            >
-                                                {selectionLabel}
-                                            </Typography>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Typography
-                                            sx={{
-                                                fontWeight: 700,
-                                                color: edgeColorFromScore(module[scoreField]),
-                                                fontVariantNumeric: 'tabular-nums',
-                                            }}
-                                        >
-                                            {formatNumber(module[scoreField], 2)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                        {module.totalFilteredGenes}/{module[totalField]}
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                                        <Box component="span" sx={{ color: effectColors.positive, fontWeight: 700 }}>{positiveCount}</Box>
-                                        {' / '}
-                                        <Box component="span" sx={{ color: effectColors.negative, fontWeight: 700 }}>{negativeCount}</Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                                            {uniqueGenes.length ? uniqueGenes.slice(0, 10).map((gene) => {
-                                                const geneLabel = gene.geneLabel || gene.gene || gene.ensg || 'gene';
-                                                const sign = effectSignFromGene(gene);
-                                                const geneSelected = selectedGeneKey === gene.highlightKey;
-                                                return (
-                                                    <Chip
-                                                        key={gene.highlightKey || `${module.program}:${geneLabel}`}
-                                                        label={geneLabel}
-                                                        size="small"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            onSelectGene?.(gene);
-                                                        }}
-                                                        onDelete={(event) => {
-                                                            event.stopPropagation();
-                                                            onOpenGene?.(gene);
-                                                        }}
-                                                        deleteIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-                                                        sx={{
-                                                            height: 22,
-                                                            borderRadius: 1,
-                                                            fontSize: 11,
-                                                            fontWeight: 680,
-                                                            color: geneSelected ? '#fff' : (effectColors[sign] || '#475467'),
-                                                            bgcolor: geneSelected
-                                                                ? (effectColors[sign] || '#475467')
-                                                                : sign === 'negative'
-                                                                ? alpha(effectColors.negative, 0.10)
-                                                                : sign === 'positive'
-                                                                    ? alpha(effectColors.positive, 0.10)
-                                                                    : 'rgba(15,23,42,0.06)',
-                                                            border: `1px solid ${geneSelected
-                                                                ? (effectColors[sign] || '#475467')
-                                                                : sign === 'negative'
-                                                                ? alpha(effectColors.negative, 0.24)
-                                                                : sign === 'positive'
-                                                                    ? alpha(effectColors.positive, 0.24)
-                                                                    : 'rgba(15,23,42,0.10)'}`,
-                                                            cursor: 'pointer',
-                                                            '& .MuiChip-deleteIcon': {
-                                                                color: geneSelected ? 'rgba(255,255,255,0.92)' : '#667085',
-                                                                mr: 0.35,
-                                                                '&:hover': {
-                                                                    color: geneSelected ? '#fff' : '#245089',
-                                                                },
-                                                            },
-                                                        }}
-                                                    />
-                                                );
-                                            }) : (
-                                                <Typography sx={{ fontSize: 12, color: '#667085' }}>none</Typography>
-                                            )}
-                                            {uniqueGenes.length > 10 && (
-                                                <Chip label={`+${uniqueGenes.length - 10}`} size="small" sx={{ height: 22, borderRadius: 1, fontSize: 11, fontWeight: 650 }} />
-                                            )}
-                                        </Stack>
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {module.collapsed ? (
-                                            <Typography sx={{ fontSize: 12, color: '#667085' }}>none</Typography>
-                                        ) : (
+                                    <TableCell sx={compactCellSx}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.25, minWidth: 0 }}>
                                             <Button
                                                 size="small"
                                                 variant="text"
                                                 onClick={(event) => {
                                                     event.stopPropagation();
-                                                    onToggleExpanded(module.program, rowSide);
+                                                    onSelectGene?.(row.gene);
                                                 }}
-                                                sx={{ minWidth: 0, px: 0.5, textTransform: 'none', fontSize: 12 }}
+                                                sx={{
+                                                    justifyContent: 'center',
+                                                    minWidth: 0,
+                                                    maxWidth: 116,
+                                                    p: 0,
+                                                    color: geneSelected ? effectColor : '#245089',
+                                                    fontSize: 12,
+                                                    fontWeight: 780,
+                                                    lineHeight: 1.1,
+                                                    textTransform: 'none',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                }}
                                             >
-                                                {module.expanded ? 'Collapse' : 'Show all'}
+                                                {formatGeneName(row.gene)}
                                             </Button>
-                                        )}
+                                            <Tooltip title={`Open ${formatGeneName(row.gene)}`}>
+                                                <IconButton
+                                                    size="small"
+                                                    aria-label={`Open ${formatGeneName(row.gene)}`}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onOpenGene?.(row.gene);
+                                                    }}
+                                                    sx={{ width: 20, height: 20, color: '#667085', flexShrink: 0 }}
+                                                >
+                                                    <OpenInNew sx={{ fontSize: 13 }} />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell sx={compactCellSx}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.25, minWidth: 0 }}>
+                                            <Tooltip title={`Focus ${row.module.program} in the gene association map and summary`}>
+                                                <Button
+                                                    size="small"
+                                                    variant="text"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onSelectProgram(row.module.program, row.rowSide);
+                                                    }}
+                                                    sx={{
+                                                        justifyContent: 'center',
+                                                        minWidth: 0,
+                                                        maxWidth: 132,
+                                                        p: 0,
+                                                        color: '#245089',
+                                                        fontSize: 12,
+                                                        fontWeight: 740,
+                                                        lineHeight: 1.1,
+                                                        textTransform: 'none',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    {row.module.program}
+                                                </Button>
+                                            </Tooltip>
+                                            <Tooltip title={`Open ${row.module.program}`}>
+                                                <IconButton
+                                                    size="small"
+                                                    aria-label={`Open ${row.module.program}`}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onOpenProgram?.(row.module.program);
+                                                    }}
+                                                    sx={{ width: 20, height: 20, color: '#667085', flexShrink: 0 }}
+                                                >
+                                                    <OpenInNew sx={{ fontSize: 13 }} />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell sx={compactCellSx}>
+                                        <Chip
+                                            label={row.rowSide}
+                                            size="small"
+                                            sx={{
+                                                height: 20,
+                                                borderRadius: 1,
+                                                color: row.rowMeta.accent,
+                                                bgcolor: row.rowMeta.softBg,
+                                                fontSize: 10.5,
+                                                fontWeight: 700,
+                                                textTransform: 'lowercase',
+                                            }}
+                                        />
+                                    </TableCell>
+                                    <TableCell sx={compactCellSx}>
+                                        <Chip
+                                            label={row.sign || 'neutral'}
+                                            size="small"
+                                            sx={{
+                                                height: 20,
+                                                borderRadius: 1,
+                                                fontSize: 10.5,
+                                                fontWeight: 720,
+                                                color: effectColor,
+                                                bgcolor: alpha(effectColor, 0.10),
+                                                border: `1px solid ${alpha(effectColor, 0.24)}`,
+                                            }}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ ...compactNumericCellSx, color: effectColor, fontWeight: 780 }}>
+                                        {formatNumber(row.gene.postMean, 3)}
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ ...compactNumericCellSx, color: '#475467', fontWeight: 700 }}>
+                                        {formatNumber(row.gene.absGamma, 3)}
+                                    </TableCell>
+                                    <TableCell sx={{ ...compactCellSx, color: row.gene.isDiscordant ? '#b45309' : '#667085', fontWeight: row.gene.isDiscordant ? 760 : 620 }}>
+                                        {getDirectionLabel(row.gene)}
+                                    </TableCell>
+                                    <TableCell align="center" sx={compactNumericCellSx}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.8 }}>
+                                            <Box component="span" sx={{ color: edgeColorFromScore(row.score), fontWeight: 780 }}>
+                                                {formatNumber(row.score, 2)}
+                                            </Box>
+                                            <Box component="span" sx={{ color: '#667085', fontWeight: 680 }}>
+                                                {formatNumber(row.gene.membershipScore, 3)}
+                                            </Box>
+                                        </Box>
                                     </TableCell>
                                 </TableRow>
                             );
                         })}
-                        {!filteredModules.length && (
+                        {!geneRows.length && (
                             <TableRow>
-                                <TableCell colSpan={8}>
+                                <TableCell colSpan={SUMMARY_COLUMNS.length}>
                                     <Typography sx={{ py: 2, textAlign: 'center', color: '#667085', fontSize: 13 }}>
-                                        No modules after current filters
+                                        No genes available
                                     </Typography>
                                 </TableCell>
                             </TableRow>
@@ -416,15 +456,15 @@ export default function TraitProgramGraphSummary({
             {shouldPaginate && (
                 <TablePagination
                     component="div"
-                    count={filteredModules.length}
+                    count={sortedGeneRows.length}
                     page={tablePage}
                     onPageChange={(_, nextPage) => setTablePage(nextPage)}
                     rowsPerPage={rowsPerPage}
                     onRowsPerPageChange={(event) => {
-                        setRowsPerPage(Number(event.target.value) || 25);
+                        setRowsPerPage(Number(event.target.value) || 50);
                         setTablePage(0);
                     }}
-                    rowsPerPageOptions={[25, 50, 100, 200]}
+                    rowsPerPageOptions={[50, 100, 200, 500]}
                 />
             )}
         </Paper>

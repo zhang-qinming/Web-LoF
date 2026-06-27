@@ -21,12 +21,13 @@ import FloatingLegend from './FloatingLegend';
 import { UpdatingStatus } from './PageScaffold';
 import ProgramScatterTable from './ProgramScatterTable';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
-import { parseNullableNumber } from '../utils/numbers';
+import { formatScientificNumber, parseNullableNumber } from '../utils/numbers';
 import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { detailSummarySWRConfig, figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { useDebouncedControlValue, useIdleRenderGate } from '../utils/renderScheduling';
+import { compareValues } from '../utils/sort';
 import {
     buildPlotHoverTone,
     buildPlotHoverToneNeutral,
@@ -242,15 +243,15 @@ function buildAnimationStartData(previousPlotData, nextPlotData, previousRanges,
 }
 
 function formatFixed(value, digits) {
-    return Number.isFinite(value) ? value.toFixed(digits) : 'NA';
+    return Number.isFinite(value) ? value.toFixed(digits) : '-';
 }
 
 function formatPValue(value) {
-    return Number.isFinite(value) ? value.toExponential(2) : 'NA';
+    return formatScientificNumber(value, 2, '-');
 }
 
 function formatRank(value) {
-    return Number.isFinite(value) ? `#${value}` : 'NA';
+    return Number.isFinite(value) ? `#${value}` : '-';
 }
 
 function formatProgramId(value) {
@@ -285,22 +286,22 @@ function buildHoverText(item, key, info) {
         '',
         '<b>Program burden</b>',
         `Score: ${formatFixed(item.progScore, 3)}`,
-        `Rank: ${formatRank(item.rankProg)} | P: ${formatPValue(item.progP)}`,
+        `Rank: ${formatRank(item.rankProg)} | p-value: ${formatPValue(item.progP)}`,
         `Mean gamma: ${formatFixed(item.progGamma, 4)}`,
         '',
         '<b>Regulator-burden correlation</b>',
         `Score: ${formatFixed(item.regScore, 3)}`,
-        `Rank: ${formatRank(item.rankReg)} | P: ${formatPValue(item.regP)}`,
+        `Rank: ${formatRank(item.rankReg)} | p-value: ${formatPValue(item.regP)}`,
         `Regulator beta: ${formatFixed(item.regBeta, 4)}`,
     ];
 
     if (representativeGo) {
         lines.push('', '<b>Representative annotations</b>');
-        lines.push(`GO: ${representativeGo}${info?.go_enrichment_p ? ` (P ${info.go_enrichment_p})` : ''}`);
+        lines.push(`GO: ${representativeGo}${info?.go_enrichment_p ? ` (p-value ${formatScientificNumber(info.go_enrichment_p, 2)})` : ''}`);
     }
     if (representativeTf) {
         if (!representativeGo) lines.push('', '<b>Representative annotations</b>');
-        lines.push(`TF: ${representativeTf}${representativeTfClass ? ` | ${representativeTfClass}` : ''}${info?.representative_tf_p ? ` (P ${info.representative_tf_p})` : ''}`);
+        lines.push(`TF: ${representativeTf}${representativeTfClass ? ` | ${representativeTfClass}` : ''}${info?.representative_tf_p ? ` (p-value ${formatScientificNumber(info.representative_tf_p, 2)})` : ''}`);
     }
     if (markerCoexpression) {
         if (!representativeGo && !representativeTf) lines.push('', '<b>Representative annotations</b>');
@@ -590,24 +591,14 @@ export default function ProgramScatter({ fileId }) {
         }
     }, [sortBy]);
 
-    const collator = useMemo(() => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), []);
-
     const sortedRows = useMemo(() => {
-        const dir = sortDir === 'asc' ? 1 : -1;
         return [...rows].sort((a, b) => {
-            const va = a[sortBy];
-            const vb = b[sortBy];
             if (sortBy === 'program' || sortBy === 'color') {
-                const sa = va ?? '';
-                const sb = vb ?? '';
-                return collator.compare(sa, sb) * dir;
+                return compareValues(a[sortBy], b[sortBy], 'text', sortDir);
             }
-            const na = va ?? -Infinity;
-            const nb = vb ?? -Infinity;
-            if (na === nb) return 0;
-            return na > nb ? dir : -dir;
+            return compareValues(a[sortBy], b[sortBy], 'number', sortDir);
         });
-    }, [rows, sortBy, sortDir, collator]);
+    }, [rows, sortBy, sortDir]);
     const shouldRenderTable = useIdleRenderGate(
         !isLoading && afterFirstPaint,
         `${scatterKey || 'program-scatter-empty'}:${rows.length}:${sortedRows.length}`,
@@ -785,9 +776,9 @@ export default function ProgramScatter({ fileId }) {
     const layout = useMemo(() => {
         const isRank = mode !== MODES.SCATTER;
         const xTitle = mode === MODES.RANK_REG
-            ? 'Regulator-burden correlation, signed -log10(P)'
-            : 'Program burden effect, signed -log10(P)';
-        const yTitle = isRank ? 'Rank' : 'Regulator-burden correlation, signed -log10(P)';
+            ? 'Regulator-burden correlation, signed -log10(p-value)'
+            : 'Program burden effect, signed -log10(p-value)';
+        const yTitle = isRank ? 'Rank' : 'Regulator-burden correlation, signed -log10(p-value)';
         const titleText = mode === MODES.SCATTER
             ? 'Program x Regulator'
             : (mode === MODES.RANK_PROG ? 'Program Rank' : 'Regulator Rank');

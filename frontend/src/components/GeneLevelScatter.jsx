@@ -24,12 +24,13 @@ import useSWR from 'swr';
 import { getDataFileText } from '../api/gwas';
 import { UpdatingStatus } from './PageScaffold';
 import { downloadBlob, downloadDataUrl } from '../utils/download';
-import { parseNullableNumber } from '../utils/numbers';
+import { formatScientificNumber, parseNullableNumber } from '../utils/numbers';
 import { scrollElementIntoNearestView, scrollElementNearViewportCenter } from '../utils/scroll';
 import { figureResourceSWRConfig } from '../utils/swrOptions';
 import { useAfterFirstPaint } from '../utils/useAfterFirstPaint';
 import { useCachedResourceState } from '../utils/useCachedResourceState';
 import { useDebouncedControlValue, useIdleRenderGate } from '../utils/renderScheduling';
+import { compareValues } from '../utils/sort';
 import {
     buildPlotHoverTone,
     chartLayoutTokens,
@@ -228,11 +229,11 @@ function computeAxisRange(values, paddingRatio = 0.08) {
 }
 
 function formatNumber(value, digits = 3) {
-    return Number.isFinite(value) ? value.toFixed(digits) : 'NA';
+    return Number.isFinite(value) ? value.toFixed(digits) : '-';
 }
 
 function formatPValue(value) {
-    return Number.isFinite(value) ? value.toExponential(2) : 'NA';
+    return formatScientificNumber(value, 2, '-');
 }
 
 function buildHoverText(row) {
@@ -246,9 +247,9 @@ function buildHoverText(row) {
     }
     if ([row.signedLogP, row.beta, row.p, row.fdr].some(Number.isFinite)) {
         lines.push('', '<b>Perturb-seq regulation</b>');
-        if (Number.isFinite(row.signedLogP)) lines.push(`signed -log10(P): ${formatNumber(row.signedLogP, 2)}`);
+        if (Number.isFinite(row.signedLogP)) lines.push(`signed -log10(p-value): ${formatNumber(row.signedLogP, 2)}`);
         if (Number.isFinite(row.beta)) lines.push(`beta_withShet: ${formatNumber(row.beta, 4)}${row.regulationSign ? ` (${row.regulationSign})` : ''}`);
-        if (Number.isFinite(row.p)) lines.push(`P_withShet: ${formatPValue(row.p)}`);
+        if (Number.isFinite(row.p)) lines.push(`p-value: ${formatPValue(row.p)}`);
         if (Number.isFinite(row.fdr)) lines.push(`FDR: ${formatPValue(row.fdr)}`);
     }
     if (Number.isFinite(row.combinedScore)) lines.push('', `Combined score: ${formatNumber(row.combinedScore, 2)}`);
@@ -669,7 +670,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
             },
             yaxis: {
                 ...axisStyle,
-                title: { text: 'Perturb-seq signed -log10(P), sign(beta_withShet)', font: { size: 14, color: theme.palette.text.primary } },
+                title: { text: 'Perturb-seq signed -log10(p-value), sign(beta_withShet)', font: { size: 14, color: theme.palette.text.primary } },
                 range: yRange,
                 fixedrange: false,
             },
@@ -692,16 +693,11 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
     }), []);
 
     const sortedRows = useMemo(() => {
-        const dir = sortDir === 'asc' ? 1 : -1;
-        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
         return [...filteredRows].sort((a, b) => {
             if (['gene', 'ensg', 'evidenceClassLabel', 'labelReason'].includes(sortBy)) {
-                return collator.compare(String(a[sortBy] || ''), String(b[sortBy] || '')) * dir;
+                return compareValues(a[sortBy], b[sortBy], 'text', sortDir);
             }
-            const av = a[sortBy] ?? -Infinity;
-            const bv = b[sortBy] ?? -Infinity;
-            if (av === bv) return 0;
-            return av > bv ? dir : -dir;
+            return compareValues(a[sortBy], b[sortBy], 'number', sortDir);
         });
     }, [filteredRows, sortBy, sortDir]);
 
@@ -953,7 +949,7 @@ export default function GeneLevelScatter({ fileId, gwasId, traitLabel, lookupIds
                                 onClick={() => setExportOpen(true)}
                                 sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
                             >
-                                Export Image
+                                Export image
                             </Button>
                         )}
                     </Box>

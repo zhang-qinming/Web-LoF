@@ -159,6 +159,23 @@ function normalizeGraphRows(programRows, geneRows) {
     const normalizedProgramRows = programRows.map((row, index) => normalizeProgramRow(row, { rowIndex: index }));
     const programsById = buildProgramContext(normalizedProgramRows);
     const normalizedGeneRows = geneRows.map((row) => normalizeGeneRow(row, { programsById }));
+    const countsByProgram = normalizedGeneRows.reduce((map, row) => {
+        const program = normalizeProgramId(row.Program);
+        if (!program) return map;
+        if (!map.has(program)) map.set(program, { program: 0, regulator: 0 });
+        const counts = map.get(program);
+        if (cleanText(row.side).toLowerCase() === 'regulator') counts.regulator += 1;
+        else counts.program += 1;
+        return map;
+    }, new Map());
+
+    for (const row of normalizedProgramRows) {
+        const counts = countsByProgram.get(row.Program);
+        if (!counts) continue;
+        row.loading_gene_count = String(counts.program);
+        row.regulator_gene_count = String(counts.regulator);
+        row.program_label = `${row.Program}  L:${counts.program}  R:${counts.regulator}`;
+    }
 
     return {
         programRows: normalizedProgramRows,

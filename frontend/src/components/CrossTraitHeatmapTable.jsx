@@ -8,11 +8,11 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import Download from '@mui/icons-material/Download';
-import { useNavigate } from 'react-router-dom';
 import {
     panelSx,
     sectionTitleSx,
@@ -25,9 +25,10 @@ import {
     tableTone,
 } from '../themeUtils';
 import { downloadBlob } from '../utils/download';
+import { compareValues, nextSortDirection } from '../utils/sort';
 
 function formatEffect(value) {
-    if (!Number.isFinite(value)) return 'NA';
+    if (!Number.isFinite(value)) return '-';
     return `${value > 0 ? '+' : ''}${value.toFixed(4)}`;
 }
 
@@ -57,15 +58,27 @@ const GENE_COL_WIDTH = 150;
 const ENSG_COL_WIDTH = 176;
 const TRAIT_COL_WIDTH = 196;
 const FROZEN_COL_WIDTH = GENE_COL_WIDTH + ENSG_COL_WIDTH;
+const EMPTY_ITEMS = [];
+const sortLabelSx = {
+    display: 'inline-flex',
+    justifyContent: 'center',
+    width: '100%',
+    fontSize: 'inherit',
+    '& .MuiTableSortLabel-icon': {
+        fontSize: '0.82rem',
+        margin: 0,
+    },
+};
 
 export default function CrossTraitHeatmapTable({ payload, fileId }) {
     const theme = useTheme();
-    const navigate = useNavigate();
-    const targets = payload?.targets || [];
-    const genes = payload?.genes || [];
+    const targets = payload?.targets || EMPTY_ITEMS;
+    const genes = payload?.genes || EMPTY_ITEMS;
     const cellCount = targets.length * genes.length;
     const largeMatrix = cellCount > 2500;
     const [forceRenderTable, setForceRenderTable] = useState(false);
+    const [sortBy, setSortBy] = useState('gene');
+    const [sortDir, setSortDir] = useState('asc');
     const maxAbs = useMemo(() => Math.max(
         Math.abs(Number(payload?.summary?.valueRange?.min) || 0),
         Math.abs(Number(payload?.summary?.valueRange?.max) || 0),
@@ -77,6 +90,35 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
     useEffect(() => {
         setForceRenderTable(false);
     }, [payload]);
+
+    const sortedGeneRows = useMemo(() => {
+        const rows = genes.map((gene, index) => ({ gene, originalIndex: index }));
+        return rows.sort((a, b) => {
+            if (sortBy === 'gene') {
+                return compareValues(a.gene?.gene, b.gene?.gene, 'text', sortDir)
+                    || compareValues(a.gene?.ensg, b.gene?.ensg, 'text', 'asc');
+            }
+            if (sortBy === 'ensg') {
+                return compareValues(a.gene?.ensg, b.gene?.ensg, 'text', sortDir)
+                    || compareValues(a.gene?.gene, b.gene?.gene, 'text', 'asc');
+            }
+            if (sortBy.startsWith('target:')) {
+                const columnIndex = Number(sortBy.slice('target:'.length));
+                return compareValues(
+                    payload?.matrix?.[a.originalIndex]?.[columnIndex],
+                    payload?.matrix?.[b.originalIndex]?.[columnIndex],
+                    'number',
+                    sortDir,
+                ) || compareValues(a.gene?.gene, b.gene?.gene, 'text', 'asc');
+            }
+            return 0;
+        });
+    }, [genes, payload?.matrix, sortBy, sortDir]);
+
+    const handleSort = (key, defaultDirection = 'asc') => {
+        setSortDir((current) => nextSortDirection(sortBy, key, current, defaultDirection));
+        setSortBy(key);
+    };
 
     if (!targets.length || !genes.length) return null;
 
@@ -99,7 +141,7 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                             Cross-trait gene effect matrix
                         </Typography>
                         <Typography sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', mt: 0.2 }}>
-                            {genes.length.toLocaleString()} genes × {targets.length.toLocaleString()} traits ({cellCount.toLocaleString()} cells). The table is deferred so the plot stays responsive.
+                            {genes.length.toLocaleString()} genes x {targets.length.toLocaleString()} traits ({cellCount.toLocaleString()} cells). The table is deferred so the plot stays responsive.
                         </Typography>
                     </Box>
                     <Box sx={tableToolbarGroupSx(theme)}>
@@ -187,7 +229,14 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                     minWidth: GENE_COL_WIDTH,
                                 })}
                             >
-                                Gene
+                                <TableSortLabel
+                                    active={sortBy === 'gene'}
+                                    direction={sortBy === 'gene' ? sortDir : 'asc'}
+                                    onClick={() => handleSort('gene', 'asc')}
+                                    sx={sortLabelSx}
+                                >
+                                    Gene
+                                </TableSortLabel>
                             </TableCell>
                             <TableCell
                                 align="center"
@@ -198,17 +247,22 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                     boxShadow: `8px 0 12px -12px ${alpha(theme.palette.common.black, 0.42)}, 0 2px 0 ${theme.custom.surface.base}, inset 0 -1px 0 ${geneTone.headerBorder}`,
                                 })}
                             >
-                                ENSG
+                                <TableSortLabel
+                                    active={sortBy === 'ensg'}
+                                    direction={sortBy === 'ensg' ? sortDir : 'asc'}
+                                    onClick={() => handleSort('ensg', 'asc')}
+                                    sx={sortLabelSx}
+                                >
+                                    ENSG
+                                </TableSortLabel>
                             </TableCell>
-                             {targets.map((target) => (
-                                 <TableCell
-                                     key={target.file_id}
-                                     align="center"
-                                     onClick={() => navigate(`/trait/${encodeURIComponent(target.file_id)}`)}
-                                     sx={stickyTableHeaderCellSx(theme, traitTone, 'center', {
-                                         cursor: 'pointer',
-                                         whiteSpace: 'normal',
-                                         wordBreak: 'break-word',
+                             {targets.map((target, colIndex) => (
+                                  <TableCell
+                                      key={target.file_id}
+                                      align="center"
+                                      sx={stickyTableHeaderCellSx(theme, traitTone, 'center', {
+                                          whiteSpace: 'normal',
+                                          wordBreak: 'break-word',
                                          overflowWrap: 'anywhere',
                                          overflow: 'visible',
                                          textOverflow: 'clip',
@@ -216,23 +270,32 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                          py: 0.9,
                                          px: 1,
                                          verticalAlign: 'top',
-                                     })}
-                                 >
-                                     <Typography sx={{ fontSize: '0.68rem', fontWeight: 720, lineHeight: 1.18 }}>
-                                         {target.trait_name || target.file_id}
-                                     </Typography>
-                                     {(target.n_sig != null || (target.trait_name && target.file_id && target.trait_name !== target.file_id)) && (
-                                         <Typography sx={{ mt: 0.25, fontSize: '0.6rem', color: theme.palette.text.secondary, textAlign: 'center' }}>
-                                             {target.n_sig == null ? target.file_id : `${Number(target.n_sig).toLocaleString()} loci`}
-                                         </Typography>
-                                     )}
-                                 </TableCell>
-                             ))}
+                                      })}
+                                  >
+                                      <TableSortLabel
+                                          active={sortBy === `target:${colIndex}`}
+                                          direction={sortBy === `target:${colIndex}` ? sortDir : 'asc'}
+                                          onClick={() => handleSort(`target:${colIndex}`, 'desc')}
+                                          sx={{ ...sortLabelSx, whiteSpace: 'normal', alignItems: 'flex-start' }}
+                                      >
+                                          <Box sx={{ minWidth: 0 }}>
+                                              <Typography sx={{ fontSize: '0.68rem', fontWeight: 720, lineHeight: 1.18 }}>
+                                                  {target.trait_name || target.file_id}
+                                              </Typography>
+                                              {(target.n_sig != null || (target.trait_name && target.file_id && target.trait_name !== target.file_id)) && (
+                                                  <Typography sx={{ mt: 0.25, fontSize: '0.6rem', color: theme.palette.text.secondary, textAlign: 'center' }}>
+                                                      {target.n_sig == null ? target.file_id : `${Number(target.n_sig).toLocaleString()} loci`}
+                                                  </Typography>
+                                              )}
+                                          </Box>
+                                      </TableSortLabel>
+                                  </TableCell>
+                              ))}
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {genes.map((gene, rowIndex) => (
-                            <TableRow key={`${gene.ensg || gene.gene}-${rowIndex}`} hover sx={tableRowRevealSx(theme, rowIndex)}>
+                        {sortedGeneRows.map(({ gene, originalIndex }, rowIndex) => (
+                            <TableRow key={`${gene.ensg || gene.gene}-${originalIndex}`} hover sx={tableRowRevealSx(theme, rowIndex)}>
                                 <TableCell
                                     align="center"
                                     sx={{
@@ -272,7 +335,7 @@ export default function CrossTraitHeatmapTable({ payload, fileId }) {
                                     {gene.ensg || '-'}
                                 </TableCell>
                                 {targets.map((target, colIndex) => {
-                                    const value = payload?.matrix?.[rowIndex]?.[colIndex];
+                                    const value = payload?.matrix?.[originalIndex]?.[colIndex];
                                     return (
                                     <TableCell
                                         key={`${gene.ensg || gene.gene}-${target.file_id || colIndex}`}
