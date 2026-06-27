@@ -975,8 +975,8 @@ function ProgramGenesTable({ programId }) {
         annotation: tableTone(theme, 'warning'),
         metric: tableTone(theme, 'warning'),
     };
-    const [sortBy, setSortBy] = useState('loading_gene_score');
-    const [sortDir, setSortDir] = useState('desc');
+    const [sortBy, setSortBy] = useState('gene_symbol');
+    const [sortDir, setSortDir] = useState('asc');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(RELATION_ROWS_PER_PAGE);
     const [searchQuery, setSearchQuery] = useState('');

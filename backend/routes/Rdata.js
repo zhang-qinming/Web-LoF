@@ -2,8 +2,6 @@ const fs = require('fs');
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
-const mysql = require('mysql2');
-const { PassThrough } = require('stream');
 const { createFileStore, buildHttpError } = require('../lib/fileStore');
 const { config } = require('../lib/config');
 const pool = require('../models/db');
@@ -293,137 +291,6 @@ function getZipArchiveOptions() {
         // Folder-level data downloads use the highest zlib compression by default.
         zlib: { level: config.data.archiveCompressionLevel },
     };
-}
-
-function getDbConnectionConfig() {
-    const dbConfig = {
-        host: config.db.host,
-        port: config.db.port,
-        user: config.db.user,
-        database: config.db.database,
-        dateStrings: true,
-        supportBigNumbers: true,
-        bigNumberStrings: true,
-    };
-    if (config.db.password) dbConfig.password = config.db.password;
-    return dbConfig;
-}
-
-function escapeTsvValue(value) {
-    if (value == null) return '';
-    return String(value)
-        .replace(/\t/g, '\\t')
-        .replace(/\r/g, '\\r')
-        .replace(/\n/g, '\\n');
-}
-
-function writeStreamLine(stream, line) {
-    return new Promise((resolve, reject) => {
-        if (stream.write(line)) {
-            resolve();
-            return;
-        }
-        stream.once('drain', resolve);
-        stream.once('error', reject);
-    });
-}
-
-async function getTableColumns(connection, tableName) {
-    const [rows] = await connection.promise().query(
-        `SELECT COLUMN_NAME
-         FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
-         ORDER BY ORDINAL_POSITION`,
-        [tableName],
-    );
-    return rows.map((row) => row.COLUMN_NAME);
-}
-
-async function appendTableTsvToArchive(archive, connection, definition, tableName, manifest, signal) {
-    throwIfAborted(signal);
-    const columns = await getTableColumns(connection, tableName);
-    if (!columns.length) {
-        manifest.skippedTables.push({ tableName, reason: 'missing table' });
-        return;
-    }
-
-    const entryPath = `${definition.rootEntryName}/${tableName}.tsv`;
-    const passThrough = new PassThrough();
-    archive.append(passThrough, { name: entryPath });
-
-    let rowCount = 0;
-    let rowStream = null;
-    try {
-        await writeStreamLine(passThrough, `${columns.join('\t')}\n`);
-        rowStream = connection
-            .query(`SELECT * FROM ${mysql.escapeId(tableName)}`)
-            .stream({ objectMode: true });
-
-        signal?.addEventListener('abort', () => rowStream.destroy(), { once: true });
-
-        await new Promise((resolve, reject) => {
-            rowStream.on('data', async (row) => {
-                rowStream.pause();
-                try {
-                    throwIfAborted(signal);
-                    const line = columns.map((column) => escapeTsvValue(row[column])).join('\t');
-                    await writeStreamLine(passThrough, `${line}\n`);
-                    rowCount += 1;
-                    rowStream.resume();
-                } catch (err) {
-                    rowStream.destroy(err);
-                }
-            });
-            rowStream.on('error', reject);
-            rowStream.on('end', resolve);
-            passThrough.on('error', reject);
-        });
-        manifest.tables.push({ tableName, columns: columns.length, rows: rowCount });
-    } catch (err) {
-        manifest.skippedTables.push({ tableName, reason: err.message || 'export failed' });
-        throw err;
-    } finally {
-        passThrough.end();
-    }
-}
-
-async function streamDatabasePackage(res, definition, signal) {
-    throwIfAborted(signal);
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', encodeDownloadFilename(`${definition.id}.zip`));
-
-    const archive = await createZipArchive(getZipArchiveOptions());
-    const connection = mysql.createConnection(getDbConnectionConfig());
-    const manifest = {
-        generatedAt: new Date().toISOString(),
-        database: config.db.database,
-        packageId: definition.id,
-        tables: [],
-        skippedTables: [],
-    };
-
-    archive.on('error', () => {
-        if (!res.headersSent) res.status(500).end();
-        else res.end();
-    });
-    archive.pipe(res);
-
-    try {
-        for (const tableName of definition.tables) {
-            await appendTableTsvToArchive(archive, connection, definition, tableName, manifest, signal);
-        }
-        if (!manifest.tables.length) throw buildHttpError(404, 'No database tables were exported');
-        archive.append(`${JSON.stringify(manifest, null, 2)}\n`, {
-            name: `${definition.rootEntryName}/manifest.json`,
-        });
-        await archive.finalize();
-    } finally {
-        try {
-            await connection.promise().end();
-        } catch (err) {
-            connection.destroy();
-        }
-    }
 }
 
 function escapeLike(value) {
@@ -1454,16 +1321,6 @@ router.get('/api/data/packages/:packageId/download-info', asyncRoute(async (req,
 
     const archiveStat = await statPackageArchive(definition.id);
     if (!archiveStat.exists) {
-        if (definition.type === 'database') {
-            return res.json({
-                id: definition.id,
-                title: definition.title,
-                type: definition.type,
-                size: null,
-                dynamic: true,
-                tableCount: definition.tables.length,
-            });
-        }
         return res.status(404).json({
             error: 'Prepared package is missing. Run npm run prepare:data-archives in backend first.',
         });
@@ -1485,10 +1342,6 @@ router.get('/api/data/packages/:packageId/download', asyncRoute(async (req, res)
 
     const archiveStat = await statPackageArchive(definition.id);
     if (!archiveStat.exists) {
-        if (definition.type === 'database') {
-            await streamDatabasePackage(res, definition, signal);
-            return;
-        }
         throw buildHttpError(404, 'Prepared package is missing. Run npm run prepare:data-archives in backend first.');
     }
 

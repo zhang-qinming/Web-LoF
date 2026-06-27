@@ -351,8 +351,8 @@ export default function ProgramAssociatedTraits({
     };
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(RELATION_ROWS_PER_PAGE);
-    const [sortBy, setSortBy] = React.useState('program_score');
-    const [sortDir, setSortDir] = React.useState('desc');
+    const [sortBy, setSortBy] = React.useState('trait');
+    const [sortDir, setSortDir] = React.useState('asc');
     const [searchQuery, setSearchQuery] = React.useState('');
     const traitKey = programId ? ['program-scatter-traits', programId] : null;
     const traitResource = useCachedResourceState(

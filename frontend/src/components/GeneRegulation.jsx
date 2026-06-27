@@ -379,7 +379,7 @@ export default function GeneRegulation({ programId }) {
     }), []);
 
     // ---- 表格 ----
-    const [sortBy, setSortBy] = useState('p');
+    const [sortBy, setSortBy] = useState('gene');
     const [sortDir, setSortDir] = useState('asc');
     const [highlightGene, setHighlightGene] = useState({ gene: null, key: 0 });
     const [fullscreen, setFullscreen] = useState(false);

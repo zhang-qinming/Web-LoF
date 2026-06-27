@@ -51,8 +51,8 @@ import homeFigureDataBrowser from '../assets/home/home-figure-data-browser.svg';
 import homeFigureProgramVolcano from '../assets/home/home-figure-program-volcano.svg';
 import homeFigureTraitCorrelation from '../assets/home/home-figure-trait-correlation.svg';
 import homeFigureVariantDetail from '../assets/home/home-figure-variant-detail.svg';
+import homeWorkflowFigure from '../assets/home/home-workflow.png';
 
-const accent = '#ff6b4a';
 const siteName = 'TraitProgram';
 const EMPTY_ENTITY_RESULTS = { traits: [], genes: [], programs: [] };
 const EMPTY_ENTITY_META = { traits: 0, genes: 0, programs: 0 };
@@ -92,6 +92,13 @@ const searchPlaceholderExamples = [
     `${FEATURED_GENES[0].symbol} or ${FEATURED_GENES[1].symbol}`,
     FEATURED_PROGRAM.name,
     FEATURED_TRAIT.name,
+];
+
+const heroMetricDefinitions = [
+    { label: 'Traits', statKey: 'traits', color: '#2563eb', href: '/trait', icon: traitsIcon },
+    { label: 'Programs', statKey: 'programs', color: '#7c3aed', href: '/programs', icon: programsIcon },
+    { label: 'Genes', statKey: 'genes', color: '#0f766e', href: '/genes', icon: variantsIcon },
+    { label: 'Associations', statKey: 'associations', color: '#d45235', downloadPackageId: 'trait-associations', icon: associationsIcon },
 ];
 
 const loadingBarSx = {
@@ -657,6 +664,68 @@ function HomeSearch({
         setLoading(true);
     };
 
+    const searchPanelSx = embedded
+        ? {
+            p: { xs: 1.35, sm: 1.6, md: 1.85 },
+            width: '100%',
+            overflow: 'visible',
+            borderRadius: 1.25,
+            border: '1px solid rgba(255,255,255,0.72)',
+            bgcolor: 'rgba(255,255,255,0.46)',
+            backgroundImage: `
+                linear-gradient(135deg, rgba(37,99,235,0.07), rgba(15,118,110,0.05) 42%, rgba(212,82,53,0.04)),
+                linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0.38))
+            `,
+            boxShadow: '0 18px 48px rgba(15,23,42,0.075), inset 0 1px 0 rgba(255,255,255,0.78)',
+            backdropFilter: 'blur(18px)',
+            '& .MuiOutlinedInput-root': {
+                borderRadius: 1,
+                bgcolor: 'rgba(255,255,255,0.72)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.82)',
+                transition: 'background-color 180ms ease, box-shadow 180ms ease',
+                '& fieldset': {
+                    borderColor: 'rgba(148,163,184,0.26)',
+                },
+                '&:hover fieldset': {
+                    borderColor: 'rgba(37,99,235,0.28)',
+                },
+                '&.Mui-focused': {
+                    bgcolor: 'rgba(255,255,255,0.92)',
+                    boxShadow: '0 10px 28px rgba(37,99,235,0.09), inset 0 1px 0 rgba(255,255,255,0.92)',
+                },
+                '&.Mui-focused fieldset': {
+                    borderColor: 'rgba(37,99,235,0.42)',
+                    borderWidth: 1,
+                },
+            },
+        }
+        : panelSx(theme, { p: { xs: 1.5, sm: 1.8, md: 2.1 }, width: '100%', overflow: 'visible', backgroundColor: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(14px)' });
+
+    const quickSearchChipSx = {
+        ...summaryChipSx(theme, {
+            cursor: 'pointer',
+            backgroundColor: embedded ? 'rgba(255,255,255,0.58)' : alpha(theme.palette.primary.main, 0.07),
+            border: embedded ? '1px solid rgba(148,163,184,0.22)' : `1px solid ${alpha(theme.palette.primary.main, 0.16)}`,
+            boxShadow: embedded ? '0 4px 14px rgba(15,23,42,0.035)' : undefined,
+        }),
+        height: 'auto',
+        minHeight: 26,
+        maxWidth: '100%',
+        alignItems: 'center',
+        '& .MuiChip-label': {
+            display: 'block',
+            px: 1,
+            py: 0.35,
+            maxWidth: '100%',
+            whiteSpace: 'normal',
+            overflow: 'visible',
+            textOverflow: 'clip',
+            lineHeight: 1.25,
+            overflowWrap: 'anywhere',
+            wordBreak: 'normal',
+        },
+    };
+
     return (
         <Box
             id="home-search"
@@ -670,11 +739,11 @@ function HomeSearch({
                 zIndex: 20,
             }}
         >
-            <Box sx={panelSx(theme, { p: { xs: 1.5, sm: 1.8, md: 2.1 }, width: '100%', overflow: 'visible', backgroundColor: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(14px)' })}>
+            <Box sx={searchPanelSx}>
                 <Stack spacing={{ xs: 1.5, md: 1.8 }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
                         <Box>
-                            <Typography sx={{ fontSize: '0.84rem', fontWeight: 700, letterSpacing: 0, textTransform: 'none', color: '#111827' }}>
+                            <Typography sx={{ fontSize: '0.84rem', fontWeight: 700, letterSpacing: 0, textTransform: 'none', color: embedded ? '#1e293b' : '#111827' }}>
                                 Search
                             </Typography>
 
@@ -688,11 +757,7 @@ function HomeSearch({
                                         key={item.query}
                                         label={item.label}
                                         onClick={() => runQuickSearch(item.query)}
-                                        sx={summaryChipSx(theme, {
-                                            cursor: 'pointer',
-                                            backgroundColor: alpha(theme.palette.primary.main, 0.07),
-                                            border: `1px solid ${alpha(theme.palette.primary.main, 0.16)}`,
-                                        })}
+                                        sx={quickSearchChipSx}
                                     />
                                 ))}
                             </Stack>
@@ -1011,57 +1076,218 @@ function FigureGateway({ items }) {
                 maxWidth: APP_SHELL_MAX_WIDTH,
                 mx: 'auto',
                 px: { xs: 2, sm: 3, lg: 4, xl: 5 },
+                pt: { xs: 2, md: 3 },
                 pb: { xs: 6, md: 8 },
             }}
         >
             <Box
                 sx={{
-                    position: 'relative',
-                    overflow: 'visible',
-                    borderRadius: 1,
-                    border: '1px solid rgba(226,232,240,0.82)',
-                    backgroundColor: 'rgba(255,255,255,0.72)',
-                    boxShadow: '0 12px 34px rgba(15,23,42,0.045)',
-                    px: { xs: 1.4, sm: 2, md: 2.4 },
-                    pt: { xs: 1.8, md: 2.2 },
-                    pb: { xs: 1.4, md: 2 },
+                    mb: { xs: 1.8, md: 2.4 },
                 }}
             >
-                <Typography
-                    component="h2"
-                    sx={{
-                        color: '#0f172a',
-                        fontSize: { xs: '1.28rem', sm: '1.45rem', md: '1.65rem' },
-                        fontWeight: 760,
-                        lineHeight: 1.18,
-                        mb: { xs: 1.6, md: 2 },
-                    }}
-                >
-                    Explore analysis figures
-                </Typography>
+                <Box sx={{ maxWidth: 760 }}>
+                    <Typography
+                        component="h2"
+                        sx={{
+                            color: '#0f172a',
+                            fontSize: { xs: '1.32rem', sm: '1.5rem', md: '1.72rem' },
+                            fontWeight: 760,
+                            lineHeight: 1.16,
+                            mb: 0.65,
+                        }}
+                    >
+                        Explore analysis figures
+                    </Typography>
+                </Box>
+            </Box>
 
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: {
+                        xs: '1fr',
+                        sm: 'repeat(2, minmax(0, 1fr))',
+                        md: 'repeat(3, minmax(0, 1fr))',
+                        xl: 'repeat(4, minmax(0, 1fr))',
+                    },
+                    gap: { xs: 2.2, md: 2.8 },
+                }}
+            >
+                {items.map((item) => (
+                    <FigureCard key={item.title} item={item} />
+                ))}
+            </Box>
+        </Box>
+    );
+}
+
+function HeroMetric({ metric, stats, statsLoading, downloadingPackageId, onDownload }) {
+    const isDownloading = downloadingPackageId === metric.downloadPackageId;
+    const value = statsLoading
+        ? <Skeleton variant="text" width={64} height={36} sx={{ bgcolor: 'rgba(15,23,42,0.05)' }} />
+        : fmtMetricCount(stats?.[metric.statKey]);
+
+    return (
+        <Box
+            component={metric.href ? RouterLink : 'button'}
+            {...(metric.href ? { to: metric.href } : { type: 'button' })}
+            disabled={metric.downloadPackageId ? Boolean(downloadingPackageId) : undefined}
+            onClick={metric.downloadPackageId ? () => { void onDownload(metric); } : undefined}
+            sx={{
+                textDecoration: 'none',
+                height: '100%',
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                px: { xs: 1.8, md: 2.25 },
+                py: { xs: 2, md: 2.45 },
+                textAlign: 'center',
+                color: 'inherit',
+                borderRadius: 3,
+                border: '1px solid rgba(255,255,255,0.9)',
+                bgcolor: 'rgba(255,255,255,0.6)',
+                boxShadow: '0 8px 32px rgba(15,23,42,0.03)',
+                backdropFilter: 'blur(12px)',
+                cursor: metric.href || metric.downloadPackageId ? 'pointer' : 'default',
+                font: 'inherit',
+                transition: 'background-color 220ms ease, box-shadow 220ms ease, transform 220ms ease',
+                '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.85)',
+                    boxShadow: '0 12px 48px rgba(15,23,42,0.06)',
+                    transform: 'translateY(-2px)',
+                },
+                '&:disabled': {
+                    cursor: 'wait',
+                    opacity: 0.72,
+                },
+                '&:focus-visible': {
+                    outline: `3px solid ${alpha(metric.color, 0.22)}`,
+                    outlineOffset: 3,
+                },
+            }}
+        >
+            <Box component="img" src={metric.icon} alt="" sx={{ width: 56, height: 56, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.06))' }} />
+            <Typography
+                sx={{
+                    minWidth: 0,
+                    width: '100%',
+                    maxWidth: '100%',
+                    color: metric.color,
+                    fontSize: 'clamp(1.32rem, 1.1rem + 0.7vw, 1.8rem)',
+                    fontWeight: 800,
+                    lineHeight: 1.05,
+                    fontVariantNumeric: 'tabular-nums',
+                    whiteSpace: 'nowrap',
+                    overflow: 'visible',
+                    textOverflow: 'clip',
+                    letterSpacing: 0,
+                    transform: 'scaleX(0.96)',
+                    transformOrigin: 'center',
+                }}
+            >
+                {value}
+            </Typography>
+            <Typography
+                sx={{
+                    mt: 0.8,
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    color: '#64748b',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    lineHeight: 1.2,
+                    letterSpacing: 0,
+                }}
+            >
+                {isDownloading ? 'Preparing download' : metric.label}
+            </Typography>
+        </Box>
+    );
+}
+
+function WorkflowHeroFigure() {
+    return (
+        <Box
+            sx={{
+                position: 'relative',
+                minWidth: 0,
+                animation: 'heroFadeIn 720ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both',
+            }}
+        >
+            <Box
+                component="a"
+                href={homeWorkflowFigure}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open TraitProgram workflow figure"
+                sx={{
+                    display: 'block',
+                    color: 'inherit',
+                    textDecoration: 'none',
+                    borderRadius: 1,
+                    border: '1px solid rgba(148,163,184,0.26)',
+                    bgcolor: '#ffffff',
+                    overflow: 'hidden',
+                    boxShadow: '0 26px 70px rgba(30,41,59,0.15)',
+                    transition: 'transform 220ms ease, box-shadow 220ms ease',
+                    '&:hover': {
+                        transform: 'translateY(-3px)',
+                        boxShadow: '0 32px 82px rgba(30,41,59,0.19)',
+                    },
+                    '&:focus-visible': {
+                        outline: '3px solid rgba(37,99,235,0.24)',
+                        outlineOffset: 4,
+                    },
+                }}
+            >
                 <Box
                     sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                            xs: '1fr',
-                            sm: 'repeat(2, minmax(0, 1fr))',
-                            md: 'repeat(3, minmax(0, 1fr))',
-                            xl: 'repeat(4, minmax(0, 1fr))',
-                        },
-                        gap: { xs: 2.2, md: 2.8 },
+                        px: { xs: 1.2, md: 1.5 },
+                        py: { xs: 1, md: 1.15 },
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        borderBottom: '1px solid rgba(226,232,240,0.9)',
+                        background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
                     }}
                 >
-                    {items.map((item) => (
-                        <FigureCard key={item.title} item={item} />
-                    ))}
+                    <Typography
+                        sx={{
+                            color: '#0f172a',
+                            fontSize: { xs: '0.82rem', md: '0.9rem' },
+                            fontWeight: 760,
+                            lineHeight: 1.2,
+                        }}
+                    >
+                        Integrated workflow
+                    </Typography>
+                </Box>
+                <Box
+                    sx={{
+                        position: 'relative',
+                        aspectRatio: '1406 / 610',
+                        bgcolor: '#ffffff',
+                    }}
+                >
+                    <Box
+                        component="img"
+                        src={homeWorkflowFigure}
+                        alt="TraitProgram workflow from GWAS and loss-of-function data to gene, program, trait, and regulatory analyses"
+                        sx={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'block',
+                            objectFit: 'contain',
+                        }}
+                    />
                 </Box>
             </Box>
         </Box>
     );
 }
 
-/* ─── Animated SVG background for the hero ─── */
 function HeroBackground() {
     return (
         <Box
@@ -1074,20 +1300,93 @@ function HeroBackground() {
             }}
             aria-hidden="true"
         >
-            {/* Gradient base */}
             <Box
                 sx={{
                     position: 'absolute',
                     inset: 0,
-                    backgroundColor: '#ffffff',
+                    backgroundColor: '#f6f9fd',
                     backgroundImage: `
-                        radial-gradient(at 0% 0%, hsla(217, 100%, 94%, 1) 0px, transparent 50%),
-                        radial-gradient(at 80% 0%, hsla(189, 100%, 92%, 1) 0px, transparent 50%),
-                        radial-gradient(at 100% 100%, hsla(248, 100%, 95%, 1) 0px, transparent 50%),
-                        radial-gradient(at 0% 100%, hsla(210, 100%, 96%, 1) 0px, transparent 50%)
+                        linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(15,118,110,0.06) 44%, rgba(255,255,255,0) 72%),
+                        linear-gradient(180deg, #ffffff 0%, #f6f9fd 66%, #f5f7fb 100%),
+                        repeating-linear-gradient(90deg, rgba(148,163,184,0.13) 0, rgba(148,163,184,0.13) 1px, transparent 1px, transparent 72px),
+                        repeating-linear-gradient(0deg, rgba(148,163,184,0.09) 0, rgba(148,163,184,0.09) 1px, transparent 1px, transparent 72px)
                     `,
+                    backgroundSize: '140% 140%, auto, 72px 72px, 72px 72px',
+                    backgroundPosition: '0% 0%, center, 0 0, 0 0',
+                    backgroundBlendMode: 'normal, normal, multiply, multiply',
+                    animation: 'heroBackplateDrift 18s ease-in-out infinite alternate',
+                    '@keyframes heroBackplateDrift': {
+                        from: {
+                            backgroundPosition: '0% 0%, center, 0 0, 0 0',
+                        },
+                        to: {
+                            backgroundPosition: '100% 38%, center, 18px 0, 0 18px',
+                        },
+                    },
                 }}
             />
+
+            <Box
+                component="svg"
+                viewBox="0 0 1440 560"
+                preserveAspectRatio="xMidYMid slice"
+                sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: { xs: 0.38, md: 0.52 },
+                    mixBlendMode: 'multiply',
+                }}
+            >
+                <defs>
+                    <linearGradient id="heroSignalBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#2563eb" stopOpacity="0" />
+                        <stop offset="42%" stopColor="#2563eb" stopOpacity="0.42" />
+                        <stop offset="100%" stopColor="#0f766e" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="heroSignalWarm" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#d45235" stopOpacity="0" />
+                        <stop offset="48%" stopColor="#d45235" stopOpacity="0.28" />
+                        <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+                {[
+                    { d: 'M-120 124 C160 88 240 190 438 158 S760 86 996 132 1238 214 1570 136', stroke: 'url(#heroSignalBlue)', dur: '11s' },
+                    { d: 'M-100 252 C126 220 290 300 470 256 S794 206 990 260 1220 332 1540 250', stroke: 'url(#heroSignalWarm)', dur: '13s' },
+                    { d: 'M-140 386 C110 330 294 422 520 372 S844 300 1088 368 1290 456 1560 382', stroke: 'url(#heroSignalBlue)', dur: '15s' },
+                ].map((line, index) => (
+                    <path
+                        key={line.d}
+                        d={line.d}
+                        fill="none"
+                        stroke={line.stroke}
+                        strokeWidth={index === 1 ? 2.2 : 2.6}
+                        strokeLinecap="round"
+                        strokeDasharray="14 26"
+                    >
+                        <animate attributeName="stroke-dashoffset" values="0;-160" dur={line.dur} repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.38;0.82;0.38" dur={`${8 + index * 2}s`} repeatCount="indefinite" />
+                    </path>
+                ))}
+                {[
+                    { cx: 188, cy: 118, r: 4, fill: '#2563eb' },
+                    { cx: 386, cy: 166, r: 3.4, fill: '#0f766e' },
+                    { cx: 706, cy: 112, r: 4.2, fill: '#2563eb' },
+                    { cx: 1064, cy: 146, r: 3.8, fill: '#d45235' },
+                    { cx: 248, cy: 284, r: 3.6, fill: '#d45235' },
+                    { cx: 646, cy: 238, r: 4.2, fill: '#0f766e' },
+                    { cx: 1008, cy: 278, r: 3.5, fill: '#2563eb' },
+                    { cx: 352, cy: 408, r: 3.8, fill: '#2563eb' },
+                    { cx: 792, cy: 330, r: 4, fill: '#0f766e' },
+                    { cx: 1188, cy: 398, r: 3.6, fill: '#d45235' },
+                ].map((node, index) => (
+                    <circle key={`${node.cx}-${node.cy}`} cx={node.cx} cy={node.cy} r={node.r} fill={node.fill} opacity="0.5">
+                        <animate attributeName="r" values={`${node.r};${node.r + 2.4};${node.r}`} dur={`${4.5 + index * 0.35}s`} repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.22;0.68;0.22" dur={`${4.5 + index * 0.35}s`} repeatCount="indefinite" />
+                    </circle>
+                ))}
+            </Box>
 
             {/* SVG illustration layer */}
             <Box
@@ -1099,7 +1398,8 @@ function HeroBackground() {
                     inset: 0,
                     width: '100%',
                     height: '100%',
-                    opacity: 0.55,
+                    opacity: { xs: 0.3, md: 0.4 },
+                    mixBlendMode: 'multiply',
                 }}
             >
                 <defs>
@@ -1392,39 +1692,6 @@ function HeroSection({ stats, statsLoading, theme }) {
                         </Alert>
                     )}
 
-                    {/* CTA buttons */}
-                    <Stack
-                        direction={{ xs: 'column', sm: 'row' }}
-                        spacing={1.2}
-                        justifyContent="center"
-                        sx={{
-                            mt: { xs: 3, md: 3.5 },
-                            animation: 'heroFadeIn 700ms 320ms cubic-bezier(0.22, 1, 0.36, 1) both',
-                        }}
-                    >
-                        <Button
-                            variant="contained"
-                            size="large"
-                            endIcon={<ArrowForward />}
-                            component={RouterLink}
-                            to="/trait"
-                            sx={{
-                                px: 3.5,
-                                py: 1.2,
-                                borderRadius: 999,
-                                bgcolor: accent,
-                                color: '#fff',
-                                fontWeight: 680,
-                                fontSize: '0.95rem',
-                                '&:hover': { bgcolor: '#e8593a', transform: 'translateY(-2px)' },
-                                boxShadow: '0 8px 28px rgba(255,107,74,0.35)',
-                                transition: 'transform 220ms ease, background-color 180ms ease, box-shadow 220ms ease',
-                            }}
-                        >
-                            Browse traits
-                        </Button>
-
-                    </Stack>
                 </Box>
                 <Box
                     sx={{
@@ -1450,6 +1717,232 @@ function HeroSection({ stats, statsLoading, theme }) {
 }
 
 
+function WorkflowHeroSection({ stats, statsLoading, theme }) {
+    const [downloadError, setDownloadError] = useState('');
+    const [downloadingPackageId, setDownloadingPackageId] = useState('');
+
+    const handleMetricDownload = async (metric) => {
+        if (!metric.downloadPackageId || downloadingPackageId) return;
+        setDownloadError('');
+        setDownloadingPackageId(metric.downloadPackageId);
+        try {
+            await triggerDataPackageDownload(metric.downloadPackageId);
+        } catch (err) {
+            setDownloadError(getRequestErrorMessage(err, 'Download failed'));
+        } finally {
+            setDownloadingPackageId('');
+        }
+    };
+
+    return (
+        <Box
+            component="section"
+            sx={{
+                position: 'relative',
+                width: 'calc(100% + var(--page-pad-x) * 2)',
+                ml: 'calc(var(--page-pad-x) * -1)',
+                mt: 'calc(var(--page-pad-y) * -1)',
+                overflow: 'visible',
+                '@keyframes heroFadeIn': {
+                    from: {
+                        opacity: 0,
+                        transform: 'translateY(14px)',
+                    },
+                    to: {
+                        opacity: 1,
+                        transform: 'translateY(0)',
+                    },
+                },
+            }}
+        >
+            <HeroBackground />
+
+            <Box
+                sx={{
+                    position: 'relative',
+                    zIndex: 2,
+                    maxWidth: APP_SHELL_MAX_WIDTH,
+                    mx: 'auto',
+                    px: { xs: 2, sm: 3, lg: 4, xl: 5 },
+                    pt: { xs: 4.5, md: 5.5, lg: 6.4 },
+                    pb: { xs: 3.5, md: 4.5, lg: 5.2 },
+                }}
+            >
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                            xs: 'minmax(0, 1fr)',
+                            lg: 'minmax(420px, 0.64fr) minmax(620px, 1.36fr)',
+                        },
+                        gridTemplateAreas: {
+                            xs: '"intro" "figure"',
+                            lg: '"intro figure"',
+                        },
+                        alignItems: 'start',
+                        gap: { xs: 2.4, md: 3, lg: 4.5 },
+                    }}
+                >
+                    <Stack
+                        spacing={{ xs: 2, md: 2.4 }}
+                        sx={{
+                            gridArea: 'intro',
+                            maxWidth: { xs: 760, lg: 620 },
+                            mx: { xs: 'auto', lg: 0 },
+                            alignItems: { xs: 'center', lg: 'flex-start' },
+                            textAlign: { xs: 'center', lg: 'left' },
+                            animation: 'heroFadeIn 680ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both',
+                        }}
+                    >
+                        <Typography
+                            component="h1"
+                            aria-label={siteName}
+                            sx={{
+                                maxWidth: '100%',
+                                color: '#0f172a',
+                                fontFamily: theme.typography.fontFamily,
+                                fontSize: { xs: '1.85rem', sm: '2.85rem', md: '3.45rem', lg: '3.48rem', xl: '4.1rem' },
+                                fontWeight: 820,
+                                lineHeight: { xs: 1.08, md: 1.03 },
+                                letterSpacing: 0,
+                                whiteSpace: 'normal',
+                                overflow: 'visible',
+                                overflowWrap: 'anywhere',
+                                wordBreak: 'normal',
+                                textAlign: { xs: 'center', lg: 'left' },
+                            }}
+                        >
+                            <Box
+                                component="span"
+                                sx={{
+                                    display: 'inline',
+                                    background: 'linear-gradient(135deg, #1d4ed8 0%, #0f766e 52%, #d45235 100%)',
+                                    backgroundClip: 'text',
+                                    WebkitBackgroundClip: 'text',
+                                    color: 'transparent',
+                                    WebkitTextFillColor: 'transparent',
+                                }}
+                            >
+                                {siteName}
+                            </Box>
+                        </Typography>
+
+                        <Typography
+                            sx={{
+                                maxWidth: 620,
+                                color: '#475569',
+                                fontFamily: theme.typography.fontFamily,
+                                fontSize: { xs: '0.98rem', md: '1.05rem' },
+                                lineHeight: 1.75,
+                                textAlign: { xs: 'center', lg: 'left' },
+                            }}
+                        >
+                            A program-centric atlas that connects GWAS associations, loss-of-function perturbation evidence, gene programs, and regulatory context into one browsable workflow. Move from trait-level signals to candidate genes, programs, and evidence-backed mechanisms without switching tools.
+                        </Typography>
+
+                        <Box
+                            sx={{
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                mt: { xs: 0.7, md: 1.35, lg: 1.8 },
+                            }}
+                        >
+                            <Button
+                                variant="contained"
+                                size="large"
+                                endIcon={<ArrowForward />}
+                                component={RouterLink}
+                                to="/trait"
+                                sx={{
+                                    px: 2.5,
+                                    py: 1.08,
+                                    minHeight: 44,
+                                    borderRadius: 1,
+                                    bgcolor: '#1d4ed8',
+                                    color: '#fff',
+                                    fontWeight: 730,
+                                    fontSize: '0.94rem',
+                                    boxShadow: '0 14px 26px rgba(37,99,235,0.22)',
+                                    '&:hover': {
+                                        bgcolor: '#1e40af',
+                                        transform: 'translateY(-2px)',
+                                    },
+                                }}
+                            >
+                                Browse traits
+                            </Button>
+                        </Box>
+                    </Stack>
+
+                    <Box sx={{ gridArea: 'figure', minWidth: 0, alignSelf: 'start' }}>
+                        <WorkflowHeroFigure />
+                    </Box>
+                </Box>
+
+                <Box
+                    sx={{
+                        mt: { xs: 2.8, md: 3.4 },
+                        mx: 'auto',
+                        maxWidth: 900,
+                        display: 'grid',
+                        gridTemplateColumns: {
+                            xs: '1fr',
+                            sm: 'repeat(2, minmax(0, 1fr))',
+                            lg: 'repeat(4, minmax(0, 1fr))',
+                        },
+                        gridAutoRows: { xs: '142px', md: '150px' },
+                        gap: { xs: 2, md: 3 },
+                        animation: 'heroFadeIn 700ms 240ms cubic-bezier(0.22, 1, 0.36, 1) both',
+                    }}
+                    aria-label="Data coverage"
+                >
+                    {heroMetricDefinitions.map((metric) => (
+                        <HeroMetric
+                            key={metric.label}
+                            metric={metric}
+                            stats={stats}
+                            statsLoading={statsLoading}
+                            downloadingPackageId={downloadingPackageId}
+                            onDownload={handleMetricDownload}
+                        />
+                    ))}
+                </Box>
+
+                <Box
+                    sx={{
+                        mt: { xs: 2.4, md: 3.2 },
+                        maxWidth: 1120,
+                        mx: 'auto',
+                        position: 'relative',
+                        zIndex: 90,
+                        animation: 'heroFadeIn 700ms 320ms cubic-bezier(0.22, 1, 0.36, 1) both',
+                    }}
+                >
+                    <HomeSearch
+                        embedded
+                        showCoverage={false}
+                        stats={stats}
+                        statsLoading={statsLoading}
+                        theme={theme}
+                    />
+                </Box>
+
+                {downloadError && (
+                    <Alert
+                        severity="error"
+                        onClose={() => setDownloadError('')}
+                        sx={{ mt: 2, mx: 'auto', maxWidth: 720, borderRadius: 1, textAlign: 'left' }}
+                    >
+                        {downloadError}
+                    </Alert>
+                )}
+            </Box>
+        </Box>
+    );
+}
+
+
 function Home() {
     const theme = useTheme();
     const homeStatsResource = useCachedResourceState(
@@ -1461,7 +1954,7 @@ function Home() {
 
     return (
         <Box sx={{ width: '100%', minHeight: '100%', color: '#1f2933', bgcolor: '#f5f7fb', mx: 'auto' }}>
-            <HeroSection stats={homeStats} statsLoading={homeStatsLoading} theme={theme} />
+            <WorkflowHeroSection stats={homeStats} statsLoading={homeStatsLoading} theme={theme} />
 
             <FigureGateway items={traitFigureCards} />
 

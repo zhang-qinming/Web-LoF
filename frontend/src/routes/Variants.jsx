@@ -2448,7 +2448,6 @@ export default function DataBrowser() {
                         )}
                         {packagePayload.data.map((item) => {
                             const archiveReady = Boolean(item.archive?.exists);
-                            const downloadReady = Boolean(item.download?.available || archiveReady);
                             const isDownloading = packageDownloadId === item.id;
                             return (
                                 <Paper
@@ -2503,7 +2502,7 @@ export default function DataBrowser() {
                                         size="small"
                                         variant="contained"
                                         color="secondary"
-                                        disabled={isDownloading || !downloadReady}
+                                        disabled={isDownloading || !archiveReady}
                                         onClick={() => { void downloadPackage(item.id); }}
                                         sx={{
                                             textTransform: 'none',

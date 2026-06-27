@@ -79,8 +79,8 @@ router.get('/api/genes/:geneId/association-traits', asyncRoute(async (req, res) 
 
     const page = parsePositiveInt(req.query.page, 1, Number.MAX_SAFE_INTEGER);
     const limit = parsePositiveInt(req.query.limit, 50, 250);
-    const sortBy = normalizeIdentifier(req.query.sortBy || 'abs_gamma', 50) || 'abs_gamma';
-    const order = String(req.query.order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const sortBy = normalizeIdentifier(req.query.sortBy || 'trait', 50) || 'trait';
+    const order = String(req.query.order || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
     const result = await semanticRelationsModel.getGeneAssociationTraits(geneId, { page, limit, sortBy, order });
     res.json(result);
 }));

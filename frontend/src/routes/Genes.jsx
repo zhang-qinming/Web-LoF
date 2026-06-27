@@ -2127,8 +2127,8 @@ function GeneProgramTable({ gene, records, programRows }) {
         [programRows],
     );
     void records;
-    const [sortBy, setSortBy] = React.useState('loading_gene_score');
-    const [sortDir, setSortDir] = React.useState('desc');
+    const [sortBy, setSortBy] = React.useState('program');
+    const [sortDir, setSortDir] = React.useState('asc');
 
     const TONES = {
         gene: tableTone(theme, 'success'),
@@ -2712,8 +2712,8 @@ export default function Genes() {
     const [input, setInput] = React.useState(queryParam);
     const [traitPage, setTraitPage] = React.useState(0);
     const [traitRowsPerPage, setTraitRowsPerPage] = React.useState(RELATION_ROWS_PER_PAGE);
-    const [traitSortBy, setTraitSortBy] = React.useState('membership_score');
-    const [traitSortDir, setTraitSortDir] = React.useState('desc');
+    const [traitSortBy, setTraitSortBy] = React.useState('trait');
+    const [traitSortDir, setTraitSortDir] = React.useState('asc');
     const query = queryParam.trim();
     const debouncedInput = useDebouncedValue(input.trim());
     const suggestionQuery = !query ? debouncedInput : '';
@@ -2726,8 +2726,8 @@ export default function Genes() {
 
     React.useEffect(() => {
         setTraitPage(0);
-        setTraitSortBy('membership_score');
-        setTraitSortDir('desc');
+        setTraitSortBy('trait');
+        setTraitSortDir('asc');
     }, [query]);
 
     const { data: suggestions, isLoading: suggestionsLoading } = useSWR(
@@ -2746,8 +2746,8 @@ export default function Genes() {
     const runSearch = React.useCallback((value = input) => {
         const next = value.trim();
         setTraitPage(0);
-        setTraitSortBy('membership_score');
-        setTraitSortDir('desc');
+        setTraitSortBy('trait');
+        setTraitSortDir('asc');
         if (!next) {
             setParams({});
             return;

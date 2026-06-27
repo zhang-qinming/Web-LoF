@@ -351,7 +351,7 @@ async function getProgramScatterTraits(programId) {
 }
 
 async function getGeneAssociationTraits(geneId, options = {}) {
-    const sourceSortBy = normalizeAssociationSortBy(options.sortBy || 'abs_gamma');
+    const sourceSortBy = normalizeAssociationSortBy(options.sortBy || 'trait');
     const payload = await geneProgramModel.getGeneProgramRecords(geneId, {
         ...options,
         sortBy: toLegacyAssociationSortBy(sourceSortBy),
