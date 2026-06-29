@@ -31,7 +31,8 @@ coverage
 .claude
 .serena
 CLAUDE.md
-
+AGENTS.md
+.agents
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
